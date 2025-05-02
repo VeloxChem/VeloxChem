@@ -36,6 +36,7 @@ import sys
 import h5py
 from contextlib import redirect_stderr
 from io import StringIO
+
 from .interpolationdatapoint import InterpolationDatapoint
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
@@ -102,7 +103,7 @@ class InterpolationDriver():
         self.exponent_q = None
         self.confidence_radius = 0.5
         
-        self.distance_thrsh = 0.5
+        self.distance_thrsh = 2.0
         self.z_matrix = z_matrix
         self.impes_dict = None
 
@@ -232,7 +233,7 @@ class InterpolationDriver():
         """
         self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
 
-    def compute(self, molecule, qm_data_points=None, chk_file=None, labels=None, NACs=False):
+    def compute(self, molecule, qm_data_points=None, chk_file=None, labels=None):
         """Computes the energy and gradient by interpolation
            between pre-defined points.
 
@@ -254,20 +255,20 @@ class InterpolationDriver():
             self.labels = labels
         if chk_file:
             self.imforcefield_file = chk_file
-        qm_data_points = self.qm_data_points
-        if qm_data_points is None:
-            qm_data_points = self.read_qm_data_points()
+
+        if self.qm_data_points is None:
+            self.qm_data_points = self.read_qm_data_points()
 
         if self.interpolation_type == 'simple':
-            self.simple_interpolation(qm_data_points)
+            self.simple_interpolation()
         elif self.interpolation_type == 'shepard':
-            self.shepard_interpolation(qm_data_points)
+            self.shepard_interpolation()
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
 
-    def simple_interpolation(self, qm_data_points):
+    def simple_interpolation(self):
         """Performs a simple interpolation.
 
         :param qm_data_points:
@@ -285,12 +286,12 @@ class InterpolationDriver():
         weight_gradients = []
         sum_weight_gradients = np.zeros((natms, 3))
 
-        n_points = len(qm_data_points)
+        n_points = len(self.qm_data_points)
 
         # Determine weights, weight gradients,
         # energy values, and energy gradients for interpolation
-        for data_point in qm_data_points:
-            distance, weight_gradient = self.cartesian_distance(data_point)
+        for data_point in self.qm_data_points:
+            distance, weight_gradient, _ = self.cartesian_distance(data_point)
             weight = 1.0 / (distance**(2 * self.exponent_p))
             sum_weights += weight
             sum_weight_gradients += weight_gradient
@@ -316,7 +317,7 @@ class InterpolationDriver():
                 potentials[i] * weights[i] * sum_weight_gradients / sum_weights)
         
     
-    def shepard_interpolation(self, qm_data_points):
+    def shepard_interpolation(self):
         """Performs a simple interpolation.
 
         :param qm_data_points:
@@ -339,7 +340,7 @@ class InterpolationDriver():
         min_distance = float('inf')
         self.time_step_reducer = False
 
-        for i, data_point in enumerate(qm_data_points):
+        for i, data_point in enumerate(self.qm_data_points):
             
             distance, weight_gradient, _ = self.cartesian_distance(data_point)
 
@@ -350,7 +351,7 @@ class InterpolationDriver():
         
         close_distances = None
         close_distances = [
-            (qm_data_points[index], distance, wg) 
+            (self.qm_data_points[index], distance, wg) 
             for distance, index, wg in distances_and_gradients 
             if abs(distance) <= min_distance + self.distance_thrsh]
         distances_from_points = [] 
@@ -377,8 +378,8 @@ class InterpolationDriver():
         self.impes_coordinate.NAC = np.zeros((natms, 3))
         weights = np.array(weights) / sum_weights
         
-        for i, w in enumerate(weights):
-            print(f'Label: {self.labels[i]} with weight: {w} with distance: {distances_from_points[i]}')
+        # for i, w in enumerate(weights):
+        #     print(f'Label: {self.labels[i]} with weight: {w} with distance: {distances_from_points[i]}')
 
         for i in range(n_points):
 
@@ -448,48 +449,7 @@ class InterpolationDriver():
         
         return pes
 
-    ######
-    # Previous interpolation code from sowon
-    #####
-    # def compute_gradient(self, data_point):
-    #     """Calculates part of the cartesian gradient
-    #        for self.impes_coordinate based on the gradient
-    #        and Hessian of data_point.
-    #        J ( g_a + delta_a H_a )
-    #        eq. (4) JCTC 12, 5235-5246
-
-    #        :param data_point:
-    #             InterpolationDatapoint object.
-    #     """
-
-    #     natm = data_point.cartesian_coordinates.shape[0]
-    #     grad = data_point.internal_gradient.copy()
-    #     hessian = data_point.internal_hessian
-    #     im_b_matrix = self.impes_coordinate.b_matrix                
-    #     dist_org = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
-    #     dist_check_hessian = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
-        
-    #     for i, element in enumerate(self.impes_coordinate.z_matrix):
-            
-    #         if len(element) == 4:
-    #             dist_check_hessian[i] = np.sin(dist_check_hessian[i])
-
-    #     dist_hessian_cos = np.matmul(dist_check_hessian.T, hessian)
-
-    #     internal_gradient_hess_cos = grad + dist_hessian_cos
-        
-    #     for i, element in enumerate(self.impes_coordinate.z_matrix):
-    #         if len(element) == 4:
-    #             internal_gradient_hess_cos[i] *= np.cos(dist_org[i])
-    #         if len(element) == 2:
-    #             internal_gradient_hess_cos[i] *= -(self.impes_coordinate.internal_coordinates_values[i])**2
-    #         else:
-    #             internal_gradient_hess_cos[i] *= 1.0
-
-    #     gradient = (np.matmul(im_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
-    #     return gradient
-
-    def compute_gradient(self, data_point, swapped_indices_map=None):
+    def compute_gradient(self, data_point):
         """Calculates part of the cartesian gradient
            for self.impes_coordinate based on the gradient
            and Hessian of data_point.
@@ -568,7 +528,6 @@ class InterpolationDriver():
 
         return weight_gradient
     
-    
     def cartesian_distance(self, data_point):
         """Calculates and returns the cartesian distance between
            self.coordinates and data_point coordinates.
@@ -605,15 +564,15 @@ class InterpolationDriver():
         for i in range(len(distance_vector_norm)):
             distance_vector_norm[i] += np.linalg.norm(distance_vector[i])
 
-        if distance < 1e-10:
-            distance = 1e-7
+        if distance < 1e-7:
+            distance = 1e-5
             distance_vector[:] = 0
         if self.interpolation_type == 'shepard':
             weight_gradient = self.shepard_weight_gradient(
                 distance_vector, distance)
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
-                distance_vector, distance, None)
+                distance_vector, distance)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
@@ -631,5 +590,4 @@ class InterpolationDriver():
         """ Returns the gradient obtained by interpolation.
         """
         return self.impes_coordinate.gradient
-
-
+    

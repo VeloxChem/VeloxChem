@@ -1992,7 +1992,7 @@ class LinearSolver:
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo_core_exc.T, P, mo_core_exc]),
+                        np.linalg.multi_dot([mo_core_exc.T, P.T, mo_core_exc]),
                         nocc, self.num_core_orbitals) for P in integral_comps
                 ]
                 gradients = tuple(

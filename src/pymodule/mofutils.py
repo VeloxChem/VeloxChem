@@ -49,7 +49,6 @@ from .mofoptimizer import (
     expand_setrots,
 )
 
-
 try:
     from scipy.optimize import linear_sum_assignment
 except ImportError:
@@ -108,7 +107,8 @@ def fetch_pdbfile(dir_name, keywords, nokeywords):
     candidates = []
     for pdb in Path(dir_name).rglob("*.pdb"):
         name = pdb.name
-        if all(i in name for i in keywords) and all(j not in name for j in nokeywords):
+        if all(i in name for i in keywords) and all(
+                j not in name for j in nokeywords):
             candidates.append(pdb.name)
     if len(candidates) == 0:
         raise ValueError(f"Cannot find a file including '{keywords}' ")
@@ -126,7 +126,7 @@ def read_mof_top_dict(data_path):
         mof_top_dict_path = str(Path(data_path, "MOF_topology_dict"))
         with open(mof_top_dict_path, "r") as f:
             lines = f.readlines()
-        titles = lines[0].split()
+        # titles = lines[0].split()
         mofs = lines[1:]
     mof_top_dict = {}
     for mof in mofs:
@@ -172,7 +172,7 @@ def add_quotes(value):
 def remove_note_lines(lines):
     newlines = []
     for i in range(len(lines)):
-        m = re.search("_", lines[i])
+        m = re.search(r"_", lines[i])
         if m is None:
             newlines.append(lines[i])
     return newlines
@@ -212,47 +212,68 @@ def convert_fraction_to_decimal(expression):
     # Regular expression to find fractions
     fraction_pattern = r"(-?\d+)/(\d+)"
     # get fraction
-    converted_expression = re.sub(fraction_pattern, replace_fraction, expression)
+    converted_expression = re.sub(fraction_pattern, replace_fraction,
+                                  expression)
 
     return converted_expression
 
 
-def extract_xyz_coefficients_and_constant(expr_str):
-    # Initialize coefficients and constant
-    coeffs = {"x": 0, "y": 0, "z": 0}
-    constant_term = 0
+def extract_value_str_slice(s):
+    if len(s) == 0:
+        return 0
+    sign = 1
+    mul_value = 1
+    s_list = list(s[0])
 
-    # Regular expression to match terms with coefficients and variables
-    pattern = r"([+-]?\d*\.?\d*)\s*([xyz])"
-    matches = re.findall(pattern, expr_str)
+    if "-" in s_list:
+        sign = -1
+    if "*" in s_list:
+        mul_value = s_list[s_list.index("*") - 1]
 
-    # Update coefficients based on matches
-    for match in matches:
-        coeff = match[0]
-        variable = match[1]
-        if coeff == "" or coeff == "+":
-            coeff = 1
-        elif coeff == "-":
-            coeff = -1
-        else:
-            coeff = float(coeff)
-        coeffs[variable] += coeff
+    return sign * int(mul_value)
 
-    # match if no constant at tail
-    if re.search(r"[a-zA-Z]$", expr_str):
-        constant_term = 0
+
+def extract_value_from_str(s):
+    s = re.sub(r" ", "", s)  # remove space
+    s = re.sub(r"(?<=[+-])", ",", s[::-1])[::-1]
+    if s[0] == ",":
+        s = s[1:]
+    s_list = list(s.split(","))
+    # find the slice of x
+    x_slice = [s_list[i] for i in range(len(s_list)) if "x" in s_list[i]]
+    y_slice = [s_list[i] for i in range(len(s_list)) if "y" in s_list[i]]
+    z_slice = [s_list[i] for i in range(len(s_list)) if "z" in s_list[i]]
+    # find the only digit in the slice no x,y,z
+    const_slice = [
+        s_list[i] for i in range(len(s_list)) if "x" not in s_list[i] and
+        "y" not in s_list[i] and "z" not in s_list[i]
+    ]
+    # extract the coefficient and constant from slice
+    # if * exist then use the value before *, if - exist then *-1
+    x_coeff = extract_value_str_slice(x_slice)
+    y_coeff = extract_value_str_slice(y_slice)
+    z_coeff = extract_value_str_slice(z_slice)
+    if len(const_slice) == 0:
+        const = 0
     else:
-        # extract tail constant term
-        constant_match = re.search(r"([a-zA-Z])(\d*.*)$", expr_str)
-        if constant_match:
-            # constant_term = constant_match.group(2)
-            constant_term = convert_fraction_to_decimal(constant_match.group(2))
-        else:
-            constant_term = 0
+        const = const_slice[0]
+        const = convert_fraction_to_decimal(const)
 
-    xyz_coeff_array = np.array([coeffs["x"], coeffs["y"], coeffs["z"]])
+    return x_coeff, y_coeff, z_coeff, const
 
-    return xyz_coeff_array, constant_term
+
+def extract_transformation_matrix_from_symmetry_operator(expr_str):
+    expr_str = str(expr_str)
+    expr_str = expr_str.strip("\n")
+    expr_str = expr_str.replace(" ", "")
+    split_str = expr_str.split(",")
+    transformation_matrix = np.zeros((4, 4))
+    transformation_matrix[3, 3] = 1
+    for i in range(len(split_str)):
+        x_coeff, y_coeff, z_coeff, const = extract_value_from_str(split_str[i])
+        transformation_matrix[i] = [x_coeff, y_coeff, z_coeff, const]
+
+    return transformation_matrix
 
 
 #########below are from readcif_pdb.py#####################
@@ -291,28 +312,28 @@ def read_cif(cif_file):
         lines = f.readlines()
         nonempty_lines = [line for line in lines if line.strip()]
     # nonempty_lines=lines
-    keyword1 = "loop_"
+    keyword1 = r"loop_"
     keyword2 = r"x,\s*y,\s*z"
-    keyword3 = "-x"
+    keyword3 = r"-x"
     # find the symmetry sector begin with x,y,z, beteen can have space or tab and comma,but just x start, not '-x'
     # keyword2 = "x,\s*y,\s*z"
 
     loop_key = []
     loop_key.append(0)
     linenumber = 0
-    for i in range(len(nonempty_lines)):  # search for keywords and get linenumber
+    for i in range(
+            len(nonempty_lines)):  # search for keywords and get linenumber
         # m is find keywor1 or (find keyword2 without keyword3)
         m = find_keyword(keyword1, nonempty_lines[i]) or (
-            find_keyword(keyword2, nonempty_lines[i])
-            and (not find_keyword(keyword3, nonempty_lines[i]))
-        )
+            find_keyword(keyword2, nonempty_lines[i]) and
+            (not find_keyword(keyword3, nonempty_lines[i])))
 
-        a = re.search("_cell_length_a", nonempty_lines[i])
-        b = re.search("_cell_length_b", nonempty_lines[i])
-        c = re.search("_cell_length_c", nonempty_lines[i])
-        alpha = re.search("_cell_angle_alpha", nonempty_lines[i])
-        beta = re.search("_cell_angle_beta", nonempty_lines[i])
-        gamma = re.search("_cell_angle_gamma", nonempty_lines[i])
+        a = re.search(r"_cell_length_a", nonempty_lines[i])
+        b = re.search(r"_cell_length_b", nonempty_lines[i])
+        c = re.search(r"_cell_length_c", nonempty_lines[i])
+        alpha = re.search(r"_cell_angle_alpha", nonempty_lines[i])
+        beta = re.search(r"_cell_angle_beta", nonempty_lines[i])
+        gamma = re.search(r"_cell_angle_gamma", nonempty_lines[i])
 
         if m:
             loop_key.append(linenumber)
@@ -350,13 +371,14 @@ def read_cif(cif_file):
     # find symmetry sectors and atom_site_sectors
     cif_sectors = []
     for i in range(len(loop_key) - 1):
-        cif_sectors.append(nonempty_lines[loop_key[i] : loop_key[i + 1]])
+        cif_sectors.append(nonempty_lines[loop_key[i]:loop_key[i + 1]])
     for i in range(len(cif_sectors)):  # find '\s*x,\s*y,\s*z' symmetry sector
         if re.search(keyword2, cif_sectors[i][0]):
             symmetry_sector = cif_sectors[i]
 
         if len(cif_sectors[i]) > 1:
-            if re.search(r"_atom_site_label\s+", cif_sectors[i][1]):  # line0 is _loop
+            if re.search(r"_atom_site_label\s+",
+                         cif_sectors[i][1]):  # line0 is _loop
                 atom_site_sector = cif_sectors[i]
 
     return cell_info, symmetry_sector, atom_site_sector
@@ -388,22 +410,26 @@ def limit_value_0_1(new_array_metal_xyz):
 
 
 def apply_sym_operator(symmetry_operations, array_metal_xyz):
+    array_metal_extend_xyz = np.hstack(
+        (array_metal_xyz, np.ones((len(array_metal_xyz), 1))))
     cell_array_metal_xyz = np.empty((0, 3))
-    for sym_line in range(len(symmetry_operations)):
-        sym_operation = np.empty((3, 3))
-        constants_xyz = np.empty((1, 3))
-        for i in range(3):  # x,y,z columns for operation
-            coeff_xyz, constant_term = extract_xyz_coefficients_and_constant(
-                symmetry_operations[sym_line].split(",")[i]
-            )
-            # print(f"symmetry_operations[sym_line],{symmetry_operations[sym_line]}\ncoeff_xyz, constant_term,{coeff_xyz, constant_term}")
-            sym_operation[:, i] = coeff_xyz
-            constants_xyz[:, i] = constant_term
-        new_xyz = np.dot(array_metal_xyz, sym_operation) + constants_xyz
+    for sym_line_idx in range(len(symmetry_operations)):
+        transfromation_matrix = extract_transformation_matrix_from_symmetry_operator(
+            symmetry_operations[sym_line_idx])
+        # print(
+        #    f"symmetry_operations[sym_line_idx],{symmetry_operations[sym_line_idx]}\n,transfromation_matrix{transfromation_matrix}"
+        # )
+
+        new_extend_xyz = np.matmul(transfromation_matrix,
+                                   array_metal_extend_xyz.T).T
+        new_xyz = new_extend_xyz[:, 0:3]
         cell_array_metal_xyz = np.vstack((cell_array_metal_xyz, new_xyz))
 
-    round_cell_array_metal_xyz = np.round(limit_value_0_1(cell_array_metal_xyz), 3)
-    _, unique_indices = np.unique(round_cell_array_metal_xyz, axis=0, return_index=True)
+    round_cell_array_metal_xyz = np.round(limit_value_0_1(cell_array_metal_xyz),
+                                          4)
+    _, unique_indices = np.unique(round_cell_array_metal_xyz,
+                                  axis=0,
+                                  return_index=True)
     unique_indices.sort()
     unique_metal_array = round_cell_array_metal_xyz[unique_indices]
 
@@ -416,9 +442,12 @@ def process_node_pdb(pdbfile, com_target_type):
     node_ccoords = data[:, 2:5]
     node_ccoords = node_ccoords.astype(float)
     com_type_indices = [
-        i for i in range(len(node_atoms)) if nn(node_atoms[i, 0]) == com_target_type
+        i for i in range(len(node_atoms))
+        if nn(node_atoms[i, 0]) == com_target_type
     ]
-    x_indices = [j for j in range(len(node_atoms)) if nn(node_atoms[j, 0]) == "X"]
+    x_indices = [
+        j for j in range(len(node_atoms)) if nn(node_atoms[j, 0]) == "X"
+    ]
     node_x_ccoords = data[x_indices, 2:5]
     node_x_ccoords = node_x_ccoords.astype(float)
     com_type_ccoords = node_ccoords[com_type_indices]
@@ -430,23 +459,24 @@ def process_node_pdb(pdbfile, com_target_type):
 
 def extract_atoms_fcoords_from_lines(atom_site_sector):
     atom_site_lines = []
-    keyword = "_"
+    keyword = r"_"
     for line in atom_site_sector:  # search for keywords and get linenumber
         m = re.search(keyword, line)
         if m is None:
             atom_site_lines.append(line)
 
-    array_atom = np.zeros(
-        (len(atom_site_lines), 2), dtype=object
-    )  # modified to 2 from 1, NOTE:
+    array_atom = np.zeros((len(atom_site_lines), 2),
+                          dtype=object)  # modified to 2 from 1, NOTE:
     array_xyz = np.zeros((len(atom_site_lines), 3))
 
     for i in range(len(atom_site_lines)):
         for j in [0, 1, 2, 3, 4]:  # NOTE: modified to 0-4 from 0 2 3 4
             if j < 2:
-                array_atom[i, j] = remove_tail_number(atom_site_lines[i].split()[j])
+                array_atom[i, j] = remove_tail_number(
+                    atom_site_lines[i].split()[j])
             else:
-                array_xyz[i, (j - 2)] = remove_bracket(atom_site_lines[i].split()[j])
+                array_xyz[i, (j - 2)] = remove_bracket(
+                    atom_site_lines[i].split()[j])
     # print(f"array_atom{array_atom}") #DEBUG
     return array_atom, array_xyz
 
@@ -463,11 +493,9 @@ def extract_type_atoms_fcoords_in_primitive_cell(cif_file, target_type):
         if len(symmetry_sector_neat) < 2:  # if no quote, then find x,y,z
             symmetry_sector_neat = extract_xyz_lines(symmetry_sector)
         symmetry_operations = extract_symmetry_operation_from_lines(
-            symmetry_sector_neat
-        )
+            symmetry_sector_neat)
         no_sym_array_metal_xyz, no_sym_indices = apply_sym_operator(
-            symmetry_operations, array_metal_xyz
-        )
+            symmetry_operations, array_metal_xyz)
         array_metal_xyz_final = no_sym_array_metal_xyz
 
     else:  # P1
@@ -500,8 +528,7 @@ def nodepdb(filename):
                 value_z = float(line[46:54])  # z
                 atom_type = line[67:80].strip()  # atom_note
                 formatted_xyz_line = "{:6s}  {:8.3f} {:8.3f} {:8.3f}".format(
-                    atom_type, value_x, value_y, value_z
-                )
+                    atom_type, value_x, value_y, value_z)
                 xyzlines += formatted_xyz_line + "\n"
                 data.append([value_atom, atom_type, value_x, value_y, value_z])
     head = str(len(data)) + "\n" + "\n"
@@ -516,7 +543,9 @@ def nodepdb2G(pdbfile, metal):
     for n in node_data:
         G.add_node(
             n[0],
-            ccoords=(np.asarray([float(n[2]), float(n[3]), float(n[4])])),
+            ccoords=(np.asarray([float(n[2]),
+                                 float(n[3]),
+                                 float(n[4])])),
             type=n[1],
         )
 
@@ -525,10 +554,23 @@ def nodepdb2G(pdbfile, metal):
     for i in range(len(node_data)):
         for j in range(i, len(node_data)):
             if con_matrix[i, j] == 1:
-                if (
-                    nn(node_data[i][0]) == nn(node_data[j][0])
-                    and nn(node_data[i][0]) == metal
-                ):  # skip same atom type bond metal-metal
+                if (nn(node_data[i][0]) == nn(node_data[j][0]) and
+                        nn(node_data[i][0])
+                        == metal):  # skip same atom type bond metal-metal
+                    continue
+                # skip metal-X bond
+                elif nn(node_data[i][0]) == metal and nn(
+                        node_data[j][0]) == "X":
+                    continue
+                elif nn(node_data[j][0]) == metal and nn(
+                        node_data[i][0]) == "X":
+                    continue
+                # skip metal-H bond
+                elif nn(node_data[i][0]) == metal and nn(
+                        node_data[j][0]) == "H":
+                    continue
+                elif nn(node_data[j][0]) == metal and nn(
+                        node_data[i][0]) == "H":
                     continue
                 else:
                     G.add_edge(node_data[i][0], node_data[j][0])
@@ -537,68 +579,58 @@ def nodepdb2G(pdbfile, metal):
 
 def fetch_template(metal):
     if metal == "Zr":  # Zr-D = 1A
-        template_Zr_D = np.array(
-            (
-                [0.70710678, 0.70710678, 0.0],
-                [-0.70710678, 0.70710678, 0.0],
-                [-0.70710678, -0.70710678, 0.0],
-                [0.70710678, -0.70710678, 0.0],
-                [0.0, 0.70710678, 0.70710678],
-                [0.0, -0.70710678, 0.70710678],
-                [0.0, -0.70710678, -0.70710678],
-                [0.0, 0.70710678, -0.70710678],
-            )
-        )
+        template_Zr_D = np.array((
+            [0.70710678, 0.70710678, 0.0],
+            [-0.70710678, 0.70710678, 0.0],
+            [-0.70710678, -0.70710678, 0.0],
+            [0.70710678, -0.70710678, 0.0],
+            [0.0, 0.70710678, 0.70710678],
+            [0.0, -0.70710678, 0.70710678],
+            [0.0, -0.70710678, -0.70710678],
+            [0.0, 0.70710678, -0.70710678],
+        ))
         return template_Zr_D
     elif metal == "Hf":  # Hf-D = 1A
-        template_Hf_D = np.array(
-            (
-                [0.70710678, 0.70710678, 0.0],
-                [-0.70710678, 0.70710678, 0.0],
-                [-0.70710678, -0.70710678, 0.0],
-                [0.70710678, -0.70710678, 0.0],
-                [0.0, 0.70710678, 0.70710678],
-                [0.0, -0.70710678, 0.70710678],
-                [0.0, -0.70710678, -0.70710678],
-                [0.0, 0.70710678, -0.70710678],
-            )
-        )
+        template_Hf_D = np.array((
+            [0.70710678, 0.70710678, 0.0],
+            [-0.70710678, 0.70710678, 0.0],
+            [-0.70710678, -0.70710678, 0.0],
+            [0.70710678, -0.70710678, 0.0],
+            [0.0, 0.70710678, 0.70710678],
+            [0.0, -0.70710678, 0.70710678],
+            [0.0, -0.70710678, -0.70710678],
+            [0.0, 0.70710678, -0.70710678],
+        ))
         return template_Hf_D
     elif metal == "Al":  # Al-D = 0.74A
-        template_Al_D = np.array(
-            (
-                [0.74, 0.0, 0.0],
-                [0.0, 0.74, 0.0],
-                [0.0, 0.0, 0.74],
-                [-0.74, 0.0, 0.0],
-                [0.0, -0.74, 0.0],
-                [0.0, 0.0, -0.74],
-            )
-        )
+        template_Al_D = np.array((
+            [0.74, 0.0, 0.0],
+            [0.0, 0.74, 0.0],
+            [0.0, 0.0, 0.74],
+            [-0.74, 0.0, 0.0],
+            [0.0, -0.74, 0.0],
+            [0.0, 0.0, -0.74],
+        ))
         return template_Al_D
     elif metal == "Fe":  # Fe-D = 0.86A
-        template_Fe_D = np.array(
-            (
-                [0.86, 0.0, 0.0],
-                [0.0, 0.86, 0.0],
-                [0.0, 0.0, 0.86],
-                [-0.86, 0.0, 0.0],
-                [0.0, -0.86, 0.0],
-                [0.0, 0.0, -0.86],
-            )
-        )
+        template_Fe_D = np.array((
+            [0.86, 0.0, 0.0],
+            [0.0, 0.86, 0.0],
+            [0.0, 0.0, 0.86],
+            [-0.86, 0.0, 0.0],
+            [0.0, -0.86, 0.0],
+            [0.0, 0.0, -0.86],
+        ))
         return template_Fe_D
     elif metal == "Cr":  # Cr-D = 0.82A
-        template_Cr_D = np.array(
-            (
-                [0.82, 0.0, 0.0],
-                [0.0, 0.82, 0.0],
-                [0.0, 0.0, 0.82],
-                [-0.82, 0.0, 0.0],
-                [0.0, -0.82, 0.0],
-                [0.0, 0.0, -0.82],
-            )
-        )
+        template_Cr_D = np.array((
+            [0.82, 0.0, 0.0],
+            [0.0, 0.82, 0.0],
+            [0.0, 0.0, 0.82],
+            [-0.82, 0.0, 0.0],
+            [0.0, -0.82, 0.0],
+            [0.0, 0.0, -0.82],
+        ))
         return template_Cr_D
 
 
@@ -620,13 +652,19 @@ def lines_of_atoms(subgraph, subgraph_nodes):
         name = sn  # label+str(count)
         count += 1
         rows.append([name, label, coord[0], coord[1], coord[2]])
+    #sort rows by atom label
+    if "D" in [nn(i) for i in subgraph_nodes]:
+        rows = sorted(rows, key=lambda x: (x[1], x[0]))
+    else:  #use reverse order for non dummy nodes
+        rows = sorted(rows, key=lambda x: (x[1], x[0]), reverse=True)
 
     return rows
 
 
 def create_pdb(filename, lines):
     newpdb = []
-    newpdb.append("Dummy node \n" + str(filename) + "   GENERATED BY MOF_builder\n")
+    newpdb.append("Dummy node \n" + str(filename) +
+                  "   GENERATED BY MOF_builder\n")
     # check if the file directory exists and create it if it doesn't
     Path(str(filename) + ".pdb").parent.mkdir(parents=True, exist_ok=True)
 
@@ -688,37 +726,51 @@ def add_dummy_atoms_nodepdb(pdbfile, metal, nodeG):
         metal_valence = 3
 
     dummy_pdbfile = pdbfile.removesuffix(".pdb") + "_dummy.pdb"
-
-    # dummy_ciffile = 'test12zr_dummy.cif'
     template_metal_D = fetch_template(metal)
     sG = nodeG.copy()
-
     ind_max = max([int(nl(n)) for n in list(sG.nodes())])
     hydrogen_nodes = [n for n in list(sG.nodes()) if nn(n) == "H"]
     oxygen_nodes = [n for n in list(sG.nodes()) if nn(n) == "O"]
     metal_nodes = [n for n in list(sG.nodes()) if nn(n) == metal]
+    print("metal_nodes", metal_nodes)
+    for metal_n in metal_nodes:
+        dist = []
+        for oxy_n in oxygen_nodes:
+            dist.append((oxy_n,
+                         np.linalg.norm(sG.nodes[metal_n]['ccoords'] -
+                                        sG.nodes[oxy_n]['ccoords'])))
+        sorted_dist = sorted(dist, key=lambda x: x[1])[:2 * metal_valence]
+        for (oxy_node, dist) in sorted_dist:
+            if oxy_node not in sG.adj[metal_n]:
+                sG.add_edge(metal_n, oxy_node)
+
     count = ind_max + 1
     for mn in metal_nodes:
         neighbor_nodes = sG.adj[mn].copy()
+        # print(neighbor_nodes, mn)
         Ocheck = all(nn(i) == "O" for i in neighbor_nodes)
+
         if len(neighbor_nodes) == 2 * metal_valence and Ocheck:
             # add dummy
             beginning_cc = sG.nodes[mn]["ccoords"]
             d_ccoords = []
             for nO in neighbor_nodes:
                 sO = sG.nodes[nO]["ccoords"]
+                sO = np.round(sO, 4)
+                beginning_cc = np.round(beginning_cc, 4)
                 cnorm_vec = (sO - beginning_cc) / np.linalg.norm(
-                    sO - beginning_cc
-                )  # 1 angstrom
+                    sO - beginning_cc)  # 1 angstrom
                 d_ccoord = beginning_cc + cnorm_vec
                 d_ccoords.append(d_ccoord)
-
                 sG.remove_edge(mn, nO)
             # order ccords based on template order
-            ordered_ccoords = order_ccoords(d_ccoords, template_metal_D, beginning_cc)
+            ordered_ccoords = order_ccoords(d_ccoords, template_metal_D,
+                                            beginning_cc)
 
             for row in range(len(d_ccoords)):
-                sG.add_node("D" + str(count), type="D", ccoords=ordered_ccoords[row])
+                sG.add_node("D" + str(count),
+                            type="D",
+                            ccoords=ordered_ccoords[row])
                 sG.add_edge(mn, "D" + str(count))
                 count += 1
     # nx.draw_networkx(sG,**options)
@@ -728,7 +780,8 @@ def add_dummy_atoms_nodepdb(pdbfile, metal, nodeG):
             # find a nearest oxygen to add a connection
             min_dist = 1000
             for on in oxygen_nodes:
-                dist = np.linalg.norm(sG.nodes[hn]["ccoords"] - sG.nodes[on]["ccoords"])
+                dist = np.linalg.norm(sG.nodes[hn]["ccoords"] -
+                                      sG.nodes[on]["ccoords"])
                 if dist < min_dist:
                     min_dist = dist
                     nearest_o = on
@@ -737,7 +790,7 @@ def add_dummy_atoms_nodepdb(pdbfile, metal, nodeG):
     sG_subparts = [
         c for c in sorted(nx.connected_components(sG), key=len, reverse=True)
     ]
-
+    # print(sG_subparts)  # debug
     head = []
     tail = []
     for sub in sG_subparts:
@@ -749,13 +802,12 @@ def add_dummy_atoms_nodepdb(pdbfile, metal, nodeG):
 
     sub_headlens = [len(i) for i in head]
     sub_taillens = [len(i) for i in tail]
-    # sum(sub_headlens)+sum(sub_taillens),sub_headlens,sub_taillens
-
     dummy_count = 0
     hho_count = 0
     ho_count = 0
     o_count = 0
     ooc_count = 0
+    dummy_res_len = 0
 
     for i in sub_headlens:
         if i == 3:
@@ -778,7 +830,8 @@ def add_dummy_atoms_nodepdb(pdbfile, metal, nodeG):
     node_split_dict["METAL_count"] = dummy_count
     node_split_dict["dummy_res_len"] = dummy_res_len
     node_split_dict["OOC_count"] = ooc_count
-    node_split_dict["inres_count"] = hho_count + ho_count + o_count + dummy_count
+    node_split_dict[
+        "inres_count"] = hho_count + ho_count + o_count + dummy_count
 
     node_dict_name = dummy_pdbfile.removesuffix(".pdb") + "_dict"
     node_dict_path = node_dict_name
@@ -804,31 +857,6 @@ def add_dummy_atoms_nodepdb(pdbfile, metal, nodeG):
 
 
 #############below are from frag_recognizer.py####################
-
-
-def get_atom_name_in_subgraph(subgraph, n_id, Xs_indices):
-    for ind, value in enumerate(list(subgraph.nodes)):
-        if value == n_id:
-            if value not in Xs_indices:
-                return subgraph.nodes[n_id]["label"] + str(ind + 1)
-            else:
-                return "X" + str(ind + 1)
-
-
-def get_bonds_from_subgraph(subgraph, Xs_indices):
-    bonds = []
-    for e in list(subgraph.edges):
-        atom1 = get_atom_name_in_subgraph(subgraph, e[0], Xs_indices)
-        atom2 = get_atom_name_in_subgraph(subgraph, e[1], Xs_indices)
-        length = subgraph.edges[e]["weight"] / 50  # 50 50 50 box
-        sym = "."
-        if atom1[0] == "X" or atom2[0] == "X":
-            bond_type = "A"
-        else:
-            bond_type = "S"
-        bonds.append([atom1, atom2, length, sym, bond_type])
-
-    return bonds
 
 
 def create_lG(molecule):
@@ -899,61 +927,88 @@ def create_lG(molecule):
     return lG, metals, mass_center_angstrom
 
 
-def find_center_cycle_nodes(lG):
-    # To find center cycle
-    target_nodes = set(nx.center(lG))
-    cycles = list(nx.simple_cycles(lG, length_bound=80))
+# find isolated cycles, which do not share any node with other cycles
+def find_center_highly_connected_isolated_cycle(lG):
+    # for each isolated cycle, find the one have edge with all other isolated cycles
+    # remove nodes in the cycle from lG, which cycle get the most fragments is the center cycle
+    max_frag_num = 0
+    min_frag_size_std = 1000
+    center_cycle = []
+    cycles = list(nx.simple_cycles(lG, length_bound=200))
     for cycle in cycles:
-        if target_nodes < set(cycle):
-            return cycle
+        lG_temp = lG.copy()
+        lG_temp.remove_nodes_from(cycle)
+        frag_num = nx.number_connected_components(lG_temp)
+        #get size of each fragment
+        frag_sizes = [len(f) for f in nx.connected_components(lG_temp)]
+        frag_size_msd = np.std(frag_sizes)
+
+        if frag_num > max_frag_num:
+            max_frag_num = frag_num
+            center_cycle = cycle
+            min_frag_size_std = frag_size_msd
+        elif frag_num == max_frag_num and frag_size_msd < min_frag_size_std:
+            # find the cycle which make all fragments have the similar size
+            max_frag_num = frag_num
+            min_frag_size_std = frag_size_msd
+            center_cycle = cycle
+
+    return center_cycle
+
+
+def find_center_cycle_nodes(lG):
+    ## To find center cycle,
+    # target_nodes = set(nx.center(lG))
+    # cycles = list(nx.simple_cycles(lG, length_bound=200))
+    ## find largest cycle
+    # max_cycle_length = 0
+    # for cycle in cycles:
+    #    if not target_nodes.intersection(set(cycle)):
+    #        if len(cycle) > max_cycle_length:
+    #            max_cycle_length = len(cycle)
+    #            center_nodes = cycle
+
+    center_nodes = find_center_highly_connected_isolated_cycle(lG)
+    return center_nodes
+
+
+def check_two_points_center(lG, centers):
+    if nx.shortest_path_length(lG, centers[0], centers[1]) != 1:
+        return False
+    else:
+        G = lG.copy()
+        G.remove_edge(centers[0], centers[1])
+        if nx.number_connected_components(G) == 2:
+            return True
+        else:
+            return False
 
 
 def distinguish_G_centers(lG):
     centers = nx.barycenter(lG)
+    # centers = nx.center(lG)
     if len(centers) == 1:
         print("center is a point")
         center_class = "onepoint"
         center_nodes = centers
     elif len(centers) == 2:
-        if nx.shortest_path_length(lG, centers[0], centers[1]) == 1:
+        if check_two_points_center(lG, centers):
+            # if remove the edge between the two center nodes, the graph will be divided into two parts
             print("center is two points")
             center_class = "twopoints"
             center_nodes = centers
         else:
             print("center is a cycle")
+            lG.remove_edge(centers[0], centers[1])
             center_class = "cycle"
             center_nodes = find_center_cycle_nodes(lG)
     else:
         print("center is a cycle")
         center_class = "cycle"
         center_nodes = find_center_cycle_nodes(lG)
+    print("center_nodes:", center_nodes, "center_class:", center_class,
+          len(centers))
     return center_class, center_nodes
-
-
-def find_center_nodes_pair(lG, center_nodes):
-    if len(center_nodes) > 6:
-        centers = nx.center(lG)
-
-    pairs = []
-    for i in range(len(centers)):
-        for j in range(i, len(centers)):
-            l = nx.shortest_path_length(lG, centers[i], centers[j])
-            if l == 1:
-                pairs.append([centers[i], centers[j]])
-
-    # loop each pair to find center pair
-    for p in pairs:
-        a = p[0]
-        b = p[1]
-        ds = []
-        for n in centers:
-            if n not in p:
-                d = nx.shortest_path_length(lG, a, n)
-                ds.append(d)
-        if len(set(ds)) < len(ds):
-            center_pair = p
-
-    return center_pair
 
 
 def classify_nodes(lG, center_nodes):
@@ -980,6 +1035,32 @@ def classify_nodes(lG, center_nodes):
     return lG
 
 
+def find_center_nodes_pair(lG, center_nodes):
+    if len(center_nodes) > 6:
+        centers = nx.barycenter(lG)
+
+    pairs = []
+    for i in range(len(centers)):
+        for j in range(i, len(centers)):
+            l = nx.shortest_path_length(lG, centers[i], centers[j])
+            if l == 1:
+                pairs.append([centers[i], centers[j]])
+
+    # loop each pair to find center pair
+    for p in pairs:
+        a = p[0]
+        # b = p[1]
+        ds = []
+        for n in centers:
+            if n not in p:
+                d = nx.shortest_path_length(lG, a, n)
+                ds.append(d)
+        if len(set(ds)) < len(ds):
+            center_pair = p
+
+    return center_pair
+
+
 def get_pairX_outer_frag(connected_pairXs, outer_frag_nodes):
     for x in list(connected_pairXs):
         pairXs = [connected_pairXs[x][1], connected_pairXs[x][3]]
@@ -992,22 +1073,23 @@ def cleave_outer_frag_subgraph(lG, pairXs, outer_frag_nodes):
     subgraph_outer_frag = lG.subgraph(outer_frag_nodes)
     kick_nodes = []
     for i in list(outer_frag_nodes):
-        if nx.shortest_path_length(
-            subgraph_outer_frag, pairXs[0], i
-        ) > nx.shortest_path_length(subgraph_outer_frag, pairXs[0], pairXs[1]):
+        if nx.shortest_path_length(subgraph_outer_frag, pairXs[0],
+                                   i) > nx.shortest_path_length(
+                                       subgraph_outer_frag, pairXs[0],
+                                       pairXs[1]):
             kick_nodes.append(i)
-        elif nx.shortest_path_length(
-            subgraph_outer_frag, pairXs[1], i
-        ) > nx.shortest_path_length(subgraph_outer_frag, pairXs[0], pairXs[1]):
+        elif nx.shortest_path_length(subgraph_outer_frag, pairXs[1],
+                                     i) > nx.shortest_path_length(
+                                         subgraph_outer_frag, pairXs[0],
+                                         pairXs[1]):
             kick_nodes.append(i)
 
     subgraph_single_frag = lG.subgraph(outer_frag_nodes - set(kick_nodes))
     return subgraph_single_frag
 
 
-def lines_of_center_frag(
-    subgraph_center_frag, Xs_indices, metals, labels, coords, mass_center_angstrom
-):
+def lines_of_center_frag(subgraph_center_frag, Xs_indices, metals, labels,
+                         coords, mass_center_angstrom):
     count = 1
     lines = []
     Xs = []
@@ -1046,9 +1128,35 @@ def lines_of_single_frag(subgraph_single_frag, Xs_indices):
     return rows, Xs
 
 
-def process_linker_molecule(
-    molecule, linker_topic, save_nodes_dir="nodes", save_edges_dir="edges"
-):
+def get_atom_name_in_subgraph(subgraph, n_id, Xs_indices):
+    for ind, value in enumerate(list(subgraph.nodes)):
+        if value == n_id:
+            if value not in Xs_indices:
+                return subgraph.nodes[n_id]["label"] + str(ind + 1)
+            else:
+                return "X" + str(ind + 1)
+
+
+def get_bonds_from_subgraph(subgraph, Xs_indices):
+    bonds = []
+    for e in list(subgraph.edges):
+        atom1 = get_atom_name_in_subgraph(subgraph, e[0], Xs_indices)
+        atom2 = get_atom_name_in_subgraph(subgraph, e[1], Xs_indices)
+        length = subgraph.edges[e]["weight"] / 50  # 50 50 50 box
+        sym = "."
+        if atom1[0] == "X" or atom2[0] == "X":
+            bond_type = "A"
+        else:
+            bond_type = "S"
+        bonds.append([atom1, atom2, length, sym, bond_type])
+
+    return bonds
+
+
+def process_linker_molecule(molecule,
+                            linker_topic,
+                            save_nodes_dir="nodes",
+                            save_edges_dir="edges"):
     coords = molecule.get_coordinates_in_angstrom()
     labels = molecule.get_labels()
     # To remove center metals
@@ -1070,19 +1178,19 @@ def process_linker_molecule(
             linker_C_l = []
             l_list = []
             for n in lG.nodes:
-                if (
-                    lG.nodes[n]["cnodes_l"][0] == center_nodes[k]
-                    and lG.nodes[n]["label"] == "C"
-                ):
+                if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k] and
+                        lG.nodes[n]["label"] == "C"):
                     linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                     l_list.append(lG.nodes[n]["cnodes_l"][1])
             center_connected_C_ind = [
                 ind for ind, value in enumerate(l_list) if value == 1
             ]
             outer_connected_C_ind = [
-                ind for ind, value in enumerate(l_list) if value == (max(l_list) - 1)
+                ind for ind, value in enumerate(l_list)
+                if value == (max(l_list) - 1)
             ]
-            if len(center_connected_C_ind) == 1 and len(outer_connected_C_ind) == 1:
+            if len(center_connected_C_ind) == 1 and len(
+                    outer_connected_C_ind) == 1:
                 inner_X = linker_C_l[center_connected_C_ind[0]]
                 outer_X = linker_C_l[outer_connected_C_ind[0]]
                 if center_nodes[k] not in [inner_X[0], outer_X[0]]:
@@ -1102,9 +1210,8 @@ def process_linker_molecule(
                     Xs_indices += [center_nodes[k], inner_X[0], outer_X[0]]
                     innerX_coords.append(lG.nodes[inner_X[0]]["coords"])
 
-        if (
-            nx.number_connected_components(lG) != linker_topic + 1
-        ):  # for check linker_topics+1
+        if (nx.number_connected_components(lG)
+                != linker_topic + 1):  # for check linker_topics+1
             print("wrong fragments")
             raise ValueError
 
@@ -1116,16 +1223,13 @@ def process_linker_molecule(
                 linker_C_l = []
                 l_list = []
                 for n in lG.nodes:
-                    if (
-                        lG.nodes[n]["cnodes_l"][0] == center_nodes[k]
-                        and lG.nodes[n]["label"] == "C"
-                    ):
+                    if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k] and
+                            lG.nodes[n]["label"] == "C"):
                         linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                         l_list.append(lG.nodes[n]["cnodes_l"][1])
 
                 outer_connected_C_ind = [
-                    ind
-                    for ind, value in enumerate(l_list)
+                    ind for ind, value in enumerate(l_list)
                     if value == (max(l_list) - 1)
                 ]
 
@@ -1141,15 +1245,14 @@ def process_linker_molecule(
             linker_C_l = []
             l_list = []
             for n in lG.nodes:
-                if (
-                    lG.nodes[n]["cnodes_l"][0] == center_nodes[0]
-                    and lG.nodes[n]["label"] == "C"
-                ):
+                if (lG.nodes[n]["cnodes_l"][0] == center_nodes[0] and
+                        lG.nodes[n]["label"] == "C"):
                     linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                     l_list.append(lG.nodes[n]["cnodes_l"][1])
 
             outer_connected_C_ind = [
-                ind for ind, value in enumerate(l_list) if value == (max(l_list) - 1)
+                ind for ind, value in enumerate(l_list)
+                if value == (max(l_list) - 1)
             ]
             for m in range(len(outer_connected_C_ind)):
                 outer_X = linker_C_l[outer_connected_C_ind[m]]
@@ -1163,15 +1266,12 @@ def process_linker_molecule(
                 linker_C_l = []
                 l_list = []
                 for n in lG.nodes:
-                    if (
-                        lG.nodes[n]["cnodes_l"][0] == center_nodes[k]
-                        and lG.nodes[n]["label"] == "C"
-                    ):
+                    if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k] and
+                            lG.nodes[n]["label"] == "C"):
                         linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                         l_list.append(lG.nodes[n]["cnodes_l"][1])
                 outer_connected_C_ind = [
-                    ind
-                    for ind, value in enumerate(l_list)
+                    ind for ind, value in enumerate(l_list)
                     if value == (max(l_list) - 1)
                 ]
                 if len(outer_connected_C_ind) == 1:
@@ -1200,9 +1300,9 @@ def process_linker_molecule(
         )
 
     # write cifs
-
     if linker_topic > 2:  # multitopic
-        frag_nodes = list(sorted(nx.connected_components(lG), key=len, reverse=True))
+        frag_nodes = list(
+            sorted(nx.connected_components(lG), key=len, reverse=True))
         for f in frag_nodes:
             if set(center_nodes) < set(f):
                 center_frag_nodes = f
@@ -1218,19 +1318,20 @@ def process_linker_molecule(
             coords,
             mass_center_angstrom,
         )
-        center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
-        subgraph_center_frag_edges = list(subgraph_center_frag.edges)
+        # center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
+        # subgraph_center_frag_edges = list(subgraph_center_frag.edges)
         # plot2dedge(lG,coords,subgraph_center_frag_edges,True)
         # plot2dedge(lG,coords,subgraph_center_frag_edges,False)
         pairXs = get_pairX_outer_frag(connected_pairXs, outer_frag_nodes)
-        subgraph_single_frag = cleave_outer_frag_subgraph(lG, pairXs, outer_frag_nodes)
+        subgraph_single_frag = cleave_outer_frag_subgraph(
+            lG, pairXs, outer_frag_nodes)
         rows, frag_Xs = lines_of_single_frag(subgraph_single_frag, Xs_indices)
-        single_frag_bonds = get_bonds_from_subgraph(subgraph_single_frag, Xs_indices)
+        # single_frag_bonds = get_bonds_from_subgraph(subgraph_single_frag, Xs_indices)
         if linker_topic == 3:
-            print(
-                "linker_center_frag:", subgraph_center_frag.number_of_nodes(), center_Xs
-            )
-            print("linker_outer_frag:", subgraph_single_frag.number_of_nodes(), frag_Xs)
+            print("linker_center_frag:", subgraph_center_frag.number_of_nodes(),
+                  center_Xs)
+            print("linker_outer_frag:", subgraph_single_frag.number_of_nodes(),
+                  frag_Xs)
             linker_center_node_pdb_name = Path(save_nodes_dir, "tricenter")
             create_pdb(linker_center_node_pdb_name, lines)
             linker_branch_pdb_name = Path(save_edges_dir, "triedge")
@@ -1246,9 +1347,12 @@ def process_linker_molecule(
                 linker_branch_pdb_name + ".pdb",
             )
         elif linker_topic == 4:
-            print("center_frag:", subgraph_center_frag.number_of_nodes(), center_Xs)
-            print("outer_frag:", subgraph_single_frag.number_of_nodes(), frag_Xs)
-            linker_center_node_pdb_name = str(Path(save_nodes_dir, "tetracenter"))
+            print("center_frag:", subgraph_center_frag.number_of_nodes(),
+                  center_Xs)
+            print("outer_frag:", subgraph_single_frag.number_of_nodes(),
+                  frag_Xs)
+            linker_center_node_pdb_name = str(
+                Path(save_nodes_dir, "tetracenter"))
             create_pdb(linker_center_node_pdb_name, lines)
             linker_branch_pdb_name = str(Path(save_edges_dir, "tetraedge"))
             create_pdb(linker_branch_pdb_name, rows)
@@ -1263,7 +1367,8 @@ def process_linker_molecule(
                 linker_branch_pdb_name + ".pdb",
             )
         else:
-            linker_center_node_pdb_name = str(Path(save_nodes_dir, "multicenter"))
+            linker_center_node_pdb_name = str(
+                Path(save_nodes_dir, "multicenter"))
             create_pdb(linker_center_node_pdb_name, lines)
             linker_branch_pdb_name = str(Path(save_edges_dir, "multiedge"))
             create_pdb(linker_branch_pdb_name, rows)
@@ -1282,7 +1387,7 @@ def process_linker_molecule(
         pairXs = Xs_indices
         print("pairXs:", pairXs)
         subgraph_center_frag = cleave_outer_frag_subgraph(lG, pairXs, lG.nodes)
-        subgraph_center_frag_edges = list(subgraph_center_frag.edges)
+        # subgraph_center_frag_edges = list(subgraph_center_frag.edges)
         # plot2dedge(lG,coords,subgraph_center_frag_edges,True)
         # plot2dedge(subgraph_center_frag,coords,subgraph_center_frag_edges,False)
         lines, center_Xs = lines_of_center_frag(
@@ -1293,11 +1398,12 @@ def process_linker_molecule(
             coords,
             mass_center_angstrom,
         )
-        center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
+        # center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
         # create_cif(lines,center_frag_bonds,'edges','diedge.cif')
         edge_pdb_name = str(Path(save_edges_dir, "diedge"))
         create_pdb(edge_pdb_name, lines)
-        print("linker_center_frag:", subgraph_center_frag.number_of_nodes(), center_Xs)
+        print("linker_center_frag:", subgraph_center_frag.number_of_nodes(),
+              center_Xs)
         return (
             subgraph_center_frag.number_of_nodes(),
             center_Xs,
@@ -1311,6 +1417,7 @@ def process_linker_molecule(
 ##############below are from learn_template#####################
 
 
+# use cell_info to generate the matrix for the unit cell to get cartesian coordinates
 def make_supercell_3x3x3(array_xyz):
     array_x1 = array_xyz + np.array([1, 0, 0])
     array_x2 = array_xyz + np.array([-1, 0, 0])
@@ -1321,19 +1428,17 @@ def make_supercell_3x3x3(array_xyz):
     array_x2_y1 = array_xyz + np.array([-1, 1, 0])
     array_x2_y2 = array_xyz + np.array([-1, -1, 0])
 
-    layer_3x3 = np.vstack(
-        (
-            array_xyz,
-            array_x1,
-            array_x2,
-            array_y1,
-            array_y2,
-            array_x1_y1,
-            array_x1_y2,
-            array_x2_y1,
-            array_x2_y2,
-        )
-    )
+    layer_3x3 = np.vstack((
+        array_xyz,
+        array_x1,
+        array_x2,
+        array_y1,
+        array_y2,
+        array_x1_y1,
+        array_x1_y2,
+        array_x2_y1,
+        array_x2_y2,
+    ))
 
     layer_3x3_z1 = layer_3x3 + np.array([0, 0, 1])
     layer_3x3_z2 = layer_3x3 + np.array([0, 0, -1])
@@ -1343,14 +1448,11 @@ def make_supercell_3x3x3(array_xyz):
     return supercell_3x3x3
 
 
-def check_inside_unit_cell(point):
-    return all([i >= -0.0 and i < 1.0 for i in point])
-
-
 def extract_unit_cell(cell_info):
     pi = np.pi
     aL, bL, cL, alpha, beta, gamma = cell_info
-    aL, bL, cL, alpha, beta, gamma = list(map(float, (aL, bL, cL, alpha, beta, gamma)))
+    aL, bL, cL, alpha, beta, gamma = list(
+        map(float, (aL, bL, cL, alpha, beta, gamma)))
     ax = aL
     ay = 0.0
     az = 0.0
@@ -1359,22 +1461,63 @@ def extract_unit_cell(cell_info):
     bz = 0.0
     cx = cL * np.cos(beta * pi / 180.0)
     cy = (cL * bL * np.cos(alpha * pi / 180.0) - bx * cx) / by
-    cz = (cL**2.0 - cx**2.0 - cy**2.0) ** 0.5
+    cz = (cL**2.0 - cx**2.0 - cy**2.0)**0.5
     unit_cell = np.asarray([[ax, ay, az], [bx, by, bz], [cx, cy, cz]]).T
     return unit_cell
 
 
-def find_pair_v_e(vvnode333, eenode333):
+# use pdist to calculate the distance between the points
+# use squreform to get the distance matrix
+def c2f_coords(coords, unit_cell):
+    unit_cell_inv = np.linalg.inv(unit_cell)
+    fc = np.dot(unit_cell_inv, coords.T).T
+    return fc
+
+
+# for each y, find nearest x in xxnode333, then check if the center of the pair of x is around y, if yes, the it is valid pair of x
+def check_inside_unit_cell(point):
+    return all([i >= -0.0 and i < 1.0 for i in point])
+
+
+# check if after np.mod, the fcoords is the same as before
+def check_moded_fcoords(point):
+    x, y, z = point[0], point[1], point[2]
+    if np.mod(x, 1) != x:
+        return False
+    if np.mod(y, 1) != y:
+        return False
+    if np.mod(z, 1) != z:
+        return False
+    return True
+
+
+def find_pair_v_e(vvnode333, eenode333, unit_cell, distance_range=[]):
     G = nx.Graph()
     pair_ve = []
     for e in eenode333:
-        dist = np.linalg.norm(vvnode333 - e, axis=1)
-        # find two v which are nearest to e, and at least one v is in [0,1] unit cell
-        v1 = vvnode333[np.argmin(dist)]
-        v1_idx = np.argmin(dist)
-        dist[np.argmin(dist)] = 1000
-        v2 = vvnode333[np.argmin(dist)]
-        v2_idx = np.argmin(dist)
+        dist = np.linalg.norm(np.dot(unit_cell, (vvnode333 - e).T).T, axis=1)
+        if (
+                len(distance_range) == 0
+        ):  # if distance_range is not given, then use the minimum distance match the pair of v
+            v1 = vvnode333[np.argmin(dist)]
+            v1_idx = np.argmin(dist)
+            dist[np.argmin(dist)] = 1000
+            v2 = vvnode333[np.argmin(dist)]
+            v2_idx = np.argmin(dist)
+        else:  # if distance_range is given, then use the distance_range to find the pair of v
+            v1v2_candidates = np.where((dist > distance_range[0]) &
+                                       (dist < distance_range[1]))[0]
+            if len(v1v2_candidates) != 2:
+                print("mimimum distance", np.min(dist))
+                print("dist", [d for d in dist if d < distance_range[1]])
+                print(
+                    f"The number of v1v2 candidates are {len(v1v2_candidates)}, which should be 2, please check the distance_range"
+                )
+                continue
+            else:
+                v1_idx, v2_idx = v1v2_candidates
+                v1 = vvnode333[v1_idx]
+                v2 = vvnode333[v2_idx]
         # find the center of the pair of v
         center = (v1 + v2) / 2
         # check if there is a v in [0,1] unit cell
@@ -1383,31 +1526,30 @@ def find_pair_v_e(vvnode333, eenode333):
             if np.linalg.norm(center - e) < 1e-3:
                 G.add_node("V" + str(v1_idx), fcoords=v1, note="V", type="V")
                 G.add_node("V" + str(v2_idx), fcoords=v2, note="V", type="V")
-                (
-                    G.add_edge(
-                        "V" + str(v1_idx),
-                        "V" + str(v2_idx),
-                        fcoords=(v1, v2),
-                        fc_center=e,
-                    ),
-                )
+                (G.add_edge(
+                    "V" + str(v1_idx),
+                    "V" + str(v2_idx),
+                    fcoords=(v1, v2),
+                    fc_center=e,
+                ),)
                 pair_ve.append((v1, v2, e))
     return pair_ve, len(pair_ve), G
 
 
-def find_pair_v_e_c(
-    vvnode333, ecnode333, eenode333, unit_cell
-):  # exist center of linker  in mof
+def find_pair_v_e_c(vvnode333, ecnode333, eenode333,
+                    unit_cell):  # exist center of linker  in mof
     G = nx.Graph()
     pair_ve = []
     for e in eenode333:
         # print(e, "check")
         # dist_v_e = np.linalg.norm(vvnode333 - e, axis=1)
-        dist_v_e = np.linalg.norm(np.dot(unit_cell, (vvnode333 - e).T).T, axis=1)
+        dist_v_e = np.linalg.norm(np.dot(unit_cell, (vvnode333 - e).T).T,
+                                  axis=1)
         # find two v which are nearest to e, and at least one v is in [0,1] unit cell
         v1 = vvnode333[np.argmin(dist_v_e)]
         v1_idx = np.argmin(dist_v_e)
-        dist_c_e = np.linalg.norm(np.dot(unit_cell, (ecnode333 - e).T).T, axis=1)
+        dist_c_e = np.linalg.norm(np.dot(unit_cell, (ecnode333 - e).T).T,
+                                  axis=1)
         # find two v which are nearest to e, and at least one v is in [0,1] unit cell
         v2 = ecnode333[np.argmin(dist_c_e)]
         v2_idx = np.argmin(dist_c_e)
@@ -1423,14 +1565,12 @@ def find_pair_v_e_c(
                 # print(e,v1,v2,'check')
                 G.add_node("V" + str(v1_idx), fcoords=v1, note="V")
                 G.add_node("CV" + str(v2_idx), fcoords=v2, note="CV")
-                (
-                    G.add_edge(
-                        "V" + str(v1_idx),
-                        "CV" + str(v2_idx),
-                        fcoords=(v1, v2),
-                        fc_center=e,
-                    ),
-                )
+                (G.add_edge(
+                    "V" + str(v1_idx),
+                    "CV" + str(v2_idx),
+                    fcoords=(v1, v2),
+                    fc_center=e,
+                ),)
                 pair_ve.append(("V" + str(v1_idx), "CV" + str(v2_idx), e))
 
     return pair_ve, len(pair_ve), G
@@ -1443,18 +1583,6 @@ def add_ccoords(G, unit_cell):
     return G
 
 
-# check if after np.mod, the fcoords is the same as before
-def check_moded_fcoords(point):
-    x, y, z = point[0], point[1], point[2]
-    if np.mod(x, 1) != x:
-        return False
-    if np.mod(y, 1) != y:
-        return False
-    if np.mod(z, 1) != z:
-        return False
-    return True
-
-
 def set_DV_V(G):
     for n in G.nodes():
         ##if G.degree(n) == max(dict(G.degree()).values()):
@@ -1463,8 +1591,7 @@ def set_DV_V(G):
         if check_moded_fcoords(G.nodes[n]["fcoords"]):
             G.nodes[n]["type"] = "V"
             G = nx.relabel_nodes(
-                G, {n: pname(n) + "_" + str(np.array([0.0, 0.0, 0.0]))}
-            )
+                G, {n: pname(n) + "_" + str(np.array([0.0, 0.0, 0.0]))})
 
         else:
             G.nodes[n]["type"] = "DV"
@@ -1473,14 +1600,17 @@ def set_DV_V(G):
             # find the corresponding V (with type V)node by the moded fcoords
             for n1 in G.nodes():
                 if np.all(
-                    np.isclose(G.nodes[n1]["fcoords"], np.mod(G.nodes[n]["fcoords"], 1))
-                ):
+                        np.isclose(G.nodes[n1]["fcoords"],
+                                   np.mod(G.nodes[n]["fcoords"], 1))):
                     n1_name = pname(n1)
             # replace node name
             G = nx.relabel_nodes(G, {n: n1_name + "_" + str(diff)})
 
     max_degree = max(dict(G.degree()).values())
     return G, max_degree
+
+
+# check e_new in G, if e_new = e+[0,0,1] or e = e+[0,0,-1], [0,1,0],[0,-1,0] then this e_new is invalid not unique
 
 
 # if make supercell333 of unique_e list cannot find the e_new, then this e_new should be appended to the unique_e list
@@ -1507,13 +1637,44 @@ def set_DE_E(G):
     unique_e = np.vstack(find_unitcell_e(all_e))
     # print(unique_e) #debug
     for e in G.edges():
-        if np.any(np.all(np.isclose(G.edges[e]["fc_center"], unique_e), axis=1)):
+        if np.any(np.all(np.isclose(G.edges[e]["fc_center"], unique_e),
+                         axis=1)):
             G.edges[e]["type"] = "E"
             # print(G.edges[e]['fc_center'],'E') #debug
         else:
             G.edges[e]["type"] = "DE"
             # print(G.edges[e]['fc_center'],'DE') #debug
     return G
+
+
+def find_and_sort_edges_bynodeconnectivity(graph, sorted_nodes):
+    all_edges = list(graph.edges())
+
+    sorted_edges = []
+    # add unit_cell edge first
+
+    ei = 0
+    while ei < len(all_edges):
+        e = all_edges[ei]
+        if check_edge_inunitcell(graph, e):
+            sorted_edges.append(put_V_ahead_of_CV(e))
+            all_edges.pop(ei)
+        ei += 1
+    # sort edge by sorted_nodes
+    for n in sorted_nodes:
+        ei = 0
+        while ei < len(all_edges):
+            e = all_edges[ei]
+            if n in e:
+                if n == e[0]:
+                    sorted_edges.append(put_V_ahead_of_CV(e))
+                else:
+                    sorted_edges.append(put_V_ahead_of_CV((e[1], e[0])))
+                all_edges.pop(ei)
+            else:
+                ei += 1
+
+    return sorted_edges
 
 
 ##########below are from terminations.py#####################
@@ -1523,39 +1684,30 @@ def termpdb(filename):
     inputfile = str(filename)
     with open(inputfile, "r") as fp:
         content = fp.readlines()
-        # linesnumber = len(content)
+        #linesnumber = len(content)
     data = []
     for line in content:
         line = line.strip()
-        if len(line) > 0:  # skip blank line
+        if len(line) > 0:  #skip blank line
             if line[0:6] == "ATOM" or line[0:6] == "HETATM":
                 value_atom = line[12:16].strip()  # atom_label
-                # resname
-                # value2 = 'MOL'  # res_name
+                #resname
+                #value2 = 'MOL'  # res_name
 
                 value_x = float(line[30:38])  # x
                 value_y = float(line[38:46])  # y
                 value_z = float(line[46:54])  # z
                 value_charge = float(line[61:66])
                 value_note = line[67:80].strip()  # atom_note
-                # resnumber
+                #resnumber
                 try:
                     value_res_num = int(line[22:26])
                 except ValueError:
                     value_res_num = 1
-                data.append(
-                    [
-                        value_atom,
-                        value_charge,
-                        value_note,
-                        value_res_num,
-                        "TERM",
-                        value_res_num,
-                        value_x,
-                        value_y,
-                        value_z,
-                    ]
-                )
+                data.append([
+                    value_atom, value_charge, value_note, value_res_num, 'TERM',
+                    value_res_num, value_x, value_y, value_z
+                ])
     return np.vstack(data)
 
 
@@ -1658,7 +1810,8 @@ def superimpose_rotation_only(arr1, arr2, min_rmsd=1e6):
 def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
     pi = np.pi
     """Convert unit cell parameters to a Cartesian transformation matrix."""
-    aL, bL, cL, alpha, beta, gamma = list(map(float, (aL, bL, cL, alpha, beta, gamma)))
+    aL, bL, cL, alpha, beta, gamma = list(
+        map(float, (aL, bL, cL, alpha, beta, gamma)))
     ax = aL
     ay = 0.0
     az = 0.0
@@ -1667,7 +1820,7 @@ def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
     bz = 0.0
     cx = cL * np.cos(beta * pi / 180.0)
     cy = (cL * bL * np.cos(alpha * pi / 180.0) - bx * cx) / by
-    cz = (cL**2.0 - cx**2.0 - cy**2.0) ** 0.5
+    cz = (cL**2.0 - cx**2.0 - cy**2.0)**0.5
     unit_cell = np.asarray([[ax, ay, az], [bx, by, bz], [cx, cy, cz]]).T
     return unit_cell
 
@@ -1730,11 +1883,9 @@ def update_node_ccoords(G, edge_lengths, start_node, new_edge_length):
                 edge = (n, nn)
                 edge_length = edge_lengths[edge]
                 updated_ccoords[nn] = (
-                    updated_ccoords[n]
-                    + (G.nodes[nn]["ccoords"] - G.nodes[n]["ccoords"])
-                    * new_edge_length
-                    / edge_length
-                )
+                    updated_ccoords[n] +
+                    (G.nodes[nn]["ccoords"] - G.nodes[n]["ccoords"]) *
+                    new_edge_length / edge_length)
                 original_ccoords[nn] = G.nodes[nn]["ccoords"]
                 updated_node.append(nn)
 
@@ -1742,10 +1893,13 @@ def update_node_ccoords(G, edge_lengths, start_node, new_edge_length):
 
 
 ###below are from multiedge_bundling.py#######
+
+
 def find_pair_x_edge_fc(x_matrix, edge_matrix, sc_unit_cell):
-    assert_msg_critical(
-        "scipy" in sys.modules, "scipy is required for find_pair_x_edge."
-    )
+
+    assert_msg_critical("scipy" in sys.modules,
+                        "scipy is required for find_pair_x_edge_fc.")
+
     dist_matrix = np.zeros((len(x_matrix), len(edge_matrix)))
     x_matrix = fractional_to_cartesian(x_matrix, sc_unit_cell)
     edge_matrix = fractional_to_cartesian(edge_matrix, sc_unit_cell)
@@ -1753,7 +1907,6 @@ def find_pair_x_edge_fc(x_matrix, edge_matrix, sc_unit_cell):
         for j in range(len(edge_matrix)):
             dist_matrix[i, j] = np.linalg.norm(x_matrix[i] - edge_matrix[j])
     row_ind, col_ind = linear_sum_assignment(dist_matrix)
-    ##print(row_ind, col_ind) # debug
     return row_ind, col_ind
 
 
@@ -1787,9 +1940,8 @@ def order_edge_array(row_ind, col_ind, edges_array):
     old_split = np.vsplit(edges_array, len(col_ind))
     old_order = []
     for i in range(len(col_ind)):
-        old_order.append(
-            (row_ind[i], col_ind[i], old_split[sorted(col_ind).index(col_ind[i])])
-        )
+        old_order.append((row_ind[i], col_ind[i],
+                          old_split[sorted(col_ind).index(col_ind[i])]))
     new_order = sorted(old_order, key=lambda x: x[0])
     ordered_arr = np.vstack([new_order[j][2] for j in range(len(new_order))])
     return ordered_arr
@@ -1818,15 +1970,15 @@ def make_paired_Xto_x(ec_arr, merged_arr, neighbor_number, sc_unit_cell):
     # switch the X to x for nei_fcpoints
     for i in col_ind:
         if nn(merged_arr[nei_indices[i], 0]) == "X":
-            merged_arr[nei_indices[i], 0] = "x" + nl(merged_arr[nei_indices[i], 0])
+            merged_arr[nei_indices[i],
+                       0] = "x" + nl(merged_arr[nei_indices[i], 0])
     for k in row_ind:
         if ec_indices[k] < len(ec_arr):
             if nn(ec_arr[ec_indices[k], 0]) == "X":
                 ec_arr[ec_indices[k], 0] = "x" + nl(ec_arr[ec_indices[k], 0])
 
     ordered_edges_points_follow_ecXatoms = order_edge_array(
-        row_ind, col_ind, merged_arr
-    )
+        row_ind, col_ind, merged_arr)
     # remove the duplicated cv_xatoms
     ec_merged_arr = np.vstack((ec_arr, ordered_edges_points_follow_ecXatoms))
     return ec_merged_arr
@@ -1863,15 +2015,14 @@ def superG_to_eG_multitopic(superG, sc_unit_cell):
 
             for ne in neighbors:
                 merged_edges = np.vstack(
-                    [superG.edges[n, ne]["f_points"] for ne in neighbors]
-                )
+                    [superG.edges[n, ne]["f_points"] for ne in neighbors])
 
                 # follow the order of X atoms in CV node
 
             # for x atoms in merged_edges, use hungarian algorithm to find the nearest X-X atoms in the neighbor nodes and replace the X to x
-            ec_merged_edges = make_paired_Xto_x(
-                superG.nodes[n]["f_points"], merged_edges, len(neighbors), sc_unit_cell
-            )
+            ec_merged_edges = make_paired_Xto_x(superG.nodes[n]["f_points"],
+                                                merged_edges, len(neighbors),
+                                                sc_unit_cell)
             eG.add_node(
                 "EDGE_" + str(edge_count),
                 f_points=ec_merged_edges,
@@ -1913,15 +2064,14 @@ def superG_to_eG_ditopic(superG):
             )
             # print('add node',n,'type',superG.nodes[n]['type']) #debug
             superG.nodes[n]["index"] = node_count
-            # add virtual edge
-            for e in superG.edges(n):
-                if superG.edges[e]["type"] == "virtual":
-                    eG.add_edge(e[0], e[1], type="virtual")
 
             neighbors = list(superG.neighbors(n))
             for ne in neighbors:
                 if sorted([n, ne]) in edge_record:
                     continue
+                if superG.edges[n, ne]["type"] == "virtual":
+                    continue
+
                 edge_record.append(sorted([n, ne]))
                 edge_count -= 1
                 eG.add_node(
@@ -1946,24 +2096,17 @@ def superG_to_eG_ditopic(superG):
                     index="E_" + str(edge_count),
                     type="half",
                 )
-
+    # add virtual edge
+    for e in superG.edges():
+        if superG.edges[e]["type"] == "virtual":
+            eG.add_edge(e[0], e[1], type="virtual")
+            print("add virtual edge", e[0], e[1])  # debug
     return eG, superG
 
 
-def remove_node_by_index(eG, remove_node_list, remove_edge_list):
-    for n in eG.nodes():
-        if pname(n) != "EDGE":
-            if eG.nodes[n]["index"] in remove_node_list:
-                eG.remove_node(n)
-        if pname(n) == "EDGE":
-            if -1 * eG.nodes[n]["index"] in remove_edge_list:
-                eG.remove_node(n)
-    return eG
-
-
 def find_nearest_neighbor(i, n_n_distance_matrix):
-    n_n_min_distance = np.min(n_n_distance_matrix[i : i + 1, :])
-    _, n_j = locate_min_idx(n_n_distance_matrix[i : i + 1, :])
+    n_n_min_distance = np.min(n_n_distance_matrix[i:i + 1, :])
+    _, n_j = locate_min_idx(n_n_distance_matrix[i:i + 1, :])
     # print('add virtual edge between',nodes_list[i],nodes_list[n_j])
     # n_n_distance_matrix[i, n_j] = 1000
     # set the column to 1000 to avoid the same atom being selected again
@@ -1979,7 +2122,8 @@ def find_surrounding_points(ind, n_n_distance_matrix, max_number):
         stop += 1
         if stop > 100:
             break
-        n_j, _, n_n_distance_matrix = find_nearest_neighbor(ind, n_n_distance_matrix)
+        n_j, _, n_n_distance_matrix = find_nearest_neighbor(
+            ind, n_n_distance_matrix)
         nearest_neighbor[ind].append(n_j)
     return nearest_neighbor
 
@@ -1994,27 +2138,25 @@ def xoo_pair_ind_node(single_node_fc, sc_unit_cell):
     # the distance is in cartesian coordinates
     # single_node_fc: coordinates of any node in the main fragment
     # sc_unit_cell: supercell unit cell matrix
-    single_node = np.hstack(
-        (
-            single_node_fc[:, 0:1],
-            np.dot(sc_unit_cell, single_node_fc[:, 2:5].astype(float).T).T,
-        )
-    )  # NOTE: modified to skip atom type
+    single_node = np.hstack((
+        single_node_fc[:, 0:1],
+        np.dot(sc_unit_cell, single_node_fc[:, 2:5].astype(float).T).T,
+    ))  # NOTE: modified to skip atom type
     xind, xs_coords = fetch_X_atoms_ind_array(single_node, 0, "X")
     oind, os_coords = fetch_X_atoms_ind_array(single_node, 0, "O")
     xs_os_dist_matrix = np.zeros((len(xs_coords), len(os_coords)))
     for i in range(len(xs_coords)):
         for j in range(len(os_coords)):
-            xs_os_dist_matrix[i, j] = np.linalg.norm(
-                xs_coords[i, 1:4].astype(float) - os_coords[j, 1:4].astype(float)
-            )
+            xs_os_dist_matrix[
+                i, j] = np.linalg.norm(xs_coords[i, 1:4].astype(float) -
+                                       os_coords[j, 1:4].astype(float))
     xoo_ind_list = []
     for k in range(len(xind)):
         nearest_dict = find_surrounding_points(k, xs_os_dist_matrix, 2)
         for key in nearest_dict.keys():
             xoo_ind_list.append(
-                [xind[key], sorted([oind[m] for m in nearest_dict[key]])]
-            )
+                [xind[key],
+                 sorted([oind[m] for m in nearest_dict[key]])])
     return xoo_ind_list
 
 
@@ -2024,20 +2166,33 @@ def get_xoo_dict_of_node(eG, sc_unit_cell):
     n0 = [i for i in eG.nodes() if pname(i) != "EDGE"][0]
     n1 = [i for i in eG.nodes() if pname(i) != "EDGE"][1]
     xoo_ind_node0 = xoo_pair_ind_node(
-        eG.nodes[n0]["f_points"], sc_unit_cell
-    )  # pick node one and get xoo_ind pair
+        eG.nodes[n0]["f_points"],
+        sc_unit_cell)  # pick node one and get xoo_ind pair
     xoo_ind_node1 = xoo_pair_ind_node(
-        eG.nodes[n1]["f_points"], sc_unit_cell
-    )  # pick node two and get xoo_ind pair
+        eG.nodes[n1]["f_points"],
+        sc_unit_cell)  # pick node two and get xoo_ind pair
     if xoo_ind_node0 == xoo_ind_node1:
         xoo_dict = {}
         for xoo in xoo_ind_node0:
             xoo_dict[xoo[0]] = xoo[1]
     else:
-        print("the order of xoo in every node are not same, please check the input")
+        print(
+            "the order of xoo in every node are not same, please check the input"
+        )
         print("xoo_ind_node0", xoo_ind_node0)
         print("xoo_ind_node1", xoo_ind_node1)
     return xoo_dict
+
+
+def remove_node_by_index(eG, remove_node_list, remove_edge_list):
+    for n in eG.nodes():
+        if pname(n) != "EDGE":
+            if eG.nodes[n]["index"] in remove_node_list:
+                eG.remove_node(n)
+        if pname(n) == "EDGE":
+            if -1 * eG.nodes[n]["index"] in remove_edge_list:
+                eG.remove_node(n)
+    return eG
 
 
 def addxoo2edge_multitopic(eG, sc_unit_cell):
@@ -2050,15 +2205,13 @@ def addxoo2edge_multitopic(eG, sc_unit_cell):
     # all xoo_node for the V node is the same
     EDGE_nodes = [n for n in eG.nodes() if pname(n) == "EDGE"]
     for n in EDGE_nodes:
+        eG.nodes[n]["xoo_f_points"] = np.zeros((0, 5))
         Xs_edge_indices, Xs_edge_fpoints = fetch_X_atoms_ind_array(
-            eG.nodes[n]["f_points"], 0, "X"
-        )
-        Xs_edge_ccpoints = np.hstack(
-            (
-                Xs_edge_fpoints[:, 0:2],
-                np.dot(sc_unit_cell, Xs_edge_fpoints[:, 2:5].astype(float).T).T,
-            )
-        )  # NOTE: modified to skip atom type
+            eG.nodes[n]["f_points"], 0, "X")
+        Xs_edge_ccpoints = np.hstack((
+            Xs_edge_fpoints[:, 0:2],
+            np.dot(sc_unit_cell, Xs_edge_fpoints[:, 2:5].astype(float).T).T,
+        ))  # NOTE: modified to skip atom type
         V_nodes = [i for i in eG.neighbors(n) if pname(i) != "EDGE"]
         if len(V_nodes) == 0:
             # unsaturated_linker.append(n)
@@ -2072,33 +2225,27 @@ def addxoo2edge_multitopic(eG, sc_unit_cell):
         for v in V_nodes:
             # find the connected V node and its X atoms
             Xs_vnode_indices, Xs_vnode_fpoints = fetch_X_atoms_ind_array(
-                eG.nodes[v]["f_points"], 0, "X"
-            )
-            Xs_vnode_ccpoints = np.hstack(
-                (
-                    Xs_vnode_fpoints[:, 0:2],
-                    np.dot(sc_unit_cell, Xs_vnode_fpoints[:, 2:5].astype(float).T).T,
-                )
-            )  # NOTE: modified to skip atom type
+                eG.nodes[v]["f_points"], 0, "X")
+            Xs_vnode_ccpoints = np.hstack((
+                Xs_vnode_fpoints[:, 0:2],
+                np.dot(sc_unit_cell, Xs_vnode_fpoints[:,
+                                                      2:5].astype(float).T).T,
+            ))  # NOTE: modified to skip atom type
             for ind in Xs_vnode_indices:
                 all_Xs_vnodes_ind.append([v, ind, n])
             all_Xs_vnodes_ccpoints = np.vstack(
-                (all_Xs_vnodes_ccpoints, Xs_vnode_ccpoints)
-            )
+                (all_Xs_vnodes_ccpoints, Xs_vnode_ccpoints))
         edgeX_vnodeX_dist_matrix = np.zeros(
-            (len(Xs_edge_ccpoints), len(all_Xs_vnodes_ccpoints))
-        )
+            (len(Xs_edge_ccpoints), len(all_Xs_vnodes_ccpoints)))
         for i in range(len(Xs_edge_ccpoints)):
             for j in range(len(all_Xs_vnodes_ccpoints)):
                 edgeX_vnodeX_dist_matrix[i, j] = np.linalg.norm(
-                    Xs_edge_ccpoints[i, 2:5].astype(float)
-                    - all_Xs_vnodes_ccpoints[j, 2:5].astype(float)
-                )
+                    Xs_edge_ccpoints[i, 2:5].astype(float) -
+                    all_Xs_vnodes_ccpoints[j, 2:5].astype(float))
 
         for k in range(len(Xs_edge_fpoints)):
             n_j, min_dist, edgeX_vnodeX_dist_matrix = find_nearest_neighbor(
-                k, edgeX_vnodeX_dist_matrix
-            )
+                k, edgeX_vnodeX_dist_matrix)
 
             if min_dist > 4:
                 unsaturated_linker.append(n)
@@ -2113,14 +2260,14 @@ def addxoo2edge_multitopic(eG, sc_unit_cell):
             nearest_X_ind_in_vnode = all_Xs_vnodes_ind[n_j][1]
             matched_vnode_X.append(all_Xs_vnodes_ind[n_j])
             corresponding_o_indices = xoo_dict[nearest_X_ind_in_vnode]
-            xoo_ind_in_vnode = [[nearest_X_ind_in_vnode] + corresponding_o_indices]
+            xoo_ind_in_vnode = [[nearest_X_ind_in_vnode] +
+                                corresponding_o_indices]
             xoo_fpoints_in_vnode = [
                 eG.nodes[nearest_vnode]["f_points"][i] for i in xoo_ind_in_vnode
             ]
             xoo_fpoints_in_vnode = np.vstack(xoo_fpoints_in_vnode)
-            eG.nodes[n]["f_points"] = np.vstack(
-                (eG.nodes[n]["f_points"], xoo_fpoints_in_vnode)
-            )
+            eG.nodes[n]["xoo_f_points"] = np.vstack(
+                (eG.nodes[n]["xoo_f_points"], xoo_fpoints_in_vnode))
             # print('add xoo to edge node',n) #debug
     return eG, unsaturated_linker, matched_vnode_X, xoo_dict
 
@@ -2135,16 +2282,14 @@ def addxoo2edge_ditopic(eG, sc_unit_cell):
     # all xoo_node for the V node is the same
     EDGE_nodes = [n for n in eG.nodes() if pname(n) == "EDGE"]
     for n in EDGE_nodes:
+        eG.nodes[n]["xoo_f_points"] = np.zeros((0, 5))
         Xs_edge_indices, Xs_edge_fpoints = fetch_X_atoms_ind_array(
-            eG.nodes[n]["f_points"], 0, "X"
-        )
-        Xs_edge_ccpoints = np.hstack(
-            (
-                Xs_edge_fpoints[:, 0:2],
-                np.dot(sc_unit_cell, Xs_edge_fpoints[:, 2:5].astype(float).T).T,
-            )
-        )  # NOTE: modified to skip atom type
-        V_nodes = [i for i in eG.neighbors(n) if pname(i) != "EDGE"]
+            eG.nodes[n]["f_points"], 0, "X")
+        Xs_edge_ccpoints = np.hstack((
+            Xs_edge_fpoints[:, 0:2],
+            np.dot(sc_unit_cell, Xs_edge_fpoints[:, 2:5].astype(float).T).T,
+        ))  # NOTE: modified to skip atom type
+        V_nodes = [i for i in eG.neighbors(n) if (pname(i) != "EDGE")]
         if len(V_nodes) == 0:
             # unsaturated_linker.append(n)
             print(
@@ -2157,30 +2302,26 @@ def addxoo2edge_ditopic(eG, sc_unit_cell):
         for v in V_nodes:
             # find the connected V node
             Xs_vnode_indices, Xs_vnode_fpoints = fetch_X_atoms_ind_array(
-                eG.nodes[v]["f_points"], 0, "X"
-            )
-            Xs_vnode_ccpoints = np.hstack(
-                (
-                    Xs_vnode_fpoints[:, 0:2],
-                    np.dot(sc_unit_cell, Xs_vnode_fpoints[:, 2:5].astype(float).T).T,
-                )
-            )  # NOTE: modified to skip atom type
+                eG.nodes[v]["f_points"], 0, "X")
+            Xs_vnode_ccpoints = np.hstack((
+                Xs_vnode_fpoints[:, 0:2],
+                np.dot(sc_unit_cell, Xs_vnode_fpoints[:,
+                                                      2:5].astype(float).T).T,
+            ))  # NOTE: modified to skip atom type
             for ind in Xs_vnode_indices:
                 all_Xs_vnodes_ind.append([v, ind, n])
             all_Xs_vnodes_ccpoints = np.vstack(
-                (all_Xs_vnodes_ccpoints, Xs_vnode_ccpoints)
-            )
+                (all_Xs_vnodes_ccpoints, Xs_vnode_ccpoints))
         edgeX_vnodeX_dist_matrix = np.zeros(
-            (len(Xs_edge_ccpoints), len(all_Xs_vnodes_ccpoints))
-        )
+            (len(Xs_edge_ccpoints), len(all_Xs_vnodes_ccpoints)))
         for i in range(len(Xs_edge_ccpoints)):
             for j in range(len(all_Xs_vnodes_ccpoints)):
                 edgeX_vnodeX_dist_matrix[i, j] = np.linalg.norm(
-                    Xs_edge_ccpoints[i, 2:54].astype(float)
-                    - all_Xs_vnodes_ccpoints[j, 2:5].astype(float)
-                )
+                    Xs_edge_ccpoints[i, 2:54].astype(float) -
+                    all_Xs_vnodes_ccpoints[j, 2:5].astype(float))
         for k in range(len(Xs_edge_fpoints)):
-            n_j, min_dist, _ = find_nearest_neighbor(k, edgeX_vnodeX_dist_matrix)
+            n_j, min_dist, _ = find_nearest_neighbor(k,
+                                                     edgeX_vnodeX_dist_matrix)
             if min_dist > 4:
                 unsaturated_linker.append(n)
                 # print(
@@ -2194,45 +2335,16 @@ def addxoo2edge_ditopic(eG, sc_unit_cell):
             nearest_X_ind_in_vnode = all_Xs_vnodes_ind[n_j][1]
             matched_vnode_X.append(all_Xs_vnodes_ind[n_j])
             corresponding_o_indices = xoo_dict[nearest_X_ind_in_vnode]
-            xoo_ind_in_vnode = [[nearest_X_ind_in_vnode] + corresponding_o_indices]
+            xoo_ind_in_vnode = [[nearest_X_ind_in_vnode] +
+                                corresponding_o_indices]
             xoo_fpoints_in_vnode = [
                 eG.nodes[nearest_vnode]["f_points"][i] for i in xoo_ind_in_vnode
             ]
             xoo_fpoints_in_vnode = np.vstack(xoo_fpoints_in_vnode)
-            eG.nodes[n]["f_points"] = np.vstack(
-                (eG.nodes[n]["f_points"], xoo_fpoints_in_vnode)
-            )
+            eG.nodes[n]["xoo_f_points"] = np.vstack(
+                (eG.nodes[n]["xoo_f_points"], xoo_fpoints_in_vnode))
             # print('add xoo to edge node',n) #debug
     return eG, unsaturated_linker, matched_vnode_X, xoo_dict
-
-
-def recenter_and_norm_vectors(vectors, extra_mass_center=None):
-    vectors = np.array(vectors)
-    if extra_mass_center is not None:
-        mass_center = extra_mass_center
-    else:
-        mass_center = np.mean(vectors, axis=0)
-    vectors = vectors - mass_center
-    vectors = vectors / np.linalg.norm(vectors, axis=1)[:, None]
-    return vectors, mass_center
-
-
-def get_connected_nodes_vectors(node, G):
-    # use adjacent nodes to get vectors
-    vectors = []
-    for i in list(G.neighbors(node)):
-        vectors.append(G.nodes[i]["ccoords"])
-    return vectors, G.nodes[node]["ccoords"]
-
-
-def get_rot_trans_matrix(node, G, sorted_nodes, Xatoms_positions_dict):
-    node_id = sorted_nodes.index(node)
-    node_xvecs = Xatoms_positions_dict[node_id][:, 1:]
-    vecsA, _ = recenter_and_norm_vectors(node_xvecs, extra_mass_center=None)
-    v2, node_center = get_connected_nodes_vectors(node, G)
-    vecsB, _ = recenter_and_norm_vectors(v2, extra_mass_center=node_center)
-    rmsd, rot, tran = superimpose_rotation_only(vecsA, vecsB)
-    return rot, tran
 
 
 def find_unsaturated_node(eG, node_topics):
@@ -2262,22 +2374,12 @@ def find_unsaturated_linker(eG, linker_topics):
 def Carte_points_generator(xyz_num):
     x_num, y_num, z_num = xyz_num
     """this function is to generate a group of 3d points(unit=1) defined by user for further grouping points"""
-    unit_dx, unit_dy, unit_dz = np.array(
-        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
-    )
-    # add x layer
-    points = np.array([0.0, 0.0, 0.0])
+    points = []
     for i in range(0, x_num + 1):
-        points = np.vstack((points, i * unit_dx))
-    # add y layer
-    points_x = points
-    for i in range(0, y_num + 1):
-        points = np.vstack((points, points_x + i * unit_dy))
-    # add z layer
-    points_xy = points
-    for i in range(0, z_num + 1):
-        points = np.vstack((points, points_xy + i * unit_dz))
-    points = np.unique(points, axis=0)
+        for j in range(0, y_num + 1):
+            for k in range(0, z_num + 1):
+                points.append([i, j, k])
+    points = np.array(points)
     return points
 
 
@@ -2334,12 +2436,10 @@ def replace_sG_dvnode_with_vnode(sG, diff_e, dvnode, vnode):
 
     sG.add_node(
         vnode + "_" + str(diff_e),
-        f_points=np.hstack(
-            (
-                sG.nodes[vnode]["f_points"][:, 0:2],
-                sG.nodes[vnode]["f_points"][:, 2:5].astype(float) + diff_e,
-            )
-        ),  # NOTE:modified because of extra column of atom type
+        f_points=np.hstack((
+            sG.nodes[vnode]["f_points"][:, 0:2],
+            sG.nodes[vnode]["f_points"][:, 2:5].astype(float) + diff_e,
+        )),  # NOTE:modified because of extra column of atom type
         fcoords=sG.nodes[vnode]["fcoords"] + diff_e,
         type="SV",
         note=sG.nodes[vnode]["note"],
@@ -2367,6 +2467,7 @@ def replace_DV_with_corresponding_V(sG):
     v_fc = []
     for n in sG.nodes():
         if sG.nodes[n]["type"] == "DV":
+            print("DV node", n)
             moded_dv_fc.append((n, np.mod(sG.nodes[n]["fcoords"], 1)))
         else:
             v_fc.append((n, sG.nodes[n]["fcoords"]))
@@ -2385,9 +2486,8 @@ def replace_DV_with_corresponding_V(sG):
             vnode = v_fc[corresponding_v][0]
             diff_e = sG.nodes[dvnode]["fcoords"] - sG.nodes[vnode]["fcoords"]
             dv_v_pairs.append((dvnode, vnode + "_" + str(diff_e)))
-            sG = replace_sG_dvnode_with_vnode(
-                sG, diff_e, moded_dv_fc[k][0], v_fc[corresponding_v][0]
-            )
+            sG = replace_sG_dvnode_with_vnode(sG, diff_e, moded_dv_fc[k][0],
+                                              v_fc[corresponding_v][0])
         else:
             print(
                 "distance is larger than 1e-2",
@@ -2405,7 +2505,7 @@ def update_supercell_node_fpoints_loose(sG, supercell):
     # incell_node_res = []
     superG = nx.Graph()
     for n in sG.nodes():
-        if sG.nodes[n]["type"] == "SV":  # get rid of SV, sv will be pnode+i
+        if sG.nodes[n]["type"] != "V":  # get rid of SV, sv will be pnode+i
             superG.add_node(
                 n,
                 f_points=sG.nodes[n]["f_points"],
@@ -2425,17 +2525,12 @@ def update_supercell_node_fpoints_loose(sG, supercell):
             note=sG.nodes[n]["note"],
         )
 
-        arr = (
-            sG.nodes[n]["f_points"][:, 2:5].astype(float) + supercell
-        )  # NOTE:modified because of extra column of atom type
-        moded_arr = np.mod(arr, 1)
-        arr = arr.astype(float)
-        moded_arr = moded_arr.astype(float)
-        row_diff = [i for i in range(len(arr)) if not np.allclose(arr[i], moded_arr[i])]
-        diff = [arr[i] - moded_arr[i] for i in row_diff]
+        diffs = (np.mod(sG.nodes[n]["fcoords"], 1) - sG.nodes[n]["fcoords"] +
+                 np.asarray(supercell))
+        diffs = diffs.astype(int)
+        diff_ele = Carte_points_generator(diffs)
+        diff_ele = diff_ele[1:]  # remove the first element [0,0,0]
 
-        diffs = np.round(np.unique(diff, axis=0), 1)
-        diff_ele = split_diffs(diffs)
         # if len(diff_ele) > supercell_Carte.shape[0]:
         #    boundary_node_res.append(n)
         # else:
@@ -2444,22 +2539,21 @@ def update_supercell_node_fpoints_loose(sG, supercell):
         for diff_e in diff_ele:
             diff_e = np.asarray(diff_e)
             if (pname(n) + "_" + str(lname(n) + diff_e)) in superG.nodes():
-                # print("node already in superG", pname(n) + "_" + str(lname(n) + diff_e))
+                print("node already in superG",
+                      pname(n) + "_" + str(lname(n) + diff_e))
                 continue
             superG.add_node(
                 (pname(n) + "_" + str(lname(n) + diff_e)),
-                f_points=np.hstack(
-                    (
-                        sG.nodes[n]["f_points"][:, 0:2],
-                        sG.nodes[n]["f_points"][:, 2:5].astype(float) + diff_e,
-                    )
-                ),  # NOTE:modified because of extra column of atom type
+                f_points=np.hstack((
+                    sG.nodes[n]["f_points"][:, 0:2],
+                    sG.nodes[n]["f_points"][:, 2:5].astype(float) + diff_e,
+                )),  # NOTE:modified because of extra column of atom type
                 fcoords=sG.nodes[n]["fcoords"] + diff_e,
                 type="SV",
                 note=sG.nodes[n]["note"],
             )
 
-    return superG  # ,boundary_node_res,incell_node_res
+    return superG
 
 
 """
@@ -2486,12 +2580,10 @@ def update_supercell_edge_fpoints(sG, superG, supercell):
                 superG.add_edge(
                     s_edge[0],
                     s_edge[1],
-                    f_points=np.hstack(
-                        (
-                            sG.edges[e]["f_points"][:, 0:2],
-                            sG.edges[e]["f_points"][:, 2:5].astype(float) + i,
-                        )
-                    ),  # NOTE:modified because of extra column of atom type
+                    f_points=np.hstack((
+                        sG.edges[e]["f_points"][:, 0:2],
+                        sG.edges[e]["f_points"][:, 2:5].astype(float) + i,
+                    )),  # NOTE:modified because of extra column of atom type
                     fcoords=sG.edges[e]["fcoords"] + i,
                     type=sG.edges[e]["type"],
                 )
@@ -2503,7 +2595,8 @@ def update_supercell_edge_fpoints(sG, superG, supercell):
                         f_points=np.hstack(
                             (
                                 sG.nodes[e[1]]["f_points"][:, 0:2],
-                                sG.nodes[e[1]]["f_points"][:, 2:5].astype(float) + i,
+                                sG.nodes[e[1]]["f_points"][:, 2:5].astype(float)
+                                + i,
                             )
                         ),  # NOTE:modified because of extra column of atom type
                         fcoords=sG.nodes[e[1]]["fcoords"] + i,
@@ -2517,7 +2610,8 @@ def update_supercell_edge_fpoints(sG, superG, supercell):
                         f_points=np.hstack(
                             (
                                 sG.nodes[e[0]]["f_points"][:, 0:2],
-                                sG.nodes[e[0]]["f_points"][:, 2:5].astype(float) + i,
+                                sG.nodes[e[0]]["f_points"][:, 2:5].astype(float)
+                                + i,
                             )
                         ),  # NOTE:modified because of extra column of atom type
                         fcoords=sG.nodes[e[0]]["fcoords"] + i,
@@ -2528,16 +2622,16 @@ def update_supercell_edge_fpoints(sG, superG, supercell):
                 superG.add_edge(
                     s_edge[0],
                     s_edge[1],
-                    f_points=np.hstack(
-                        (
-                            sG.edges[e]["f_points"][:, 0:2],
-                            sG.edges[e]["f_points"][:, 2:5].astype(float) + i,
-                        )
-                    ),  # NOTE:modified because of extra column of atom type
+                    f_points=np.hstack((
+                        sG.edges[e]["f_points"][:, 0:2],
+                        sG.edges[e]["f_points"][:, 2:5].astype(float) + i,
+                    )),  # NOTE:modified because of extra column of atom type
                     fcoords=sG.edges[e]["fcoords"] + i,
                     type="DSE",
                 )
 
+            else:
+                print("edge not in superG", s_edge[0], s_edge[1])
     return superG
 
 
@@ -2575,9 +2669,9 @@ def make_super_multiedge_bundlings(prim_multiedge_bundlings, supercell):
 
 
 def update_supercell_bundle(superG, super_multiedge_bundlings):
-    # print("*" * 50)
-    # print("superG nodes name", list(superG.nodes()))
-    # print("*" * 50)
+    print("*" * 50)
+    print("superG nodes name", list(superG.nodes()))
+    print("*" * 50)
     for ec_node in super_multiedge_bundlings.keys():
         con_nodes = super_multiedge_bundlings[ec_node]
         # order the con_nodes by th x-x pair of the ecnode X atoms
@@ -2586,39 +2680,33 @@ def update_supercell_bundle(superG, super_multiedge_bundlings):
             trans = lname(ec_node)
             superG.add_node(
                 ec_node,
-                f_points=np.hstack(
-                    (
-                        superG.nodes[prim_ecname]["f_points"][
-                            :, 0:2
-                        ],  # NOTE:modified because of extra column of atom type
-                        superG.nodes[prim_ecname]["f_points"][:, 2:5].astype(float)
-                        + trans,
-                    )
-                ),  # NOTE:modified because of extra column of atom type
+                f_points=np.hstack((
+                    superG.nodes[prim_ecname]["f_points"]
+                    [:,
+                     0:2],  # NOTE:modified because of extra column of atom type
+                    superG.nodes[prim_ecname]["f_points"][:, 2:5].astype(float)
+                    + trans,
+                )),  # NOTE:modified because of extra column of atom type
                 fcoords=superG.nodes[prim_ecname]["fcoords"] + trans,
                 type="SV",
                 note=superG.nodes[prim_ecname]["note"],
             )
         for j in range(len(con_nodes)):
             cn = con_nodes[j]
-            prim_cnname = super_multiedge_bundlings[
-                prim_ecname
-            ][
-                j
-            ]  # find prim_ecname in super_multiedge_bundlings and then get the corresponding prim_cnname
+            prim_cnname = super_multiedge_bundlings[prim_ecname][
+                j]  # find prim_ecname in super_multiedge_bundlings and then get the corresponding prim_cnname
             trans = lname(cn) - lname(prim_cnname)
             if cn not in superG.nodes():
                 superG.add_node(
                     cn,
-                    f_points=np.hstack(
-                        (
-                            superG.nodes[prim_cnname]["f_points"][
-                                :, 0:2
-                            ],  # NOTE:modified because of extra column of atom type
-                            superG.nodes[prim_cnname]["f_points"][:, 2:5].astype(float)
-                            + trans,
-                        )
-                    ),  # NOTE:modified because of extra column of atom type
+                    f_points=np.hstack((
+                        superG.nodes[prim_cnname]["f_points"]
+                        [:, 0:
+                         2],  # NOTE:modified because of extra column of atom type
+                        superG.nodes[prim_cnname]["f_points"][:,
+                                                              2:5].astype(float)
+                        + trans,
+                    )),  # NOTE:modified because of extra column of atom type
                     fcoords=superG.nodes[prim_cnname]["fcoords"] + trans,
                     type="SV",
                     note=superG.nodes[prim_cnname]["note"],
@@ -2626,18 +2714,16 @@ def update_supercell_bundle(superG, super_multiedge_bundlings):
             superG.add_edge(
                 ec_node,
                 cn,
-                f_points=np.hstack(
-                    (
-                        superG.edges[prim_ecname, prim_cnname]["f_points"][
-                            :, 0:2
-                        ],  # NOTE:modified because of extra column of atom type
-                        superG.edges[prim_ecname, prim_cnname]["f_points"][
-                            :, 2:5
-                        ].astype(float)
-                        + trans,
-                    )
-                ),  # NOTE:modified because of extra column of atom type
-                fcoords=superG.edges[prim_ecname, prim_cnname]["fcoords"] + trans,
+                f_points=np.hstack((
+                    superG.edges[prim_ecname, prim_cnname]["f_points"]
+                    [:,
+                     0:2],  # NOTE:modified because of extra column of atom type
+                    superG.edges[prim_ecname,
+                                 prim_cnname]["f_points"][:, 2:5].astype(float)
+                    + trans,
+                )),  # NOTE:modified because of extra column of atom type
+                fcoords=superG.edges[prim_ecname, prim_cnname]["fcoords"] +
+                trans,
                 type="DSE",
             )
 
@@ -2653,9 +2739,10 @@ def check_multiedge_bundlings_insuperG(super_multiedge_bundlings, superG):
         if set(cvnodes) == set([i[0] for i in super_multiedge_bundlings_edges]):
             return superG
         else:
-            # print("not all CV nodes in super_multiedge_bundlings_edges")
-            diff_element = set(cvnodes).difference(set(list(super_multiedge_bundlings)))
-            # print("to remove diff_element", diff_element)
+            print("not all CV nodes in super_multiedge_bundlings_edges")
+            diff_element = set(cvnodes).difference(
+                set(list(super_multiedge_bundlings)))
+            print("to remove diff_element", diff_element)
             # remove the diff_element from the superG
             for n in diff_element:
                 superG.remove_node(n)
@@ -2667,15 +2754,12 @@ def check_multiedge_bundlings_insuperG(super_multiedge_bundlings, superG):
             return superG
 
 
-########## the above is to process the multiedge bundling in superG###########
-
-
 def locate_min_idx(matrix):
     min_idx = np.unravel_index(matrix.argmin(), matrix.shape)
     return min_idx[0], min_idx[1]
 
 
-def add_virtual_edge(superG, bridge_node_distance, max_neighbor=2):
+def add_virtual_edge(unit_cell, superG, bridge_node_distance, max_neighbor=2):
     # add pillar nodes virtual edges
     nodes_list = [n for n in superG.nodes() if superG.nodes[n]["note"] == "V"]
     n_n_distance_matrix = np.zeros((len(nodes_list), len(nodes_list)))
@@ -2683,9 +2767,11 @@ def add_virtual_edge(superG, bridge_node_distance, max_neighbor=2):
     for i in range(len(nodes_list)):
         for j in range(len(nodes_list)):
             n_n_distance_matrix[i, j] = np.linalg.norm(
-                superG.nodes[nodes_list[i]]["fcoords"]
-                - superG.nodes[nodes_list[j]]["fcoords"]
-            )
+                np.dot(
+                    unit_cell,
+                    superG.nodes[nodes_list[i]]["fcoords"] -
+                    superG.nodes[nodes_list[j]]["fcoords"],
+                ))
         n_n_distance_matrix[i, i] = 1000
     # use hungrain algorithm to find the shortest path between all nodes
 
@@ -2693,13 +2779,14 @@ def add_virtual_edge(superG, bridge_node_distance, max_neighbor=2):
         neighbor_count = 0
         while neighbor_count < max_neighbor:
 
-            def add_virtual_edge(
-                i, n_n_distance_matrix, superG, bridge_node_distance, count
-            ):
-                n_n_min_distance = np.min(n_n_distance_matrix[i : i + 1, :])
+            def add_virtual_edge(i, n_n_distance_matrix, superG,
+                                 bridge_node_distance, count):
+                n_n_min_distance = np.min(n_n_distance_matrix[i:i + 1, :])
                 if n_n_min_distance < bridge_node_distance:
-                    _, n_j = locate_min_idx(n_n_distance_matrix[i : i + 1, :])
-                    superG.add_edge(nodes_list[i], nodes_list[n_j], type="virtual")
+                    _, n_j = locate_min_idx(n_n_distance_matrix[i:i + 1, :])
+                    superG.add_edge(nodes_list[i],
+                                    nodes_list[n_j],
+                                    type="virtual")
                     # print('add virtual edge between',nodes_list[i],nodes_list[n_j])
                     n_n_distance_matrix[i, n_j] = 1000
                     return True, count + 1, n_n_distance_matrix, superG
@@ -2707,8 +2794,8 @@ def add_virtual_edge(superG, bridge_node_distance, max_neighbor=2):
                     return False, count, n_n_distance_matrix, superG
 
             added, neighbor_count, n_n_distance_matrix, superG = add_virtual_edge(
-                i, n_n_distance_matrix, superG, bridge_node_distance, neighbor_count
-            )
+                i, n_n_distance_matrix, superG, bridge_node_distance,
+                neighbor_count)
             if not added:
                 break
 
@@ -2722,9 +2809,40 @@ def fetch_X_atoms_ind_array(array, column, X):
     # column: column index to check for label
     # X: label to search for
 
-    ind = [k for k in range(len(array)) if re.sub(r"\d", "", array[k, column]) == X]
+    ind = [
+        k for k in range(len(array)) if re.sub(r"\d", "", array[k, column]) == X
+    ]
     x_array = array[ind]
     return ind, x_array
+
+
+def recenter_and_norm_vectors(vectors, extra_mass_center=None):
+    vectors = np.array(vectors)
+    if extra_mass_center is not None:
+        mass_center = extra_mass_center
+    else:
+        mass_center = np.mean(vectors, axis=0)
+    vectors = vectors - mass_center
+    vectors = vectors / np.linalg.norm(vectors, axis=1)[:, None]
+    return vectors, mass_center
+
+
+def get_connected_nodes_vectors(node, G):
+    # use adjacent nodes to get vectors
+    vectors = []
+    for i in list(G.neighbors(node)):
+        vectors.append(G.nodes[i]["ccoords"])
+    return vectors, G.nodes[node]["ccoords"]
+
+
+def get_rot_trans_matrix(node, G, sorted_nodes, Xatoms_positions_dict):
+    node_id = sorted_nodes.index(node)
+    node_xvecs = Xatoms_positions_dict[node_id][:, 1:]
+    vecsA, _ = recenter_and_norm_vectors(node_xvecs, extra_mass_center=None)
+    v2, node_center = get_connected_nodes_vectors(node, G)
+    vecsB, _ = recenter_and_norm_vectors(v2, extra_mass_center=node_center)
+    _, rot, tran = superimpose_rotation_only(vecsA, vecsB)
+    return rot, tran
 
 
 def sort_nodes_by_type_connectivity(G):
@@ -2739,23 +2857,19 @@ def sort_nodes_by_type_connectivity(G):
         # CV+V
         # get CV_Vnode
         CV_Vnodes = [
-            n
-            for n in G.nodes()
+            n for n in G.nodes()
             if G.nodes[n]["type"] == "V" and G.nodes[n]["note"] == "CV"
         ]
         CV_DVnodes = [
-            n
-            for n in G.nodes()
+            n for n in G.nodes()
             if G.nodes[n]["type"] == "DV" and G.nodes[n]["note"] == "CV"
         ]
         V_Vnodes = [
-            n
-            for n in G.nodes()
+            n for n in G.nodes()
             if G.nodes[n]["type"] == "V" and G.nodes[n]["note"] == "V"
         ]
         V_DVnodes = [
-            n
-            for n in G.nodes()
+            n for n in G.nodes()
             if G.nodes[n]["type"] == "DV" and G.nodes[n]["note"] == "V"
         ]
         CV_Vnodes = sorted(CV_Vnodes, key=lambda x: G.degree(x), reverse=True)
@@ -2779,39 +2893,8 @@ def put_V_ahead_of_CV(e):
         return e
 
 
-def find_and_sort_edges_bynodeconnectivity(graph, sorted_nodes):
-    all_edges = list(graph.edges())
-
-    sorted_edges = []
-    # add unit_cell edge first
-
-    ei = 0
-    while ei < len(all_edges):
-        e = all_edges[ei]
-        if check_edge_inunitcell(graph, e):
-            sorted_edges.append(put_V_ahead_of_CV(e))
-            all_edges.pop(ei)
-        ei += 1
-    # sort edge by sorted_nodes
-    for n in sorted_nodes:
-        ei = 0
-        while ei < len(all_edges):
-            e = all_edges[ei]
-            if n in e:
-                if n == e[0]:
-                    sorted_edges.append(put_V_ahead_of_CV(e))
-                else:
-                    sorted_edges.append(put_V_ahead_of_CV((e[1], e[0])))
-                all_edges.pop(ei)
-            else:
-                ei += 1
-
-    return sorted_edges
-
-
-def make_unsaturated_vnode_xoo_dict(
-    unsaturated_node, xoo_dict, matched_vnode_xind, eG, sc_unit_cell
-):
+def make_unsaturated_vnode_xoo_dict(unsaturated_node, xoo_dict,
+                                    matched_vnode_xind, eG, sc_unit_cell):
     """
     make a dictionary of the unsaturated node and the exposed X connected atom index and the corresponding O connected atoms
     """
@@ -2843,19 +2926,19 @@ def make_unsaturated_vnode_xoo_dict(
         for xind in exposed_x_indices:
             x_fpoints = eG.nodes[vnode]["f_points"][xind]
             x_cpoints = np.hstack(
-                (x_fpoints[0:2], fractional_to_cartesian(x_fpoints[2:5], sc_unit_cell))
-            )  # NOTE: modified add the atom type and atom name
+                (x_fpoints[0:2],
+                 fractional_to_cartesian(x_fpoints[2:5], sc_unit_cell)
+                ))  # NOTE: modified add the atom type and atom name
             oo_ind_in_vnode = xoo_dict[xind]
             oo_fpoints_in_vnode = [
                 eG.nodes[vnode]["f_points"][i] for i in oo_ind_in_vnode
             ]
             oo_fpoints_in_vnode = np.vstack(oo_fpoints_in_vnode)
-            oo_cpoints = np.hstack(
-                (
-                    oo_fpoints_in_vnode[:, 0:2],
-                    fractional_to_cartesian(oo_fpoints_in_vnode[:, 2:5], sc_unit_cell),
-                )
-            )  # NOTE: modified add the atom type and atom name
+            oo_cpoints = np.hstack((
+                oo_fpoints_in_vnode[:, 0:2],
+                fractional_to_cartesian(oo_fpoints_in_vnode[:, 2:5],
+                                        sc_unit_cell),
+            ))  # NOTE: modified add the atom type and atom name
 
             unsaturated_vnode_xoo_dict[(vnode, xind)] = {
                 "xind": xind,
@@ -2873,9 +2956,8 @@ def make_unsaturated_vnode_xoo_dict(
     )
 
 
-def update_matched_nodes_xind(
-    removed_nodes_list, removed_edges_list, matched_vnode_xind
-):
+def update_matched_nodes_xind(removed_nodes_list, removed_edges_list,
+                              matched_vnode_xind):
     # if linked edge is removed and the connected node is not removed, then remove this line from matched_vnode_xind
     # add remove the middle xind of the node to matched_vnode_xind_dict[node] list
     to_remove_row = []
@@ -2919,25 +3001,25 @@ def extract_node_edge_term(tG, sc_unit_cell):
             nodes_check_set.add(len(postions))
             nodes_name_set.add(name)
             if len(nodes_check_set) > len(nodes_name_set):
-                raise ValueError("node index is not continuous")
+                raise ValueError(
+                    "node index is not continuous, MOF have too many mixed nodes?"
+                )
             node_res_num += 1
             nodes_tG.append(
-                np.hstack(
-                    (
-                        np.tile(
-                            np.array([node_res_num, name]), (len(postions), 1)
-                        ),  # residue number and residue name
-                        postions[:, 1:2],  # atom type (element)
-                        fractional_to_cartesian(
-                            postions[:, 2:5], sc_unit_cell
-                        ),  # Cartesian coordinates
-                        postions[:, 0:1],  # atom name
-                        np.tile(np.array([n]), (len(postions), 1)),
-                    )
-                )
-            )  # node name in eG is added to the last column
+                np.hstack((
+                    np.tile(
+                        np.array([node_res_num, name]),
+                        (len(postions), 1)),  # residue number and residue name
+                    postions[:, 1:2],  # atom type (element)
+                    fractional_to_cartesian(
+                        postions[:,
+                                 2:5], sc_unit_cell),  # Cartesian coordinates
+                    postions[:, 0:1],  # atom name
+                    np.tile(np.array([n]), (len(postions), 1)),
+                )))  # node name in eG is added to the last column
             if "term_c_points" in tG.nodes[n]:
-                for term_ind_key, c_positions in tG.nodes[n]["term_c_points"].items():
+                for term_ind_key, c_positions in tG.nodes[n][
+                        "term_c_points"].items():
                     terms_check_set.add(len(c_positions))
                     name = "T" + tG.nodes[n]["name"]
                     terms_name_set.add(name)
@@ -2946,24 +3028,21 @@ def extract_node_edge_term(tG, sc_unit_cell):
 
                     term_res_num += 1
                     terms_tG.append(
-                        np.hstack(
-                            (
-                                np.tile(
-                                    np.array([term_res_num, name]),
-                                    (len(c_positions), 1),
-                                ),  # residue number and residue name
-                                c_positions[:, 1:2],  # atom type (element)
-                                c_positions[:, 2:5],  # Cartesian coordinates
-                                c_positions[:, 0:1],  # atom name
-                                np.tile(
-                                    np.array([term_ind_key]), (len(c_positions), 1)
-                                ),
-                            )
-                        )
-                    )  # term name in eG is added to the last column
+                        np.hstack((
+                            np.tile(
+                                np.array([term_res_num, name]),
+                                (len(c_positions), 1),
+                            ),  # residue number and residue name
+                            c_positions[:, 1:2],  # atom type (element)
+                            c_positions[:, 2:5],  # Cartesian coordinates
+                            c_positions[:, 0:1],  # atom name
+                            np.tile(np.array([term_ind_key]),
+                                    (len(c_positions), 1)),
+                        )))  # term name in eG is added to the last column
 
         elif pname(n) == "EDGE":
-            postions = tG.nodes[n]["f_points"]
+            postions = np.vstack(
+                (tG.nodes[n]["f_points"], tG.nodes[n]["xoo_f_points"]))
             name = tG.nodes[n]["name"]
             edges_check_set.add(len(postions))
             edges_name_set.add(name)
@@ -2977,24 +3056,18 @@ def extract_node_edge_term(tG, sc_unit_cell):
                 )
             edge_res_num += 1
             edges_tG.append(
-                np.hstack(
-                    (
-                        np.tile(
-                            np.array([edge_res_num, name]), (len(postions), 1)
-                        ),  # residue number and residue name
-                        postions[:, 1:2],  # atom type (element)
-                        fractional_to_cartesian(
-                            postions[:, 2:5], sc_unit_cell
-                        ),  # Cartesian coordinates
-                        postions[:, 0:1],  # atom name
-                        np.tile(np.array([n]), (len(postions), 1)),
-                    )
-                )
-            )  # edge name in eG is added to the last column
+                np.hstack((
+                    np.tile(
+                        np.array([edge_res_num, name]),
+                        (len(postions), 1)),  # residue number and residue name
+                    postions[:, 1:2],  # atom type (element)
+                    fractional_to_cartesian(
+                        postions[:,
+                                 2:5], sc_unit_cell),  # Cartesian coordinates
+                    postions[:, 0:1],  # atom name
+                    np.tile(np.array([n]), (len(postions), 1)),
+                )))  # edge name in eG is added to the last column
 
-    # nodes_tG = np.vstack(nodes_tG)
-    # terms_tG = np.vstack(terms_tG)
-    # edges_tG = np.vstack(edges_tG)
     return nodes_tG, edges_tG, terms_tG, node_res_num, edge_res_num, term_res_num
 
 
@@ -3004,51 +3077,49 @@ def check_supercell_box_range(point, supercell, buffer_plus, buffer_minus):
     supercell_x = supercell[0] + buffer_plus
     supercell_y = supercell[1] + buffer_plus
     supercell_z = supercell[2] + buffer_plus
-    if (
-        point[0] >= 0 + buffer_minus
-        and point[0] <= supercell_x
-        and point[1] >= 0 + buffer_minus
-        and point[1] <= supercell_y
-        and point[2] >= 0 + buffer_minus
-        and point[2] <= supercell_z
-    ):
+    if (point[0] >= 0 + buffer_minus and point[0] <= supercell_x and
+            point[1] >= 0 + buffer_minus and point[1] <= supercell_y and
+            point[2] >= 0 + buffer_minus and point[2] <= supercell_z):
         return True
     else:
         # print(point, 'out of supercell box range:  [',supercell_x,supercell_y,supercell_z, '],   will be excluded') #debug
         return False
 
 
-def replace_edges_by_callname(
-    edge_n_list, eG, sc_unit_cell_inv, new_linker_pdb, prefix="R"
-):
+def replace_edges_by_callname(edge_n_list,
+                              eG,
+                              sc_unit_cell_inv,
+                              new_linker_pdb,
+                              prefix="R"):
     new_linker_atoms, new_linker_ccoords, new_linker_x_ccoords = process_node_pdb(
-        new_linker_pdb, "X"
-    )
+        new_linker_pdb, "X")
     for edge_n in edge_n_list:
+        # check if edge_n is in eG
+        if edge_n not in eG.nodes():
+            print("this linker is not in MOF, will be skipped", edge_n)
+            continue
         edge_n = edge_n
         edge_f_points = eG.nodes[edge_n]["f_points"]
         x_indices = [
-            i for i in range(len(edge_f_points)) if nn(edge_f_points[i][0]) == "X"
+            i for i in range(len(edge_f_points))
+            if nn(edge_f_points[i][0]) == "X"
         ]
         edge_x_points = edge_f_points[x_indices]
         edge_com = np.mean(edge_x_points[:, 2:5].astype(float), axis=0)
         edge_x_fcoords = edge_x_points[:, 2:5].astype(float) - edge_com
 
-        new_linker_x_fcoords = cartesian_to_fractional(
-            new_linker_x_ccoords, sc_unit_cell_inv
-        )
-        new_linker_fcoords = cartesian_to_fractional(
-            new_linker_ccoords, sc_unit_cell_inv
-        )
+        new_linker_x_fcoords = cartesian_to_fractional(new_linker_x_ccoords,
+                                                       sc_unit_cell_inv)
+        new_linker_fcoords = cartesian_to_fractional(new_linker_ccoords,
+                                                     sc_unit_cell_inv)
 
         _, rot, trans = superimpose(new_linker_x_fcoords, edge_x_fcoords)
         replaced_linker_fcoords = np.dot(new_linker_fcoords, rot) + edge_com
         replaced_linker_f_points = np.hstack(
-            (new_linker_atoms, replaced_linker_fcoords)
-        )
+            (new_linker_atoms, replaced_linker_fcoords))
 
         eG.nodes[edge_n]["f_points"] = replaced_linker_f_points
-        eG.nodes[edge_n]["name"] = prefix + eG.nodes[edge_n]["name"]
+        eG.nodes[edge_n]["name"] = prefix + edge_n
 
     return eG
 
@@ -3071,7 +3142,7 @@ def make_dummy_split_node_dict(dummy_node_name):
     dict_path = dummy_node_name.split(".")[0] + "_dict"
     with open(dict_path, "r") as f:
         lines = f.readlines()
-    node_res_counts = 0
+    # node_res_counts = 0
     for li in lines:
         li = li.strip("\n")
         key = li[:20].strip(" ")
@@ -3082,8 +3153,7 @@ def make_dummy_split_node_dict(dummy_node_name):
 
 def chunk_array(chunk_list, array, chunk_num, chunksize):
     chunk_list.extend(
-        array[i * chunksize : (i + 1) * chunksize] for i in range(chunk_num)
-    )
+        array[i * chunksize:(i + 1) * chunksize] for i in range(chunk_num))
     return chunk_list
 
 
@@ -3109,13 +3179,13 @@ def rename_node_arr(node_split_dict, node_arr):
         if metal_num > 0:
             metal = idx_arr[0:metal_range].copy()
             metal[:, 1] = "METAL"
-            metals_list = chunk_array(
-                metals_list, metal, node_split_dict["METAL_count"], dummy_len
-            )
+            metals_list = chunk_array(metals_list, metal,
+                                      node_split_dict["METAL_count"], dummy_len)
         if hho_num > 0:
             hho = idx_arr[metal_range:hho_range].copy()
             hho[:, 1] = "HHO"
-            hhos_list = chunk_array(hhos_list, hho, node_split_dict["HHO_count"], 3)
+            hhos_list = chunk_array(hhos_list, hho,
+                                    node_split_dict["HHO_count"], 3)
         if ho_num > 0:
             ho = idx_arr[hho_range:ho_range].copy()
             ho[:, 1] = "HO"
@@ -3128,17 +3198,15 @@ def rename_node_arr(node_split_dict, node_arr):
     return metals_list, hhos_list, hos_list, os_list
 
 
-def merge_metal_list_to_node_array(
-    merged_node_edge_term, metals_list, line_num, res_count
-):
+def merge_metal_list_to_node_array(merged_node_edge_term, metals_list, line_num,
+                                   res_count):
     if any([len(metal) == 0 for metal in metals_list]):
         return merged_node_edge_term, line_num, res_count
     for i in range(len(metals_list)):
         metal = metals_list[i]
         metal[:, 0] = i + 1
         formatted_gro_lines, line_num = convert_node_array_to_gro_lines(
-            metal, line_num, res_count
-        )
+            metal, line_num, res_count)
         merged_node_edge_term += formatted_gro_lines
     res_count += len(metals_list)
     return merged_node_edge_term, line_num, res_count
@@ -3152,7 +3220,7 @@ def convert_node_array_to_gro_lines(array, line_num_start, res_num_start):
         ind_inres = i + 1
         name = line[1]
         value_atom_number_in_gro = int(ind_inres + line_num_start)  # atom_number
-        value_label = re.sub("\d", "", line[2]) + str(ind_inres)  # atom_label
+        value_label = re.sub(r"\d", "", line[2]) + str(ind_inres)  # atom_label
         value_resname = str(name)[0:3]  # +str(eG.nodes[n]['index'])  # residue_name
         value_resnumber = int(res_num_start + int(line[0]))  # residue number
         value_x = 0.1 * float(line[3])  # x
@@ -3171,28 +3239,28 @@ def convert_node_array_to_gro_lines(array, line_num_start, res_num_start):
     return formatted_gro_lines, value_atom_number_in_gro
 
 
-def merge_node_edge_term(nodes_tG, edges_tG, terms_tG, node_res_num, edge_res_num):
+def merge_node_edge_term(nodes_tG, edges_tG, terms_tG, node_res_num,
+                         edge_res_num):
     merged_node_edge_term = []
     line_num = 0
     for node in nodes_tG:
         formatted_gro_lines, line_num = convert_node_array_to_gro_lines(
-            node, line_num, 0
-        )
+            node, line_num, 0)
         merged_node_edge_term += formatted_gro_lines
     for edge in edges_tG:
         formatted_gro_lines, line_num = convert_node_array_to_gro_lines(
-            edge, line_num, node_res_num
-        )
+            edge, line_num, node_res_num)
         merged_node_edge_term += formatted_gro_lines
     for term in terms_tG:
         formatted_gro_lines, line_num = convert_node_array_to_gro_lines(
-            term, line_num, node_res_num + edge_res_num
-        )
+            term, line_num, node_res_num + edge_res_num)
         merged_node_edge_term += formatted_gro_lines
     return merged_node_edge_term
 
 
-def save_node_edge_term_gro(merged_node_edge_term, gro_name, dir_name="output_gros"):
+def save_node_edge_term_gro(merged_node_edge_term,
+                            gro_name,
+                            dir_name="output_gros"):
     Path(dir_name).mkdir(parents=True, exist_ok=True)
     gro_name = str(Path(dir_name, gro_name))
     with open(gro_name + ".gro", "w") as f:
@@ -3206,13 +3274,14 @@ def save_node_edge_term_gro(merged_node_edge_term, gro_name, dir_name="output_gr
 
 
 #################below are from display.py######################
-def gro_show(gro_file, w=800, h=600, res_id=True, res_name=True):
+
+
+def gro_string_show(gro_lines_list, w=800, h=600, res_id=True, res_name=True):
     try:
         import py3Dmol
 
         viewer = py3Dmol.view(width=w, height=h)
-        with open(gro_file, "r") as f:
-            lines = f.readlines()
+        lines = gro_lines_list
 
         viewer.addModel("".join(lines), "gro")
         # viewer.setStyle({"stick": {}})
@@ -3272,7 +3341,6 @@ class NetOptimizer:
     :param template_cif (str):
         cif file of the template, including only V and E *(EC)nodes info in primitive cell
     Instance variables:
-        - node_cif (str):cif file of the node
         - node_target_type (str):metal atom type of the node
         - node_unit_cell (array):unit cell of the node
         - node_atom (array):2 columns, atom_name, atom_type of the node
@@ -3280,7 +3348,6 @@ class NetOptimizer:
         - node_fcoords (array):fractional coordinates of the whole node
         - node_x_ccoords (array):cartesian coordinates of the X connected atoms of node
         - node_coords (array):cartesian coordinates of the whole node
-        - linker_cif (str):cif file of the ditopic linker or branch of multitopic linker
         - linker_unit_cell (array):unit cell of the ditopic linker or branch of multitopic linker
         - linker_atom (array):2 columns, atom_name, atom_type of the ditopic linker or branch of multitopic linker
         - linker_x_fcoords (array):fractional coordinates of the X connected atoms of ditopic linker or branch of multitopic linker
@@ -3358,10 +3425,11 @@ class NetOptimizer:
             cell information of the template
         """
         template_cell_info, _, vvnode = extract_type_atoms_fcoords_in_primitive_cell(
-            template_cif, "V"
-        )
-        _, _, eenode = extract_type_atoms_fcoords_in_primitive_cell(template_cif, "E")
-        _, _, ecnode = extract_type_atoms_fcoords_in_primitive_cell(template_cif, "EC")
+            template_cif, "V")
+        _, _, eenode = extract_type_atoms_fcoords_in_primitive_cell(
+            template_cif, "E")
+        _, _, ecnode = extract_type_atoms_fcoords_in_primitive_cell(
+            template_cif, "EC")
         unit_cell = extract_unit_cell(template_cell_info)
 
         vvnode = np.unique(np.array(vvnode, dtype=float), axis=0)
@@ -3381,7 +3449,7 @@ class NetOptimizer:
         self.eenode333 = eenode333
         self.ecnode333 = ecnode333
 
-    def analyze_template_ditopic(self, template_cif):
+    def analyze_template_ditopic(self, template_cif, pair_v_e_range=[]):
         """
         analyze the template topology of the ditopic linker, only V and E nodes in the template
 
@@ -3389,9 +3457,9 @@ class NetOptimizer:
             cif file of the template, including only V and E nodes info in primitive cell
         """
         template_cell_info, _, vvnode = extract_type_atoms_fcoords_in_primitive_cell(
-            template_cif, "V"
-        )
-        _, _, eenode = extract_type_atoms_fcoords_in_primitive_cell(template_cif, "E")
+            template_cif, "V")
+        _, _, eenode = extract_type_atoms_fcoords_in_primitive_cell(
+            template_cif, "E")
         unit_cell = extract_unit_cell(template_cell_info)
 
         vvnode = np.unique(np.array(vvnode, dtype=float), axis=0)
@@ -3399,7 +3467,10 @@ class NetOptimizer:
         ##loop over super333xxnode and super333yynode to find the pair of x node in unicell which pass through the yynode
         vvnode333 = make_supercell_3x3x3(vvnode)
         eenode333 = make_supercell_3x3x3(eenode)
-        _, _, G = find_pair_v_e(vvnode333, eenode333)
+        _, _, G = find_pair_v_e(vvnode333,
+                                eenode333,
+                                unit_cell,
+                                distance_range=pair_v_e_range)
         G = add_ccoords(G, unit_cell)
         G, self.node_max_degree = set_DV_V(G)
         self.G = set_DE_E(G)
@@ -3407,34 +3478,33 @@ class NetOptimizer:
         self.vvnode333 = vvnode333
         self.eenode333 = eenode333
 
-    def node_info(self, node_pdb):
+    def node_info(self, node_pdb, com_target_type="X"):
         """
         get the node information
 
-        :param node_cif (str):
-            cif file of the node
+        :param node_pdb (str):
+            pdb file of the node
         :param node_target_type (str):
             metal atom type of the node
         """
         self.node_pdb = node_pdb
         self.node_atom, self.node_ccoords, self.node_x_ccoords = process_node_pdb(
-            node_pdb, "X"
+            node_pdb,
+            com_target_type,  # TODO: change to the target type X
         )  # com type could be metal in bridge nodes
 
     def linker_info(self, linker_pdb):
         """
         get the linker information
 
-        :param linker_cif (str):
-            cif file of the ditopic linker or branch of multitopic linker
+        :param linker_pdb (str):
+            pdb file of the ditopic linker or branch of multitopic linker
         """
         self.linker_pdb = linker_pdb
         self.linker_atom, self.linker_ccoords, self.linker_x_ccoords = process_node_pdb(
-            linker_pdb, "X"
-        )
-        self.linker_length = np.linalg.norm(
-            self.linker_x_ccoords[0] - self.linker_x_ccoords[1]
-        )
+            linker_pdb, "X")
+        self.linker_length = np.linalg.norm(self.linker_x_ccoords[0] -
+                                            self.linker_x_ccoords[1])
 
     def linker_center_info(self, linker_center_pdb):
         """
@@ -3445,8 +3515,7 @@ class NetOptimizer:
         """
         self.linker_center_pdb = linker_center_pdb
         self.ec_atom, self.ec_ccoords, self.ec_x_ccoords = process_node_pdb(
-            linker_center_pdb, "X"
-        )
+            linker_center_pdb, "X")
 
     def set_constant_length(self, constant_length):
         """
@@ -3501,7 +3570,8 @@ class NetOptimizer:
         use the saved optimized rotations from the previous optimization
         """
         self.saved_optimized_rotations = optimized_rotations
-        print("load the saved optimized_rotations from the previous optimization")
+        print(
+            "load the saved optimized_rotations from the previous optimization")
 
     def to_save_optimized_rotations(self, filename):
         """
@@ -3510,14 +3580,13 @@ class NetOptimizer:
         self.to_save_optimized_rotations_filename = filename
 
     def use_saved_rotations_as_initial_guess(
-        self, use_saved_rotations_as_initial_guess
-    ):
+            self, use_saved_rotations_as_initial_guess):
         """
         use the saved optimized rotations as initial guess
         """
         self.use_saved_rotations_as_initial_guess = use_saved_rotations_as_initial_guess
 
-    def optimize(self):
+    def optimize(self):  # TODO: modified for mil53
         """
         two optimization steps:
         1. optimize the node rotation
@@ -3560,7 +3629,7 @@ class NetOptimizer:
         node_xcoords = self.node_x_ccoords
         node_coords = self.node_ccoords
         linker_length = self.linker_length
-        opt_method = self.opt_method
+        # opt_method = self.opt_method
 
         constant_length = self.constant_length
 
@@ -3586,27 +3655,23 @@ class NetOptimizer:
         for n in sorted_nodes:
             if "CV" in n:
                 Xatoms_positions_dict[sorted_nodes.index(n)] = addidx(
-                    G.nodes[n]["ccoords"] + ec_x_ccoords
-                )
+                    G.nodes[n]["ccoords"] + ec_x_ccoords)
             else:
                 Xatoms_positions_dict[sorted_nodes.index(n)] = addidx(
-                    G.nodes[n]["ccoords"] + node_xcoords
-                )
+                    G.nodes[n]["ccoords"] + node_xcoords)
 
         for n in sorted_nodes:
             if "CV" in n:
                 node_positions_dict[sorted_nodes.index(n)] = (
-                    G.nodes[n]["ccoords"] + ecoords
-                )
+                    G.nodes[n]["ccoords"] + ecoords)
             else:
                 node_positions_dict[sorted_nodes.index(n)] = (
-                    G.nodes[n]["ccoords"] + node_coords
-                )
+                    G.nodes[n]["ccoords"] + node_coords)
 
         # reindex the edges in the G with the index in the sorted_nodes
-        sorted_edges_of_sortednodeidx = [
-            (sorted_nodes.index(e[0]), sorted_nodes.index(e[1])) for e in sorted_edges
-        ]
+        sorted_edges_of_sortednodeidx = [(sorted_nodes.index(e[0]),
+                                          sorted_nodes.index(e[1]))
+                                         for e in sorted_edges]
 
         # Optimize rotations
         num_nodes = G.number_of_nodes()
@@ -3619,28 +3684,25 @@ class NetOptimizer:
             }
         for i, node in enumerate(sorted_nodes):
             pname_set_dict[pname(node)]["ind_ofsortednodes"].append(i)
-            if len(pname_set_dict[pname(node)]["ind_ofsortednodes"]) == 1:  # first node
+            if len(pname_set_dict[pname(node)]
+                   ["ind_ofsortednodes"]) == 1:  # first node
                 pname_set_dict[pname(node)]["rot_trans"] = get_rot_trans_matrix(
-                    node, G, sorted_nodes, Xatoms_positions_dict
-                )  # initial guess
+                    node, G, sorted_nodes,
+                    Xatoms_positions_dict)  # initial guess
         self.pname_set_dict = pname_set_dict
 
         for p_name in pname_set_dict:
             rot, trans = pname_set_dict[p_name]["rot_trans"]
             for k in pname_set_dict[p_name]["ind_ofsortednodes"]:
                 node = sorted_nodes[k]
-                Xatoms_positions_dict[k][:, 1:] = (
-                    np.dot(
-                        Xatoms_positions_dict[k][:, 1:] - G.nodes[node]["ccoords"], rot
-                    )
-                    + trans
-                    + G.nodes[node]["ccoords"]
-                )
-                node_positions_dict[k] = (
-                    np.dot(node_positions_dict[k] - G.nodes[node]["ccoords"], rot)
-                    + trans
-                    + G.nodes[node]["ccoords"]
-                )
+
+                Xatoms_positions_dict[k][:, 1:] = (np.dot(
+                    Xatoms_positions_dict[k][:, 1:] - G.nodes[node]["ccoords"],
+                    rot,
+                ) + trans + G.nodes[node]["ccoords"])
+                node_positions_dict[k] = (np.dot(
+                    node_positions_dict[k] - G.nodes[node]["ccoords"], rot) +
+                                          trans + G.nodes[node]["ccoords"])
         ###3D free rotation
         if not hasattr(self, "saved_optimized_rotations"):
             print("-" * 80)
@@ -3657,29 +3719,28 @@ class NetOptimizer:
             ##    initial_rots
             ##).flatten()  # Initial guess for rotation matrices
 
-            initial_guess_set_rotations = (
-                np.eye(3, 3).reshape(1, 3, 3).repeat(len(pname_set), axis=0)
-            )
+            initial_guess_set_rotations = (np.eye(3, 3).reshape(1, 3, 3).repeat(
+                len(pname_set), axis=0))
 
-            ##
-            # (
-            #    optimized_rotations_pre,
-            #    _,
-            # ) = optimize_rotations_pre(
-            #    num_nodes,
-            #    G,
-            #    sorted_nodes,
-            #    sorted_edges_of_sortednodeidx,
-            #    Xatoms_positions_dict,
-            #    initial_guess_set_rotations,
-            #    pname_set_dict,
-            #    opt_method=self.opt_method,
-            #    maxfun=self.maxfun,
-            #    maxiter=self.maxiter,
-            #    disp=self.display,
-            #    eps=self.eps,
-            #    iprint=self.iprint,
-            # )
+            ####TODO: modified for mil53
+            (
+                optimized_rotations_pre,
+                _,
+            ) = optimize_rotations_pre(
+                num_nodes,
+                G,
+                sorted_nodes,
+                sorted_edges_of_sortednodeidx,
+                Xatoms_positions_dict,
+                initial_guess_set_rotations,
+                pname_set_dict,
+                opt_method=self.opt_method,
+                maxfun=self.maxfun,
+                maxiter=self.maxiter,
+                disp=self.display,
+                eps=self.eps,
+                iprint=self.iprint,
+            )
 
             (
                 optimized_set_rotations,
@@ -3690,8 +3751,8 @@ class NetOptimizer:
                 sorted_nodes,
                 sorted_edges_of_sortednodeidx,
                 Xatoms_positions_dict,
-                initial_guess_set_rotations,
-                # optimized_rotations_pre,
+                # initial_guess_set_rotations,  # TODO: modified for mil53
+                optimized_rotations_pre,
                 pname_set_dict,
                 opt_method=self.opt_method,
                 maxfun=self.maxfun,
@@ -3723,8 +3784,7 @@ class NetOptimizer:
                     print("-" * 80)
 
                     saved_set_rotations = self.saved_optimized_rotations.reshape(
-                        -1, 3, 3
-                    )
+                        -1, 3, 3)
                     # (
                     #    optimized_rotations_pre,
                     #    _,
@@ -3763,7 +3823,8 @@ class NetOptimizer:
                         iprint=self.iprint,
                     )
                     print("-" * 80)
-                    print(" " * 20, "rotations optimization completed", " " * 20)
+                    print(" " * 20, "rotations optimization completed",
+                          " " * 20)
                     print("-" * 80)
                     # to save the optimized rotations as npy
                     if hasattr(self, "to_save_optimized_rotations_filename"):
@@ -3778,24 +3839,21 @@ class NetOptimizer:
 
                 else:
                     optimized_set_rotations = self.saved_optimized_rotations.reshape(
-                        -1, 3, 3
-                    )
+                        -1, 3, 3)
 
             else:
                 print(
                     "use the loaded optimized_rotations from the previous optimization"
                 )
                 optimized_set_rotations = self.saved_optimized_rotations.reshape(
-                    -1, 3, 3
-                )
+                    -1, 3, 3)
 
-        optimized_rotations = expand_setrots(
-            pname_set_dict, optimized_set_rotations, sorted_nodes
-        )
+        optimized_rotations = expand_setrots(pname_set_dict,
+                                             optimized_set_rotations,
+                                             sorted_nodes)
         # Apply rotations
         rotated_node_positions = apply_rotations_to_atom_positions(
-            optimized_rotations, G, sorted_nodes, node_positions_dict
-        )
+            optimized_rotations, G, sorted_nodes, node_positions_dict)
 
         # Save results to XYZ
         # save_xyz("optimized_nodesstructure.xyz", rotated_node_positions) #DEBUG
@@ -3807,10 +3865,10 @@ class NetOptimizer:
                 sorted_nodes,
                 sorted_edges_of_sortednodeidx,
                 Xatoms_positions_dict,
-            )
-        )
+            ))
 
-        start_node = sorted_edges[0][0]  # find_nearest_node_to_beginning_point(G)
+        start_node = sorted_edges[0][
+            0]  # find_nearest_node_to_beginning_point(G)
         # loop all of the edges in G and get the lengths of the edges, length is the distance between the two nodes ccoords
         edge_lengths, lengths = get_edge_lengths(G)
 
@@ -3819,10 +3877,11 @@ class NetOptimizer:
         # update the node ccoords in G by loop edge, start from the start_node, and then update the connected node ccoords by the edge length, and update the next node ccords from the updated node
 
         updated_ccoords, original_ccoords = update_node_ccoords(
-            G, edge_lengths, start_node, new_edge_length
-        )
+            G, edge_lengths, start_node, new_edge_length)
         # exclude the start_node in updated_ccoords and original_ccoords
-        updated_ccoords = {k: v for k, v in updated_ccoords.items() if k != start_node}
+        updated_ccoords = {
+            k: v for k, v in updated_ccoords.items() if k != start_node
+        }
         original_ccoords = {
             k: v for k, v in original_ccoords.items() if k != start_node
         }
@@ -3832,9 +3891,9 @@ class NetOptimizer:
             print("-" * 80)
             print(" " * 20, "start to optimize the cell parameters", " " * 20)
             print("-" * 80)
-            optimized_params = optimize_cell_parameters(
-                self.cell_info, original_ccoords, updated_ccoords
-            )
+            optimized_params = optimize_cell_parameters(self.cell_info,
+                                                        original_ccoords,
+                                                        updated_ccoords)
             print("-" * 80)
             print(" " * 20, "cell parameters optimization completed", " " * 20)
             print("-" * 80)
@@ -3852,57 +3911,43 @@ class NetOptimizer:
         )
         sc_unit_cell_inv = np.linalg.inv(sc_unit_cell)
         sG, scaled_ccoords = update_ccoords_by_optimized_cell_params(
-            self.G, optimized_params
-        )
+            self.G, optimized_params)
         scaled_node_positions_dict = {}
         scaled_Xatoms_positions_dict = {}
 
         for n in sorted_nodes:
             if "CV" in n:
                 scaled_Xatoms_positions_dict[sorted_nodes.index(n)] = addidx(
-                    sG.nodes[n]["ccoords"] + ec_x_ccoords
-                )
+                    sG.nodes[n]["ccoords"] + ec_x_ccoords)
             else:
                 scaled_Xatoms_positions_dict[sorted_nodes.index(n)] = addidx(
-                    sG.nodes[n]["ccoords"] + node_xcoords
-                )
+                    sG.nodes[n]["ccoords"] + node_xcoords)
 
         for n in sorted_nodes:
             if "CV" in n:
                 scaled_node_positions_dict[sorted_nodes.index(n)] = (
-                    sG.nodes[n]["ccoords"] + ecoords
-                )
+                    sG.nodes[n]["ccoords"] + ecoords)
             else:
                 scaled_node_positions_dict[sorted_nodes.index(n)] = (
-                    sG.nodes[n]["ccoords"] + node_coords
-                )
+                    sG.nodes[n]["ccoords"] + node_coords)
 
         # Apply rotations
         for p_name in pname_set_dict:
             rot, trans = pname_set_dict[p_name]["rot_trans"]
             for k in pname_set_dict[p_name]["ind_ofsortednodes"]:
                 node = sorted_nodes[k]
-                scaled_Xatoms_positions_dict[k][:, 1:] = (
-                    np.dot(
-                        scaled_Xatoms_positions_dict[k][:, 1:]
-                        - sG.nodes[node]["ccoords"],
-                        rot,
-                    )
-                    + trans
-                    + sG.nodes[node]["ccoords"]
-                )
+                scaled_Xatoms_positions_dict[k][:, 1:] = (np.dot(
+                    scaled_Xatoms_positions_dict[k][:, 1:] -
+                    sG.nodes[node]["ccoords"],
+                    rot,
+                ) + trans + sG.nodes[node]["ccoords"])
 
-                scaled_node_positions_dict[k] = (
-                    np.dot(
-                        scaled_node_positions_dict[k] - sG.nodes[node]["ccoords"], rot
-                    )
-                    + trans
-                    + sG.nodes[node]["ccoords"]
-                )
+                scaled_node_positions_dict[k] = (np.dot(
+                    scaled_node_positions_dict[k] - sG.nodes[node]["ccoords"],
+                    rot) + trans + sG.nodes[node]["ccoords"])
 
         scaled_rotated_node_positions = apply_rotations_to_atom_positions(
-            optimized_rotations, sG, sorted_nodes, scaled_node_positions_dict
-        )
+            optimized_rotations, sG, sorted_nodes, scaled_node_positions_dict)
         scaled_rotated_Xatoms_positions, optimized_pair = (
             apply_rotations_to_Xatoms_positions(
                 optimized_rotations,
@@ -3910,8 +3955,7 @@ class NetOptimizer:
                 sorted_nodes,
                 sorted_edges_of_sortednodeidx,
                 scaled_Xatoms_positions_dict,
-            )
-        )
+            ))
         # Save results to XYZ
 
         self.sorted_nodes = sorted_nodes
@@ -3966,37 +4010,37 @@ class NetOptimizer:
             x_j = scaled_rotated_Xatoms_positions[reindex_j][x_idx_j][1:]
             x_i_x_j_middle_point = np.mean([x_i, x_j], axis=0)
             xx_vector = np.vstack(
-                [x_i - x_i_x_j_middle_point, x_j - x_i_x_j_middle_point]
-            )
+                [x_i - x_i_x_j_middle_point, x_j - x_i_x_j_middle_point])
             norm_xx_vector = xx_vector / np.linalg.norm(xx_vector)
 
             # print(i, j, reindex_i, reindex_j, x_idx_i, x_idx_j)
             # use superimpose to get the rotation matrix
             # use record to record the rotation matrix for get rid of the repeat calculation
             indices = [
-                index
-                for index, value in enumerate(norm_xx_vector_record)
+                index for index, value in enumerate(norm_xx_vector_record)
                 if is_list_A_in_B(norm_xx_vector, value)
             ]
             if len(indices) == 1:
                 rot = rot_record[indices[0]]
                 # rot = reorthogonalize_matrix(rot)
             else:
-                _, rot, _ = superimpose_rotation_only(extended_linker_xx_vec, xx_vector)
+                _, rot, _ = superimpose_rotation_only(extended_linker_xx_vec,
+                                                      xx_vector)
                 # rot = reorthogonalize_matrix(rot)
                 norm_xx_vector_record.append(norm_xx_vector)
                 # the rot may be opposite, so we need to check the angle between the two vectors
                 # if the angle is larger than 90 degree, we need to reverse the rot
                 roted_xx = np.dot(extended_linker_xx_vec, rot)
 
-                if np.dot(roted_xx[1] - roted_xx[0], xx_vector[1] - xx_vector[0]) < 0:
+                if np.dot(roted_xx[1] - roted_xx[0],
+                          xx_vector[1] - xx_vector[0]) < 0:
                     ##rotate 180 around the axis of the cross product of the two vectors
-                    axis = np.cross(
-                        roted_xx[1] - roted_xx[0], xx_vector[1] - xx_vector[0]
-                    )
+                    axis = np.cross(roted_xx[1] - roted_xx[0],
+                                    xx_vector[1] - xx_vector[0])
                     # if 001 not linear to the two vectors
                     if np.linalg.norm(axis) == 0:
-                        check_z_axis = np.cross(roted_xx[1] - roted_xx[0], [0, 0, 1])
+                        check_z_axis = np.cross(roted_xx[1] - roted_xx[0],
+                                                [0, 0, 1])
                         if np.linalg.norm(check_z_axis) == 0:
                             axis = np.array([1, 0, 0])
                         else:
@@ -4004,47 +4048,36 @@ class NetOptimizer:
 
                     axis = axis / np.linalg.norm(axis)
                     flip_matrix = np.eye(3) - 2 * np.outer(
-                        axis, axis
-                    )  # Householder matrix for reflection
+                        axis, axis)  # Householder matrix for reflection
                     rot = np.dot(rot, flip_matrix)
                 # Flip the last column of the rotation matrix if the determinant is negative
-
                 rot_record.append(rot)
 
             # use the rotation matrix to rotate the linker x coords
-            # rotated_xx = np.dot(extended_linker_xx_vec, rot)
-            # print(rotated_xx,'rotated_xx',xx_vector) #DEBUG
-            placed_edge_ccoords = (
-                np.dot(self.linker_ccoords, rot) + x_i_x_j_middle_point
-            )
+            placed_edge_ccoords = (np.dot(self.linker_ccoords, rot) +
+                                   x_i_x_j_middle_point)
 
-            placed_edge = np.hstack((np.asarray(self.linker_atom), placed_edge_ccoords))
+            placed_edge = np.hstack(
+                (np.asarray(self.linker_atom), placed_edge_ccoords))
             sG.edges[(i, j)]["coords"] = x_i_x_j_middle_point
             sG.edges[(i, j)]["c_points"] = placed_edge
 
-            sG.edges[(i, j)]["f_points"] = np.hstack(
-                (
-                    placed_edge[:, 0:2],
-                    cartesian_to_fractional(placed_edge[:, 2:5], sc_unit_cell_inv),
-                )
-            )  # NOTE: modified add the atom type and atom name
+            sG.edges[(i, j)]["f_points"] = np.hstack((
+                placed_edge[:, 0:2],
+                cartesian_to_fractional(placed_edge[:, 2:5], sc_unit_cell_inv),
+            ))  # NOTE: modified add the atom type and atom name
 
             _, sG.edges[(i, j)]["x_coords"] = fetch_X_atoms_ind_array(
-                placed_edge, 0, "X"
-            )
-            # edges[(i,j)]=placed_edge
-        # placed_node = {}
+                placed_edge, 0, "X")
         for k, v in scaled_rotated_node_positions.items():
             # print(k,v)
             # placed_node[k] = np.hstack((nodes_atom[k],v))
             sG.nodes[k]["c_points"] = np.hstack((nodes_atom[k], v))
             sG.nodes[k]["f_points"] = np.hstack(
-                (nodes_atom[k], cartesian_to_fractional(v, sc_unit_cell_inv))
-            )
+                (nodes_atom[k], cartesian_to_fractional(v, sc_unit_cell_inv)))
             # find the atoms starts with "x" and extract the coordinates
             _, sG.nodes[k]["x_coords"] = fetch_X_atoms_ind_array(
-                sG.nodes[k]["c_points"], 0, "X"
-            )
+                sG.nodes[k]["c_points"], 0, "X")
         self.sG = sG
         return sG
 
@@ -4068,12 +4101,10 @@ class NetOptimizer:
         # )
         self.prim_multiedge_bundlings = self.multiedge_bundlings
         self.super_multiedge_bundlings = make_super_multiedge_bundlings(
-            self.prim_multiedge_bundlings, self.supercell
-        )
+            self.prim_multiedge_bundlings, self.supercell)
         superG = update_supercell_bundle(superG, self.super_multiedge_bundlings)
         superG = check_multiedge_bundlings_insuperG(
-            self.super_multiedge_bundlings, superG
-        )
+            self.super_multiedge_bundlings, superG)
         self.superG = superG
         return superG
 
@@ -4100,18 +4131,21 @@ class NetOptimizer:
         self.vir_edge_range = range
         self.vir_edge_max_neighbor = max_neighbor
 
-    def add_virtual_edge_for_bridge_node(self):
+    def add_virtual_edge_for_bridge_node(self, superG):
         """
         after setting the virtual edge search, add the virtual edge to the target supercell superG MOF
         """
         if self.add_virtual_edge:
-            superG = add_virtual_edge(
-                self.superG, self.vir_edge_range, self.vir_edge_max_neighbor
+            add_superG = add_virtual_edge(
+                self.sc_unit_cell,
+                superG,
+                self.vir_edge_range,
+                self.vir_edge_max_neighbor,
             )
             print("add virtual edge")
-            self.superG = superG
+            return add_superG
         else:
-            pass
+            return superG
 
     def set_remove_node_list(self, remove_node_list):
         """
@@ -4138,8 +4172,7 @@ class NetOptimizer:
     def add_xoo_to_edge_multitopic(self):
         eG = self.eG
         eG, unsaturated_linker, matched_vnode_xind, xoo_dict = addxoo2edge_multitopic(
-            eG, self.sc_unit_cell
-        )
+            eG, self.sc_unit_cell)
         self.unsaturated_linker = unsaturated_linker
         self.matched_vnode_xind = matched_vnode_xind
         self.xoo_dict = xoo_dict
@@ -4162,8 +4195,7 @@ class NetOptimizer:
         """
         eG = self.eG
         eG, unsaturated_linker, matched_vnode_xind, xoo_dict = addxoo2edge_ditopic(
-            eG, self.sc_unit_cell
-        )
+            eG, self.sc_unit_cell)
         self.unsaturated_linker = unsaturated_linker
         self.matched_vnode_xind = matched_vnode_xind
         self.xoo_dict = xoo_dict
@@ -4175,8 +4207,10 @@ class NetOptimizer:
         only keep the main fragment of the target MOF cell, remove the other fragments, to avoid the disconnected fragments
         """
         eG = self.eG
-        self.eG = [eG.subgraph(c).copy() for c in nx.connected_components(eG)][0]
-        print("main fragment of the MOF cell is kept")  # ,len(self.eG.nodes()),'nodes')
+        self.eG = [eG.subgraph(c).copy() for c in nx.connected_components(eG)
+                  ][0]
+        print("main fragment of the MOF cell is kept"
+             )  # ,len(self.eG.nodes()),'nodes')
         # print('fragment size list:',[len(c) for c in nx.connected_components(eG)]) #debug
         return self.eG
 
@@ -4188,26 +4222,23 @@ class NetOptimizer:
         removed_nodes = []
         for n in eG.nodes():
             if pname(n) != "EDGE":
-                if check_supercell_box_range(
-                    eG.nodes[n]["fcoords"], supercell, buffer_plus, buffer_minus
-                ):
+                if check_supercell_box_range(eG.nodes[n]["fcoords"], supercell,
+                                             buffer_plus, buffer_minus):
                     pass
                 else:
                     new_eG.remove_node(n)
                     removed_nodes.append(n)
             elif pname(n) == "EDGE":
-                if (
-                    arr_dimension(eG.nodes[n]["fcoords"]) == 2
-                ):  # ditopic linker have two points in the fcoords
+                if (arr_dimension(eG.nodes[n]["fcoords"]) == 2
+                   ):  # ditopic linker have two points in the fcoords
                     edge_coords = np.mean(eG.nodes[n]["fcoords"], axis=0)
                 elif (
-                    arr_dimension(eG.nodes[n]["fcoords"]) == 1
+                        arr_dimension(eG.nodes[n]["fcoords"]) == 1
                 ):  # multitopic linker have one point in the fcoords from EC
                     edge_coords = eG.nodes[n]["fcoords"]
 
-                if check_supercell_box_range(
-                    edge_coords, supercell, buffer_plus, buffer_minus
-                ):
+                if check_supercell_box_range(edge_coords, supercell,
+                                             buffer_plus, buffer_minus):
                     pass
                 else:
                     new_eG.remove_node(n)
@@ -4270,7 +4301,7 @@ class NetOptimizer:
         term_coords = term_coords - term_ovecs_c
         term_xoovecs = np.vstack((term_xvecs, term_ovecs))
         term_xoovecs = term_xoovecs - term_ovecs_c
-
+        self.node_termination = term_file
         self.term_info = term_info
         self.term_coords = term_coords
         self.term_xoovecs = term_xoovecs
@@ -4281,7 +4312,9 @@ class NetOptimizer:
         use the node terminations to add terminations to the unsaturated nodes
 
         """
-        unsaturated_node = [n for n in self.unsaturated_node if n in self.eG.nodes()]
+        unsaturated_node = [
+            n for n in self.unsaturated_node if n in self.eG.nodes()
+        ]
         xoo_dict = self.xoo_dict
         matched_vnode_xind = self.matched_vnode_xind
         eG = self.eG
@@ -4290,9 +4323,9 @@ class NetOptimizer:
             unsaturated_vnode_xind_dict,
             unsaturated_vnode_xoo_dict,
             self.matched_vnode_xind_dict,
-        ) = make_unsaturated_vnode_xoo_dict(
-            unsaturated_node, xoo_dict, matched_vnode_xind, eG, sc_unit_cell
-        )
+        ) = make_unsaturated_vnode_xoo_dict(unsaturated_node, xoo_dict,
+                                            matched_vnode_xind, eG,
+                                            sc_unit_cell)
         # term_file: path to the termination file
         # ex_node_cxo_cc: exposed node coordinates
 
@@ -4301,48 +4334,42 @@ class NetOptimizer:
             eG.nodes[n]["term_c_points"] = {}
         for exvnode_xind_key in unsaturated_vnode_xoo_dict.keys():
             exvnode_x_ccoords = unsaturated_vnode_xoo_dict[exvnode_xind_key][
-                "x_cpoints"
-            ]
+                "x_cpoints"]
             exvnode_oo_ccoords = unsaturated_vnode_xoo_dict[exvnode_xind_key][
-                "oo_cpoints"
-            ]
-            node_xoo_ccoords = np.vstack([exvnode_x_ccoords, exvnode_oo_ccoords])
+                "oo_cpoints"]
+            node_xoo_ccoords = np.vstack(
+                [exvnode_x_ccoords, exvnode_oo_ccoords])
             # make the beginning point of the termination to the center of the oo atoms
             node_oo_center_cvec = np.mean(
-                exvnode_oo_ccoords[:, 2:5].astype(float), axis=0
-            )  # NOTE: modified add the atom type and atom name
-            node_xoo_cvecs = (
-                node_xoo_ccoords[:, 2:5].astype(float) - node_oo_center_cvec
-            )  # NOTE: modified add the atom type and atom name
+                exvnode_oo_ccoords[:, 2:5].astype(float),
+                axis=0)  # NOTE: modified add the atom type and atom name
+            node_xoo_cvecs = (node_xoo_ccoords[:, 2:5].astype(float) -
+                              node_oo_center_cvec
+                             )  # NOTE: modified add the atom type and atom name
             node_xoo_cvecs = node_xoo_cvecs.astype("float")
             # use record to record the rotation matrix for get rid of the repeat calculation
 
             indices = [
-                index
-                for index, value in enumerate(node_oovecs_record)
+                index for index, value in enumerate(node_oovecs_record)
                 if is_list_A_in_B(node_xoo_cvecs, value[0])
             ]
             if len(indices) == 1:
                 rot = node_oovecs_record[indices[0]][1]
             else:
                 _, rot, _ = superimpose(self.term_xoovecs, node_xoo_cvecs)
-
                 node_oovecs_record.append((node_xoo_cvecs, rot))
-            adjusted_term_vecs = np.dot(self.term_coords, rot) + node_oo_center_cvec
-            adjusted_term = np.hstack(
-                (
-                    np.asarray(self.term_info[:, 0:1]),
-                    np.asarray(self.term_info[:, 2:3]),
-                    adjusted_term_vecs,
-                )
-            )
+            adjusted_term_vecs = np.dot(self.term_coords,
+                                        rot) + node_oo_center_cvec
+            adjusted_term = np.hstack((
+                np.asarray(self.term_info[:, 0:1]),
+                np.asarray(self.term_info[:, 2:3]),
+                adjusted_term_vecs,
+            ))
             # add the adjusted term to the terms, add index, add the node name
-            unsaturated_vnode_xoo_dict[exvnode_xind_key]["node_term_c_points"] = (
-                adjusted_term
-            )
-            eG.nodes[exvnode_xind_key[0]]["term_c_points"][exvnode_xind_key[1]] = (
-                adjusted_term
-            )
+            unsaturated_vnode_xoo_dict[exvnode_xind_key][
+                "node_term_c_points"] = (adjusted_term)
+            eG.nodes[exvnode_xind_key[0]]["term_c_points"][
+                exvnode_xind_key[1]] = (adjusted_term)
 
         self.unsaturated_vnode_xoo_dict = unsaturated_vnode_xoo_dict
         self.eG = eG
@@ -4363,34 +4390,44 @@ class NetOptimizer:
         for n in eG.nodes():
             if pname(n) != "EDGE":
                 all_f_points = eG.nodes[n]["f_points"]
-                noxoo_f_points = np.delete(all_f_points, all_xoo_indices, axis=0)
+                noxoo_f_points = np.delete(all_f_points,
+                                           all_xoo_indices,
+                                           axis=0)
                 eG.nodes[n]["noxoo_f_points"] = noxoo_f_points
         self.eG = eG
 
         return eG
 
-    def write_node_edge_node_gro(self, gro_name):
-        """
-        write the node, edge, node to the gro file
-        """
-
+    def get_node_edge_term_grolines(self, eG, sc_unit_cell):
         nodes_eG, edges_eG, terms_eG, node_res_num, edge_res_num, term_res_num = (
-            extract_node_edge_term(self.eG, self.sc_unit_cell)
-        )
-        merged_node_edge_term = merge_node_edge_term(
-            nodes_eG, edges_eG, terms_eG, node_res_num, edge_res_num
-        )
-        dir_name = "output_gros"
-        save_node_edge_term_gro(merged_node_edge_term, gro_name, dir_name)
-        print(str(gro_name) + ".gro is saved in folder " + str(dir_name))
+            extract_node_edge_term(eG, sc_unit_cell))
+        merged_node_edge_term = merge_node_edge_term(nodes_eG, edges_eG,
+                                                     terms_eG, node_res_num,
+                                                     edge_res_num)
         print("node_res_num: ", node_res_num)
         print("edge_res_num: ", edge_res_num)
         print("term_res_num: ", term_res_num)
+        return merged_node_edge_term
 
-        self.nodes_eG = nodes_eG
-        self.edges_eG = edges_eG
-        self.terms_eG = terms_eG
-        self.node_res_num = node_res_num
-        self.edge_res_num = edge_res_num
-        self.term_res_num = term_res_num
+    def extract_node_edge_term(self):
+        self.nodes_eG, self.edges_eG, self.terms_eG, self.node_res_num, self.edge_res_num, self.term_res_num = (
+            extract_node_edge_term(self.eG, self.sc_unit_cell))
+        print("node_res_num: ", self.node_res_num)
+        print("edge_res_num: ", self.edge_res_num)
+        print("term_res_num: ", self.term_res_num)
+
+    def write_node_edge_term_gro(self, gro_name):
+        """
+        write the node, edge, term to the gro file
+        """
+
+        merged_node_edge_term = merge_node_edge_term(self.nodes_eG,
+                                                     self.edges_eG,
+                                                     self.terms_eG,
+                                                     self.node_res_num,
+                                                     self.edge_res_num)
+        dir_name = "output_gros"
+        save_node_edge_term_gro(merged_node_edge_term, gro_name, dir_name)
+        print(str(gro_name) + ".gro is saved in folder " + str(dir_name))
+
         self.merged_node_edge_term = merged_node_edge_term
