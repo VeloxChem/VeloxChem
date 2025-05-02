@@ -62,11 +62,10 @@ from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
-from .checkpoint import write_rsp_hdf5
+from .checkpoint import write_rsp_hdf5, write_cpcm_charges, read_cpcm_charges
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .cpcmdriver import CpcmDriver
-from .errorhandler import safe_solve
 
 try:
     from scipy.linalg import lu_factor, lu_solve
@@ -578,6 +577,11 @@ class LinearSolver:
         else:
             (self._dist_bger, self._dist_bung, self._dist_e2bger,
              self._dist_e2bung) = dist_arrays
+            
+        if self._cpcm:
+            if self.rank == mpi_master():
+                self._cpcm_q = read_cpcm_charges(self.checkpoint_file)
+            self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
 
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
@@ -1574,6 +1578,8 @@ class LinearSolver:
         if self.rank == mpi_master():
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
                                      basis, dft_dict, pe_dict, self.ostream)
+            if self._cpcm:
+                    write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
