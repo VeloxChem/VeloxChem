@@ -1721,10 +1721,10 @@ class LinearSolver:
             cur_str += 'C-PCM'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'C-PCM Points per Hydrogen Sphere: '
-            cur_str += f'{self.cpcm_drv.grid_per_sphere[1]}'
+            cur_str += f'{self.cpcm_grid_per_sphere[1]}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'C-PCM Points per non-H Sphere   : '
-            cur_str += f'{self.cpcm_drv.grid_per_sphere[0]}'
+            cur_str += f'{self.cpcm_grid_per_sphere[0]}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Non-Equilibrium solvation       : '
             cur_str += f'{self.non_equilibrium_solv}'
