@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -46,10 +47,11 @@ class TestCPPCpcm:
         lr_drv.non_equilibrium_solv = noneq_solv
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
-        lr_spec = lr_drv.get_spectrum(lr_results, 'au')
-        assert np.max(
-            np.abs(np.array(lr_spec['y_data']) -
-                    np.array(ref_y_data))) < tol
+        if lr_drv.rank == mpi_master():
+            lr_spec = lr_drv.get_spectrum(lr_results, 'au')
+            assert np.max(
+                np.abs(np.array(lr_spec['y_data']) -
+                       np.array(ref_y_data))) < tol
 
     def test_b3lyp_absorption_cpcm(self):
 
@@ -71,5 +73,9 @@ class TestCPPCpcm:
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [0.23785824, 0.32046951, 1.27698344]
 
-        self.run_cpp_cpcm(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-4,
+        self.run_cpp_cpcm(xcfun_label,
+                          cpp_flag,
+                          ref_x_data,
+                          ref_y_data,
+                          1.0e-4,
                           noneq_solv=True)
