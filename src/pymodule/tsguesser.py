@@ -40,6 +40,7 @@ from pathlib import Path
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
+from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
@@ -84,11 +85,21 @@ class TransitionStateGuesser():
         self.save_mm_traj = False
         self.scf_drv = None
 
-    def find_TS(self, evb, scf=True, constraints=None, scf_drv=None):
+    def find_TS(self, evb, scf=True, constraints=None, scf_drv=None, charge = None, multiplicity=None):
         #todo ideally find a way to efficiently deal with the input to the EVB object
         self.scf_drv = scf_drv
         evb.temperature = self.mm_temperature
         config = evb.default_system_configurations("ts_guesser")
+
+        if scf:
+            molecule_sanity_check(evb.reactant.molecule)
+
+        self.molecule = evb.reactant.molecule
+        if charge is not None:
+            self.molecule.set_charge(charge)
+        if multiplicity is not None:
+            self.molecule.set_multiplicity(multiplicity)
+        print(f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong.")
 
         evb.build_systems([config],
                           self.lambda_vec,
@@ -123,8 +134,6 @@ class TransitionStateGuesser():
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
             raise ff_exception
-
-        self.molecule = evb.reactant.molecule
 
         max_mm_index = np.argmax(mm_energies)
         max_xyz_geom = xyz_geometries[max_mm_index]

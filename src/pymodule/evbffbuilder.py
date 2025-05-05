@@ -36,6 +36,7 @@ import networkx as nx
 import sys
 
 from .veloxchemlib import mpi_master
+from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -160,6 +161,8 @@ class EvbForceFieldBuilder():
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
+
+        molecule_sanity_check(combined_molecule)
         return combined_molecule
 
     def _optimize_molecule(self, elemental_ids, forcefield, changing_bonds, name='MOL',note=None):
@@ -238,7 +241,9 @@ class EvbForceFieldBuilder():
         for i,elem in enumerate(elemental_ids):
             point = Point(pos[i])
             new_molecule.add_atom(int(elem), point, 'angstrom')
-
+        new_molecule.set_charge(forcefield.molecule.get_charge())
+        new_molecule.set_multiplicity(
+            forcefield.molecule.get_multiplicity())
         return new_molecule
 
     def get_forcefield(
