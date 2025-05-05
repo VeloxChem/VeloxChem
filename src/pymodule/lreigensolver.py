@@ -52,7 +52,7 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check, pe_sanity_check,solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
                          write_lr_rsp_results_to_hdf5,
@@ -123,6 +123,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.esa = False
         self.esa_from_state = None
+        self.point_charges= None
+        self.solvation_model = None
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
@@ -223,11 +225,8 @@ class LinearResponseEigenSolver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation model setup
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                'solvation_model' not in scf_tensors,
-                type(self).__name__ + ': Solvation model not implemented')
+        # check solvation
+        solvation_model_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -277,6 +276,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
 
         if self.nonlinear:
             rsp_vector_labels = [

@@ -53,7 +53,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check, pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, write_rsp_solution,
                          write_lr_rsp_results_to_hdf5,
@@ -208,11 +208,8 @@ class TdaEigenSolver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation model setup
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                'solvation_model' not in scf_tensors,
-                type(self).__name__ + ': Solvation model not implemented')
+        # check solvation setup
+        solvation_model_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -268,6 +265,9 @@ class TdaEigenSolver(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
 
         # set up trial excitation vectors on master node
 
