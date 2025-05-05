@@ -716,6 +716,7 @@ class IMForceFieldGenerator:
         # For all Methods a ForceField of the molecule is requiered
         forcefield_generator = MMForceFieldGenerator()
         forcefield_generator.create_topology(molecule)
+        self.molecule = molecule
         
         self.imforcefieldfile = imforcefieldfile
         if self.interpolation_settings is None:
