@@ -197,6 +197,12 @@ class ScfHessianDriver(HessianDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
+        self.ostream.flush()
+        self.ostream.unmute()
+        profiler.print_timing(self.ostream)
+        self.ostream.flush()
+        self.ostream.mute()
+
     def compute_numerical(self, molecule, ao_basis):
         """
         Performs the calculation of a numerical Hessian based only
@@ -306,6 +312,9 @@ class ScfHessianDriver(HessianDriver):
             The atom pairs to compute the Hessian for.
         """
 
+        profiler.timing = True
+        profiler.set_timing_key('atom pairs')
+
         assert_msg_critical(
             self.scf_driver.scf_type == 'restricted',
             'ScfHessianDriver: Analytical Hessian only implemented ' +
@@ -389,19 +398,20 @@ class ScfHessianDriver(HessianDriver):
             setattr(cphf_solver, key, getattr(self, key))
 
         # todo add atom pair option to cphf solver
+        profiler.start_timer('total')
+        profiler.start_timer('cphf')
         cphf_solver.compute(molecule, ao_basis, scf_tensors, atom_pairs)
-
+        profiler.stop_timer('cphf')
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
-        
         hessian_first_integral_derivatives = cphf_solution_dict[
             'hessian_first_integral_derivatives']
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
 
         # First-order contributions
-
+        profiler.start_timer('1e')
         t1 = tm.time()
 
         # RHS contracted with CPHF coefficients (ov)
@@ -438,7 +448,7 @@ class ScfHessianDriver(HessianDriver):
 
         hessian_cphf_coeff_rhs = self.comm.reduce(hessian_cphf_coeff_rhs,
                                                   root=mpi_master())
-        
+
         if self.rank == mpi_master():
             hessian_first_order_derivatives = (
                 hessian_cphf_coeff_rhs + hessian_first_integral_derivatives +
@@ -451,9 +461,10 @@ class ScfHessianDriver(HessianDriver):
                                 ' {:.2f} sec.'.format(tm.time() - t1))
         self.ostream.print_blank()
         self.ostream.flush()
+        profiler.stop_timer('1e')
 
         # Second-order contributions
-
+        profiler.start_timer('2e pure')
         t2 = tm.time()
 
         ovlp_hess_200_drv = OverlapGeom200Driver()
@@ -602,12 +613,13 @@ class ScfHessianDriver(HessianDriver):
                 hessian_2nd_order_derivatives[i, i, x, y] += hess_val
                 if x != y:
                     hessian_2nd_order_derivatives[i, i, y, x] += hess_val
-
+        profiler.stop_timer('2e pure')
         # do only upper triangular matrix
-
+        profiler.start_timer('2e mixed')
         # TODO: use alternative way to partition atom pairs
         if atom_pairs is None:
-            all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
+            all_atom_pairs = [(i, j) for i in range(natm)
+                              for j in range(i, natm)]
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
         else:
             all_atom_pairs = atom_pairs
@@ -715,9 +727,10 @@ class ScfHessianDriver(HessianDriver):
 
         hessian_2nd_order_derivatives = self.comm.reduce(
             hessian_2nd_order_derivatives, root=mpi_master())
-
+        profiler.stop_timer('2e mixed')
         # DFT:
         if self._dft:
+            profiler.start_timer('DFT')
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.scf_driver.xcfun)
                           if self.scf_driver.grid_level is None else
@@ -735,7 +748,9 @@ class ScfHessianDriver(HessianDriver):
                 molecule, ao_basis, [density], mol_grid,
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
+            profiler.stop_timer('DFT')
 
+        #todo atompairs, ask zilvinas
         # nuclei-point charges contribution
         if self.scf_driver.point_charges is not None:
 
@@ -748,7 +763,7 @@ class ScfHessianDriver(HessianDriver):
                 if atom_pairs is not None:
                     if i not in atoms:
                         continue
-                
+
                 q_i = nuclear_charges[i]
                 xyz_i = qm_coords[i]
 
@@ -760,7 +775,7 @@ class ScfHessianDriver(HessianDriver):
                     rij = np.linalg.norm(vec_ij)
 
                     hess_ii = q_i * q_j * (3.0 * np.outer(vec_ij, vec_ij) /
-                                            rij**5 - np.eye(3) / rij**3)
+                                           rij**5 - np.eye(3) / rij**3)
 
                     hessian_point_charges[i, i, :, :] += hess_ii
 
@@ -798,8 +813,7 @@ class ScfHessianDriver(HessianDriver):
                         sigma_r_6 = (sigma_ij / rij)**6
                         sigma_r_12 = sigma_r_6**2
 
-                        coef_rr = (28.0 * sigma_r_12 -
-                                    8.0 * sigma_r_6) * inv_r4
+                        coef_rr = (28.0 * sigma_r_12 - 8.0 * sigma_r_6) * inv_r4
                         coef_I = (2.0 * sigma_r_12 - sigma_r_6) * inv_r2
 
                         hess_ii = 24.0 * epsilon_ij * (
@@ -816,17 +830,19 @@ class ScfHessianDriver(HessianDriver):
                                                      root=mpi_master())
 
         if self.rank == mpi_master():
-
+            profiler.start_timer('Finalisation')
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
             # Doing this post-hoc is much easier to implement, and the cost of the nuclear nuclear contribution is neglible
             if atom_pairs is not None:
                 for i in range(natm):
                     for j in range(natm):
-                        if (i,j) not in all_atom_pairs and (j,i) not in all_atom_pairs:
+                        if (i, j) not in all_atom_pairs and (
+                                j, i) not in all_atom_pairs:
                             hessian_nuclear_nuclear[i, j, :, :] = 0.0
                             if self._dft:
-                                hessian_dft_xc[i*3:i*3+3, j*3:j*3+3] = 0.0
+                                hessian_dft_xc[i * 3:i * 3 + 3,
+                                               j * 3:j * 3 + 3] = 0.0
 
             self.hessian = (
                 hessian_first_order_derivatives +
@@ -852,7 +868,8 @@ class ScfHessianDriver(HessianDriver):
 
             if self._dft:
                 self.hessian += hessian_dft_xc
-            
+            profiler.stop_timer('Finalisation')
+            profiler.stop_timer('total')
 
         self.ostream.print_info('Second order derivative contributions' +
                                 ' to the Hessian computed in' +
