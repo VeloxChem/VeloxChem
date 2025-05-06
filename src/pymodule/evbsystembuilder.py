@@ -277,6 +277,7 @@ class EvbSystemBuilder():
         no_reactant = configuration.get("no_reactant", False)
         E_field = configuration.get("E_field", [0, 0, 0])
         neutralize = configuration.get("neutralize", False)
+        pressure = configuration.get("pressure", -1)
 
         self.constraints = constraints
 
@@ -351,13 +352,13 @@ class EvbSystemBuilder():
         nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
         system.addForce(nb_force)
 
-        
-        barostat = mm.MonteCarloBarostat(
-            pressure * mmunit.bar,  # type: ignore
-            self.temperature * mmunit.kelvin,  # type: ignore
-        )
-        barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
-        system.addForce(barostat)
+        if pressure > 0:
+            barostat = mm.MonteCarloBarostat(
+                pressure * mmunit.bar,  # type: ignore
+                self.temperature * mmunit.kelvin,  # type: ignore
+            )
+            barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
+            system.addForce(barostat)
 
         if np.any(np.array(E_field) > 0.001):
             E_field_force = self._create_E_field(system, E_field)
