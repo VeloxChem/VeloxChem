@@ -90,6 +90,7 @@ class EvbFepDriver():
         self.report_forcegroups: bool = True
         self.debug: bool = False
         self.save_frames: int = 1000
+        self.friction: float = 1.0
 
     def run_FEP(
         self,
@@ -131,6 +132,7 @@ class EvbFepDriver():
         self.topology = topology
         self.NPT = configuration.get("NPT", False)
         self.NVE = configuration.get("NVE", False)
+        self.friction = configuration.get("friction", 1.0)
         assert not (self.NPT
                     and self.NVE), "NPT and NVE cannot be used at the same time"
         if self.NPT:
@@ -156,7 +158,7 @@ class EvbFepDriver():
         self.ostream.flush()
 
         self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
-        self.integrator_friction_coeff = 1 / mmunit.picosecond
+        self.integrator_friction_coeff = self.friction / mmunit.picosecond
 
         timer = Timer(len(self.Lambda))
 
