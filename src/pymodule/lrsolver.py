@@ -503,6 +503,10 @@ class LinearResponseSolver(LinearSolver):
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
+                            # TODO: flip sign for imaginary a_operator
+                            # if self.a_operator == 'magnetic dipole':
+                            #     rsp_funcs[(aop, bop, w)] *= -1.0
+
                         # write to h5 file for response solutions
                         if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [

@@ -1316,7 +1316,7 @@ class NonlinearSolver:
     def _a2_contract(self, k, A, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 2 with a
-        second-order response matrix. A[2]N1 = -(1 / 2)[[k1,X],D.T]
+        second-order response matrix. A[2]N1 = -(1 / 2)[[k1,A],D.T]
 
         # Note that the sign needs further investigation.
 
