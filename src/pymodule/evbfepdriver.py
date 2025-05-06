@@ -336,6 +336,13 @@ class EvbFepDriver():
     def _sample(self, system, l, initial_state):
         run_simulation = self._get_simulation(system, self.equil_step_size)
         run_simulation.reporters.append(self.traj_roporter)
+
+        if self.isobaric:
+            barostat = [
+                force for force in run_simulation.system.getForces()
+                if isinstance(force, mm.MonteCarloBarostat)
+            ][0]
+            barostat.setFrequency(0)
         sz = self.step_size * mmunit.picoseconds
         run_simulation.integrator.setStepSize(sz)
         run_simulation.context.setState(initial_state)
