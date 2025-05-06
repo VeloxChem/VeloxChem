@@ -123,7 +123,6 @@ class EvbFepDriver():
 
         systems = configuration["systems"]
         topology = configuration["topology"]
-        temperature = configuration["temperature"]
         initial_positions = configuration["initial_positions"]
 
         cwd = Path.cwd()
