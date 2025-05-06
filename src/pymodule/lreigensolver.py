@@ -123,8 +123,6 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.esa = False
         self.esa_from_state = None
-        self.point_charges= None
-        self.solvation_model = None
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),

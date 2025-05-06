@@ -150,13 +150,13 @@ class LinearSolver:
         # static electric field
         self.electric_field = None
 
+        # point charges
+        self.point_charges = None
+    
         # solvation model
         self.solvation_model = None
         self.non_equilibrium_solv = False
 
-        # point charges
-        self.point_charges = None
-    
         # C-PCM setup
         self._cpcm = False
         self.cpcm_drv = None
