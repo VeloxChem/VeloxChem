@@ -663,38 +663,51 @@ class EvbDriver():
             name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
         """
         #todo restructure the input system for keywords, build proper class and enum for this, also restructure ensembles with NPT and NVE stuff
-        # provide temperature if you want isothermal
-        # provide pressure if you want isobaric
-        if name == "NVE":
+        if name == "vacuum":
             conf = {
-                "name": "vac_NVE",
-            }
-        elif name == "NVT":
-            conf = {
-                "name": "vac_NVT",
-                "temperature": self.temperature
-            }
-        elif name == "NPT":
-            conf = {
-                "name": "vac_NPT",
+                "name": "vacuum",
+                "NVE": False,
                 "temperature": self.temperature,
-                "pressure": 1
             }
         elif name == "water":
             conf = {
                 "name": "water",
                 "solvent": "spce",
                 "temperature": self.temperature,
+                "NPT": True,
                 "pressure": 1,
                 "padding": 1.5,
                 "ion_count": 0,
                 "neutralize": False
             }
+        # elif name == "CNT":
+        #     conf = {
+        #         "name": "water_CNT",
+        #         "solvent": "spce",
+        #         "temperature": self.temperature,
+        #         "NPT": True,
+        #         "pressure": 1,
+        #         "ion_count": 0,
+        #         "CNT": True,
+        #         "CNT_radius": 0.5,
+        #     }
+        # elif name == "graphene":
+        #     conf = {
+        #         "name": "water_graphene",
+        #         "solvent": "spce",
+        #         "temperature": self.temperature,
+        #         "NPT": True,
+        #         "pressure": 1,
+        #         "ion_count": 0,
+        #         "graphene": True,
+        #         "graphene_size": 2,
+        #     }
         elif name == "E_field":
             conf = {
                 "name": "water_E_field",
                 "solvent": "spce",
                 "temperature": self.temperature,
+                "NPT": True,
                 "pressure": 1,
                 "padding": 1.5,
                 "ion_count": 0,
@@ -705,6 +718,7 @@ class EvbDriver():
                 "name": "no_reactant",
                 "solvent": "spce",
                 "temperature": self.temperature,
+                "NPT": True,
                 "pressure": 1,
                 "padding": 1.5,
                 "ion_count": 0,
