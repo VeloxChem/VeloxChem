@@ -141,9 +141,7 @@ class EvbFepDriver():
         if pressure > 0:
             self.isobaric = True
 
-        self.ostream.print_info(
-            f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
-        )
+        
         self.ostream.flush()
 
         self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
@@ -156,10 +154,13 @@ class EvbFepDriver():
 
         self.total_snapshots = total_sample_steps / write_step * len(
             self.Lambda)
-        self.ostream.print_info(f"Lambda: {self.Lambda}")
+        self.ostream.print_info(f"Lambda: {np.array(self.Lambda)}")
         info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equiliberation steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
         info += f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}\n"
         info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
+        self.ostream.print_info(
+            f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
+        )
         self.ostream.print_info(info)
         self.ostream.flush()
 
