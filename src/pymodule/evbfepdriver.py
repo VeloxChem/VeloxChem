@@ -132,6 +132,13 @@ class EvbFepDriver():
         self.NPT = configuration.get("NPT", False)
         self.NVE = configuration.get("NVE", False)
         assert not (self.NPT and self.NVE), "NPT and NVE cannot be used at the same time"
+        if self.NPT:
+            self.ostream.print_info("Running in NPT ensemble")
+        if self.NVE:
+            self.ostream.print_info("Running in NVE ensemble")
+        else:
+            self.ostream.print_info("Running in NVT ensemble")
+        self.ostream.flush()
 
         assert (total_sample_steps % write_step == 0
                 ), "write_step must be a factor of total_sample_steps"
