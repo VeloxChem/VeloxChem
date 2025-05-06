@@ -91,6 +91,9 @@ class EvbFepDriver():
         self.debug: bool = False
         self.save_frames: int = 1000
 
+        self.isothermal: bool = False
+        self.isobaric: bool = False
+
     def run_FEP(
         self,
         equil_NVT_steps,
@@ -132,11 +135,10 @@ class EvbFepDriver():
 
         temperature = configuration.get('temperature', -1)
         pressure = configuration.get('pressure', -1)
-        self.isothermal = False
+
         if temperature > 0:
             self.isothermal = True
 
-        self.isobaric = False
         if pressure > 0:
             self.isobaric = True
 
