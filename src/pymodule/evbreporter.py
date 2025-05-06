@@ -143,20 +143,7 @@ class EvbReporter():
             self.report_forcegroups = True
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
             if not append:
-                header = ""
-                integration_forcegroups = EvbForceGroup.integration_force_groups()
-                pes_forcegroups = EvbForceGroup.pes_force_groups()
-                for fg in EvbForceGroup:
-                    in_int = fg.value in integration_forcegroups
-                    in_pes = fg.value in pes_forcegroups
-                    fg_cat = 'b'
-                    if in_int and not in_pes:
-                        fg_cat = 'i'
-                    if not in_int and in_pes:
-                        fg_cat = 'p'
-                    header += f"{fg.name}({fg.value}-{fg_cat}), "
-                header = header[:-2] + '\n'
-                self.FG_out.write(header)
+                self.FG_out.write(EvbForceGroup.get_header())
 
     def __del__(self):
         self.E_out.close()
@@ -268,48 +255,6 @@ class EvbReporter():
                 self.ostream.print_info(
                     f"Lambda: {self.Lambda}, pes difference: {Em_pes - pes_recalc}, NB force difference: {dif[3]}"
                 )
-
-                # context0 = simulations[0].context
-                # sys0 = context0.getSystem()
-                # state0 = context0.getState(
-                #     positions=True,
-                #     energy=True,
-                #     groups=EvbForceGroup.pes_force_groups(),
-                # )
-                # pos0 = state0.getPositions(asNumpy=True).value_in_unit(
-                #     mm.unit.nanometer)
-                # E0 = state0.getPotentialEnergy().value_in_unit(
-                #     mm.unit.kilojoules_per_mole)
-
-                # context1 = simulations[1].context
-                # sys1 = context1.getSystem()
-
-                # state1 = context1.getState(
-                #     positions=True,
-                #     energy=True,
-                #     groups=EvbForceGroup.pes_force_groups(),
-                # )
-
-                # pos1 = state1.getPositions(asNumpy=True).value_in_unit(
-                #     mm.unit.nanometer)
-                # E1 = state1.getPotentialEnergy().value_in_unit(
-                #     mm.unit.kilojoules_per_mole)
-
-                # sys_string0 = mm.XmlSerializer.serialize(sys0)
-                # sys_string1 = mm.XmlSerializer.serialize(sys1)
-                # state_string0 = mm.XmlSerializer.serialize(state0)
-                # state_string1 = mm.XmlSerializer.serialize(state1)
-                # self.ostream.print_info(
-                #     f"Systems equal: {sys_string0==sys_string1}, States equal: {state_string0==state_string1}, Positions equal: {np.all(pos0== pos1)}, Energies difference: {E0 - E1}"
-                # )
-                # state_string0 = state_string0.splitlines()
-                # state_string1 = state_string1.splitlines()
-                # for i, (line0,
-                #         line1) in enumerate(zip(state_string0, state_string1)):
-                #     if line0 != line1:
-                #         self.ostream.print_info(f"line {i}: {line0} vs {line1}")
-                # self.ostream.flush()
-                # # what line are sys0 and sys1 different
 
             if self.report_forcegroups:
                 pes_fg_recalc = 0

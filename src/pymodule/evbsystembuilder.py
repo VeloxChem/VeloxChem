@@ -145,6 +145,23 @@ class EvbForceGroup(Enum):
             # cls.DEBUG2.value,
         ])
 
+    @classmethod
+    def get_header(cls):
+        header = ""
+        integration_forcegroups = cls.integration_force_groups()
+        pes_forcegroups = cls.pes_force_groups()
+        for fg in cls:
+            in_int = fg.value in integration_forcegroups
+            in_pes = fg.value in pes_forcegroups
+            fg_cat = 'b'
+            if in_int and not in_pes:
+                fg_cat = 'i'
+            if not in_int and in_pes:
+                fg_cat = 'p'
+            header += f"{fg.name}({fg.value}-{fg_cat}), "
+        header = header[:-2] + '\n'
+        return header
+
 
 class EvbSystemBuilder():
 

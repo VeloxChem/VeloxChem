@@ -130,6 +130,8 @@ class EvbFepDriver():
         self.systems = systems
         self.topology = topology
         self.NPT = configuration.get("NPT", False)
+        self.NVE = configuration.get("NVE", False)
+        assert not (self.NPT and self.NVE), "NPT and NVE cannot be used at the same time"
 
         assert (total_sample_steps % write_step == 0
                 ), "write_step must be a factor of total_sample_steps"
@@ -185,26 +187,7 @@ class EvbFepDriver():
         self.ostream.flush()
 
     def _minimize_and_equilibrate(self, system, l, positions):
-        equil_integrator = mm.LangevinMiddleIntegrator(
-            self.integrator_temperature,
-            self.integrator_friction_coeff,
-            self.equil_step_size * mmunit.picoseconds,
-        )
-        equil_integrator.setIntegrationForceGroups(
-            EvbForceGroup.integration_force_groups())
-        if self.platform is not None:
-            equil_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                equil_integrator,
-                mm.Platform.getPlatformByName(self.platform),
-            )
-        else:
-            equil_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                equil_integrator,
-            )
+        equil_simulation = self._get_simulation(system, self.equil_step_size)
         equil_simulation.context.setPositions(positions)
 
         if l == 0:
@@ -336,28 +319,7 @@ class EvbFepDriver():
         return equil_state
 
     def _sample(self, system, l, initial_state):
-        run_integrator = mm.LangevinMiddleIntegrator(
-            self.integrator_temperature,
-            self.integrator_friction_coeff,
-            self.equil_step_size * mmunit.picoseconds,
-        )
-        run_integrator.setIntegrationForceGroups(
-            EvbForceGroup.integration_force_groups())
-
-        if self.platform is not None:
-            run_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                run_integrator,
-                mm.Platform.getPlatformByName(self.platform),
-            )
-        else:
-            run_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                run_integrator,
-            )
-
+        run_simulation = self._get_simulation(system, self.equil_step_size)
         run_simulation.reporters.append(self.traj_roporter)
         sz = self.step_size * mmunit.picoseconds
         run_simulation.integrator.setStepSize(sz)
@@ -416,6 +378,33 @@ class EvbFepDriver():
         states = self._safe_step(run_simulation, self.total_sample_steps)
         return states[-1]
 
+    def _get_simulation(self,system,step_size):
+        if self.NVE:
+            integrator = mm.VerletIntegrator(step_size)
+        else:
+            integrator = mm.LangevinMiddleIntegrator(
+                self.integrator_temperature,
+                self.integrator_friction_coeff,
+                step_size * mmunit.picoseconds,
+            )
+        integrator.setIntegrationForceGroups(
+            EvbForceGroup.integration_force_groups())
+
+        if self.platform is not None:
+            simulation = mmapp.Simulation(
+                self.topology,
+                system,
+                integrator,
+                mm.Platform.getPlatformByName(self.platform),
+            )
+        else:
+            simulation = mmapp.Simulation(
+                self.topology,
+                system,
+                integrator,
+            )
+        return simulation
+
     def _constrain_H_bonds(self, system):
         harm_bond_forces = [
             force for force in system.getForces()
@@ -471,7 +460,6 @@ class EvbFepDriver():
             pot = state.getPotentialEnergy()
             pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
 
-
             states.append(state)
             if len(states) > self.save_frames:
                 states.pop(0)
@@ -487,14 +475,15 @@ class EvbFepDriver():
 
         for j, state in enumerate(states):
             step_num = step - len(states) + j
-            with open(path / f"state_step_{step_num}.xml", "w") as f:
+            name = f"state_step_{j}_{step_num}"
+            with open(path / f"{name}.xml", "w") as f:
                 f.write(mm.XmlSerializer.serialize(state))
 
             minim_positions = state.getPositions()
             mmapp.PDBFile.writeFile(
                 self.topology,
                 np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
-                open(self.run_folder / f"state_step_{step_num}.pdb", "w"),
+                open(self.run_folder / f"{name}.pdb", "w"),
             )
 
             kin = state.getKineticEnergy()
@@ -510,7 +499,6 @@ class EvbFepDriver():
             energies[j, 3] = vol
 
             simulation.context.setState(state)
-            energies[j, 0]
             for k, fg in enumerate(EvbForceGroup):
                 fg_state = simulation.context.getState(
                     getEnergy=True,
@@ -518,7 +506,7 @@ class EvbFepDriver():
                 )
                 energy = fg_state.getPotentialEnergy()
                 energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
-                energies[j, k + 3] = energy
+                energies[j, k + 4] = energy
 
         # Combine all saved PDB files into one and remove the sigle ones
         input_folder = self.run_folder  # replace this
@@ -536,8 +524,8 @@ class EvbFepDriver():
                 outfile.write("ENDMDL\n")
                 os.remove(pdb_file)
 
-        header = "step,kinetic,potential,volume"
-        header += ",".join([fg.name for fg in EvbForceGroup])
+        header = "step, kinetic, potential, volume,"
+        header += EvbForceGroup.get_header()
         np.savetxt(
             path / f"crash_energies.csv",
             energies,
@@ -545,7 +533,6 @@ class EvbFepDriver():
             header=header,
             fmt="%.5e",
         )
-
 
 class Timer:
 

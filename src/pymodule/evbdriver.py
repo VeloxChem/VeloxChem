@@ -662,9 +662,11 @@ class EvbDriver():
         Args:
             name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
         """
+        #todo restructure the input system for keywords, build proper class and enum for this, also restructure ensembles with NPT and NVE stuff
         if name == "vacuum":
             conf = {
                 "name": "vacuum",
+                "NVE": False,
                 "temperature": self.temperature,
             }
         elif name == "water":
