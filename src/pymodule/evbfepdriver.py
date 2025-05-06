@@ -129,16 +129,22 @@ class EvbFepDriver():
         self.Lambda = Lambda
         self.systems = systems
         self.topology = topology
-        self.NPT = configuration.get("NPT", False)
-        self.NVE = configuration.get("NVE", False)
-        assert not (self.NPT and self.NVE), "NPT and NVE cannot be used at the same time"
-        if self.NPT:
-            self.ostream.print_info("Running in NPT ensemble")
-        if self.NVE:
-            self.ostream.print_info("Running in NVE ensemble")
+
+        temperature = configuration.get('temperature',-1)
+        pressure = configuration.get('pressure',-1)
+        if temperature ==-1:
+            self.ensemble = "NVE"
+        elif pressure > 0 and temperature >0:
+            self.ensemble = "NPT"
+            self.isobaric = True
         else:
-            self.ostream.print_info("Running in NVT ensemble")
+            self.ensemble = "NVT"
+            
+        self.ostream.print_info(f"Running {self.ensemble} ensemble")
         self.ostream.flush()
+
+        self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
+        self.integrator_friction_coeff = 0.5 / mmunit.picosecond
 
         assert (total_sample_steps % write_step == 0
                 ), "write_step must be a factor of total_sample_steps"
@@ -153,9 +159,6 @@ class EvbFepDriver():
         info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
         self.ostream.print_info(info)
         self.ostream.flush()
-
-        self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
-        self.integrator_friction_coeff = 1 / mmunit.picosecond
 
         timer = Timer(len(self.Lambda))
 
@@ -242,7 +245,7 @@ class EvbFepDriver():
         sz = self.equil_step_size * mmunit.picoseconds
         equil_simulation.integrator.setStepSize(sz)
         self.ostream.print_info(f"Equilibration with step size {sz}")
-        if self.NPT:
+        if self.isobaric:
             NPT_equil_reporter = mmapp.StateDataReporter(
                 str(self.run_folder / f"equil_NPT_data_{l:.3f}.csv"),
                 1,
@@ -260,7 +263,7 @@ class EvbFepDriver():
                 if isinstance(force, mm.MonteCarloBarostat)
             ][0]
         if l == 0:
-            if self.NPT:
+            if self.isobaric:
                 barostat.setFrequency(0)
                 self.ostream.print_info(
                     f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
@@ -285,7 +288,7 @@ class EvbFepDriver():
                     equil_simulation,
                     self.initial_equil_NVT_steps + self.initial_equil_NPT_steps)
 
-        if self.NPT:
+        if self.isobaric:
             self.ostream.print_info(
                 f"Running NVT equilibration for {self.equil_NVT_steps} steps")
             self.ostream.flush()

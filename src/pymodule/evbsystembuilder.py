@@ -265,7 +265,6 @@ class EvbSystemBuilder():
             self.soft_core_lj_int,
         )
 
-        NPT = configuration.get("NPT", False)
         pressure = configuration.get("pressure", 1)
         solvent = configuration.get("solvent", None)
         padding = configuration.get("padding", 1)
@@ -352,13 +351,13 @@ class EvbSystemBuilder():
         nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
         system.addForce(nb_force)
 
-        if NPT:
-            barostat = mm.MonteCarloBarostat(
-                pressure * mmunit.bar,  # type: ignore
-                self.temperature * mmunit.kelvin,  # type: ignore
-            )
-            barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
-            system.addForce(barostat)
+        
+        barostat = mm.MonteCarloBarostat(
+            pressure * mmunit.bar,  # type: ignore
+            self.temperature * mmunit.kelvin,  # type: ignore
+        )
+        barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
+        system.addForce(barostat)
 
         if np.any(np.array(E_field) > 0.001):
             E_field_force = self._create_E_field(system, E_field)
