@@ -130,19 +130,19 @@ class EvbFepDriver():
         self.systems = systems
         self.topology = topology
 
-        temperature = configuration.get('temperature',-1)
-        pressure = configuration.get('pressure',-1)
-        if temperature >0:
+        temperature = configuration.get('temperature', -1)
+        pressure = configuration.get('pressure', -1)
+        self.isothermal = False
+        if temperature > 0:
             self.isothermal = True
-        else:
-            self.isothermal = False
 
-        if pressure >0:
+        self.isobaric = False
+        if pressure > 0:
             self.isobaric = True
-        else:
-            self.isobaric = False
 
-        self.ostream.print_info(f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}")
+        self.ostream.print_info(
+            f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
+        )
         self.ostream.flush()
 
         self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
@@ -390,7 +390,7 @@ class EvbFepDriver():
         states = self._safe_step(run_simulation, self.total_sample_steps)
         return states[-1]
 
-    def _get_simulation(self,system,step_size):
+    def _get_simulation(self, system, step_size):
         if self.isothermal:
             integrator = mm.LangevinMiddleIntegrator(
                 self.integrator_temperature,
@@ -525,7 +525,7 @@ class EvbFepDriver():
         output_file = "combined_crash.pdb"
         pdb_pattern = "state_step_*.pdb"
         pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
-        with open(self.run_folder/ output_file, 'w') as outfile:
+        with open(self.run_folder / output_file, 'w') as outfile:
             for model_number, pdb_file in enumerate(pdb_files, start=1):
                 outfile.write(f"MODEL     {model_number}\n")
                 with open(pdb_file, 'r') as infile:
@@ -545,6 +545,7 @@ class EvbFepDriver():
             header=header,
             fmt="%.5e",
         )
+
 
 class Timer:
 
