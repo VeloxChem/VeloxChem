@@ -1,34 +1,26 @@
 #
-#                                   VELOXCHEM
-#              ----------------------------------------------------
-#                          An Electronic Structure Code
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
 #
-#  SPDX-License-Identifier: BSD-3-Clause
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
-#  Copyright 2018-2025 VeloxChem developers
+#  SPDX-License-Identifier: LGPL-3.0-or-later
 #
-#  Redistribution and use in source and binary forms, with or without modification,
-#  are permitted provided that the following conditions are met:
+#  This file is part of VeloxChem.
 #
-#  1. Redistributions of source code must retain the above copyright notice, this
-#     list of conditions and the following disclaimer.
-#  2. Redistributions in binary form must reproduce the above copyright notice,
-#     this list of conditions and the following disclaimer in the documentation
-#     and/or other materials provided with the distribution.
-#  3. Neither the name of the copyright holder nor the names of its contributors
-#     may be used to endorse or promote products derived from this software without
-#     specific prior written permission.
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
 #
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from contextlib import redirect_stderr
 from io import StringIO
@@ -41,6 +33,7 @@ import multiprocessing as mp
 from mpi4py import MPI
 
 
+from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
 
@@ -91,16 +84,10 @@ class InterpolationDatapoint:
         """
         # if comm is None:
         #     comm = MPI.COMM_WORLD
-        # if comm is None:
-        #     comm = MPI.COMM_WORLD
 
         # if ostream is None:
         #     ostream = OutputStream(sys.stdout)
-        # if ostream is None:
-        #     ostream = OutputStream(sys.stdout)
 
-        # self.comm = None
-        # self.ostream = ostream
         # self.comm = None
         # self.ostream = ostream
 
@@ -130,6 +117,7 @@ class InterpolationDatapoint:
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
         self.internal_coordinates = None
+        self.mapping_masks = None
 
         # internal_coordinates_values is a numpy array with the values of the
         # geomeTRIC internal coordinates. It is used in InterpolationDriver to
@@ -677,6 +665,12 @@ class InterpolationDatapoint:
                 h5f.create_dataset(label + '_' + key,
                                    data=zmat_dict[key],
                                    compression='gzip')
+                
+            full_label = label + "_masks"
+            h5f.create_dataset(full_label,
+                               data=self.mapping_masks,
+                               compression='gzip')
+            
 
             
             h5f.close()
@@ -713,6 +707,7 @@ class InterpolationDatapoint:
             hessian_label = label + "_hessian"
             coords_label = label + "_internal_coordinates"
             cart_coords_label = label + "_cartesian_coordinates"
+            mapping_masks_label = label + "_masks"
             confidence_radius_label = label + "_confidence_radius"
 
             z_matrix_bonds = label + '_bonds'
@@ -728,6 +723,7 @@ class InterpolationDatapoint:
             self.internal_coordinates_values = np.array(h5f.get(coords_label))
             self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
             self.confidence_radius = np.array(h5f.get(confidence_radius_label))
+            self.mapping_masks = np.array(h5f.get(mapping_masks_label))
 
 
             z_matrix = []
