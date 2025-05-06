@@ -337,7 +337,7 @@ class EvbFepDriver():
         run_simulation = self._get_simulation(system, self.equil_step_size)
         run_simulation.reporters.append(self.traj_roporter)
 
-        if self.isobaric:
+        if not self.isobaric:
             barostat = [
                 force for force in run_simulation.system.getForces()
                 if isinstance(force, mm.MonteCarloBarostat)
