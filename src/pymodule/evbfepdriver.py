@@ -389,7 +389,7 @@ class EvbFepDriver():
         return states[-1]
 
     def _get_simulation(self,system,step_size):
-        if self.NVE:
+        if self.ensemble == "NVE":
             integrator = mm.VerletIntegrator(step_size)
         else:
             integrator = mm.LangevinMiddleIntegrator(
