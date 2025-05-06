@@ -36,6 +36,7 @@ import numpy as np
 import time
 import sys
 import os
+import glob
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -138,7 +139,7 @@ class EvbFepDriver():
         self.total_snapshots = total_sample_steps / write_step * len(
             self.Lambda)
         self.ostream.print_info(f"Lambda: {self.Lambda}")
-        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equilibration steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
+        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equiliberation steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
         info += f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}\n"
         info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
         self.ostream.print_info(info)
@@ -264,7 +265,10 @@ class EvbFepDriver():
                 append=False,
             )
             equil_simulation.reporters.append(NPT_equil_reporter)
-            barostat = [force for force in equil_simulation.system.getForces() if isinstance(force,mm.MonteCarloBarostat)][0]
+            barostat = [
+                force for force in equil_simulation.system.getForces()
+                if isinstance(force, mm.MonteCarloBarostat)
+            ][0]
         if l == 0:
             if self.NPT:
                 barostat.setFrequency(0)
@@ -308,7 +312,8 @@ class EvbFepDriver():
                 f"Running equilibration for {self.equil_NVT_steps+self.equil_NPT_steps} steps"
             )
             self.ostream.flush()
-            self._safe_step(equil_simulation, self.equil_NVT_steps+self.equil_NPT_steps)
+            self._safe_step(equil_simulation,
+                            self.equil_NVT_steps + self.equil_NPT_steps)
 
         equil_state = equil_simulation.context.getState(
             getPositions=True,
@@ -514,6 +519,23 @@ class EvbFepDriver():
                 energy = fg_state.getPotentialEnergy()
                 energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
                 energies[j, k + 3] = energy
+
+        # Combine all saved PDB files into one and remove the sigle ones
+        input_folder = self.run_folder  # replace this
+        output_file = "combined_crash.pdb"
+        pdb_pattern = "state_step_*.pdb"
+        pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
+        with open(output_file, 'w') as outfile:
+            for model_number, pdb_file in enumerate(pdb_files, start=1):
+                outfile.write(f"MODEL     {model_number}\n")
+                with open(pdb_file, 'r') as infile:
+                    for line in infile:
+                        if line.startswith(('ATOM', 'HETATM', 'TER',
+                                            'END')):  # Skip headers/footers
+                            outfile.write(line)
+                outfile.write("ENDMDL\n")
+                os.remove(pdb_file)
+
         header = "step,kinetic,potential,volume"
         header += ",".join([fg.name for fg in EvbForceGroup])
         np.savetxt(
