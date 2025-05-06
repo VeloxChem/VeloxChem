@@ -926,7 +926,7 @@ class OpenMMDynamics:
 
         return conformers_dict
     
-    def calculate_boltzmann(self, dict=None, T=300, unit='kj/mol'):
+    def calculate_boltzmann_distribution(self, dict=None, T=300, unit='kj/mol'):
                 if unit=='kj/mol':
                     R = 0.008314462618
                 elif unit=='kcal/mol':
@@ -955,7 +955,7 @@ class OpenMMDynamics:
     def show_conformers(self, number=5, atom_indices=False, atom_labels=False, boltzmann_distribution=True):
         weights = None
         if boltzmann_distribution:
-            weights = self.calculate_boltzmann(T=300, dict=self.conformer_dict, unit='kj/mol')
+            weights = self.calculate_boltzmann_distribution(T=300, dict=self.conformer_dict, unit='kj/mol')
 
         if number > len(self.conformer_dict["energies"]):
             number = len(self.conformer_dict["energies"])
