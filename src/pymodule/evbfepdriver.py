@@ -132,15 +132,17 @@ class EvbFepDriver():
 
         temperature = configuration.get('temperature',-1)
         pressure = configuration.get('pressure',-1)
-        if temperature ==-1:
-            self.ensemble = "NVE"
-        elif pressure > 0 and temperature >0:
-            self.ensemble = "NPT"
+        if temperature >0:
+            self.isothermal = True
+        else:
+            self.isothermal = False
+
+        if pressure >0:
             self.isobaric = True
         else:
-            self.ensemble = "NVT"
-            
-        self.ostream.print_info(f"Running {self.ensemble} ensemble")
+            self.isobaric = False
+
+        self.ostream.print_info(f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}")
         self.ostream.flush()
 
         self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
@@ -389,14 +391,14 @@ class EvbFepDriver():
         return states[-1]
 
     def _get_simulation(self,system,step_size):
-        if self.ensemble == "NVE":
-            integrator = mm.VerletIntegrator(step_size)
-        else:
+        if self.isothermal:
             integrator = mm.LangevinMiddleIntegrator(
                 self.integrator_temperature,
                 self.integrator_friction_coeff,
                 step_size * mmunit.picoseconds,
             )
+        else:
+            integrator = mm.VerletIntegrator(step_size)
         integrator.setIntegrationForceGroups(
             EvbForceGroup.integration_force_groups())
 
