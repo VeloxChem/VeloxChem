@@ -1,7 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
     Dense4DTensor.cpp
-    DenseLinearAlgebra.cpp
     DenseMatrix.cpp
     Matrices.cpp
     Matrix.cpp

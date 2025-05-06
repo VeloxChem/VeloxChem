@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from copy import deepcopy
@@ -164,6 +172,8 @@ class ScfGradientDriver(GradientDriver):
             'Fock_grad': 0.0,
             'XC_grad': 0.0,
             'PE_grad': 0.0,
+            'CPCM_grad': 0.0,
+            'D4_grad': 0.0,
             'Classical': 0.0,
         }
 
@@ -255,7 +265,7 @@ class ScfGradientDriver(GradientDriver):
 
                 gmats_100 = Matrices()
 
-        grad_timing['Point_charges_grad'] += time.time() - t0
+            grad_timing['Point_charges_grad'] += time.time() - t0
 
         # orbital contribution to gradient
 
@@ -344,11 +354,7 @@ class ScfGradientDriver(GradientDriver):
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            local_ri_gvec = np.array(
-                self.scf_driver._ri_drv.compute_local_bq_vector(
-                    den_mat_for_fock))
-            ri_gvec = np.zeros(local_ri_gvec.shape)
-            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
+            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(den_mat_for_fock)
 
             ri_grad_drv = RIFockGradDriver()
 
@@ -407,10 +413,10 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += grad_drv.integrate_vxc_gradient(
                 molecule, basis, [D], self.scf_driver._mol_grid, xcfun_label)
 
+            grad_timing['XC_grad'] += time.time() - t0
+
         else:
             xcfun_label = 'hf'
-
-        grad_timing['XC_grad'] += time.time() - t0
 
         # Embedding contribution to the gradient
 
@@ -432,7 +438,17 @@ class ScfGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 self.gradient += pe_grad
 
-        grad_timing['PE_grad'] += time.time() - t0
+            grad_timing['PE_grad'] += time.time() - t0
+
+        # CPCM contribution to gradient
+
+        if self.scf_driver._cpcm:
+            self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
+                molecule, basis, self.scf_driver._cpcm_grid,
+                self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
+                2.0 * D)
+
+            grad_timing['CPCM_grad'] += time.time() - t0
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -443,20 +459,22 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
+            grad_timing['Classical'] += time.time() - t0
+
+            t0 = time.time()
+
             if self.dispersion:
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
 
-            # CPCM contribution to gradient
-            # TODO: parallelize over MPI
-            if self.scf_driver._cpcm:
-                self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
-                    molecule, basis, self.scf_driver._cpcm_grid,
-                    self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
-                    2.0 * D)
+                grad_timing['D4_grad'] += time.time() - t0
+
+            t0 = time.time()
 
         # nuclei-point charges contribution to gradient
+
+        t0 = time.time()
 
         if self.scf_driver.point_charges is not None:
             coords = molecule.get_coordinates_in_bohr()
@@ -520,7 +538,8 @@ class ScfGradientDriver(GradientDriver):
         if self.timing and self.rank == mpi_master():
             self.ostream.print_info('Gradient timing decomposition')
             for key, val in grad_timing.items():
-                self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
+                if val > 0.0:
+                    self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_analytical_unrestricted(self, molecule, basis, scf_results):
@@ -717,10 +736,7 @@ class ScfGradientDriver(GradientDriver):
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            local_ri_gvec = np.array(
-                self.scf_driver._ri_drv.compute_local_bq_vector(Dab_for_fock))
-            ri_gvec = np.zeros(local_ri_gvec.shape)
-            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
+            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(Dab_for_fock)
 
             ri_grad_drv = RIFockGradDriver()
 
@@ -795,6 +811,14 @@ class ScfGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 self.gradient += pe_grad
 
+        # CPCM contribution to gradient
+
+        if self.scf_driver._cpcm:
+            self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
+                molecule, basis, self.scf_driver._cpcm_grid,
+                self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
+                Da + Db)
+
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
         # (only added on master rank)
@@ -806,14 +830,6 @@ class ScfGradientDriver(GradientDriver):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
-
-            # CPCM contribution to gradient
-            # TODO: parallelize over MPI
-            if self.scf_driver._cpcm:
-                self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
-                    molecule, basis, self.scf_driver._cpcm_grid,
-                    self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
-                    Da + Db)
 
         # nuclei-point charges contribution to gradient
 

@@ -12,7 +12,8 @@ target_sources(vlxobjs
     ElectricFieldRecGrad.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
-    NuclearPotentialValues.cpp
+    NuclearPotentialErfGradient.cpp
+    NuclearPotentialErfValues.cpp
     QuadrupoleIntegrals.cpp
     OldOneElecIntsDrivers.cpp
   )

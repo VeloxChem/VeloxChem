@@ -7,20 +7,25 @@
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
-#  This file is part of VeloxChem.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
-#
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 import multiprocessing as mp
@@ -35,6 +40,7 @@ from .profiler import Profiler
 import h5py
 from contextlib import redirect_stderr
 from io import StringIO
+
 from .interpolationdatapoint import InterpolationDatapoint
 from .atommapper import AtomMapper
 from .molecule import Molecule
@@ -74,7 +80,7 @@ class InterpolationDriver():
         - exponent_q: exponent required in the Shepard interpolation procedure.
         - confidence_radius: confidence radius required by the Shepard
           interpolation procedure.
-        - imforcefield_file: File containing the necessary information to construct the interpolation forcefield
+        - imforcefieldfile: File containing the necessary information to construct the interpolation forcefield
     """
 
     def __init__(self, z_matrix=None, comm=None, ostream=None):
@@ -110,6 +116,7 @@ class InterpolationDriver():
         self.confidence_radius = 0.5
         
         self.distance_thrsh = 2.0
+        self.distance_thrsh = 2.0
         self.z_matrix = z_matrix
         self.impes_dict = None
         self.sum_of_weights = None
@@ -122,7 +129,7 @@ class InterpolationDriver():
         self.potentials = []
 
         # kpoint file with QM data
-        self.imforcefield_file = None
+        self.imforcefieldfile = None
         self.qm_data_points = None
         # Name lables for the QM data points
         self.labels = None
@@ -134,7 +141,7 @@ class InterpolationDriver():
                 'exponent_p': ('int', 'the main exponent'),
                 'exponent_q': ('int', 'the additional exponent (Shepard IM)'),
                 'confidence_radius': ('float', 'the confidence radius'),
-                'imforcefield_file':
+                'imforcefieldfile':
                     ('str', 'the name of the chk file with QM data'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
@@ -180,6 +187,8 @@ class InterpolationDriver():
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
 
+        
+
     def read_labels(self):
         """
         Read data point labels from checkpoint file.
@@ -189,10 +198,10 @@ class InterpolationDriver():
         """
 
         assert_msg_critical(
-            self.imforcefield_file is not None,
+            self.imforcefieldfile is not None,
             'ImpesDriver: Please provide a chekpoint file name.')
 
-        h5f = h5py.File(self.imforcefield_file, 'r')
+        h5f = h5py.File(self.imforcefieldfile, 'r')
 
         keys = h5f.keys()
 
@@ -569,7 +578,7 @@ class InterpolationDriver():
         qm_data_points = []
 
         assert_msg_critical(
-            self.imforcefield_file is not None,
+            self.imforcefieldfile is not None,
             'ImpesDriver: Please provide a chekpoint file name.')
        
         if not self.labels:
@@ -581,7 +590,7 @@ class InterpolationDriver():
         for label in self.labels:
             data_point = InterpolationDatapoint(z_matrix)#, self.comm, self.ostream)
             data_point.update_settings(self.impes_dict)
-            data_point.read_hdf5(self.imforcefield_file, label)
+            data_point.read_hdf5(self.imforcefieldfile, label)
             qm_data_points.append(data_point)
 
         self.qm_data_points = qm_data_points
@@ -604,13 +613,9 @@ class InterpolationDriver():
         hessian = data_point.internal_hessian
         dist_check = (current_internal_coordinates_values - data_point.internal_coordinates_values)
 
-        # implement sin for keeping the structure
-        # change the code so it can take on any function that is being used for the dihedral
-        # TODO: check if the bond angle can be described by a function as well?
         for i, element in enumerate(self.impes_coordinate.z_matrix): 
             if len(element) == 4:
                     dist_check[i] = np.sin(dist_check[i])
-                    # dist_check[i] = abs(self.principal_angle(dist_check[i]))
 
         pes = (energy + np.matmul(dist_check.T, grad) +
                0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
@@ -792,7 +797,7 @@ class InterpolationDriver():
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
                 distance_vector, distance)
-        else:
+
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)

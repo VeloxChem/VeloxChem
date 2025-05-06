@@ -14,6 +14,8 @@ on:
       - ri-grad-test
       - tddft_vibanalysis_test
       - tddft_grad_test
+      - feature-test
+      - merge-test
 
 jobs:
   vlx_ci:
@@ -70,7 +72,7 @@ jobs:
           python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
-          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++" \
+          SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++" \
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
@@ -78,3 +80,5 @@ jobs:
             -m "solvers" --durations=10
           OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
             -m "not timeconsuming" --durations=10
+          git clone https://github.com/VeloxChem/vlx-extra-tests.git
+          OMP_NUM_THREADS=4 python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests

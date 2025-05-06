@@ -1,28 +1,37 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import math
 import math
 import os
 import random
@@ -46,9 +55,13 @@ from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDrive
 
 from .molecularbasis import MolecularBasis
 from .openmmdynamics import OpenMMDynamics
+
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imdatabasepointcollecter import IMDatabasePointCollecter
+# from .impesdatabasebuilder import ImpesDatabaseBuilder
+# from .imdatabasedriver import IMDatabaseDriver
+#from .impesforcefieldgenerator_parallel import ImpesForceFieldGeneratorParallel
 # from .impesdatabasebuilder import ImpesDatabaseBuilder
 # from .imdatabasedriver import IMDatabaseDriver
 #from .impesforcefieldgenerator_parallel import ImpesForceFieldGeneratorParallel
@@ -86,11 +99,8 @@ class IMForceFieldGenerator:
         - molecules_along_rp: Represents molecular structures along a predefined reaction path or internal coordinate 
                               pathway.
 
-        - dihedrals: A list of dihedral angles to be rotated or scanned during simulations. Used to determine a pre-
+        - dihedrals_dict: A list of dihedral angles and number of scan steps the angle is rotated or scanned for the database. Used to determine a pre-
                         defined path that should be sampled within the interpolation database construction.
-
-        - sampling_structures: Specifies how many structures to generate around rotatable dihedral angles for database 
-                               population.
 
         - molecule: The initial molecular structure. (This mus be provided by the user)
 
@@ -103,9 +113,6 @@ class IMForceFieldGenerator:
         - allowed_deviation: A threshold for how much a generated or sampled 
                             structure is allowed to deviate from an expected configuration. Ensures structural integrity 
                             during sampling or dynamics.
-
-        - angle_threshold: Defines the range within which dihedral angles can vary during sampling and dynamics.
-                           Making sure the smapling for 1 structure stays within a certain constained space.
 
         - interpolation_settings: A dictionary containing settings for the interpolation.
 
@@ -170,6 +177,9 @@ class IMForceFieldGenerator:
         - dynamics_method: Determines the method to generate molecular structures for the database quality conformation.
         
         - nstruc_to_confirm_database_quality: Number of randomly selected strucutures for the database quality check.
+        
+        - minimize: performing optimizations of all datapoint structures which are added to the database.
+
     """
     
     def __init__(self, ground_state_driver=None, excited_state_driver=None, roots_to_follow=[0]):
@@ -224,6 +234,7 @@ class IMForceFieldGenerator:
         self.interpolation_settings = None
         self.interpolation_type = 'shepard'
         self.exponent_p = '2'
+        self.exponent_p = '2'
         self.exponent_q = '2'
         self.confidence_radius = '0.5'
         self.imforcefieldfiles = {}
@@ -238,7 +249,7 @@ class IMForceFieldGenerator:
         self.ensemble = 'NVE'
         self.timestep = 0.5
         self.friction = 1.0
-        self.nsteps = 1000
+        self.nsteps = 10000
         self.snapshots = self.nsteps
         self.trajectory_file = 'trajectory.pdb'
         self.reference_struc_energy_file = None   
@@ -266,17 +277,15 @@ class IMForceFieldGenerator:
         self.minimize = True
         self.nstruc_to_confirm_database_quality = 50
 
-    def set_up_the_system(self, molecule, target_dihedrals=None, sampling_structures=1):
+    def set_up_the_system(self, molecule, dihedrals_dict):
 
         """
         Assign the neccessary variables with respected values. 
 
         :param molecule: original molecule
 
-        :param target_dihedrals: is a list of dihedrals that should be scanned during the dynamics
+        :param dihedrals_dict: is a list of dihedrals, periodicity, n_sampling that should be scanned during the dynamics
 
-        :param sampling_structures: devides the searchspace around given rotatbale dihedrals
-            
         """
         self.qm_data_points = None
         self.molecule = molecule
@@ -729,14 +738,10 @@ class IMForceFieldGenerator:
 
         :param molecule: The original molecule object on which rotations are performed.
 
-        :param qm_datapoints: A list of interpolation data points used to track how many
-                            structures already exist (if specific_dihedrals: for certain dihedral configurations).
 
         :param specific_dihedrals: A list of dihedral angle definitions (as tuples of atoms) that 
                                 will be scanned. If not provided, no specific dihedrals are rotated.
 
-        :param nsampling: The number of samples to generate by rotating each dihedral from 0 to 360 degrees.
-                        The rotation values are evenly spaced based on this parameter.
 
         The method creates sampled molecular structures by setting each specified dihedral angle to different 
         rotation values. The rotated structures are stored in `sampled_molecules`. Additionally, it initializes
@@ -751,8 +756,7 @@ class IMForceFieldGenerator:
         - point_densities: A dictionary where keys are tuples of (dihedral, angle) and values represent the 
                             number of existing quantum mechanical data points for that configuration.
 
-        - normalized_angle: determines the normalized dihedral angle how much the the angle is allowed to change within
-                            the dynamics
+        - allowed_deviations: The allowed angle deviation within the dynamics for the given conformer.
         """
 
         sampled_molecules = {}
@@ -774,6 +778,11 @@ class IMForceFieldGenerator:
                 allowed_deviation[specific_dihedral] = {rotation_values[i]: (((rotation_values[i] - normalized_angle + 180) % 360) - 180, ((rotation_values[i] + normalized_angle + 180) % 360) - 180) for i in range(len(rotation_values))}
                 point_densities[specific_dihedral] = {rotation_values[i]: 0 for i in range(len(rotation_values))}
                 for theta in rotation_values:
+                    molecule.set_dihedral_in_degrees([specific_dihedral[0] + 1, specific_dihedral[1] + 1, specific_dihedral[2] + 1, specific_dihedral[3] + 1], theta)
+                    new_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                    sampled_molecules[specific_dihedral].append(new_molecule)
+        
+
                     molecule.set_dihedral_in_degrees([specific_dihedral[0] + 1, specific_dihedral[1] + 1, specific_dihedral[2] + 1, specific_dihedral[3] + 1], theta)
                     new_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
                     sampled_molecules[specific_dihedral].append(new_molecule)
@@ -903,6 +912,9 @@ class IMForceFieldGenerator:
                             key = dihedral
                 
                     reseted_point_densities_dict[specific_dihedral][key] += 1
+                    key = dihedral
+                
+                    reseted_point_densities_dict[specific_dihedral][key] += 1
 
         return reseted_point_densities_dict
 
@@ -968,23 +980,27 @@ class IMForceFieldGenerator:
         """
         
         im_driver = InterpolationDriver() # -> implemented Class in VeloxChem that is capable to perform interpolation calculations for a given molecule and provided z_matrix and database
-        im_driver.imforcefield_file = datafile
+        im_driver.imforcefieldfile = datafile
         labels, z_matrix = im_driver.read_labels()
         sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
 
         impes_coordinate = InterpolationDatapoint(z_matrix) # -> implemented Class in VeloxChem that handles all transformations and database changes concerning the interpolation
         data_point_molecules = []
         datapoints = []
+        datapoints = []
 
         for label in sorted_labels:
+            impes_coordinate = InterpolationDatapoint(z_matrix)
             impes_coordinate = InterpolationDatapoint(z_matrix)
             impes_coordinate.read_hdf5(datafile, label) # -> read in function from the ImpesDriver object
             coordinates_in_angstrom = impes_coordinate.cartesian_coordinates * bohr_in_angstrom()
             current_molecule = Molecule(mol_labels, coordinates_in_angstrom, 'angstrom') # -> creates a VeloxChem Molecule object
             
             datapoints.append(impes_coordinate)
+            datapoints.append(impes_coordinate)
             data_point_molecules.append(current_molecule)
 
+        return data_point_molecules, datapoints
         return data_point_molecules, datapoints
     
     def simple_run_dynamics(self, molecule, forcefield_generator):
@@ -997,7 +1013,7 @@ class IMForceFieldGenerator:
             A VeloxChem Molecule object representing the target system.
 
         :param forcefield_generator:
-            A defined MMForceFieldGenerator object.
+            A defined ForceFieldGenerator object.
 
         :returns:
             A list of molecular structures obtained from the dynamics simulation.
@@ -1005,28 +1021,10 @@ class IMForceFieldGenerator:
 
         all_structures = None
 
-        if self.dynamics_method == 'MM':
-            
-            # define OpenMMDriver object and perform a dynamical sampling
-            openmmdyn = OpenMMDynamics()
-
-            openmmdyn.create_system_from_molecule(molecule, ff_gen=forcefield_generator, 
-                                                  solvent=self.dynamics_settings['solvent'], 
-                                                  qm_atoms='all')
-    
-            _, conformation_structures = openmmdyn.conformational_sampling(ensemble=self.ensemble,
-                                                                           snapshots=self.snapshots, 
-                                                                           nsteps=self.timestep, 
-                                                                           temperature=self.temperature, 
-                                                                           minimize=True)
-
-            all_structures = conformation_structures
-            
-
         if self.dynamics_method == 'IM':
             interpolation_driver = InterpolationDriver()
             interpolation_driver.update_settings(self.interpolation_settings)
-            interpolation_driver.imforcefield_file = self.imforcefieldfile
+            interpolation_driver.imforcefieldfile = self.imforcefieldfile
             qmlabels, z_matrix = interpolation_driver.read_labels()
             sorted_labels = sorted(qmlabels, key=lambda x: int(x.split('_')[1]))
 
@@ -1053,7 +1051,7 @@ class IMForceFieldGenerator:
         if self.dynamics_method == 'IM_Driver':
             interpolation_driver = InterpolationDriver()
             interpolation_driver.update_settings(self.interpolation_settings)
-            interpolation_driver.imforcefield_file = self.imforcefieldfile
+            interpolation_driver.imforcefieldfile = self.imforcefieldfile
             self.qmlabels, z_matrix = interpolation_driver.read_labels()
 
             interpolation_driver.impes_coordinate.z_matrix = z_matrix
@@ -1061,7 +1059,7 @@ class IMForceFieldGenerator:
             im_database_driver.platform = 'CUDA'
 
             im_database_driver.system_from_molecule(molecule, z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')
-            self.interpolation_settings['imforcefield_file'] = self.imforcefieldfile
+            self.interpolation_settings['imforcefieldfile'] = self.imforcefieldfile
             im_database_driver.update_settings(self.dynamics_settings, self.interpolation_settings)
             im_database_driver.collect_qm_points = self.nsteps
             im_database_driver.run_qmmm()
@@ -1084,13 +1082,17 @@ class IMForceFieldGenerator:
        :param given_molecular_strucutres:
            An optional list of additional molecular structures that will be used for the validation.
 
+       :param improve:
+            Key-word to allow adding structures to the database. 
        :returns:
+           List of QM-energies, IM-energies.
            List of QM-energies, IM-energies.
         """
 
         # For all Methods a ForceField of the molecule is requiered
         forcefield_generator = MMForceFieldGenerator()
         forcefield_generator.create_topology(molecule)
+        self.molecule = molecule
         
         # self.imforcefieldfile = im_database_files
         # if self.interpolation_settings is None:
@@ -1102,9 +1104,6 @@ class IMForceFieldGenerator:
         #                     'use_inverse_bond_length':True
         #                   }
 
-        if self.dynamics_method == 'MM':
-            rot_bonds = forcefield_generator.rotatable_bonds
-            forcefield_generator.reparameterize_dihedrals(rot_bonds[0], scan_range=[180, 360], n_points=7, visualize=True)
 
         for root in self.roots_to_follow:
             database_quality = False
@@ -1373,7 +1372,7 @@ class IMForceFieldGenerator:
 
             if len(xyz_lines) >= 2 and im_energies is not None:
 
-                xyz_lines[1] += f'Energies  QM: {qm_energies[i]}  IM: {im_energies[i]}  delta_E: {abs(qm_energies[i] - im_energies[i])}'
+                xyz_lines[1] += f'Energies  QM: {qm_energies[i]}  IM: {im_energies[i]}  delta_E: {abs(qm_energies[i] - im_energies[i])} (h)'
 
 
             updated_xyz_string = "\n".join(xyz_lines)
@@ -1517,14 +1516,9 @@ class IMForceFieldGenerator:
         scf_tensors = None
 
         # XTB
-        if isinstance(qm_driver, XtbDriver):
-
-            qm_driver.compute(molecule)
-            qm_energy = qm_driver.get_energy()
-            qm_energy = np.array([qm_energy])
 
         # restricted SCF
-        elif isinstance(qm_driver, ScfRestrictedDriver):
+        if isinstance(qm_driver, ScfRestrictedDriver):
             qm_driver.ostream.mute()
             scf_tensors = qm_driver.compute(molecule, basis)
             qm_energy = np.array([qm_driver.scf_energy])
@@ -1558,14 +1552,7 @@ class IMForceFieldGenerator:
 
         qm_gradient = None
 
-        if isinstance(grad_driver, XtbGradientDriver):
-            grad_driver.ostream.mute()
-            grad_driver.compute(molecule)
-            grad_driver.ostream.unmute()
-            qm_gradient = grad_driver.gradient
-            qm_gradient = np.array([qm_gradient])
-
-        elif isinstance(grad_driver, ScfGradientDriver):
+        if isinstance(grad_driver, ScfGradientDriver):
             grad_driver.ostream.mute()
             grad_driver.compute(molecule, basis, scf_results)
             qm_gradient = grad_driver.gradient
@@ -1589,7 +1576,6 @@ class IMForceFieldGenerator:
         return qm_gradient
 
 
-    # TODO: mute outside to save time?
     def compute_hessian(self, hess_driver, molecule, basis=None):
         """ Computes the QM Hessian using self.hess_driver.
 
@@ -1603,14 +1589,7 @@ class IMForceFieldGenerator:
 
         qm_hessian = None
 
-        if isinstance(hess_driver, XtbHessianDriver):
-            hess_driver.ostream.mute()
-            hess_driver.compute(molecule)
-            qm_hessian = hess_driver.hessian
-            hess_driver.ostream.unmute()
-            qm_hessian = np.array([qm_hessian])
-
-        elif isinstance(hess_driver, ScfHessianDriver):
+        if isinstance(hess_driver, ScfHessianDriver):
             hess_driver.ostream.mute()
             hess_driver.compute(molecule, basis)
             qm_hessian = hess_driver.hessian

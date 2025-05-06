@@ -1,26 +1,34 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "PairDensityGridGenerator.hpp"
 
@@ -28,55 +36,40 @@
 
 #include <cstring>
 
-#include "DenseLinearAlgebra.hpp"
 #include "MathFunc.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 
 namespace pairdengridgen {  // pairdengridgen namespace
 
 void
-generatePairDensityForLDA(double*               rho,
-                          const CDenseMatrix&   gtoValues,
-                          const CDenseMatrix&   densityMatrix,
-                          const CDenseMatrix&   activeMOs,
-                          const CDenseMatrix&   twoBodyDensityMatrix,
-                          CMultiTimer&          timer)
+serialGeneratePairDensityForLDA(double*               rho,
+                                const CDenseMatrix&   gtoValues,
+                                const CDenseMatrix&   densityMatrix,
+                                const CDenseMatrix&   activeMOs,
+                                const CDenseMatrix&   twoBodyDensityMatrix)
 {
     auto npoints = gtoValues.getNumberOfColumns();
 
     // eq.(26), JCTC 2021, 17, 1512-1521
 
-    timer.start("Density grid matmul");
-
-    auto mat_F = denblas::multAB(densityMatrix, gtoValues);
+    auto mat_F = sdenblas::serialMultAB(densityMatrix, gtoValues);
 
     auto n_active = activeMOs.getNumberOfRows();
 
     CDenseMatrix MOs_on_grid;
+
     if (n_active > 0)
     {
-        MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+        MOs_on_grid = sdenblas::serialMultAB(activeMOs, gtoValues);
     }
 
-    timer.stop("Density grid matmul");
-
-    timer.start("Density mo pair");
-
     auto n_active2 = n_active * n_active;
-
-    auto nthreads = omp_get_max_threads();
 
     CDenseMatrix mo_pair(n_active2, npoints);
 
     auto mo_pair_val = mo_pair.values();
 
-    #pragma omp parallel
     {
-        auto thread_id = omp_get_thread_num();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
         for (int t = 0; t < n_active; t++)
         {
             auto MOt = MOs_on_grid.row(t);
@@ -88,8 +81,9 @@ generatePairDensityForLDA(double*               rho,
                 auto MOu = MOs_on_grid.row(u);
 
                 auto tu_offset = t_offset + u * npoints;
+
                 #pragma omp simd 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     mo_pair_val[tu_offset + g] += MOt[g] * MOu[g];
                 }
@@ -97,16 +91,7 @@ generatePairDensityForLDA(double*               rho,
         }
     }
 
-    timer.stop("Density mo pair");
-
-    timer.start("Density grid pi matmul");
-
-    auto mat_d = denblas::multAB(twoBodyDensityMatrix, mo_pair);
-
-    timer.stop("Density grid pi matmul");
-    // eq.(27), JCTC 2021, 17, 1512-1521
-
-    timer.start("Density grid rho");
+    auto mat_d = sdenblas::serialMultAB(twoBodyDensityMatrix, mo_pair);
 
     auto naos = gtoValues.getNumberOfRows();
 
@@ -116,16 +101,9 @@ generatePairDensityForLDA(double*               rho,
 
     auto chi_val = gtoValues.values();
 
-    #pragma omp parallel
     {
-        auto thread_id = omp_get_thread_num();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
         #pragma omp simd 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int g = 0; g < npoints; g++)
         {
             rho[2 * g + 0] = 0.0;
             rho[2 * g + 1] = 0.0;
@@ -138,7 +116,7 @@ generatePairDensityForLDA(double*               rho,
             auto nu_offset = nu * npoints;
 
             #pragma omp simd 
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = 0; g < npoints; g++)
             {
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
             }
@@ -151,7 +129,7 @@ generatePairDensityForLDA(double*               rho,
             auto vw_offset = vw * npoints;
 
             #pragma omp simd 
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = 0; g < npoints; g++)
             {
                 rho[2 * g + 1] += d_val[vw_offset + g] * mo_pair_val[vw_offset + g];
             }
@@ -159,7 +137,7 @@ generatePairDensityForLDA(double*               rho,
 
         // To prevent numerical issues, enforce that -0.5*rho^2 < pi < 0.5*rho^2
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int g = 0; g < npoints; g++)
         {
             auto bound = 0.5 * rho[2 * g + 0] * rho[2 * g + 0];
 
@@ -168,35 +146,29 @@ generatePairDensityForLDA(double*               rho,
             rho[2 * g + 1] = std::max(rho[2 * g + 1], -bound);
         }
     }
-
-
-    timer.stop("Density grid rho");
 }
 
 void
-generatePairDensityForGGA(double*               rho,
-                          double*               rhograd,
-                          double*               sigma,
-                          const CDenseMatrix&   gtoValues,
-                          const CDenseMatrix&   gtoValuesX,
-                          const CDenseMatrix&   gtoValuesY,
-                          const CDenseMatrix&   gtoValuesZ,
-                          const CDenseMatrix&   densityMatrix,
-                          const CDenseMatrix&   activeMOs,
-                          const CDenseMatrix&   twoBodyDensityMatrix,
-                          CMultiTimer&          timer)
+serialGeneratePairDensityForGGA(double*               rho,
+                                double*               rhograd,
+                                double*               sigma,
+                                const CDenseMatrix&   gtoValues,
+                                const CDenseMatrix&   gtoValuesX,
+                                const CDenseMatrix&   gtoValuesY,
+                                const CDenseMatrix&   gtoValuesZ,
+                                const CDenseMatrix&   densityMatrix,
+                                const CDenseMatrix&   activeMOs,
+                                const CDenseMatrix&   twoBodyDensityMatrix)
 {
     auto npoints = gtoValues.getNumberOfColumns();
 
     // eq.(26), JCTC 2021, 17, 1512-1521
 
-    timer.start("Density grid matmul");
-
     CDenseMatrix symmetricDensityMatrix(densityMatrix);
 
     symmetricDensityMatrix.symmetrizeAndScale(0.5);
 
-    auto mat_F = denblas::multAB(symmetricDensityMatrix, gtoValues);
+    auto mat_F = sdenblas::serialMultAB(symmetricDensityMatrix, gtoValues);
 
     auto n_active = activeMOs.getNumberOfRows();
 
@@ -208,33 +180,20 @@ generatePairDensityForGGA(double*               rho,
 
     if (n_active > 0)
     {
-        MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+        MOs_on_grid = sdenblas::serialMultAB(activeMOs, gtoValues);
 
-        MOs_on_gridX = denblas::multAB(activeMOs, gtoValuesX);
-        MOs_on_gridY = denblas::multAB(activeMOs, gtoValuesY);
-        MOs_on_gridZ = denblas::multAB(activeMOs, gtoValuesZ);
+        MOs_on_gridX = sdenblas::serialMultAB(activeMOs, gtoValuesX);
+        MOs_on_gridY = sdenblas::serialMultAB(activeMOs, gtoValuesY);
+        MOs_on_gridZ = sdenblas::serialMultAB(activeMOs, gtoValuesZ);
     }
 
-    timer.stop("Density grid matmul");
-
-    timer.start("Density mo pair");
-
     auto n_active2 = n_active * n_active;
-
-    auto nthreads = omp_get_max_threads();
 
     CDenseMatrix mo_pair(n_active2, npoints);
 
     auto mo_pair_val = mo_pair.values();
 
-    #pragma omp parallel
     {
-        auto thread_id = omp_get_thread_num();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
         for (int t = 0; t < n_active; t++)
         {
             auto MOt = MOs_on_grid.row(t);
@@ -246,8 +205,9 @@ generatePairDensityForGGA(double*               rho,
                 auto MOu = MOs_on_grid.row(u);
 
                 auto tu_offset = t_offset + u * npoints;
+
                 #pragma omp simd 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     mo_pair_val[tu_offset + g] += MOt[g] * MOu[g];
                 }
@@ -255,17 +215,7 @@ generatePairDensityForGGA(double*               rho,
         }
     }
 
-    timer.stop("Density mo pair");
-
-    timer.start("Density grid pi matmul");
-
-    auto mat_d = denblas::multAB(twoBodyDensityMatrix, mo_pair);
-
-    timer.stop("Density grid pi matmul");
-
-    // eq.(27), JCTC 2021, 17, 1512-1521
-
-    timer.start("Density grid rho");
+    auto mat_d = sdenblas::serialMultAB(twoBodyDensityMatrix, mo_pair);
 
     auto naos = gtoValues.getNumberOfRows();
 
@@ -279,16 +229,9 @@ generatePairDensityForGGA(double*               rho,
     auto chi_y_val = gtoValuesY.values();
     auto chi_z_val = gtoValuesZ.values();
 
-    #pragma omp parallel
     {
-        auto thread_id = omp_get_thread_num();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
         #pragma omp simd 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int g = 0; g < npoints; g++)
         {
             rho[2 * g + 0] = 0.0;
             rho[2 * g + 1] = 0.0;
@@ -308,7 +251,7 @@ generatePairDensityForGGA(double*               rho,
             auto nu_offset = nu * npoints;
 
             #pragma omp simd 
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = 0; g < npoints; g++)
             {
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
 
@@ -325,7 +268,7 @@ generatePairDensityForGGA(double*               rho,
             auto vw_offset = vw * npoints;
 
             #pragma omp simd 
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = 0; g < npoints; g++)
             {
                 rho[2 * g + 1] += d_val[vw_offset + g] * mo_pair_val[vw_offset + g];
             }
@@ -344,7 +287,7 @@ generatePairDensityForGGA(double*               rho,
                 auto MOw = MOs_on_grid.row(w);
 
                 #pragma omp simd 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     rhograd[6 * g + 3] += 4.0 * d_val[vw_offset + g] * MOw[g] * MOlX[g];
                     rhograd[6 * g + 4] += 4.0 * d_val[vw_offset + g] * MOw[g] * MOlY[g];
@@ -355,7 +298,7 @@ generatePairDensityForGGA(double*               rho,
 
         // To prevent numerical issues, enforce that -0.5*rho^2 < pi < 0.5*rho^2
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int g = 0; g < npoints; g++)
         {
             auto bound = 0.5 * rho[2 * g + 0] * rho[2 * g + 0];
 
@@ -367,7 +310,7 @@ generatePairDensityForGGA(double*               rho,
         if (sigma != nullptr)
         {
             #pragma omp simd 
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = 0; g < npoints; g++)
             {
                 sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
                                    rhograd[6 * g + 1] * rhograd[6 * g + 1] +
@@ -383,8 +326,6 @@ generatePairDensityForGGA(double*               rho,
             }
         }
     }
-
-    timer.stop("Density grid rho");
 }
 
 }  // namespace pairdengridgen

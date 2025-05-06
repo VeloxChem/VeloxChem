@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path
@@ -42,6 +50,10 @@ from .errorhandler import assert_msg_critical, safe_solve
 class RespChargesDriver:
     """
     Implements ESP and RESP charges.
+
+    # vlxtag: RHF, RESP_charges
+    # vlxtag: RHF, ESP_charges
+    # vlxtag: RHF, ESP_on_points
 
     :param comm:
         The MPI communicator.
@@ -844,12 +856,18 @@ class RespChargesDriver:
 
             for i in range(n_atoms):
                 if constr[i] != -1:
-                    for p in range(esp[m].size):
-                        r_pi = np.linalg.norm(grids[m][p] - coords[i])
-                        b_m[i] += esp[m][p] / r_pi
-                        for j in range(n_atoms):
-                            a_m[i, j] += 1.0 / (
-                                r_pi * np.linalg.norm(grids[m][p] - coords[j]))
+
+                    inv_r_pi = 1.0 / np.sqrt(np.sum(
+                        (grids[m] - coords[i])**2, axis=1))
+
+                    b_m[i] += np.sum(esp[m] * inv_r_pi)
+
+                    for j in range(n_atoms):
+
+                        r_pj = np.sqrt(np.sum(
+                            (grids[m] - coords[j])**2, axis=1))
+
+                        a_m[i, j] += np.sum(inv_r_pi / r_pj)
 
             a += weights[m] * a_m
             b += weights[m] * b_m
@@ -1018,7 +1036,8 @@ class RespChargesDriver:
                             elem_found = True
                     if elem_found:
                         self.ostream.print_info(
-                            f'Applying user-defined MK radius {val} for atom {key}')
+                            f'Applying user-defined MK radius {val} for atom {key}'
+                        )
 
             self.ostream.print_blank()
 
@@ -1183,35 +1202,32 @@ class RespChargesDriver:
             D = None
         D = self.comm.bcast(D, root=mpi_master())
 
-        esp = np.zeros(grid.shape[0])
-
-        # classical electrostatic potential
-
-        coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.get_element_ids()
-
-        if self.rank == mpi_master():
-            for i in range(esp.size):
-                for j in range(molecule.number_of_atoms()):
-                    esp[i] += elem_ids[j] / np.linalg.norm(coords[j] - grid[i])
-
-        # electrostatic potential integrals
-
         ave, res = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
 
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        elec_esp = compute_nuclear_potential_values(molecule, basis,
-                                                    grid[start:end, :], D)
+        esp = np.zeros(end - start)
 
-        elec_esp_arrays = self.comm.gather(elec_esp, root=mpi_master())
+        # nuclear contribution
+
+        coords = molecule.get_coordinates_in_bohr()
+        elem_ids = molecule.get_element_ids()
+
+        for a in range(molecule.number_of_atoms()):
+            esp += elem_ids[a] / np.sqrt(
+                np.sum((grid[start:end, :] - coords[a])**2, axis=1))
+
+        # electrostatic contribution
+
+        esp += compute_nuclear_potential_values(molecule, basis,
+                                                grid[start:end, :], D)
+
+        gathered_esp = self.comm.gather(esp, root=mpi_master())
 
         if self.rank == mpi_master():
-            elec_esp_arrays = [arr for arr in elec_esp_arrays if arr.size > 0]
-            esp += np.hstack(elec_esp_arrays)
-            return esp
+            return np.hstack(gathered_esp)
         else:
             return None
 
@@ -1333,6 +1349,8 @@ class RespChargesDriver:
                     coords[0], coords[1], coords[2])
                 self.ostream.print_header(cur_str.ljust(str_width))
 
+        self.ostream.flush()
+
     def print_resp_stage_header(self, stage):
         """
         Prints header for a stage of the RESP fit.
@@ -1371,6 +1389,7 @@ class RespChargesDriver:
         cur_str = 'Convergence Threshold (a.u.) :  ' + str(self.threshold)
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_esp_header(self):
         """
@@ -1390,6 +1409,7 @@ class RespChargesDriver:
         cur_str = '{}   {}      {}'.format('No.', 'Atom', 'Charge (a.u.)')
         self.ostream.print_header(cur_str)
         self.ostream.print_header(31 * '-')
+        self.ostream.flush()
 
     def print_esp_fitting_points_header(self, n_conf):
         """
@@ -1412,6 +1432,7 @@ class RespChargesDriver:
         cur_str = '{} {}  {}'.format('No.', 'Constraints', 'Charge (a.u.)')
         self.ostream.print_header(cur_str)
         self.ostream.print_header(31 * '-')
+        self.ostream.flush()
 
     def print_resp_stage_results(self, stage, molecule, q, constr):
         """
@@ -1513,6 +1534,7 @@ class RespChargesDriver:
             self.ostream.print_header(title.ljust(str_width))
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def recommended_resp_parameters(self):
         """

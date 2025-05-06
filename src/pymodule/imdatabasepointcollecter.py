@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 import numpy as np
@@ -35,8 +43,11 @@ import random
 from time import time
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+
 from contextlib import redirect_stderr
 from io import StringIO
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 from .molecule import Molecule
 from .veloxchemlib import mpi_master
@@ -62,9 +73,7 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
-
-with redirect_stderr(StringIO()) as fg_err:
-    import geometric
+from .optimizationdriver import OptimizationDriver
 
 try:
     import openmm as mm
@@ -124,6 +133,10 @@ class IMDatabasePointCollecter:
         """
         Initializes the class with default simulation parameters.
         """
+
+        assert_msg_critical("openmm" in sys.modules,
+                            "openmm is required by IMDatabasePointCollecter.")
+
         np.set_printoptions(threshold=sys.maxsize)
         # MPI and output stream
         if comm is None:
@@ -145,7 +158,7 @@ class IMDatabasePointCollecter:
 
         # Instance variables
         # Simulation parameters
-        self.platform = None
+        self.platform = 'CPU'
         self.ensemble = None
         self.temperature = None
         self.friction = None
@@ -199,12 +212,12 @@ class IMDatabasePointCollecter:
         self.output_file = None
         self.adiabatic_basis = False
         self.density_around_data_point = None
-        self.impes_drivers = None
+        self.impes_driver = None
         self.im_labels = None
+        self.sorted_im_labels = []
         self.sorted_im_labels = []
         self.qm_energies = None
         self.qm_data_points = None
-        self.point_adding_molecule = {}
         self.energy_threshold = None
         self.collect_qm_points = None
         self.previous_energy_list = []
@@ -217,6 +230,7 @@ class IMDatabasePointCollecter:
 
         self.current_state = None
         self.distance_thrsh = 0.1
+        self.distance_thrsh = 0.1
         self.current_im_choice = None
         self.current_gradient = 0
         self.current_energy = 0
@@ -228,6 +242,7 @@ class IMDatabasePointCollecter:
         self.check_a_point = False
         self.cluster_run = None
         self.skipping_value = 0
+        self.basis_set_label = None
         self.basis_set_label = None
         self.molecule = None
         self.expansion = True
@@ -281,8 +296,6 @@ class IMDatabasePointCollecter:
         :param residue_name:
             Name of the residue. Default is 'MOL'.
         """
-
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
 
         # Store the molecule object and generate OpenMM compatible files
         self.molecule = molecule
@@ -418,8 +431,6 @@ class IMDatabasePointCollecter:
             Target equilibrium parameter (distance (nm), angle and torsion (deg))
         """
 
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
-
         if len(atoms) == 2:
             msg = f'Adding stretch force between atoms {atoms[0]} and {atoms[1]} with force constant {force_constant}.'
             self.ostream.print_info(msg)
@@ -479,9 +490,6 @@ class IMDatabasePointCollecter:
             Tuple containing the minimized potential energies and the XYZ format strings of the relaxed coordinates.
 
         """
-
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
-
         if self.system is None:
             raise RuntimeError('System has not been created!')
         if self.molecule is None:
@@ -630,6 +638,7 @@ class IMDatabasePointCollecter:
         if 'ensemble' in dynamics_settings:
             self.ensemble = dynamics_settings['ensemble']
 
+
         #################################### DATABASE construciton inputs #############################
 
         # The desired density around a given starting structure/datapoint
@@ -698,8 +707,6 @@ class IMDatabasePointCollecter:
 
         """
 
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
-
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
@@ -720,7 +727,6 @@ class IMDatabasePointCollecter:
         self.kinetic_energies = []
         self.temperatures = []
         self.total_energies = []
-        self.coordinates_xyz = []
 
         save_freq = self.nsteps // self.snapshots if self.snapshots else self.nsteps
 
@@ -747,6 +753,7 @@ class IMDatabasePointCollecter:
             if self.ensemble in ['NVT', 'NPT']:
                 self.simulation.context.setVelocitiesToTemperature(self.temperature)
         
+        self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
         self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
         # Set up reporting
         self.simulation.reporters.clear()
@@ -831,6 +838,8 @@ class IMDatabasePointCollecter:
 
         self.current_state = self.roots_to_follow[0]
 
+        self.impes_driver.labels = self.sorted_im_labels
+        self.impes_driver.qm_data_points = self.qm_data_points
         start_time = time()
         self.step = 0 
         for step in range(self.nsteps):
@@ -889,6 +898,7 @@ class IMDatabasePointCollecter:
                 print('Current State (PES):', self.current_state)    
             # self.output_file_writer(self.summary_output)
             self.step += 1
+
 
             self.simulation.step(1)
             
@@ -1152,9 +1162,6 @@ class IMDatabasePointCollecter:
         Returns:
             OpenMM Integrator: Configured integrator for the simulation.
         """
-
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
-
         # Common parameters for Langevin integrators
 
         if self.ensemble in ['NVT', 'NPT']:
@@ -1460,19 +1467,17 @@ class IMDatabasePointCollecter:
         :param phase:
             Phase of the system ('gas', 'water', 'periodic').
         :param ff_gen:
-            MMForceFieldGenerator object from VeloxChem.
+            ForceFieldGenerator object from VeloxChem.
         """
 
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
+        from openmm import NonbondedForce
 
         # Set the QM/MM Interaction Groups
         total_atoms = self.system.getNumParticles()
         
         # The MM subregion is counted as regular MM atoms
         qm_group = set(self.qm_atoms)
-        print('QM Group:', qm_group)
         mm_group = set(range(total_atoms)) - qm_group
-        print('MM Group:', mm_group)
         if not mm_group:
             print('No external MM atoms found in the system')
 
@@ -1494,7 +1499,7 @@ class IMDatabasePointCollecter:
             
             nonbonded_force = None
             for force in self.system.getForces():
-                if isinstance(force, mm.NonbondedForce):
+                if isinstance(force, NonbondedForce):
                     nonbonded_force = force
                     break
     
@@ -1590,7 +1595,7 @@ class IMDatabasePointCollecter:
                 self.qm_force_index = i
                 break
 
-    def calculate_translation_coordinates(self, coordinates, rotation_point=None):
+    def calculate_translation_coordinates(self, coordinates):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
         center = np.mean(coordinates, axis=0)
         translated_coordinates = coordinates - center
@@ -1606,8 +1611,8 @@ class IMDatabasePointCollecter:
                 InterpolationDatapoint object
         """
         # First, translate the cartesian coordinates to zero
-        target_coordinates, center_target = self.calculate_translation_coordinates(coordinate_1)
-        reference_coordinates, center_reference = (
+        target_coordinates, _ = self.calculate_translation_coordinates(coordinate_1)
+        reference_coordinates, _ = (
             self.calculate_translation_coordinates(coordinate_2))
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
@@ -1630,10 +1635,8 @@ class IMDatabasePointCollecter:
         :param qm_atoms: 
             List of atom indices to be included in the QM region.
         :param ff_gen_qm: 
-            MMForceFieldGenerator object from VeloxChem.
+            ForceFieldGenerator object from VeloxChem.
         """
-
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
 
         # Harmonic bond contribution. Parameters are read from ff_gen_qm
         bonds = ff_gen_qm.bonds
@@ -1694,7 +1697,6 @@ class IMDatabasePointCollecter:
             The gradient and potential energy of the QM region.
         """
 
-        # self.coordinates_xyz.append(new_positions * 10)
         positions_ang = new_positions * 10 
 
         new_molecule = None
@@ -1733,7 +1735,6 @@ class IMDatabasePointCollecter:
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
-            self.unique_molecules.append(new_molecule)
         
         for root in self.roots_to_follow:
             self.impes_drivers[root].qm_data_points = self.qm_data_point_dict[root]
@@ -1804,15 +1805,11 @@ class IMDatabasePointCollecter:
             context: The OpenMM context object.
         """
 
-        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
-
         conversion_factor = (4.184 * hartree_in_kcalpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
         new_positions = context.getState(getPositions=True).getPositions()
 
         # Update the forces of the QM region
         qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
-
-        self.velocities_np.append(context.getState(getVelocities=True).getVelocities(True))
         gradient = self.update_gradient(qm_positions)
 
         positions_ang = (qm_positions) * 10
@@ -1820,9 +1817,9 @@ class IMDatabasePointCollecter:
         qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
 
         new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
-
+        self.unique_molecules.append(new_molecule)
         force = -np.array(gradient) * conversion_factor
-        self.all_gradients.append(gradient)
+        
         ############################################################
         #################### Correlation Check #####################
         ############################################################
@@ -1832,20 +1829,19 @@ class IMDatabasePointCollecter:
         if self.density_around_data_point[1] is not None:
             current_dihedral = new_molecule.get_dihedral_in_degrees([self.density_around_data_point[1][0] + 1, self.density_around_data_point[1][1] + 1, self.density_around_data_point[1][2] + 1, self.density_around_data_point[1][3] + 1])
             lower, upper = self.allowed_molecule_deviation
-
+            
             # Case 1: If boundaries do not wrap (e.g., [-60, 60])
             if lower < upper:
                 allowed = lower <= current_dihedral <= upper
             else:
-                # Case 2: If boundaries wrap around (e.g., [120, -120])
                 allowed = current_dihedral >= lower or current_dihedral <= upper
 
         if allowed:
 
+
             openmm_coordinate = context.getState(getPositions=True).getPositions()
             self.coordinates.append(openmm_coordinate)
-            self.velocities.append(context.getState(getVelocities=True).getVelocities())
-            self.gradients.append(gradient)
+
             if self.skipping_value == 0:
                 scanned = False
                 for checked_molecule in self.allowed_molecules[self.current_state]['molecules']:
@@ -1869,6 +1865,7 @@ class IMDatabasePointCollecter:
                 self.skipping_value -= 1
             self.point_checker += 1 
             if self.add_a_point == True and self.step > self.collect_qm_points or self.check_a_point == True and self.step > self.collect_qm_points:
+                self.point_correlation_check(new_molecule)
                 self.point_correlation_check(new_molecule)
             if self.point_checker == 0:            
                 
@@ -1896,15 +1893,12 @@ class IMDatabasePointCollecter:
                 gradient_2 = self.update_gradient(qm_positions)
                 force = -np.array(gradient_2) * conversion_factor
             
-            if (self.point_checker + self.last_point_added) % self.duration == 0 and self.point_checker != 0:
-                print('start when last point was added', self.point_checker + self.last_point_added)
-                self.last_point_added = 0
+            if (self.point_checker) % self.duration == 0 and self.point_checker != 0:
                 self.unadded_cycles -= 1
 
             if self.point_checker < 500 and self.cycle_iteration != self.unadded_cycles:
                 self.unadded_cycles += 1
             
-            self.coordinates_xyz.append(qm_positions * 10)
             ############################################################
             self.state_specific_molecules[self.current_state].append(new_molecule)
             for i, atom_idx in enumerate(self.qm_atoms):
@@ -1943,6 +1937,20 @@ class IMDatabasePointCollecter:
             self.system.getForce(self.qm_force_index).updateParametersInContext(context)
     
     
+    def get_qm_potential_energy(self):
+        """
+        Returns the potential energy of the QM region.
+
+        Args:
+            context: The OpenMM context object.
+        Returns:
+            The potential energy of the QM region.
+        """
+
+        potential_energy = self.current_energy
+
+        return potential_energy
+        
     ####################################################################
     ################ Functions to expand the database ##################
     ####################################################################
@@ -2114,8 +2122,8 @@ class IMDatabasePointCollecter:
                 the energy of the previous QM calcualtion.
             :param basis:
                 the basis set (if required).
-            :scf_results:
-                the scf_results of previous QM calculation (if required).
+            :scf_result:
+                the scf_result of previous QM calculation (if required).
         """
         print('state', self.current_state)
         for state, key in enumerate(self.drivers.keys()):
