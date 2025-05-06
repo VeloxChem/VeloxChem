@@ -957,7 +957,7 @@ class OpenMMDynamics:
         if boltzmann_distribution:
             weights = self.calculate_boltzmann(T=300, dict=self.conformer_dict, unit='kj/mol')
 
-        if number > len(["energies"]):
+        if number > len(self.conformer_dict["energies"]):
             number = len(self.conformer_dict["energies"])
             print(f"Only {number} conformers available, showing all.")
         for i in range(number):
