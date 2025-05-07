@@ -41,6 +41,8 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tddftgradientdriver import TddftGradientDriver
+from .tddfthessiandriver import TddftHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
@@ -104,7 +106,7 @@ class VibrationalAnalysis:
         - result_file: The name of the vibrational analysis output file (txt format).
     """
 
-    def __init__(self, drv):
+    def __init__(self, drv, rsp_drv=None, grad_drv=None):
         """
         Initializes vibrational analysis driver.
         """
@@ -134,11 +136,18 @@ class VibrationalAnalysis:
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
+        self.is_tddft = False
         if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
                             ScfRestrictedOpenDriver)):
-            self.is_scf = True
-            self.scf_driver = drv
-            self.hessian_driver = ScfHessianDriver(drv)
+            if rsp_drv is None:
+                self.is_scf = True
+                self.scf_driver = drv
+                self.hessian_driver = ScfHessianDriver(drv)
+            else:
+                self.is_tddft = True
+                self.scf_driver = drv
+                self.rsp_driver = rsp_drv
+                self.hessian_driver = TddftHessianDriver(drv, rsp_drv, grad_drv)
         elif isinstance(drv, XtbDriver):
             self.is_xtb = True
             self.scf_driver = None
@@ -340,6 +349,10 @@ class VibrationalAnalysis:
                     vib_results['depolarization_ratios'] = self.depol_ratio
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
+                self.do_raman = False
+                self.do_resonance_raman = False
+            elif (self.do_raman or self.do_resonance_raman) and self.is_tddft:
+                self.ostream.print_info('Raman not available for TDDFT.')
                 self.do_raman = False
                 self.do_resonance_raman = False
 

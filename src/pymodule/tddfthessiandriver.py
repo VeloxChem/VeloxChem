@@ -61,23 +61,27 @@ class TddftHessianDriver(HessianDriver):
         self.do_print_hessian = False
 
 
-    def update_settings(self, method_dict, hessian_dict=None):
+    def update_settings(self, method_dict, hessian_dict=None,
+                        cphf_dict=None):
         """
         Updates settings in TddftHessianDriver.
 
         :param method_dict:
             The input dictionary of method settings group.
-        :param rsp_dict:
-            The input dictionary of response settings.
         :param hessian_dict:
             The input dictionary of Hessian settings group.
-        :param orbrsp_dict:
+        :param cphf_dict:
             The input dictionary of orbital response settings.
         """
         if hessian_dict is None:
             hessian_dict = {}
 
         super().update_settings(method_dict, hessian_dict)
+
+        if cphf_dict is None:
+            cphf_dict = {}
+
+        self.cphf_dict = cphf_dict
 
     def compute(self, molecule, basis):
         """
@@ -146,6 +150,11 @@ class TddftHessianDriver(HessianDriver):
         rsp_drv.ostream.mute()
         tddft_grad_drv.ostream.mute()
 
+        # save the electronic energy
+        self.elec_energy = self.compute_energy(molecule, basis, scf_drv,
+                                               rsp_drv, tddft_grad_drv
+                                                )
+
         for i in range(molecule.number_of_atoms()):
             for d in range(3):
                 coords[i, d] += self.delta_h
@@ -196,6 +205,43 @@ class TddftHessianDriver(HessianDriver):
 
         # save Hessian in the usual shape
         self.hessian = hessian.reshape((natm*3, natm*3))
+
+    def compute_energy(self, molecule, basis, scf_drv, rsp_drv, tddft_grad_drv):
+        """
+        Computes the TDDFT energy.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_drv:
+            The ScfDriver.
+        :pram rsp_drv:
+            The response driver.
+        :param tddft_grad_drv:
+            The TddftGradientDriver.
+        """
+        scf_drv.restart = False
+        scf_results = scf_drv.compute(molecule, basis)
+        assert_msg_critical(scf_drv.is_converged,
+                            'TddftHessianDriver: SCF did not converge')
+
+        rsp_drv.restart = False
+        rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+        assert_msg_critical(rsp_drv.is_converged,
+                            'TddftHessianDriver: response did not converge')
+
+        if isinstance(tddft_grad_drv.state_deriv_index, int):
+            index = tddft_grad_drv.state_deriv_index - 1
+        else:
+            index = tddft_grad_drv.state_deriv_index[0] - 1
+
+        scf_energy = scf_drv.get_scf_energy()
+        excitation_energy = rsp_results['eigenvalues'][index]
+
+        energy = scf_energy + excitation_energy
+
+        return energy
 
 
     def compute_gradient(self, molecule, basis, scf_drv, rsp_drv, tddft_grad_drv):
