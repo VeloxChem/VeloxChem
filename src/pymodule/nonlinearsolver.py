@@ -1480,4 +1480,11 @@ class NonlinearSolver:
             True if operator is imaginary, False otherwise
         """
 
-        return op in ['linear_momentum', 'angular_momentum', 'magnetic_dipole']
+        return op in [
+            'linear momentum',
+            'linear_momentum',
+            'angular momentum',
+            'angular_momentum',
+            'magnetic dipole',
+            'magnetic_dipole',
+        ]

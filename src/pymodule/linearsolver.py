@@ -30,7 +30,6 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -38,8 +37,6 @@ import math
 import sys
 
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import TwoCenterElectronRepulsionDriver
-from .veloxchemlib import SubMatrix
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -47,17 +44,16 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
-from .molecularbasis import MolecularBasis
 from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
-from .profiler import Profiler
 from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import dft_sanity_check, pe_sanity_check, solvation_model_sanity_check
+from .sanitychecks import (dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
@@ -66,11 +62,6 @@ from .checkpoint import write_rsp_hdf5, write_cpcm_charges, read_cpcm_charges
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .cpcmdriver import CpcmDriver
-
-try:
-    from scipy.linalg import lu_factor, lu_solve
-except ImportError:
-    pass
 
 
 class LinearSolver:
@@ -152,7 +143,7 @@ class LinearSolver:
 
         # point charges
         self.point_charges = None
-    
+
         # solvation model
         self.solvation_model = None
         self.non_equilibrium_solv = False
@@ -248,8 +239,9 @@ class LinearSolver:
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
-                'non_equilibrium_solv': 
-                      ('bool', 'toggle use of non-equilibrium solvation for response'),
+                'non_equilibrium_solv':
+                    ('bool',
+                     'toggle use of non-equilibrium solvation for response'),
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
@@ -409,7 +401,8 @@ class LinearSolver:
 
         if self.ri_coulomb:
             self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule, basis,
+            self._ri_drv.prepare_buffers(molecule,
+                                         basis,
                                          self.ri_auxiliary_basis,
                                          verbose=True)
 
@@ -510,11 +503,11 @@ class LinearSolver:
         return {
             'potfile_text': potfile_text,
         }
-    
-    def _init_cpcm(self,molecule):
+
+    def _init_cpcm(self, molecule):
         """
         Initializes C-PCM.
-        
+
         :param molecule:
             The molecule.
         """
@@ -577,7 +570,7 @@ class LinearSolver:
         else:
             (self._dist_bger, self._dist_bung, self._dist_e2bger,
              self._dist_e2bung) = dist_arrays
-            
+
         if self._cpcm:
             if self.rank == mpi_master():
                 self._cpcm_q = read_cpcm_charges(self.checkpoint_file)
@@ -1507,22 +1500,21 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
 
-
         if self._cpcm:
 
             t0 = tm.time()
 
             for idx in range(num_densities):
                 Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
-                                                        self._cpcm_grid,
-                                                        dens[idx] * 2.0)
+                                                   self._cpcm_grid,
+                                                   dens[idx] * 2.0)
                 if comm_rank == mpi_master():
                     if self.non_equilibrium_solv:
                         scale_f = -(self.cpcm_optical_epsilon - 1) / (
-                                    self.cpcm_optical_epsilon + self.cpcm_drv.x)
+                            self.cpcm_optical_epsilon + self.cpcm_drv.x)
                     else:
                         scale_f = -(self.cpcm_drv.epsilon - 1) / (
-                                    self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                            self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (Cvec)
                 else:
                     rhs = None
@@ -1534,14 +1526,13 @@ class LinearSolver:
                     rhs, self._cpcm_q, self.cpcm_cg_thresh)
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
-                            molecule, basis, self._cpcm_grid, self._cpcm_q)
+                    molecule, basis, self._cpcm_grid, self._cpcm_q)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol
 
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
-
 
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
@@ -1579,7 +1570,7 @@ class LinearSolver:
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
                                      basis, dft_dict, pe_dict, self.ostream)
             if self._cpcm:
-                    write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
+                write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -1721,7 +1712,6 @@ class LinearSolver:
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
-
         if self._cpcm:
             cur_str = 'Solvation Model                 : '
             cur_str += 'C-PCM'
@@ -1742,7 +1732,6 @@ class LinearSolver:
                 cur_str = 'C-PCM Optical Dielectric Constant: '
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
-
 
         self.ostream.print_blank()
         self.ostream.flush()
@@ -2825,3 +2814,21 @@ class LinearSolver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    @staticmethod
+    def is_imag(op):
+        """
+        Checks if an operator is imaginary.
+
+        :return:
+            True if operator is imaginary, False otherwise
+        """
+
+        return op in [
+            'linear momentum',
+            'linear_momentum',
+            'angular momentum',
+            'angular_momentum',
+            'magnetic dipole',
+            'magnetic_dipole',
+        ]

@@ -95,10 +95,6 @@ class C6Driver(LinearSolver):
         self.conv_thresh = 1.0e-3
 
         self._input_keywords['response'].update({
-            'a_operator': ('str_lower', 'A operator'),
-            'a_components': ('str_lower', 'Cartesian components of A operator'),
-            'b_operator': ('str_lower', 'B operator'),
-            'b_components': ('str_lower', 'Cartesian components of B operator'),
             'n_points': ('int', 'number of integration points'),
             'w0': ('float', 'transformation function prefactor'),
         })
