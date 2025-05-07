@@ -38,33 +38,33 @@ struct GpuIntermediateBlockData
 {
     std::array<double, size> boysFuncData_;
     std::array<double, 3> PQ_;
-    double Lambda_ = 0.0;
-    double S_ij_00_ = 0.0;
-    double S_kl_00_ = 0.0;
-    double S1_ = 0.0;
-    double S2_ = 0.0;
-    double inv_S1_ = 0.0;
-    double inv_S2_ = 0.0;
-    double inv_S4_ = 0.0;
-    double PA_0_ = 0.0;
-    double PA_1_ = 0.0;
-    double PB_0_ = 0.0;
-    double PB_1_ = 0.0;
-    double QC_0_ = 0.0;
-    double QC_1_ = 0.0;
-    double QD_0_ = 0.0;
-    double QD_1_ = 0.0;
-    uint32_t a0_ = 0;
-    uint32_t a1_ = 0;
-    uint32_t b0_ = 0;
-    uint32_t b1_ = 0;
-    uint32_t c0_ = 0;
-    uint32_t c1_ = 0;
-    uint32_t d0_ = 0;
-    uint32_t d1_ = 0;
-    uint32_t j_cgto_ = 0;
-    uint32_t l_cgto_ = 0;
-    bool valid_ = false;
+    double Lambda_;
+    double S_ij_00_;
+    double S_kl_00_;
+    double S1_;
+    double S2_;
+    double inv_S1_;
+    double inv_S2_;
+    double inv_S4_;
+    double PA_0_;
+    double PA_1_;
+    double PB_0_;
+    double PB_1_;
+    double QC_0_;
+    double QC_1_;
+    double QD_0_;
+    double QD_1_;
+    uint32_t a0_;
+    uint32_t a1_;
+    uint32_t b0_;
+    uint32_t b1_;
+    uint32_t c0_;
+    uint32_t c1_;
+    uint32_t d0_;
+    uint32_t d1_;
+    uint32_t j_cgto_;
+    uint32_t l_cgto_;
+    bool valid_;
 
     __device__ __forceinline__
     GpuIntermediateBlockData(std::array<double, size> boysFuncData, std::array<double,3> PQ, double Lambda,
@@ -73,7 +73,7 @@ struct GpuIntermediateBlockData
                     double QD_0, double QD_1, uint32_t a0, uint32_t a1, uint32_t b0, uint32_t b1, uint32_t c0,
                     uint32_t c1, uint32_t d0, uint32_t d1, uint32_t j_cgto, uint32_t l_cgto)
             : boysFuncData_(boysFuncData), PQ_(PQ), Lambda_(Lambda), S_ij_00_(S_ij_00), S_kl_00_(S_kl_00),
-              inv_S1_(inv_S1), inv_S2_(inv_S2), inv_S4_(inv_S4), PA_0_(PA_0), PA_1_(PA_1), PB_0_(PB_0), PB_1_(PB_1),
+              S1_(S1), S2_(S2), inv_S1_(inv_S1), inv_S2_(inv_S2), inv_S4_(inv_S4), PA_0_(PA_0), PA_1_(PA_1), PB_0_(PB_0), PB_1_(PB_1),
               QC_0_(QC_0), QC_1_(QC_1), QD_0_(QD_0), QD_1_(QD_1), a0_(a0), a1_(a1), b0_(b0), b1_(b1), c0_(c0),
               c1_(c1), d0_(d0), d1_(d1), j_cgto_(j_cgto), l_cgto_(l_cgto), valid_(true)
         {}
@@ -81,6 +81,11 @@ struct GpuIntermediateBlockData
     __device__ __forceinline__
     GpuIntermediateBlockData()
         {}
+
+    __device__ __forceinline__
+    GpuIntermediateBlockData(bool valid) : valid_(valid)
+        {}
+
 };
 
 template<uint32_t size>
@@ -1543,16 +1548,8 @@ computeExchangeFockDDDP6(double*         mat_K,
                         const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDDBlockSizes(uint32_t *blockSize,
-                                  const uint32_t  pair_inds_count_for_K_dd,
-                                  const uint32_t* pair_inds_i_for_K_dd,
-                                  const uint32_t* pair_inds_k_for_K_dd,
-                                  const uint32_t* pair_counts_K_dd);
-
-__global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDDPrepare(
                         DeviceStore<9>* data,
-                        const uint32_t* blockOffsets,        
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -1575,8 +1572,6 @@ computeExchangeFockDDDD0(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1585,8 +1580,6 @@ computeExchangeFockDDDD1(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1595,8 +1588,6 @@ computeExchangeFockDDDD2(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1605,8 +1596,6 @@ computeExchangeFockDDDD3(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1615,8 +1604,6 @@ computeExchangeFockDDDD4(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1625,8 +1612,6 @@ computeExchangeFockDDDD5(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1635,8 +1620,6 @@ computeExchangeFockDDDD6(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1645,8 +1628,6 @@ computeExchangeFockDDDD7(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1655,8 +1636,6 @@ computeExchangeFockDDDD8(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1665,8 +1644,6 @@ computeExchangeFockDDDD9(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1675,8 +1652,6 @@ computeExchangeFockDDDD10(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1685,8 +1660,6 @@ computeExchangeFockDDDD11(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1695,8 +1668,6 @@ computeExchangeFockDDDD12(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1705,8 +1676,6 @@ computeExchangeFockDDDD13(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
@@ -1715,8 +1684,6 @@ computeExchangeFockDDDD14(
                         double*         mat_K,
                         const DeviceStore<9>*         data,
                         const double*   mat_D_full_AO,
-                        const uint32_t* blockOffset,
-                        const uint32_t* blockSize,
                         const uint32_t  pair_inds_count_for_K_dd,
                         const uint32_t  naos);
 
