@@ -90,7 +90,10 @@ class EvbFepDriver():
         self.report_forcegroups: bool = True
         self.debug: bool = False
         self.save_frames: int = 1000
+
         self.friction: float = 1.0
+        self.isothermal: bool = False
+        self.isobaric: bool = False
 
     def run_FEP(
         self,
@@ -121,7 +124,6 @@ class EvbFepDriver():
 
         systems = configuration["systems"]
         topology = configuration["topology"]
-        temperature = configuration["temperature"]
         initial_positions = configuration["initial_positions"]
 
         cwd = Path.cwd()
@@ -130,17 +132,17 @@ class EvbFepDriver():
         self.Lambda = Lambda
         self.systems = systems
         self.topology = topology
-        self.NPT = configuration.get("NPT", False)
-        self.NVE = configuration.get("NVE", False)
         self.friction = configuration.get("friction", 1.0)
-        assert not (self.NPT
-                    and self.NVE), "NPT and NVE cannot be used at the same time"
-        if self.NPT:
-            self.ostream.print_info("Running in NPT ensemble")
-        if self.NVE:
-            self.ostream.print_info("Running in NVE ensemble")
-        else:
-            self.ostream.print_info("Running in NVT ensemble")
+        self.temperature = configuration.get('temperature', -1)
+
+        pressure = configuration.get('pressure', -1)
+
+        if self.temperature > 0:
+            self.isothermal = True
+
+        if pressure > 0:
+            self.isobaric = True
+
         self.ostream.flush()
 
         assert (total_sample_steps % write_step == 0
@@ -150,15 +152,15 @@ class EvbFepDriver():
 
         self.total_snapshots = total_sample_steps / write_step * len(
             self.Lambda)
-        self.ostream.print_info(f"Lambda: {self.Lambda}")
+        self.ostream.print_info(f"Lambda: {np.array(self.Lambda)}")
         info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equiliberation steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
         info += f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}\n"
         info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
+        self.ostream.print_info(
+            f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
+        )
         self.ostream.print_info(info)
         self.ostream.flush()
-
-        self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
-        self.integrator_friction_coeff = self.friction / mmunit.picosecond
 
         timer = Timer(len(self.Lambda))
 
@@ -245,25 +247,25 @@ class EvbFepDriver():
         sz = self.equil_step_size * mmunit.picoseconds
         equil_simulation.integrator.setStepSize(sz)
         self.ostream.print_info(f"Equilibration with step size {sz}")
-        if self.NPT:
-            NPT_equil_reporter = mmapp.StateDataReporter(
-                str(self.run_folder / f"equil_NPT_data_{l:.3f}.csv"),
-                1,
-                step=True,
-                potentialEnergy=True,
-                kineticEnergy=True,
-                temperature=True,
-                volume=True,
-                density=True,
-                append=False,
-            )
-            equil_simulation.reporters.append(NPT_equil_reporter)
-            barostat = [
-                force for force in equil_simulation.system.getForces()
-                if isinstance(force, mm.MonteCarloBarostat)
-            ][0]
+
+        equil_reporter = mmapp.StateDataReporter(
+            str(self.run_folder / f"equil_data_{l:.3f}.csv"),
+            1,
+            step=True,
+            potentialEnergy=True,
+            kineticEnergy=True,
+            temperature=True,
+            volume=True,
+            density=True,
+            append=False,
+        )
+        equil_simulation.reporters.append(equil_reporter)
         if l == 0:
-            if self.NPT:
+            if self.isobaric:
+                barostat = [
+                    force for force in equil_simulation.system.getForces()
+                    if isinstance(force, mm.MonteCarloBarostat)
+                ][0]
                 barostat.setFrequency(0)
                 self.ostream.print_info(
                     f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
@@ -288,7 +290,7 @@ class EvbFepDriver():
                     equil_simulation,
                     self.initial_equil_NVT_steps + self.initial_equil_NPT_steps)
 
-        if self.NPT:
+        if self.isobaric:
             self.ostream.print_info(
                 f"Running NVT equilibration for {self.equil_NVT_steps} steps")
             self.ostream.flush()
@@ -331,6 +333,7 @@ class EvbFepDriver():
     def _sample(self, system, l, initial_state):
         run_simulation = self._get_simulation(system, self.equil_step_size)
         run_simulation.reporters.append(self.traj_roporter)
+
         sz = self.step_size * mmunit.picoseconds
         run_simulation.integrator.setStepSize(sz)
         run_simulation.context.setState(initial_state)
@@ -389,14 +392,14 @@ class EvbFepDriver():
         return states[-1]
 
     def _get_simulation(self, system, step_size):
-        if self.NVE:
-            integrator = mm.VerletIntegrator(step_size)
-        else:
+        if self.isothermal:
             integrator = mm.LangevinMiddleIntegrator(
-                self.integrator_temperature,
-                self.integrator_friction_coeff,
+                self.temperature * mmunit.kelvin,  #type: ignore
+                self.friction / mmunit.picosecond,  #type: ignore
                 step_size * mmunit.picoseconds,
             )
+        else:
+            integrator = mm.VerletIntegrator(step_size)
         integrator.setIntegrationForceGroups(
             EvbForceGroup.integration_force_groups())
 

@@ -55,114 +55,6 @@ except ImportError:
     pass
 
 
-# The EVB procedure uses two different potentials, one for the integration of the EOMs to explore phase space, and another one for the calculation of the PES
-# The integration potential is optimized to explore all relevant areas of phase space in an efficient manner. This includes constraints and distance restraints.
-# The PES potential is optimized to calculate the potential energy surface accurate. Constraints and restraints are ommitted for this.
-# Soft core long range potentials provide faster convergence for averages and are thus included in the PES potential. They cause unstable integration though.
-class EvbForceGroup(Enum):
-    DEFAULT = auto(
-    )  # Default force group, included for both integration and energy calculations
-    # THERMOSTAT = auto()  # Thermostat
-    INTLJ = auto()  # Integration lennard-jones potential
-    INTCOUL = auto()  # Integration coulombic potential
-    PESLJ = auto()  # Lennard-jones potential
-    PESCOUL = auto()  # Coulombic potential
-    CONSTRAINT = auto()
-
-    CMM_REMOVER = auto()  # Center of mass motion remover
-    NB_FORCE = auto()  # Solvent-solvent and solvent-solute nb force
-    BAROSTAT = auto()  # Barostat
-    E_FIELD = auto()  # Electric field force
-    REACTION_BONDED = auto()  # Bonded forces for the reaction atoms
-
-    # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
-    PES_CONSTRAINT = auto()
-    RESTRAINT = auto()
-    SOLVENT = auto(
-    )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
-    CARBON = auto()  # Graphene and CNTs
-    INTEGRATION = auto(
-    )  # All leftover forces that should only be used for integration
-    PES = auto(
-    )  # All leftover forces that should only be used for the calculation of the PES
-    NONE = auto(
-    )  # Forces that should not be included in the integration or PES calculations
-    DEBUG1PES = auto()  # Debugging force group 1
-    DEBUG2PES = auto()  # Debugging force group 2
-    DEBUG1INT = auto()  # Debugging force group 1
-    DEBUG2INT = auto()  # Debugging force group 2
-    DEBUG1 = auto()  # Debugging force group 1
-    DEBUG2 = auto()  # Debugging force group 2
-
-    # Both methods return classes because integrator.setIntegrationForceGroups() takes a set as argument
-    @classmethod
-    def integration_force_groups(cls):
-        return set([
-            cls.DEFAULT.value,
-            cls.CMM_REMOVER.value,
-            cls.NB_FORCE.value,
-            cls.BAROSTAT.value,
-            cls.E_FIELD.value,
-            cls.REACTION_BONDED.value,
-            cls.INTLJ.value,
-            cls.INTCOUL.value,
-            cls.CONSTRAINT.value,
-            cls.PES_CONSTRAINT.value,
-            cls.RESTRAINT.value,
-            cls.SOLVENT.value,
-            cls.CARBON.value,
-            cls.INTEGRATION.value,
-            # cls.DEBUG1INT.value,
-            # cls.DEBUG2INT.value,
-            # cls.DEBUG1.value,
-            # cls.DEBUG2.value,
-        ])
-
-    @classmethod
-    def NVT_integration_force_groups(cls):
-        int_fg = cls.integration_force_groups()
-        int_fg.remove(cls.BAROSTAT.value)
-        return int_fg
-
-    @classmethod
-    def pes_force_groups(cls):
-        return set([
-            cls.DEFAULT.value,
-            cls.CMM_REMOVER.value,
-            cls.NB_FORCE.value,
-            cls.BAROSTAT.value,
-            cls.E_FIELD.value,
-            cls.REACTION_BONDED.value,
-            cls.PES_CONSTRAINT.value,
-            cls.PESLJ.value,
-            cls.PESCOUL.value,
-            cls.SOLVENT.value,
-            cls.CARBON.value,
-            cls.PES.value,
-            # cls.DEBUG1PES.value,
-            # cls.DEBUG2PES.value,
-            # cls.DEBUG1.value,
-            # cls.DEBUG2.value,
-        ])
-
-    @classmethod
-    def get_header(cls):
-        header = ""
-        integration_forcegroups = cls.integration_force_groups()
-        pes_forcegroups = cls.pes_force_groups()
-        for fg in cls:
-            in_int = fg.value in integration_forcegroups
-            in_pes = fg.value in pes_forcegroups
-            fg_cat = 'b'
-            if in_int and not in_pes:
-                fg_cat = 'i'
-            if not in_int and in_pes:
-                fg_cat = 'p'
-            header += f"{fg.name}({fg.value}-{fg_cat}), "
-        header = header[:-2] + '\n'
-        return header
-
-
 class EvbSystemBuilder():
 
     def __init__(self, comm=None, ostream=None):
@@ -210,8 +102,7 @@ class EvbSystemBuilder():
         self.soft_core_lj_int = False
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
-
-        self.bonded_integration_fac: float = 0.2  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_fac: float = 0.25  # Scaling factor for the bonded integration forces.
 
         self.verbose = False
 
@@ -1130,13 +1021,14 @@ class EvbSystemBuilder():
                 self._add_distance_restraint(max_distance, atom_ids,
                                              broken_length, 1 - scale)
 
-                # This the force constant is not scaled down with lambda, because if bonded_integration is turned on, the morse force is not included in the integration potential
+                # This the force constant is not scaled down (fully) with lambda, because if bonded_integration is turned on, the morse force is not included in the integration potential
+                # The bonded integration factor is scaled up based on lambda, to make sure that there is a full bonded interaction when the bond is present
                 self._add_bond(
                     integration_force,
                     atom_ids,
                     bond['equilibrium'] * scale + broken_length * (1 - scale),
-                    bond['force_constant'] * self.bonded_integration_fac *
-                    self.bonded_integration_fac,
+                    bond['force_constant'] *
+                    (1 - scale * self.bonded_integration_fac),
                 )
         return harmonic_force, integration_force, morse_force, max_distance
 
@@ -1662,3 +1554,111 @@ class EvbSystemBuilder():
         angle = angle * 180 / np.pi  # Convert to degrees
 
         return angle
+
+
+# The EVB procedure uses two different potentials, one for the integration of the EOMs to explore phase space, and another one for the calculation of the PES
+# The integration potential is optimized to explore all relevant areas of phase space in an efficient manner. This includes constraints and distance restraints.
+# The PES potential is optimized to calculate the potential energy surface accurate. Constraints and restraints are ommitted for this.
+# Soft core long range potentials provide faster convergence for averages and are thus included in the PES potential. They cause unstable integration though.
+class EvbForceGroup(Enum):
+    DEFAULT = auto(
+    )  # Default force group, included for both integration and energy calculations
+    # THERMOSTAT = auto()  # Thermostat
+    INTLJ = auto()  # Integration lennard-jones potential
+    INTCOUL = auto()  # Integration coulombic potential
+    PESLJ = auto()  # Lennard-jones potential
+    PESCOUL = auto()  # Coulombic potential
+    CONSTRAINT = auto()
+
+    CMM_REMOVER = auto()  # Center of mass motion remover
+    NB_FORCE = auto()  # Solvent-solvent and solvent-solute nb force
+    BAROSTAT = auto()  # Barostat
+    E_FIELD = auto()  # Electric field force
+    REACTION_BONDED = auto()  # Bonded forces for the reaction atoms
+
+    # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
+    PES_CONSTRAINT = auto()
+    RESTRAINT = auto()
+    SOLVENT = auto(
+    )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
+    CARBON = auto()  # Graphene and CNTs
+    INTEGRATION = auto(
+    )  # All leftover forces that should only be used for integration
+    PES = auto(
+    )  # All leftover forces that should only be used for the calculation of the PES
+    NONE = auto(
+    )  # Forces that should not be included in the integration or PES calculations
+    DEBUG1PES = auto()  # Debugging force group 1
+    DEBUG2PES = auto()  # Debugging force group 2
+    DEBUG1INT = auto()  # Debugging force group 1
+    DEBUG2INT = auto()  # Debugging force group 2
+    DEBUG1 = auto()  # Debugging force group 1
+    DEBUG2 = auto()  # Debugging force group 2
+
+    # Both methods return classes because integrator.setIntegrationForceGroups() takes a set as argument
+    @classmethod
+    def integration_force_groups(cls):
+        return set([
+            cls.DEFAULT.value,
+            cls.CMM_REMOVER.value,
+            cls.NB_FORCE.value,
+            cls.BAROSTAT.value,
+            cls.E_FIELD.value,
+            cls.REACTION_BONDED.value,
+            cls.INTLJ.value,
+            cls.INTCOUL.value,
+            cls.CONSTRAINT.value,
+            cls.PES_CONSTRAINT.value,
+            cls.RESTRAINT.value,
+            cls.SOLVENT.value,
+            cls.CARBON.value,
+            cls.INTEGRATION.value,
+            # cls.DEBUG1INT.value,
+            # cls.DEBUG2INT.value,
+            # cls.DEBUG1.value,
+            # cls.DEBUG2.value,
+        ])
+
+    @classmethod
+    def NVT_integration_force_groups(cls):
+        int_fg = cls.integration_force_groups()
+        int_fg.remove(cls.BAROSTAT.value)
+        return int_fg
+
+    @classmethod
+    def pes_force_groups(cls):
+        return set([
+            cls.DEFAULT.value,
+            cls.CMM_REMOVER.value,
+            cls.NB_FORCE.value,
+            cls.BAROSTAT.value,
+            cls.E_FIELD.value,
+            cls.REACTION_BONDED.value,
+            cls.PES_CONSTRAINT.value,
+            cls.PESLJ.value,
+            cls.PESCOUL.value,
+            cls.SOLVENT.value,
+            cls.CARBON.value,
+            cls.PES.value,
+            # cls.DEBUG1PES.value,
+            # cls.DEBUG2PES.value,
+            # cls.DEBUG1.value,
+            # cls.DEBUG2.value,
+        ])
+
+    @classmethod
+    def get_header(cls):
+        header = ""
+        integration_forcegroups = cls.integration_force_groups()
+        pes_forcegroups = cls.pes_force_groups()
+        for fg in cls:
+            in_int = fg.value in integration_forcegroups
+            in_pes = fg.value in pes_forcegroups
+            fg_cat = 'b'
+            if in_int and not in_pes:
+                fg_cat = 'i'
+            if not in_int and in_pes:
+                fg_cat = 'p'
+            header += f"{fg.name}({fg.value}-{fg_cat}), "
+        header = header[:-2] + '\n'
+        return header

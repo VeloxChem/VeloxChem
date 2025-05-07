@@ -663,11 +663,20 @@ class EvbDriver():
             name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
         """
         #todo restructure the input system for keywords, build proper class and enum for this, also restructure ensembles with NPT and NVE stuff
-        if name == "vacuum":
+        if name == "vacuum" or name=="vacuum_NVT":
             conf = {
                 "name": "vacuum",
-                "NVE": False,
                 "temperature": self.temperature,
+            }
+        elif name == "vacuum_NVE":
+            conf = {
+                "name": "vacuum_NVE",
+            }
+        elif name == "vacuum_NPT":
+            conf = {
+                "name": "vacuum_NPT",
+                "temperature": self.temperature,
+                "pressure" : 1,
             }
         elif name == "water":
             conf = {
@@ -680,28 +689,6 @@ class EvbDriver():
                 "ion_count": 0,
                 "neutralize": False
             }
-        # elif name == "CNT":
-        #     conf = {
-        #         "name": "water_CNT",
-        #         "solvent": "spce",
-        #         "temperature": self.temperature,
-        #         "NPT": True,
-        #         "pressure": 1,
-        #         "ion_count": 0,
-        #         "CNT": True,
-        #         "CNT_radius": 0.5,
-        #     }
-        # elif name == "graphene":
-        #     conf = {
-        #         "name": "water_graphene",
-        #         "solvent": "spce",
-        #         "temperature": self.temperature,
-        #         "NPT": True,
-        #         "pressure": 1,
-        #         "ion_count": 0,
-        #         "graphene": True,
-        #         "graphene_size": 2,
-        #     }
         elif name == "E_field":
             conf = {
                 "name": "water_E_field",
@@ -739,7 +726,6 @@ class EvbDriver():
                 "name": name,
                 "solvent": name,
                 "temperature": self.temperature,
-                "NPT": True,
                 "pressure": 1,
                 "padding": 1.5,
                 "ion_count": 0,
