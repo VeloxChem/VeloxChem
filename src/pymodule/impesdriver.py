@@ -31,7 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from os import cpu_count
 import numpy as np
 import sys
 import h5py

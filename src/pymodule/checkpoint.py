@@ -542,3 +542,43 @@ def check_distributed_focks(fname, key_freq_pairs):
     hf.close()
 
     return valid_checkpoint
+
+
+def write_cpcm_charges(fname, cpcm_q):
+    """
+    Write C-PCM surface charges.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param cpcm_q:
+        The C-PCM surface charges.
+    """
+
+    hf = h5py.File(fname, 'a')
+    key = 'cpcm_q'
+    if key in hf:
+        del hf[key]
+    hf.create_dataset('cpcm_q', data=cpcm_q)
+    hf.close()
+
+
+def read_cpcm_charges(fname):
+    """
+    Read C-PCM surface charges.
+
+    :param fname:
+        Name of the checkpoint file.
+
+    :return:
+        The C-PCM surface charges.
+    """
+
+    hf = h5py.File(fname, 'r')
+    key = 'cpcm_q'
+    if key in hf:
+        cpcm_q = np.array(hf.get(key))
+    else:
+        cpcm_q = None
+    hf.close()
+
+    return cpcm_q

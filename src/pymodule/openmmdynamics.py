@@ -479,7 +479,7 @@ class OpenMMDynamics:
         if qm_atoms:
             self.set_qm_mm_system(phase, 
                                   ff_gen)
-            self.qm_stabilizer(ff_gen)
+            # self.qm_stabilizer(ff_gen)
         
         # Write the system to a xml file (for debugging purposes)
         with open(f'{filename}_system.xml', 'w') as f:
@@ -706,7 +706,7 @@ class OpenMMDynamics:
         self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
 
         # Adding the stabilizer force to the QM region
-        self.qm_stabilizer(ff_gen_qm)
+        # self.qm_stabilizer(ff_gen_qm)
 
         # Save system to XML and PDB for inspection and reuse
         with open(f'{filename}_system.xml', 'w') as f:
@@ -1195,6 +1195,8 @@ class OpenMMDynamics:
             self.driver_flag = 'ROSCF Driver'
         elif isinstance(self.qm_driver, InterpolationDriver):
             self.driver_flag = 'IM Driver'
+            _ = self.qm_driver.read_qm_data_points()
+
         
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')

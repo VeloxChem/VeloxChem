@@ -75,7 +75,7 @@ class ConformerGenerator:
         self.ostream = ostream
 
         self.molecule = None
-        self.number_of_conformers_to_select = 300
+        self.number_of_conformers_to_select = None
 
         self.top_file_name = None
         self.partial_charges = None
@@ -514,6 +514,8 @@ class ConformerGenerator:
         self.ostream.flush()
 
         # sort and select energy_coords
+        if self.number_of_conformers_to_select is None:
+            self.number_of_conformers_to_select = num_total_conformers
         sorted_energy_coords = sorted(
             energy_coords, key=lambda x: x[0])[:self.number_of_conformers_to_select]
 
@@ -528,10 +530,9 @@ class ConformerGenerator:
                 ene_coord for local_energy_coords in gathered_energy_coords
                 for ene_coord in local_energy_coords]
 
-            # sort and select all_energy_coords
+            # sort all_energy_coords
             all_sorted_energy_coords = sorted(
-                all_sel_energy_coords, key=lambda x: x[0])[:self.number_of_conformers_to_select]
-
+                all_sel_energy_coords, key=lambda x: x[0])
             # get the lowest energy conformer
             min_energy, min_coords_angstrom = all_sorted_energy_coords[0]
             min_mol = Molecule(molecule)
@@ -599,9 +600,9 @@ class ConformerGenerator:
             ]
 
             conformers_dict = {
-                "energies": filtered_energies,
-                "molecules": filtered_molecules,
-                "geometries": filtered_geometries,
+                "energies": filtered_energies[:self.number_of_conformers_to_select],
+                "molecules": filtered_molecules[:self.number_of_conformers_to_select],
+                "geometries": filtered_geometries[:self.number_of_conformers_to_select],
             }
 
             # save the selected conformers to file

@@ -51,6 +51,9 @@ class C6Driver(LinearSolver):
     """
     Implements the C6 value response solver.
 
+    # vlxtag: RHF, C6, LR
+    # vlxtag: RKS, C6, LR
+
     :param comm:
         The MPI communicator.
     :param ostream:

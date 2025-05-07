@@ -64,12 +64,12 @@ class ReactionMatcher:
 
     def match_reaction_graphs(self, A: nx.Graph, B: nx.Graph):
         # figure out how many bonds need to change -> difficult to impossible with multiple graphs right?
-        largest_in_A = len(list(nx.connected_components(A))[0])
-        largest_in_B = len(list(nx.connected_components(B))[0])
-        swapped = False
-        if largest_in_A > largest_in_B:
-            A, B = B, A
-            swapped = True
+        # largest_in_A = max(len(c) for c in nx.connected_components(A))
+        # largest_in_B = max(len(c) for c in nx.connected_components(B))
+        # swapped = False
+        # if largest_in_A > largest_in_B:
+        #     A, B = B, A
+        #     swapped = True
         
         mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(A, B)
         start_time = time.time()
@@ -118,8 +118,8 @@ class ReactionMatcher:
                     self.ostream.print_info(f"Found {len(Am2_mappings)} mappings with removing 2 bonds")
         if mapping == {}:
             self.ostream.print_info("No mapping found with removing two bonds, removing 3 bonds is not implemented. Try suggesting some broken bonds.")
-        if swapped:
-            mapping = {v: k for k, v in mapping.items()}
+        # if swapped:
+        #     mapping = {v: k for k, v in mapping.items()}
 
         spent_time = time.time() - start_time
         self.ostream.print_info(f"Spent {spent_time:.3f} seconds finding mapping")

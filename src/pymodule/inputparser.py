@@ -449,6 +449,14 @@ def print_keywords(input_keywords, ostream):
     """
 
     width = 90
+
+    max_key_width = 0
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
+            max_key_width = max(len(key), max_key_width)
+
     for group in input_keywords:
         group_print = group.replace('_', ' ')
         ostream.print_header('=' * width)
@@ -457,9 +465,9 @@ def print_keywords(input_keywords, ostream):
         for key, val in input_keywords[group].items():
             if key.startswith('_'):
                 continue
-            text = f'  {key}'.ljust(30)
-            text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 45)
+            text = f'  {key}'.ljust(max_key_width + 2)
+            text += f'  {get_keyword_type(val[0])}'.ljust(12)
+            text += f'  {val[1]}'.ljust(width - max_key_width - 14)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -471,14 +479,22 @@ def print_attributes(input_keywords, ostream):
     """
 
     width = 90
+
+    max_key_width = 0
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
+            max_key_width = max(len(key), max_key_width)
+
     ostream.print_header('=' * width)
     for group in input_keywords:
         for key, val in input_keywords[group].items():
             if key.startswith('_'):
                 continue
-            text = f'  {key}'.ljust(30)
-            text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 45)
+            text = f'  {key}'.ljust(max_key_width + 2)
+            text += f'  {get_keyword_type(val[0])}'.ljust(12)
+            text += f'  {val[1]}'.ljust(width - max_key_width - 14)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()

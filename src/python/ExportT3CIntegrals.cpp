@@ -68,7 +68,8 @@ export_t3cintegrals(py::module& m)
             "Computes electron repulsion integrals for given molecule, basis, auxilary basis, and list of atoms.");
     
     // CRIFockDriver class
-    PyClass<CRIFockDriver>(m, "RIFockDriver")
+    // Note: RIFockDriver is prefixed by an underscore and will be used in rifockdriver.py
+    PyClass<CRIFockDriver>(m, "_RIFockDriver")
         .def(py::init<>())
         .def(py::init<const CSubMatrix&>())
         .def("prepare_buffers", py::overload_cast<const CMolecule&,

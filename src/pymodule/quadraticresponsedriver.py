@@ -300,7 +300,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor',
+            'ri_coulomb'
         ]
 
         for key in cpp_keywords:

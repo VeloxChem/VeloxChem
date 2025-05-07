@@ -72,7 +72,7 @@ class EvbDataProcessing:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.results: dict = {} # Dictionary of dictionaries with all data
+        self.results: dict = {}  # Dictionary of dictionaries with all data
 
         self.barrier: float = None
         self.free_energy: float = None
@@ -97,7 +97,8 @@ class EvbDataProcessing:
         self.smooth_polynomial_order = 3
         self.coordinate_bins = np.array([])
         self.bin_size = 10
-        self.dens_threshold = 0.05
+        self.dens_threshold = 0.1
+        self.dens_max_window = 50
 
     def _beta(self, T) -> float:
         return 1 / (self.kb * T)
@@ -108,14 +109,24 @@ class EvbDataProcessing:
         self.free_energy = free_energy
         self.results = results["configuration_results"]
 
-        
         self.Lambda = results["Lambda"]
         self.Lambda_frame = results["Lambda_frame"]
         self.Lambda_indices = results["Lambda_indices"]
 
-        self.ostream.print_info("Fitting H12 and alpha")
-        self.ostream.flush()
-        self.alpha, self.H12 = self._fit_EVB_parameters()
+        if self.alpha is None or self.H12 is None:
+            self.ostream.print_info("Fitting H12 and alpha")
+            if self.alpha is not None:
+                self.ostream.print_info(
+                    "Overwriting provided alpha. Provide both H12 and alpha to skip fitting"
+                )
+            if self.H12 is not None:
+                self.ostream.print_info(
+                    "Overwriting provided H12. Provide both H12 and alpha to skip fitting"
+                )
+            self.ostream.flush()
+            self.alpha, self.H12 = self._fit_EVB_parameters()
+        else:
+            self.ostream.print_info("Using provided H12 and alpha")
         self.ostream.print_info("Calculating FEP and EVB curves")
         self.ostream.flush()
         self._get_FEP_and_EVB()
@@ -124,35 +135,37 @@ class EvbDataProcessing:
 
     def _fit_EVB_parameters(self):
 
-        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+        assert_msg_critical('scipy' in sys.modules,
+                            'scipy is required for EvbDataProcessing.')
 
         reference_key = list(self.results.keys())[0]
+        self.ostream.print_info(
+            f"Configuration with key {reference_key} is used as reference for fitting"
+        )
 
-        E1_ref = self.results[reference_key]["E1_ref"]
-        E2_ref = self.results[reference_key]["E2_ref"]
+        E1_ref = self.results[reference_key]["E1_pes"]
+        E2_ref = self.results[reference_key]["E2_pes"]
         Temp_set = self.results[reference_key]["Temp_set"]
+
         def get_barrier_and_free_energy_difference(x):
             alpha, H12 = x
 
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
-                E1_ref,
-                E2_ref,
-                alpha,
-                H12
-            )
-            dGfep = self._calculate_dGfep(
-                dE,
-                Temp_set
-            )  
+                E1_ref, E2_ref, alpha, H12)
+            dGfep = self._calculate_dGfep(dE, Temp_set)
             xi = np.linspace(-10000, 10000, 20000)
-            dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(dGfep, self.Lambda, H12, xi)
-            dGevb_smooth, barrier, free_energy = self._get_free_energies(dGevb_ana, fitting=True)
+            dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
+                dGfep, self.Lambda, H12, xi)
+            dGevb_smooth, barrier, free_energy = self._get_free_energies(
+                dGevb_ana, fitting=True)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
-            
+
             return barrier_dif, free_energy_dif
 
-        alpha, H12 = scipy.optimize.fsolve(get_barrier_and_free_energy_difference, [self.alpha_guess, self.H12_guess])
+        alpha, H12 = scipy.optimize.fsolve(
+            get_barrier_and_free_energy_difference,
+            [self.alpha_guess, self.H12_guess])
         self.ostream.print_info(f"Fitted alpha: {alpha}, H12: {H12}")
         return alpha, H12
 
@@ -160,12 +173,14 @@ class EvbDataProcessing:
         E2_shifted = np.copy(E2) + alpha
         V = (1 - self.Lambda_frame) * E1 + self.Lambda_frame * E2_shifted
         dE = E1 - E2_shifted
-        Eg = 0.5 * ((E1 + E2_shifted) - np.sqrt((E1 - E2_shifted)**2 + 4 * H12**2))
+        Eg = 0.5 * (
+            (E1 + E2_shifted) - np.sqrt((E1 - E2_shifted)**2 + 4 * H12**2))
         return E2_shifted, V, dE, Eg
 
     def _calculate_dGfep(self, dE, Temp_set):
 
-        assert_msg_critical('pymbar' in sys.modules, 'pymbar is required for EvbDataProcessing.')
+        assert_msg_critical('pymbar' in sys.modules,
+                            'pymbar is required for EvbDataProcessing.')
 
         de_lambda = self._bin(dE)
         dG_bar = [0.0]
@@ -173,29 +188,35 @@ class EvbDataProcessing:
             delta_lambda = self.Lambda[i + 1] - l
 
             forward_energy = self._beta(Temp_set) * delta_lambda * de_lambda[i]
-            backward_energy = self._beta(Temp_set) * delta_lambda * de_lambda[i + 1]
-            
+            backward_energy = self._beta(Temp_set) * delta_lambda * de_lambda[
+                i + 1]
+
             try:
-                dF = pymbar.other_estimators.bar(forward_energy, -backward_energy, False)["Delta_f"]
+                dF = pymbar.other_estimators.bar(forward_energy,
+                                                 -backward_energy,
+                                                 False)["Delta_f"]
                 dg_bar = -1 / self._beta(Temp_set) * dF
             except Exception as e:
-                self.ostream.print_warning(f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}")
+                self.ostream.print_warning(
+                    f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}"
+                )
                 dg_bar = 0
 
             dG_bar.append(dG_bar[-1] + dg_bar)
-            
+
         return dG_bar
 
     def _bin(self, data):
         binned_data = [[] for _ in range(np.max(self.Lambda_indices) + 1)]
         for i, li in enumerate(self.Lambda_indices):
             binned_data[li].append(data[i])
-        
+
         binned_data = np.array(binned_data)
         return binned_data
 
     @staticmethod
-    def _dGevb_analytical(dGfep, Lambda, H12,xi):
+    def _dGevb_analytical(dGfep, Lambda, H12, xi):
+
         def R(de):
             return np.sqrt(de**2 + 4 * H12**2)
 
@@ -204,6 +225,7 @@ class EvbDataProcessing:
 
         def arg(xi):
             return 0.5 * (1 + xi / R(xi))
+
         shiftxi = shift(xi)
         fepxi = np.interp(arg(xi), Lambda, dGfep)
         dGevb = shiftxi + fepxi
@@ -213,54 +235,61 @@ class EvbDataProcessing:
         V = np.array(V)
         Eg = np.array(Eg)
         dE = np.array(dE)
-        
+
         dGfep = np.array(dGfep)
         li = self.Lambda_indices
         bins = self.coordinate_bins
 
-        N = len(self.Lambda)  # The amount of frames, every lambda value is a frame
-        S = (len(bins) + 1)  # The amount of bins, in between every value of X is a bin, and outside the range are two bins
+        N = len(
+            self.Lambda)  # The amount of frames, every lambda value is a frame
+        S = (
+            len(bins) + 1
+        )  # The amount of bins, in between every value of X is a bin, and outside the range are two bins
         hist = [[[] for x in range(S)] for x in range(N)]
         beta_set = self._beta(Temp_set)
-        content = np.exp(-beta_set*(Eg-V))
+        content = np.exp(-beta_set * (Eg - V))
 
-        Xi = np.searchsorted(bins,dE)
+        Xi = np.searchsorted(bins, dE)
         for i in range(len(li)):
             bin = Xi[i]
             Lambda_index = li[i]
             hist[Lambda_index][bin].append(content[i])
 
-        dGcor = np.zeros((N,S))
-        pnscount = np.zeros((N,S))
-        pns = np.zeros((N,S))
+        dGcor = np.zeros((N, S))
+        pnscount = np.zeros((N, S))
+        pns = np.zeros((N, S))
         for n in range(N):
             for s in range(S):
                 if len(hist[n][s]) > 0:
-                    dGcor[n,s] = -self.kb*Temp_set*np.log(np.mean(hist[n][s])) #What to do with the temperature here
-                    pnscount[n,s] = len(hist[n][s])
+                    dGcor[n, s] = -self.kb * Temp_set * np.log(
+                        np.mean(
+                            hist[n][s]))  #What to do with the temperature here
+                    pnscount[n, s] = len(hist[n][s])
                 else:
-                    dGcor[n,s] = 0
+                    dGcor[n, s] = 0
 
         for n in range(N):
             for s in range(S):
-                pnssum = np.sum(pnscount[:,s])
+                pnssum = np.sum(pnscount[:, s])
                 if pnssum > 0:
-                    pns[n,s] = pnscount[n,s]/pnssum
-                
+                    pns[n, s] = pnscount[n, s] / pnssum
+
         pns = pns.transpose()
 
-        pnsfep = pns@dGfep
-        pnscor = np.sum(pns*dGcor.transpose(),axis=1)
-        dGevb = pnsfep+pnscor
+        pnsfep = pns @ dGfep
+        pnscor = np.sum(pns * dGcor.transpose(), axis=1)
+        dGevb = pnsfep + pnscor
 
         return dGevb, pns, dGcor
 
-    def _get_free_energies(self, dGevb, fitting = False):
+    def _get_free_energies(self, dGevb, fitting=False):
 
-        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+        assert_msg_critical('scipy' in sys.modules,
+                            'scipy is required for EvbDataProcessing.')
 
         if fitting:
-            dGevb_smooth = scipy.signal.savgol_filter(dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+            dGevb_smooth = scipy.signal.savgol_filter(
+                dGevb, self.smooth_window_size, self.smooth_polynomial_order)
         else:
             dGevb_smooth = dGevb
 
@@ -268,9 +297,9 @@ class EvbDataProcessing:
             min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
             max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
         else:
-            scope = len(dGevb_smooth)//4
-            min_arg = scipy.signal.argrelmin(dGevb_smooth,order=scope)[0]
-            max_arg = scipy.signal.argrelmax(dGevb_smooth,order=scope)[0]
+            scope = len(dGevb_smooth) // 4
+            min_arg = scipy.signal.argrelmin(dGevb_smooth, order=scope)[0]
+            max_arg = scipy.signal.argrelmax(dGevb_smooth, order=scope)[0]
             if len(min_arg) < 2:
                 min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
             if len(max_arg) < 1:
@@ -287,18 +316,22 @@ class EvbDataProcessing:
             Epro = dGevb_smooth[-1]
 
         if not fitting and len(min_arg) != 2:
-            self.ostream.print_warning(f"Found {len(min_arg)} minima in the EVB profile instead of 2. Confirm the calculated extrema with the plot.")
+            self.ostream.print_warning(
+                f"Found {len(min_arg)} minima in the EVB profile instead of 2. Confirm the calculated extrema with the plot."
+            )
 
         if len(max_arg) == 1:
             Ebar = dGevb_smooth[max_arg[0]]
-        elif len(max_arg) >1:
+        elif len(max_arg) > 1:
             mid_arg = max_arg[len(max_arg) // 2]
             Ebar = dGevb_smooth[mid_arg]
         else:
             Ebar = dGevb_smooth[len(dGevb_smooth) // 2]
 
         if not fitting and len(max_arg) != 1:
-            self.ostream.print_warning(f"Found {len(max_arg)} maxima in the EVB profile instead of 1. Confirm the calculated extrema with the plot.")
+            self.ostream.print_warning(
+                f"Found {len(max_arg)} maxima in the EVB profile instead of 1. Confirm the calculated extrema with the plot."
+            )
 
         barrier = Ebar - Erea
         free_energy = Epro - Erea
@@ -310,15 +343,16 @@ class EvbDataProcessing:
 
         for result in self.results.values():
             # Temp = result["Temp_step"]
-            E1_ref = result["E1_ref"]
-            E2_ref = result["E2_ref"]
-            E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12)
+            E1_ref = result["E1_pes"]
+            E2_ref = result["E2_pes"]
+            E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
+                E1_ref, E2_ref, self.alpha, self.H12)
 
-            E1_avg = np.average(self._bin(E1_ref), axis =1)
-            E2_avg = np.average(self._bin(E2_ref), axis =1)
-            Eg_avg = np.average(self._bin(Eg), axis =1)
-            V_avg = np.average(self._bin(V), axis =1)
-            dE_avg = np.average(self._bin(dE), axis =1)
+            E1_avg = np.average(self._bin(E1_ref), axis=1)
+            E2_avg = np.average(self._bin(E2_ref), axis=1)
+            Eg_avg = np.average(self._bin(Eg), axis=1)
+            V_avg = np.average(self._bin(V), axis=1)
+            dE_avg = np.average(self._bin(dE), axis=1)
             result.update({
                 "dE": dE,
                 "Eg": Eg,
@@ -329,24 +363,28 @@ class EvbDataProcessing:
                 "V_avg": V_avg,
                 "dE_avg": dE_avg,
             })
-        
-        self.coordinate_bins = self._calculate_coordinate_bins(self.Lambda_indices, self.results, self.bin_size, self.dens_threshold)
-        
+
+        if self.coordinate_bins.size == 0:
+            self.coordinate_bins = self._calculate_coordinate_bins(
+                self.Lambda_indices, self.results, self.bin_size,
+                self.dens_threshold)
+        else:
+            self.ostream.print_info(
+                f"Using provided coordinate bins, min: {self.coordinate_bins[0]}, max: {self.coordinate_bins[-1]}, length: {len(self.coordinate_bins)}"
+            )
+            self.ostream.flush()
+
         for result in self.results.values():
             dE = result["dE"]
             Temp_set = result["Temp_set"]
 
-            dGfep = self._calculate_dGfep(dE, Temp_set) 
+            dGfep = self._calculate_dGfep(dE, Temp_set)
 
             result.update({"dGfep": dGfep})
             if self.calculate_discrete:
                 dGevb_discrete, pns, dGcor = self._dGevb_discretised(
-                    dGfep,
-                    result["Eg"],
-                    result["V"],
-                    result["dE"],
-                    result["Temp_set"]
-                )
+                    dGfep, result["Eg"], result["V"], result["dE"],
+                    result["Temp_set"])
 
                 (
                     dGevb_discrete,
@@ -388,23 +426,27 @@ class EvbDataProcessing:
                     }
                 })
 
-    @staticmethod
-    def _calculate_coordinate_bins(Lambda_indices, results, bin_size, dens_threshold):
+    def _calculate_coordinate_bins(self, Lambda_indices, results, bin_size,
+                                   dens_threshold):
 
-        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+        assert_msg_critical('scipy' in sys.modules,
+                            'scipy is required for EvbDataProcessing.')
 
         dE_min = 0
         dE_max = 0
         for result in results.values():
+            dens_max = np.array([])
             dE = result['dE']
-            xy = np.vstack([dE,Lambda_indices])
+            xy = np.vstack([dE, Lambda_indices])
             dens = scipy.stats.gaussian_kde(xy)(xy)
             dens = dens / np.max(dens)
             result.update({"dE_dens": dens})
 
-            dE_bins = np.linspace(-2000,2000,2000)
-            bin_inds = np.digitize(dE,dE_bins)
-            dens_max = np.array([])
+            minde = np.min(dE)
+            maxde = np.max(dE)
+            steps = int((maxde - minde) // 2)
+            dE_bins = np.linspace(np.min(dE), np.max(dE), steps)
+            bin_inds = np.digitize(dE, dE_bins)
             for i, bin in enumerate(dE_bins):
                 inds = np.where(bin_inds == i)[0]
                 dE_hist = []
@@ -414,8 +456,16 @@ class EvbDataProcessing:
                     dens_max = np.append(dens_max, np.max(dE_hist))
                 else:
                     dens_max = np.append(dens_max, 0)
+
             middle = len(dens_max) // 2
-            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3) 
+            window_size = self.dens_max_window
+            dens_max_smooth = np.zeros(len(dens_max) - window_size)
+            for i in range(1, len(dens_max) - window_size):
+                dens_max_smooth[i] = np.max(dens_max[i:i + window_size])
+            dens_max = dens_max_smooth
+            result.update({"dE_dens_max": dens_max})
+            result.update({"dE_dens_threshold": dens_threshold})
+            # dens_max = scipy.signal.savgol_filter(dens_max, 20, 3)
             min_inds = np.where(dens_max[:middle] < dens_threshold)[0]
             max_inds = np.where(dens_max[middle:] < dens_threshold)[0]
 
@@ -430,113 +480,122 @@ class EvbDataProcessing:
                 dE_min = dE_min_new
             if dE_max_new > dE_max:
                 dE_max = dE_max_new
-        
-        return np.arange(dE_min,dE_max,bin_size)
+
+        return np.arange(dE_min, dE_max, bin_size)
 
     @staticmethod
     def print_results(results, ostream):
-        
-        ostream.print_info(f"{'Discrete':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}")
-        for name, result in results["configuration_results"].items():
-            if "discrete" in result.keys():
-                ostream.print_info(f"{name:<30} {result['discrete']['barrier']:20.2f} {result['discrete']['free_energy']:20.2f}")
 
-        ostream.print_info("\n")
-        ostream.print_info(f"{'Analytical':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}")
+        # ostream.print_info(
+        #     f"{'Discrete':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}"
+        # )
+        # for name, result in results["configuration_results"].items():
+        #     if "discrete" in result.keys():
+        #         ostream.print_info(
+        #             f"{name:<30} {result['discrete']['barrier']:20.2f} {result['discrete']['free_energy']:20.2f}"
+        #         )
+
+        # ostream.print_info("\n")
+        ostream.print_info(
+            f"{'Analytical':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}"
+        )
         for name, result in results["configuration_results"].items():
             if "analytical" in result.keys():
-                ostream.print_info(f"{name:<30} {result['analytical']['barrier']:20.2f} {result['analytical']['free_energy']:20.2f}")
+                ostream.print_info(
+                    f"{name:<30} {result['analytical']['barrier']:20.2f} {result['analytical']['free_energy']:20.2f}"
+                )
+
+        ostream.flush()
 
     @staticmethod
     def plot_dE_density(results):
 
         import matplotlib.pyplot as plt
 
-        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+        assert_msg_critical('scipy' in sys.modules,
+                            'scipy is required for EvbDataProcessing.')
 
         result_count = len(results["configuration_results"])
         coordinate_bins = results["coordinate_bins"]
         indices = results["Lambda_indices"]
         Lambda = results["Lambda"]
 
-        fig, ax = plt.subplots(result_count, 2, figsize=(12, 4*result_count))
+        fig, ax = plt.subplots(result_count, 2, figsize=(12, 4 * result_count))
 
         dE_min = coordinate_bins[0]
         dE_max = coordinate_bins[-1]
-        dE_bins = np.linspace(-2000,2000,2000)
+        dE_bins = np.linspace(dE_min, dE_max, int(dE_max - dE_min // 2))
 
-        for j, (name, result) in enumerate(results["configuration_results"].items()):
+        for j, (name,
+                result) in enumerate(results["configuration_results"].items()):
             dE = result["dE"]
             L_values = [Lambda[i] for i in indices]
             dens = result["dE_dens"]
+            dens_max = result["dE_dens_max"]
+            dens_thres = result["dE_dens_threshold"]
 
-            dens_max = np.array([])
-            bin_inds = np.digitize(dE,dE_bins)
-            for i, bin in enumerate(dE_bins):
-                inds = np.where(bin_inds == i)[0]
-                dE_hist = []
-                for ind in inds:
-                    dE_hist.append(dens[ind])
-                if len(dE_hist)>0:
-                    dens_max = np.append(dens_max, np.max(dE_hist))
-                else:
-                    dens_max = np.append(dens_max, 0)
-            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3)
+            # dens_max = scipy.signal.savgol_filter(dens_max, 20, 3)
 
-            ax[j,0].scatter(dE,L_values,c=dens,s=5)
-            ax[j,0].plot([dE_min,dE_min],[0,0.3])
-            ax[j,0].plot([dE_max,dE_max],[0.7,1])
-            ax[j,0].set_ylabel(r"$\lambda$")
-            ax[j,0].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
-            ax[j,0].set_ylim(0,1)
-            ax[j,0].set_xlim(min(dE) * 1.1,max(dE) * 1.1)
+            ax[j, 0].scatter(dE, L_values, c=dens, s=5)
+            ax[j, 0].plot([dE_min, dE_min], [0, 0.3])
+            ax[j, 0].plot([dE_max, dE_max], [0.7, 1])
+            ax[j, 0].set_ylabel(r"$\lambda$")
+            ax[j, 0].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+            ax[j, 0].set_ylim(0, 1)
+            ax[j, 0].set_xlim(min(dE) * 1.1, max(dE) * 1.1)
 
             min_label = min(dE)
             min_label = min_label - min_label % 200 + 200
             max_label = max(dE)
             max_label = max_label - max_label % 200 + 200
-            xlabels = np.arange(min_label,max_label,200)
-            ylabels = np.arange(0,1.1,0.2)
+            xlabels = np.arange(min_label, max_label, 200)
+            ylabels = np.arange(0, 1.1, 0.2)
 
             min_tick = min(dE)
             min_tick = min_tick - min_tick % 100 + 100
             max_tick = max(dE)
             max_tick = max_tick - max_tick % 100 + 100
 
-            minor_xticks = np.arange(min_tick,max_tick,100)
-            minor_yticks = np.arange(0,1.1,0.1)
+            minor_xticks = np.arange(min_tick, max_tick, 100)
+            minor_yticks = np.arange(0, 1.1, 0.1)
 
-            ax[j,0].set_xticks(xlabels)
-            ax[j,0].set_yticks(ylabels)
+            ax[j, 0].set_xticks(xlabels)
+            ax[j, 0].set_yticks(ylabels)
 
-            ax[j,0].set_xticks(minor_xticks, minor=True)
-            ax[j,0].set_yticks(minor_yticks, minor=True)
-            ax[j,0].grid(True,linestyle='-', which='major')
-            ax[j,0].grid(True,linestyle=':', which='minor')
+            ax[j, 0].set_xticks(minor_xticks, minor=True)
+            ax[j, 0].set_yticks(minor_yticks, minor=True)
+            ax[j, 0].grid(True, linestyle='-', which='major')
+            ax[j, 0].grid(True, linestyle=':', which='minor')
 
             middle = len(dens_max) // 2
-            start = np.where(dens_max[:middle] ==0)[0][-1]
-            end = np.where(dens_max[middle:] ==0)[0][0] + middle
+            # start = np.where(dens_max[:middle] == 0)[0][-1]
+            # end = np.where(dens_max[middle:] == 0)[0][0] + middle
+            start = 0
+            end = len(dens_max) - 1
 
-            ax[j,1].scatter(dE,dens,s=1)
-            ax[j,1].plot([-start,end],[0.05,0.05])
-            ax[j,1].plot(dE_bins[start:end],dens_max[start:end])
-            ax[j,1].plot([dE_min,dE_min],[0,1])
-            ax[j,1].plot([dE_max,dE_max],[0,1])
-            ax[j,1].set_ylabel("Density")
-            ax[j,1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
-            ax[j,1].tick_params(
-                axis='y',          # changes apply to the x-axis
-                which='both',      # both major and minor ticks are affected
-                bottom=False,      # ticks along the bottom edge are off
-                top=False,         # ticks along the top edge are off
-                labelbottom=False, # labels along the bottom edge are off
+            ax[j, 1].scatter(dE, dens, s=1)
+            ax[j, 1].plot([dE_min, dE_max], [dens_thres, dens_thres])
+            ax[j, 1].plot(dE_bins[start:end], dens_max[start:end])
+            ax[j, 1].plot([dE_min, dE_min], [0, 1])
+            ax[j, 1].plot([dE_max, dE_max], [0, 1])
+            ax[j, 1].set_ylabel("Density")
+            ax[j, 1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+            ax[j, 1].tick_params(
+                axis='y',  # changes apply to the x-axis
+                which='both',  # both major and minor ticks are affected
+                bottom=False,  # ticks along the bottom edge are off
+                top=False,  # ticks along the top edge are off
+                labelbottom=False,  # labels along the bottom edge are off
             )
 
         return fig, ax
 
     @staticmethod
-    def plot_results(results, plot_analytical=True, plot_discrete=True):
+    def plot_results(results,
+                     plot_analytical=True,
+                     plot_discrete=False,
+                     order=None,
+                     x_axis_publication=True):
 
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -545,7 +604,7 @@ class EvbDataProcessing:
         coordinate_bins = results["coordinate_bins"]
         Lambda = results["Lambda"]
 
-        fig, ax = plt.subplots(1, 2, figsize=(10, 4))
+        fig, ax = plt.subplots(1, 2, figsize=(15, 3.5))
         bin_indicators = (coordinate_bins[:-1] + coordinate_bins[1:]) / 2
         colors = mcolors.TABLEAU_COLORS
 
@@ -556,10 +615,24 @@ class EvbDataProcessing:
             discrete_linestyle = "--"
         else:
             discrete_linestyle = "-"
-        for i, (name, result) in enumerate(results["configuration_results"].items()):
+
+        to_plot = []
+        names = []
+        if order is not None:
+            names = order
+            for name in order:
+                assert name in results['configuration_results'].keys(
+                ), f"{name} not in configuration results"
+                to_plot.append(results['configuration_results'][name])
+        else:
+            for name, conf in results['configuration_results'].items():
+                names.append(name)
+                to_plot.append(conf)
+        for i, (name, result) in enumerate(zip(names, to_plot)):
 
             #Shift both averages by the same amount so that their relative differences stay the same
             ax[0].plot(Lambda, result["dGfep"], label=name)
+            ax[0].set_xlim(0, 1)
             if plot_discrete:
                 if "discrete" in result.keys():
                     ax[1].plot(
@@ -569,7 +642,7 @@ class EvbDataProcessing:
                         color=colors[colorkeys[i]],
                         linestyle=discrete_linestyle,
                     )
-            
+
             if plot_analytical:
                 if "analytical" in result.keys():
                     ax[1].plot(
@@ -578,32 +651,47 @@ class EvbDataProcessing:
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
-            
 
+            ax[1].set_xlim(coordinate_bins[0], coordinate_bins[-1])
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
             legend_labels.append(name)
 
         if plot_analytical and plot_discrete:
             EVB_legend_lines = []
             EVB_legend_labels = []
-            EVB_legend_lines.append(Line2D([0], [0], linestyle="-", color="grey"))
+            EVB_legend_lines.append(
+                Line2D([0], [0], linestyle="-", color="grey"))
             EVB_legend_labels.append("analytical")
-            EVB_legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
+            EVB_legend_lines.append(
+                Line2D([0], [0], linestyle="--", color="grey"))
             EVB_legend_labels.append("discrete")
             ax[1].legend(EVB_legend_lines, EVB_legend_labels)
 
         # ax[0].legend()
         ax[0].set_xlabel(r"$\lambda$")
         ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
+        ax[0].set_title("FEP profiles", fontsize=12)
 
         ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
         ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
+        ax[1].set_title("EVB profiles", fontsize=12)
+        if x_axis_publication:
+            ax[1].tick_params(labelbottom=False)
+            ax[1].set_xlabel("Reaction coordinate")
+        # fig.tight_layout()  # Adjust layout
         fig.legend(
             legend_lines,
             legend_labels,
-            loc=(0.22, 0.91),
-            ncol=len(legend_labels),
+            loc='center left',
+            bbox_to_anchor=(0.9, 0.5),
+            ncol=1,
         )
+        # fig.legend(
+        #     legend_lines,
+        #     legend_labels,
+        #     loc=(0.22, 0.91),
+        #     ncol=1,
+        # )
         return fig, ax
 
     @staticmethod
@@ -617,18 +705,25 @@ class EvbDataProcessing:
         colors = mcolors.TABLEAU_COLORS
         coordinate_bins = results["coordinate_bins"]
 
-        for i, (name,result) in enumerate(results["configuration_results"].items()):
+        for i, (name,
+                result) in enumerate(results["configuration_results"].items()):
             dGfep = result["dGfep"]
             #discrete curves
             pns = result['discrete']['pns']
             dGcor = result['discrete']['dGcor']
 
             pnsfep = pns @ dGfep
-            pnscor = np.sum(pns * dGcor.transpose(),axis=1)
+            pnscor = np.sum(pns * dGcor.transpose(), axis=1)
             dGevb_disc = pnsfep + pnscor
 
-            ax[i].plot(coordinate_bins, pnsfep[:-1], colors['tab:blue'], linestyle="--")
-            ax[i].plot(coordinate_bins, pnscor[:-1], colors['tab:blue'], linestyle=":")
+            ax[i].plot(coordinate_bins,
+                       pnsfep[:-1],
+                       colors['tab:blue'],
+                       linestyle="--")
+            ax[i].plot(coordinate_bins,
+                       pnscor[:-1],
+                       colors['tab:blue'],
+                       linestyle=":")
             ax[i].plot(coordinate_bins, dGevb_disc[:-1], colors['tab:blue'])
 
             #analytical curves
@@ -636,11 +731,23 @@ class EvbDataProcessing:
             fepxi = result['analytical']['fep']
             dGevb_ana = shift + fepxi
 
-            ax[i].plot(coordinate_bins, shift, colors['tab:orange'], linestyle=":")
-            ax[i].plot(coordinate_bins, fepxi, colors['tab:orange'], linestyle="--")
+            ax[i].plot(coordinate_bins,
+                       shift,
+                       colors['tab:orange'],
+                       linestyle=":")
+            ax[i].plot(coordinate_bins,
+                       fepxi,
+                       colors['tab:orange'],
+                       linestyle="--")
             ax[i].plot(coordinate_bins, dGevb_ana, colors['tab:orange'])
 
             ax[i].set_title(name)
 
-        fig.legend([r"$p_{n,s} \Delta G_{FEP}$", r"$p_{n,s} \Delta G_{cor}$", r"$\Delta G_{EVB,disc.}$", r"$\mu$", r"$\nu$", r"$\Delta G_{EVB,ana.}$",])
-            
+        fig.legend([
+            r"$p_{n,s} \Delta G_{FEP}$",
+            r"$p_{n,s} \Delta G_{cor}$",
+            r"$\Delta G_{EVB,disc.}$",
+            r"$\mu$",
+            r"$\nu$",
+            r"$\Delta G_{EVB,ana.}$",
+        ])
