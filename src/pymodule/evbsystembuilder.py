@@ -157,8 +157,7 @@ class EvbSystemBuilder():
             self.soft_core_lj_int,
         )
 
-        NPT = configuration.get("NPT", False)
-        pressure = configuration.get("pressure", 1)
+        pressure = configuration.get("pressure", -1)
         solvent = configuration.get("solvent", None)
         padding = configuration.get("padding", 1)
         CNT = configuration.get("CNT", False)
@@ -244,7 +243,7 @@ class EvbSystemBuilder():
         nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
         system.addForce(nb_force)
 
-        if NPT:
+        if pressure > 0:
             barostat = mm.MonteCarloBarostat(
                 pressure * mmunit.bar,  # type: ignore
                 self.temperature * mmunit.kelvin,  # type: ignore

@@ -260,12 +260,13 @@ class EvbFepDriver():
             append=False,
         )
         equil_simulation.reporters.append(equil_reporter)
+        if self.isobaric:
+            barostat = [
+                force for force in equil_simulation.system.getForces()
+                if isinstance(force, mm.MonteCarloBarostat)
+            ][0]
         if l == 0:
             if self.isobaric:
-                barostat = [
-                    force for force in equil_simulation.system.getForces()
-                    if isinstance(force, mm.MonteCarloBarostat)
-                ][0]
                 barostat.setFrequency(0)
                 self.ostream.print_info(
                     f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
