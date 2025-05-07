@@ -163,6 +163,7 @@ class ScfHessianDriver(HessianDriver):
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
+        self.profiler = profiler
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
@@ -196,12 +197,6 @@ class ScfHessianDriver(HessianDriver):
             self.ostream.print_blank()
             self.ostream.print_blank()
             self.ostream.flush()
-
-        self.ostream.flush()
-        self.ostream.unmute()
-        profiler.print_timing(self.ostream)
-        self.ostream.flush()
-        self.ostream.mute()
 
     def compute_numerical(self, molecule, ao_basis):
         """
