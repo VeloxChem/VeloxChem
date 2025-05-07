@@ -139,7 +139,9 @@ class EvbDataProcessing:
                             'scipy is required for EvbDataProcessing.')
 
         reference_key = list(self.results.keys())[0]
-        self.ostream.print_info(f"Configuration with key {reference_key} is used as reference for fitting")
+        self.ostream.print_info(
+            f"Configuration with key {reference_key} is used as reference for fitting"
+        )
 
         E1_ref = self.results[reference_key]["E1_pes"]
         E2_ref = self.results[reference_key]["E2_pes"]
@@ -589,7 +591,11 @@ class EvbDataProcessing:
         return fig, ax
 
     @staticmethod
-    def plot_results(results, plot_analytical=True, plot_discrete=False, order = None):
+    def plot_results(results,
+                     plot_analytical=True,
+                     plot_discrete=False,
+                     order=None,
+                     x_axis_publication=True):
 
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -622,8 +628,7 @@ class EvbDataProcessing:
             for name, conf in results['configuration_results'].items():
                 names.append(name)
                 to_plot.append(conf)
-        for i, (name,
-                result) in enumerate(zip(names,to_plot)):
+        for i, (name, result) in enumerate(zip(names, to_plot)):
 
             #Shift both averages by the same amount so that their relative differences stay the same
             ax[0].plot(Lambda, result["dGfep"], label=name)
@@ -670,6 +675,9 @@ class EvbDataProcessing:
         ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
         ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
         ax[1].set_title("EVB profiles", fontsize=12)
+        if x_axis_publication:
+            ax[1].tick_params(labelbottom=False)
+            ax[1].set_xlabel("Reaction coordinate")
         # fig.tight_layout()  # Adjust layout
         fig.legend(
             legend_lines,
