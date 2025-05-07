@@ -188,7 +188,7 @@ class EvbDriver():
         )
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
-        ffbuilder = EvbForceFieldBuilder()
+        ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
         ffbuilder.reparameterize = reparameterize
         ffbuilder.optimize = optimize
 
@@ -297,7 +297,7 @@ class EvbDriver():
                 product_multiplicity,
             )
 
-            ffbuilder = EvbForceFieldBuilder()
+            ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
             ffbuilder.reparameterize = reparameterize
             ffbuilder.optimize = optimize
 
@@ -606,7 +606,7 @@ class EvbDriver():
                 run_folder_path.mkdir(parents=True, exist_ok=True)
 
             # build the system
-            system_builder = EvbSystemBuilder()
+            system_builder = EvbSystemBuilder(ostream=self.ostream)
             self.ostream.print_blank()
             self.ostream.print_header(f"Building systems for {conf['name']}")
             self.ostream.flush()
@@ -892,7 +892,7 @@ class EvbDriver():
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
-            FEP = EvbFepDriver()
+            FEP = EvbFepDriver(ostream=self.ostream)
             FEP.debug = self.debug
             if saved_frames_on_crash is not None:
                 FEP.save_frames = saved_frames_on_crash
@@ -946,7 +946,7 @@ class EvbDriver():
             lambda_sub_sample_ends (bool, optional): If set to False, the lambda frames up to 0.1 and from 0.9 will not be subsampled. Defaults to False.
             time_sub_sample (int, optional): Factor with which the time vector will be subsampled. Setting this to two will discard every other snapshot. Defaults to 1.
         """
-        dp = EvbDataProcessing()
+        dp = EvbDataProcessing(ostream=self.ostream)
         results = self._load_output_from_folders(lambda_sub_sample,
                                                  lambda_sub_sample_ends,
                                                  time_sub_sample)

@@ -107,6 +107,21 @@ class EvbSystemBuilder():
         self.E_field: list[float] = [0, 0, 0]
         self.neutralize: bool = False
 
+        self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
+        self.bonded_integration_fac: float = 0.25  # Scaling factor for the bonded integration forces.
+
+        self.verbose = False
+
+        self.constraints: list[dict] = []
+
+        self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom(
+        )  # Coulombic pre-factor
+
+        self.deg_to_rad: float = np.pi / 180
+
+        self.data_folder: str | None = None
+        self.run_folder: str | None = None
+
         self.keywords = {
             "temperature": {
                 "type": float
@@ -172,21 +187,6 @@ class EvbSystemBuilder():
                 "type": float
             },
         }
-
-        self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
-        self.bonded_integration_fac: float = 0.25  # Scaling factor for the bonded integration forces.
-
-        self.verbose = False
-
-        self.constraints: list[dict] = []
-
-        self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom(
-        )  # Coulombic pre-factor
-
-        self.deg_to_rad: float = np.pi / 180
-
-        self.data_folder: str | None = None
-        self.run_folder: str | None = None
 
     def build_systems(
         self,
