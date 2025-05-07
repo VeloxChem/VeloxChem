@@ -82,8 +82,23 @@ class EvbFepDriver():
         self.systems: dict = None
         self.topology: mmapp.Topology = None
         self.Lambda: list = None
-        self.crash_reporting_interval: int = 1
 
+        self.isothermal: bool = False
+        self.isobaric: bool = False
+        self.friction = 1.0
+        self.temperature = -1
+        self.pressure = -1
+        
+        self.equil_NVT_steps=5000
+        self.equil_NPT_steps=5000
+        self.sample_steps=100000
+        self.write_step=1000
+        self.initial_equil_NVT_steps=10000
+        self.initial_equil_NPT_steps=10000
+        self.step_size=0.001
+        self.equil_step_size=0.001
+
+        self.crash_reporting_interval: int = 1
         self.constrain_H: bool = False
         self.report_forces: bool = False
         self.report_velocities: bool = False
@@ -91,37 +106,92 @@ class EvbFepDriver():
         self.debug: bool = False
         self.save_frames: int = 1000
 
-        self.friction: float = 1.0
-        self.isothermal: bool = False
-        self.isobaric: bool = False
+        self.keywords = {
+            "friction": {
+                "type": float
+            },
+            "temperature": {
+                "type": float
+            },
+            "pressure": {
+                "type": float
+            },
+            "equil_NVT_steps": {
+                "type": int
+            },
+            "equil_NPT_steps": {
+                "type": int
+            },
+            "sample_steps": {
+                "type": int
+            },
+            "write_step": {
+                "type": int
+            },
+            "initial_equil_NVT_steps": {
+                "type": int
+            },
+            "initial_equil_NPT_steps": {
+                "type": int
+            },
+            "step_size": {
+                "type": float
+            },
+            "equil_step_size": {
+                "type": float
+            },
+            "crash_reporting_interval": {
+                "type": int
+            },
+            "constrain_H": {
+                "type": bool
+            },
+            "report_forces": {
+                "type": bool
+            },
+            "report_velocities": {
+                "type": bool
+            },
+            "report_forcegroups": {
+                "type": bool
+            },
+            "debug": {
+                "type": bool
+            },
+            "save_frames": {
+                "type": int
+            },
+        }
 
     def run_FEP(
         self,
-        equil_NVT_steps,
-        equil_NPT_steps,
-        total_sample_steps,
-        write_step,
-        initial_equil_NVT_steps,
-        initial_equil_NPT_steps,
-        step_size,
-        equil_step_size,
         Lambda,
         configuration,
         platform,
     ):
-        self.equil_NVT_steps = equil_NVT_steps
-        self.equil_NPT_steps = equil_NPT_steps
-        self.total_sample_steps = total_sample_steps
-        self.write_step = write_step
-        self.initial_equil_NVT_steps = initial_equil_NVT_steps
-        self.initial_equil_NPT_steps = initial_equil_NPT_steps
-        self.step_size = step_size
-        self.equil_step_size = equil_step_size
+        #todo add this to the configuration keywords
+        
         self.platform = platform
+
+        for keyword, value in self.keywords.items():
+            if keyword in configuration:
+                if (not isinstance(configuration[keyword], value["type"])
+                        and not (isinstance(configuration[keyword], int)
+                                 and value["type"] == float)):
+                    raise ValueError(
+                        f"Configuration option {keyword} should be of type {value['type']}"
+                    )
+                else:
+                    setattr(self, keyword, configuration[keyword])
+                    self.ostream.print_info(
+                        f"{keyword}: {getattr(self, keyword)}")
+            else:
+                self.ostream.print_info(
+                    f"{keyword}: {getattr(self, keyword)} (default)"
+                )
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbFepDriver.')
-
         systems = configuration["systems"]
         topology = configuration["topology"]
         initial_positions = configuration["initial_positions"]
@@ -132,30 +202,26 @@ class EvbFepDriver():
         self.Lambda = Lambda
         self.systems = systems
         self.topology = topology
-        self.friction = configuration.get("friction", 1.0)
-        self.temperature = configuration.get('temperature', -1)
-
-        pressure = configuration.get('pressure', -1)
 
         if self.temperature > 0:
             self.isothermal = True
 
-        if pressure > 0:
+        if self.pressure > 0:
             self.isobaric = True
 
         self.ostream.flush()
 
-        assert (total_sample_steps % write_step == 0
-                ), "write_step must be a factor of total_sample_steps"
-        assert (total_sample_steps >= 2 *
-                write_step), "total_sample_steps must be at least 2*write_step"
+        assert (self.sample_steps % self.write_step == 0
+                ), "write_step must be a factor of sample_steps"
+        assert (self.sample_steps >= 2 *
+                self.write_step), "sample_steps must be at least 2*write_step"
 
-        self.total_snapshots = total_sample_steps / write_step * len(
+        self.total_snapshots = self.sample_steps / self.write_step * len(
             self.Lambda)
         self.ostream.print_info(f"Lambda: {np.array(self.Lambda)}")
-        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equiliberation steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
-        info += f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}\n"
-        info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
+        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {self.equil_NVT_steps}, NPT equiliberation steps: {self.equil_NPT_steps}, total sample steps: {self.sample_steps}, write step: {self.write_step}, step size: {self.step_size}\n"
+        info += f"Snapshots per lambda: {self.sample_steps / self.write_step}, snapshots to be recorded: {self.total_snapshots}\n"
+        info += f"System time per snapshot: {self.step_size * self.write_step} ps, system time per frame: {self.step_size * self.sample_steps} ps, total system time: {self.step_size * self.sample_steps * len(self.Lambda)} ps"
         self.ostream.print_info(
             f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
         )
@@ -166,7 +232,7 @@ class EvbFepDriver():
 
         self.traj_roporter = mmapp.XTCReporter(
             str(self.data_folder / "trajectory.xtc"),
-            write_step,
+            self.write_step,
         )
         timer.start()
         positions = initial_positions
@@ -386,10 +452,10 @@ class EvbFepDriver():
         run_simulation.reporters.append(evb_reporter)
 
         self.ostream.print_info(
-            f"Running sampling for {self.total_sample_steps} steps with step size {run_simulation.integrator.getStepSize()}"
+            f"Running sampling for {self.sample_steps} steps with step size {run_simulation.integrator.getStepSize()}"
         )
         self.ostream.flush()
-        states = self._safe_step(run_simulation, self.total_sample_steps)
+        states = self._safe_step(run_simulation, self.sample_steps)
         return states[-1]
 
     def _get_simulation(self, system, step_size):

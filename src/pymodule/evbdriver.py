@@ -663,9 +663,9 @@ class EvbDriver():
             name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
         """
         #todo restructure the input system for keywords, build proper class and enum for this, also restructure ensembles with NPT and NVE stuff
-        if name == "vacuum" or name=="vacuum_NVT":
+        if name == "vacuum" or name == "vacuum_NVT":
             conf = {
-                "name": "vacuum",
+                "name": name,
                 "temperature": self.temperature,
             }
         elif name == "vacuum_NVE":
@@ -676,7 +676,19 @@ class EvbDriver():
             conf = {
                 "name": "vacuum_NPT",
                 "temperature": self.temperature,
-                "pressure" : 1,
+                "pressure": 1,
+            }
+        elif name == "debug":
+            conf = {
+                "name": "debug",
+                "temperature": self.temperature,
+                "pressure": 1,
+                "equil_NVT_steps" :100,
+                "equil_NPT_steps" :100,
+                "sample_steps" :1000,
+                "write_step" :1,
+                "initial_equil_NVT_steps" :0,
+                "initial_equil_NPT_steps" :0,
             }
         elif name == "water":
             conf = {
@@ -832,15 +844,15 @@ class EvbDriver():
 
     def run_FEP(
         self,
-        equil_NVT_steps=5000,
-        equil_NPT_steps=5000,
-        sample_steps=100000,
-        write_step=1000,
-        initial_equil_NVT_steps=10000,
-        initial_equil_NPT_steps=10000,
-        step_size=0.001,
-        equil_step_size=0.001,
-        initial_equil_step_size=0.001,
+        # equil_NVT_steps=5000,
+        # equil_NPT_steps=5000,
+        # sample_steps=100000,
+        # write_step=1000,
+        # initial_equil_NVT_steps=10000,
+        # initial_equil_NPT_steps=10000,
+        # step_size=0.001,
+        # equil_step_size=0.001,
+        # initial_equil_step_size=0.001,
         saved_frames_on_crash=None,
         platform=None,
     ):
@@ -855,40 +867,27 @@ class EvbDriver():
             equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
             initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
-        if self.debug:
-            self.ostream.print_warning(
-                "Debugging enabled, using low number of steps. Do not use for production"
-            )
-            self.ostream.flush()
-            equil_NVT_steps = 0
-            equil_NPT_steps = 100
-            sample_steps = 200
-            write_step = 1
-            initial_equil_NVT_steps = 0
-            initial_equil_NPT_steps = 100
-            step_size = 0.001
-            equil_step_size = 0.001
-            initial_equil_step_size = 0.001
+            
 
-        if self.fast_run:
-            self.ostream.print_warning(
-                "Fast run enabled, using modest number of steps. Be careful with using results"
-            )
-            sample_steps = 25000
+        # if self.fast_run:
+        #     self.ostream.print_warning(
+        #         "Fast run enabled, using modest number of steps. Be careful with using results"
+        #     )
+        #     sample_steps = 25000
 
         for conf in self.system_confs:
-            self.update_options_json(
-                {
-                    "equil_steps_NVT": equil_NVT_steps,
-                    "equil_steps_NPT": equil_NPT_steps,
-                    "sample_steps": sample_steps,
-                    "write_step": write_step,
-                    "initial_equil_NVT_steps": initial_equil_NVT_steps,
-                    "initial_equil_NPT_steps": initial_equil_NPT_steps,
-                    "step_size": step_size,
-                    "equil_step_size": equil_step_size,
-                    "initial_equil_step_size": initial_equil_step_size,
-                }, conf)
+            # self.update_options_json(
+            #     {
+            #         "equil_steps_NVT": equil_NVT_steps,
+            #         "equil_steps_NPT": equil_NPT_steps,
+            #         "sample_steps": sample_steps,
+            #         "write_step": write_step,
+            #         "initial_equil_NVT_steps": initial_equil_NVT_steps,
+            #         "initial_equil_NPT_steps": initial_equil_NPT_steps,
+            #         "step_size": step_size,
+            #         "equil_step_size": equil_step_size,
+            #         "initial_equil_step_size": initial_equil_step_size,
+            #     }, conf)
 
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
@@ -898,14 +897,14 @@ class EvbDriver():
             if saved_frames_on_crash is not None:
                 FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
-                equil_NVT_steps=equil_NVT_steps,
-                equil_NPT_steps=equil_NPT_steps,
-                total_sample_steps=sample_steps,
-                write_step=write_step,
-                initial_equil_NVT_steps=initial_equil_NVT_steps,
-                initial_equil_NPT_steps=initial_equil_NPT_steps,
-                step_size=step_size,
-                equil_step_size=equil_step_size,
+                # equil_NVT_steps=equil_NVT_steps,
+                # equil_NPT_steps=equil_NPT_steps,
+                # total_sample_steps=sample_steps,
+                # write_step=write_step,
+                # initial_equil_NVT_steps=initial_equil_NVT_steps,
+                # initial_equil_NPT_steps=initial_equil_NPT_steps,
+                # step_size=step_size,
+                # equil_step_size=equil_step_size,
                 Lambda=self.Lambda,
                 configuration=conf,
                 platform=platform,
@@ -990,7 +989,8 @@ class EvbDriver():
 
     def plot_results(self,
                      results: dict = None,
-                     file_name: str = None, **kwargs):
+                     file_name: str = None,
+                     **kwargs):
         """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
 
         Args:

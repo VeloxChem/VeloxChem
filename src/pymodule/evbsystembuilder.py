@@ -100,6 +100,78 @@ class EvbSystemBuilder():
 
         self.soft_core_coulomb_int = False
         self.soft_core_lj_int = False
+        self.pressure: float = -1.
+        self.solvent: str = None  #type: ignore
+        self.padding: float = 1.
+        self.no_reactant: bool = False
+        self.E_field: list[float] = [0, 0, 0]
+        self.neutralize: bool = False
+
+        self.keywords = {
+            "temperature": {
+                "type": float
+            },
+            "minimal_nb_cutoff": {
+                "type": float
+            },
+            "bonded_integration": {
+                "type": bool
+            },
+            "soft_core_coulomb_pes": {
+                "type": bool
+            },
+            "soft_core_lj_pes": {
+                "type": bool
+            },
+            "soft_core_coulomb_int": {
+                "type": bool
+            },
+            "soft_core_lj_int": {
+                "type": bool
+            },
+            "bonded_integration_fac": {
+                "type": float
+            },
+            "pressure": {
+                "type": float
+            },
+            "solvent": {
+                "type": str
+            },
+            "padding": {
+                "type": float
+            },
+            "no_reactant": {
+                "type": bool
+            },
+            "E_field": {
+                "type": list
+            },
+            "neutralize": {
+                "type": bool
+            },
+            "morse_D_default": {
+                "type": float
+            },
+            "morse_couple": {
+                "type": float
+            },
+            "restraint_k": {
+                "type": float
+            },
+            "restraint_r_default": {
+                "type": float
+            },
+            "restraint_r_offset": {
+                "type": float
+            },
+            "coul14_scale": {
+                "type": float
+            },
+            "lj14_scale": {
+                "type": float
+            },
+        }
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_fac: float = 0.25  # Scaling factor for the bonded integration forces.
@@ -128,47 +200,29 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        self.temperature = configuration.get(
-            "temperature",
-            self.temperature,
-        )
-        self.minimal_nb_cutoff = configuration.get(
-            "minimal_nb_cutoff",
-            self.minimal_nb_cutoff,
-        )
-        self.bonded_integration = configuration.get(
-            "bonded_integration",
-            self.bonded_integration,
-        )
-        self.soft_core_coulomb_pes = configuration.get(
-            "soft_core_coulomb_pes",
-            self.soft_core_coulomb_pes,
-        )
-        self.soft_core_coulomb_int = configuration.get(
-            "soft_core_coulomb_int",
-            self.soft_core_coulomb_int,
-        )
-        self.soft_core_lj_pes = configuration.get(
-            "soft_core_lj_pes",
-            self.soft_core_lj_pes,
-        )
-        self.soft_core_lj_int = configuration.get(
-            "soft_core_lj_int",
-            self.soft_core_lj_int,
-        )
+        for keyword, value in self.keywords.items():
+            if keyword in configuration:
+                if (not isinstance(configuration[keyword], value["type"])
+                        and not (isinstance(configuration[keyword], int)
+                                 and value["type"] == float)):
+                    raise ValueError(
+                        f"Configuration option {keyword} should be of type {value['type']}"
+                    )
+                else:
+                    setattr(self, keyword, configuration[keyword])
+                    self.ostream.print_info(
+                        f"{keyword}: {getattr(self, keyword)}")
 
-        pressure = configuration.get("pressure", -1)
-        solvent = configuration.get("solvent", None)
-        padding = configuration.get("padding", 1)
-        CNT = configuration.get("CNT", False)
-        CNT = False  # todo fix the exploding CNT
-        Graphene = configuration.get("graphene", False)
-        graphene_size = configuration.get("graphene_size", 2)
-        CNT_radius = configuration.get("CNT_radius", 0.5)
-        ion_count = configuration.get("ion_count", 0)
-        no_reactant = configuration.get("no_reactant", False)
-        E_field = configuration.get("E_field", [0, 0, 0])
-        neutralize = configuration.get("neutralize", False)
+            else:
+                self.ostream.print_info(
+                    f"{keyword}: {getattr(self, keyword)} (default)")
+
+        # CNT = configuration.get("CNT", False)
+        # CNT = False  # todo fix the exploding CNT
+        # Graphene = configuration.get("graphene", False)
+        # graphene_size = configuration.get("graphene_size", 2)
+        # CNT_radius = configuration.get("CNT_radius", 0.5)
+        # ion_count = configuration.get("ion_count", 0)
 
         self.constraints = constraints
 
@@ -180,7 +234,7 @@ class EvbSystemBuilder():
         nb_force = mm.NonbondedForce()
         nb_force.setName("General nonbonded force")
 
-        if not no_reactant:
+        if not self.no_reactant:
             # add atoms of the solute to the topology and the system
             elements = reactant.molecule.get_labels()
             for i, atom in enumerate(reactant.atoms.values()):
@@ -194,17 +248,18 @@ class EvbSystemBuilder():
                     0, 1, 0
                 )  #Placeholder values, actual values depend on lambda and will be set later
 
-        if not no_reactant:
+        if not self.no_reactant:
             system_mol = Molecule(reactant.molecule)
             positions = system_mol.get_coordinates_in_angstrom()
             x_size = 0.1 * (max(positions[:, 0]) - min(positions[:, 0]))
             y_size = 0.1 * (max(positions[:, 1]) - min(positions[:, 1]))
             z_size = 0.1 * (max(positions[:, 2]) - min(positions[:, 2]))
             box = [
-                2 * padding + x_size, 2 * padding + y_size, 2 * padding + z_size
+                2 * self.padding + x_size, 2 * self.padding + y_size,
+                2 * self.padding + z_size
             ]
             self.ostream.print_info(
-                f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f}, padding: {padding:.3f} nm."
+                f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f}, padding: {self.padding:.3f} nm."
             )
         else:
             box = [1, 1, 1]
@@ -218,9 +273,9 @@ class EvbSystemBuilder():
 
         # self.ostream.print_info(f"Building system in box with dimensions {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm")
 
-        if solvent:
-            box = self._add_solvent(system, system_mol, solvent, topology,
-                                    nb_force, neutralize, padding)
+        if self.solvent:
+            box = self._add_solvent(system, system_mol, self.solvent, topology,
+                                    nb_force, self.neutralize, self.padding)
 
         else:
             self.positions = np.array(positions) * 0.1
@@ -243,21 +298,21 @@ class EvbSystemBuilder():
         nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
         system.addForce(nb_force)
 
-        if pressure > 0:
+        if self.pressure > 0:
             barostat = mm.MonteCarloBarostat(
-                pressure * mmunit.bar,  # type: ignore
+                self.pressure * mmunit.bar,  # type: ignore
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
             barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
             system.addForce(barostat)
 
-        if np.any(np.array(E_field) > 0.001):
-            E_field_force = self._create_E_field(system, E_field)
+        if np.any(np.array(self.E_field) > 0.001):
+            E_field_force = self._create_E_field(system, self.E_field)
             E_field_force.setForceGroup(EvbForceGroup.E_FIELD.value)
             system.addForce(E_field_force)
 
         #Add the reactant to the nonbonded force
-        if not no_reactant:
+        if not self.no_reactant:
             for i, atom in enumerate(reactant.atoms.values()):
                 #Make sure the solute does not interact with itself through, as there will be another nonbonded force to take care of this
                 for j in range(len(reactant.atoms.values())):
@@ -303,7 +358,7 @@ class EvbSystemBuilder():
 
             for i in range(system.getNumParticles()):
                 charge = nb_force.getParticleParameters(i)[0]
-                if np.any(np.array(E_field) > 0.001):
+                if np.any(np.array(self.E_field) > 0.001):
                     E_field_force.setParticleParameters(i, i, [charge])
 
             if not round(total_charge, 5).is_integer():
@@ -324,7 +379,7 @@ class EvbSystemBuilder():
         self.topology: mmapp.Topology = topology
         self.system_mol = system_mol
 
-        if not no_reactant:
+        if not self.no_reactant:
             for lam in Lambda:
                 self._add_reaction_forces(self.systems[lam], lam)
 
