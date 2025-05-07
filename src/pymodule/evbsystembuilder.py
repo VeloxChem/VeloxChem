@@ -211,8 +211,9 @@ class EvbSystemBuilder():
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
 
+        self.bonded_integration_fac: float = 0.2  # Scaling factor for the bonded integration forces.
+
         self.verbose = False
-        # self.write_xml = True
 
         self.constraints: list[dict] = []
 
@@ -973,14 +974,14 @@ class EvbSystemBuilder():
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
-        harmonic_static_force, harmonic_dynamic_force, morse_force, max_distance, = self._create_bond_forces(
+        bonded_harmonic, bonded_integration, morse_force, max_distance, = self._create_bond_forces(
             lam)
-        angle_static, angle_dynamic = self._create_angle_forces(lam)
+        angle, angle_integration = self._create_angle_forces(lam)
         torsion = self._create_proper_torsion_forces(lam)
         improper = self._create_improper_torsion_forces(lam)
 
-        # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude the nonbonded interactions over the entire lambda vector.
-        # This is compensated through the extra (dynamic) bonded interactions
+        # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude these nonbonded interactions over the entire lambda vector.
+        # This is compensated through the extra bonded interactions (labeled with integration)
         # This only affects the integration potential as the hard core interactions are used for integration
         intlj, intcoul = self._create_nonbonded_forces(
             lam,
@@ -999,8 +1000,8 @@ class EvbSystemBuilder():
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
 
-        harmonic_static_force.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
-        angle_static.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
+        bonded_harmonic.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
+        angle.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
 
@@ -1013,8 +1014,8 @@ class EvbSystemBuilder():
         angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
         torsion_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
 
-        system.addForce(harmonic_static_force)
-        system.addForce(angle_static)
+        system.addForce(bonded_harmonic)
+        system.addForce(angle)
         system.addForce(torsion)
         system.addForce(improper)
         system.addForce(intlj)
@@ -1027,12 +1028,11 @@ class EvbSystemBuilder():
         system.addForce(torsion_constraint)
 
         if self.bonded_integration:
-            harmonic_dynamic_force.setForceGroup(
-                EvbForceGroup.INTEGRATION.value)
-            angle_dynamic.setForceGroup(EvbForceGroup.INTEGRATION.value)
+            bonded_integration.setForceGroup(EvbForceGroup.INTEGRATION.value)
+            angle_integration.setForceGroup(EvbForceGroup.INTEGRATION.value)
             morse_force.setForceGroup(EvbForceGroup.PES.value)
-            system.addForce(harmonic_dynamic_force)
-            system.addForce(angle_dynamic)
+            system.addForce(bonded_integration)
+            system.addForce(angle_integration)
             system.addForce(morse_force)
         else:
             morse_force.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
@@ -1130,11 +1130,13 @@ class EvbSystemBuilder():
                 self._add_distance_restraint(max_distance, atom_ids,
                                              broken_length, 1 - scale)
 
+                # This the force constant is not scaled down with lambda, because if bonded_integration is turned on, the morse force is not included in the integration potential
                 self._add_bond(
                     integration_force,
                     atom_ids,
                     bond['equilibrium'] * scale + broken_length * (1 - scale),
-                    bond['force_constant'],
+                    bond['force_constant'] * self.bonded_integration_fac *
+                    self.bonded_integration_fac,
                 )
         return harmonic_force, integration_force, morse_force, max_distance
 
@@ -1176,8 +1178,7 @@ class EvbSystemBuilder():
 
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
-                self._add_angle(integration_force,
-                                atom_ids, broken_equil,
+                self._add_angle(integration_force, atom_ids, broken_equil,
                                 angle['force_constant'] * (1 - scale))
 
         return harmonic_force, integration_force
