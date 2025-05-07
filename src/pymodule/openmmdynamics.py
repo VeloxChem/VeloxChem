@@ -926,36 +926,50 @@ class OpenMMDynamics:
 
         return conformers_dict
     
-    def calculate_boltzmann_distribution(self, dict=None, T=300, unit='kj/mol'):
-                if unit=='kj/mol':
-                    R = 0.008314462618
-                elif unit=='kcal/mol':
-                    R = 1.98720425864083e-3
-                elif unit=='hartree':
-                    R = 3.166811563671e-6
-                else:
-                    raise ValueError('Invalid unit')
-                # calculate relative energies
-                if dict is None:
-                    energies = self.conformer_dict['energies']
-                else:
-                    energies = dict['energies']
+    def calculate_boltzmann_distribution(self, energies=None, T=300, unit='kj/mol'):
+        """ 
+        Calculate the Boltzmann distribution of conformers based on their energies.
+        
+        :param energies: 
+            list of energies. If None, it will use the energies from the conformers_dict from the conformational sampling.
+        :param T: 
+            temperature in Kelvin
+        :param unit: 
+            unit of energy, options are 'kj/mol', 'kcal/mol', 'hartree'
 
-                relative_energies = [energy - min(energies) for energy in energies]
+        :return: 
+            list of probabilities for each conformer
+        
+        """
+        if unit=='kj/mol':
+            R = 0.008314462618
+        elif unit=='kcal/mol':
+            R = 1.98720425864083e-3
+        elif unit=='hartree':
+            R = 3.166811563671e-6
+        else:
+            raise ValueError('Invalid unit')
+        # calculate relative energies
+        if energies is None:
+            energies = self.conformer_dict['energies']
+        else:
+            energies = energies
 
-                # calculate the boltzmann factors
-                boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
-                # calculate the partition function
-                partition_function = sum(boltzmann_factors)
-                # calculate the probabilities
-                probabilities = [factor/partition_function for factor in boltzmann_factors]
-                
-                return probabilities
+        relative_energies = [energy - min(energies) for energy in energies]
+
+        # calculate the boltzmann factors
+        boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
+        # calculate the partition function
+        partition_function = sum(boltzmann_factors)
+        # calculate the probabilities
+        probabilities = [factor/partition_function for factor in boltzmann_factors]
+        
+        return probabilities
     
     def show_conformers(self, number=5, atom_indices=False, atom_labels=False, boltzmann_distribution=True):
         weights = None
         if boltzmann_distribution:
-            weights = self.calculate_boltzmann_distribution(T=300, dict=self.conformer_dict, unit='kj/mol')
+            weights = self.calculate_boltzmann_distribution(T=300, unit='kj/mol')
 
         if number > len(self.conformer_dict["energies"]):
             number = len(self.conformer_dict["energies"])
