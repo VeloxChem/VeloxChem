@@ -1125,7 +1125,7 @@ class EvbSystemBuilder():
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
                 self._add_angle(integration_force, atom_ids, broken_equil,
-                                angle['force_constant'] * (1 - scale))
+                                angle['force_constant'] * (1 - scale)*self.bonded_integration_fac)
 
         return harmonic_force, integration_force
 
