@@ -1869,6 +1869,11 @@ class IMDatabasePointCollecter:
             self.velocities.append(context.getState(getVelocities=True).getVelocities())
             self.gradients.append(gradient)
             if self.skipping_value == 0:
+                
+                print('rmsd bond', min(self.impes_drivers[0].bond_rmsd), '\n')
+                print('rmsd angle', min(self.impes_drivers[0].angle_rmsd), '\n')
+                print('rmsd dihedral', min(self.impes_drivers[0].dihedral_rmsd), '\n')
+                
                 scanned = False
                 for checked_molecule in self.allowed_molecules[self.current_state]['molecules']:
                     checked_distance = self.cartesian_just_distance(checked_molecule.get_coordinates_in_bohr(), new_molecule.get_coordinates_in_bohr())

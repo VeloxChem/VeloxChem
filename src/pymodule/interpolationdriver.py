@@ -133,6 +133,10 @@ class InterpolationDriver():
         self.qm_symmetry_data_points = {}
         self.qm_symmetry_data_points_1 = None
         self.qm_symmetry_data_points_2 = None
+
+        self.bond_rmsd = None
+        self.angle_rmsd = None
+        self.dihedral_rmsd = None
         # Name lables for the QM data points
         self.labels = None
 
@@ -268,7 +272,10 @@ class InterpolationDriver():
                 if this parameter is None, all datapoints from fname will be
                 used.
         """
-        self.skip_first_check += 1
+        
+        self.bond_rmsd = []
+        self.angle_rmsd = []
+        self.dihedral_rmsd = []
         self.molecule = molecule
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
 
@@ -450,11 +457,9 @@ class InterpolationDriver():
         sum_weights_cart = 0.0
         potentials = []
         gradients = []
-        weights = []
+        # weights = []
         weights_cart = []
-        weight_gradients = []
         weight_gradients_cart = []
-        sum_weight_gradients = np.zeros((natms, 3))
         sum_weight_gradients_cart = np.zeros((natms, 3))
 
 
@@ -463,14 +468,7 @@ class InterpolationDriver():
         min_distance = float('inf')
         self.time_step_reducer = False
         
-        org_internal_coordinates = self.impes_coordinate.internal_coordinates_values.copy()
-        org_b_matrix = self.impes_coordinate.b_matrix.copy()
-        org_mask = np.arange(len(self.impes_coordinate.z_matrix))
 
-        z_matrix_dict = {tuple(sorted(element)): i 
-                  for i, element in enumerate(self.impes_coordinate.z_matrix)}
-        
-        # print('use symmetry', self.use_symmetry)
         if not self.use_symmetry:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
@@ -479,154 +477,67 @@ class InterpolationDriver():
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
 
-                distances_and_gradients.append((distance, i, weight_gradient, distance_vector, None))
+                distances_and_gradients.append((distance, i, weight_gradient, distance_vector))
         
         else:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
-                distance, weight_gradient, distance_vec, swapped = self.cartesian_distance_symmetry(data_point)
+                distance, weight_gradient, distance_vec = self.cartesian_distance_symmetry(data_point)
 
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
 
-                distances_and_gradients.append((distance, i, weight_gradient, distance_vec, swapped))
+                distances_and_gradients.append((distance, i, weight_gradient, distance_vec))
 
-        used_labels = []
+        # used_labels = []
         close_distances = None
         close_distances = [
-            (self.qm_data_points[index], distance, wg, distance_vec, index, swapped_tuple) 
-            for distance, index, wg, distance_vec, swapped_tuple in distances_and_gradients 
+            (self.qm_data_points[index], distance, wg, distance_vec, index) 
+            for distance, index, wg, distance_vec in distances_and_gradients 
             if abs(distance) <= min_distance + self.distance_thrsh + 10000]
-        distances_from_points = [] 
-        internal_distance_dict = []
-        counter_idx = 0
-        for qm_data_point, distance, weight_grad, distance_vector, label_idx, swapped_tuple_obj in close_distances:
-
-            new_coordintes = False
-            reordered_int_coord_values = org_internal_coordinates.copy()
-            mask = [i for i in range(len(self.impes_coordinate.z_matrix))]
-            org_b_matrix_cp = org_b_matrix.copy()
-            
-            if swapped_tuple_obj is not None and 1 == 2:
-                mask = []
-                for i, element in enumerate(self.impes_coordinate.z_matrix):
-                    # Otherwise, reorder the element
-                    if len(element) == 4 or 1 == 1:
-                        reordered_element = [swapped_tuple_obj[3].get(x, x) for x in element]
-                        key = tuple(sorted(reordered_element))
-    
-                        z_mat_index = z_matrix_dict.get(key)
-                        mask.append(z_mat_index)
-                        reordered_int_coord_values[i] = (float(org_internal_coordinates[z_mat_index]))
-                    else:
-
-                        mask.append(i)
-                        reordered_int_coord_values[i] = (float(org_internal_coordinates[i]))
-                # print(reordered_int_coord_values, org_internal_coordinates)
-
-                    # print(z_mat_index, key, element)
-                org_b_matrix_cp[org_mask] = org_b_matrix[mask]
-                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()), 3)
-                org_b_matrix_cp = org_b_matrix_cp[:, swapped_tuple_obj[1], :]
-                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()) * 3)
-                # print('reordered internal coordinates', reordered_int_coord_values)
-                new_coordintes = True
-
-            dihedral_dist = 0.0
-            for i in range(15, len(self.z_matrix)):
-                dihedral_dist += 3.0*(1.0 + np.sin(3.0*(reordered_int_coord_values[i] - qm_data_point.internal_coordinates_values[i]) - np.pi/2))
-                # print(dihedral_dist)
-                # dihedral_dist += np.exp(1.5*np.sin(3.0*reordered_int_coord_values[i] - qm_data_point.internal_coordinates_values[i]) - np.pi/2)
-            # print('Dihedral dist', dihedral_dist, distance)
-            # print('\n')
-            
-            # dihedral_dist = (0.5 + 0.5*np.sin(3.0*(reordered_int_coord_values[15] - qm_data_point.internal_coordinates_values[15]) - np.pi/2))
-            # print('used_internal dsit', dihedral_dist)
-            if abs(dihedral_dist) < 1e-6:
-                dihedral_dist = 1e-6
-            # dihedral_dist = 0.0
-
-            denominator = (dihedral_dist**4)
+        # distances_from_points = [] 
+        # internal_distance_dict = []
+        for qm_data_point, distance, weight_grad_cart, distance_vector, label_idx in close_distances:
 
             denominator_cart = (
             (distance / qm_data_point.confidence_radius)**(2 * self.exponent_p) +
             (distance / qm_data_point.confidence_radius)**(2 * self.exponent_q))
             
-            # print('rg_b_matrix_cp[i,:]', org_b_matrix_cp[i,:])
-
-            deriv_int_denominator = 0.0
-            deriv_int_nominator = np.zeros_like(distance_vector)
-
-            # for i in range(15, len(self.z_matrix)):
-            #     # dihedral_dist = np.exp(1.5*np.sin(3.0*reordered_int_coord_values[i] - qm_data_point.internal_coordinates_values[i]) - np.pi/2)
-            #     # deriv_int_nominator += (org_b_matrix_cp[i,:] *  18.0 * np.cos(-3.0*(reordered_int_coord_values[i] - qm_data_point.internal_coordinates_values[i]) + np.pi/2.0)).reshape(natms, 3)
-            #     dihedral_dist = 3*(1.0 + np.sin(3.0*(reordered_int_coord_values[i] - qm_data_point.internal_coordinates_values[i]) - np.pi/2))
-            #     deriv_int_nominator += (org_b_matrix_cp[i,:] * 
-            #                 9.0 * np.cos(-3.0*(reordered_int_coord_values[i] - qm_data_point.internal_coordinates_values[i]) + np.pi/2.0)).reshape(natms, 3)
-            #     deriv_int_denominator += (dihedral_dist)**4
-            # print('Deriv check', deriv_int_denominator)
-            # if abs(deriv_int_denominator) < 1e-6:
-            #     deriv_int_denominator = 1e-6
-            #     deriv_int_nominator[:] = 0 
-
-            confidence_radius = qm_data_point.confidence_radius
-            # weight_grad = None
-            # weight_grad_cart = None
-            # if distance < 1e-7:
-            #     distance = 1e-5
-            #     distance_vector[:] = 0
-            # if self.interpolation_type == 'shepard':
-            #     weight_grad = self.shepard_weight_gradient(
-            #         distance_vector, distance, confidence_radius, deriv_int_nominator, deriv_int_denominator)
-            weight_grad_cart = self.shepard_weight_gradient(
-                    distance_vector, distance, confidence_radius, deriv_int_nominator, deriv_int_denominator, True)
-
-            # print('Weight Gradient', weight_gradient, weight_grad_cart) 
-            weight = 1.0 / denominator
             weight_cart = 1.0 / denominator_cart
-            used_labels.append(label_idx)
+            # used_labels.append(label_idx)
             sum_weights_cart += weight_cart
-            sum_weight_gradients += weight_grad
             sum_weight_gradients_cart += weight_grad_cart
-            cuurent_int_dist = []
 
-            potential, gradient = self.compute_potential(qm_data_point, reordered_int_coord_values, org_internal_coordinates, org_b_matrix, swapped_tuple_obj, mask)
-            # gradient = self.compute_gradient(qm_data_point, swapped_tuple_obj, reordered_int_coord_values, org_internal_coordinates, org_b_matrix_cp, org_b_matrix)
+
+            potential, gradient = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
             gradients.append(gradient)
             potentials.append(potential)
-            weights.append(weight)
             weights_cart.append(weight_cart)
-            self.weights.append(weight)
             self.potentials.append(potential)
-            weight_gradients.append(weight_grad)
             weight_gradients_cart.append(weight_grad_cart)
-            distances_from_points.append(distance)
-            counter_idx += 1
-            if new_coordintes:
-                self.impes_coordinate.internal_coordinates_values = org_internal_coordinates
-                self.impes_coordinate.b_matrix = org_b_matrix
-        
+            # distances_from_points.append(distance)
+
         n_points = len(close_distances)
-        if self.print:
-            for i in range(n_points - 1):
-                print('\nint distane \n', i, distances_from_points[i], np.linalg.norm(internal_distance_dict[i]), '\n',
-                      i + 1, distances_from_points[i+ 1], np.linalg.norm(internal_distance_dict[i+ 1]), '\n\n', internal_distance_dict[i], '\n\n', internal_distance_dict[i + 1], '\n\n', internal_distance_dict[i] - internal_distance_dict[i + 1])
+        # if self.print:
+        #     for i in range(n_points - 1):
+        #         print('\nint distane \n', i, distances_from_points[i], np.linalg.norm(internal_distance_dict[i]), '\n',
+        #               i + 1, distances_from_points[i+ 1], np.linalg.norm(internal_distance_dict[i+ 1]), '\n\n', internal_distance_dict[i], '\n\n', internal_distance_dict[i + 1], '\n\n', internal_distance_dict[i] - internal_distance_dict[i + 1])
         
                 
         
         self.impes_coordinate.energy = 0
         self.impes_coordinate.gradient = np.zeros((natms, 3))
         self.impes_coordinate.NAC = np.zeros((natms, 3))
-        weights = np.array(weights) / sum_weights
+
         weights_cart = np.array(weights_cart) / sum_weights_cart
+
         self.sum_of_weights = sum_weights
-        self.impes_coordinate.energy += weights_cart @ np.array(potentials)
+        
         for i in range(n_points):
-            
-            # print('i', weights[i], weights_cart[i])
-            if self.store_weights:
-                self.int_coord_weights[self.labels[used_labels[i]]] = weights[i]
-            # self.impes_coordinate.energy += weights_cart[i] * potentials[i]
+
+            # if self.store_weights:
+            #     self.int_coord_weights[self.labels[used_labels[i]]] = weights[i]
+            self.impes_coordinate.energy += weights_cart[i] * potentials[i]
 
             self.impes_coordinate.gradient += (
                 weights_cart[i] * gradients[i] +
@@ -669,9 +580,6 @@ class InterpolationDriver():
         self.qm_data_points = qm_data_points
 
         return qm_data_points
-
-    def principal_angle(self, angle_rad):
-        return (angle_rad + np.pi) % (2.0 * np.pi) - np.pi
 
     def te_weight_general(self, theta, periodicity=1):
         """
@@ -747,7 +655,7 @@ class InterpolationDriver():
         
 
 
-    def compute_potential(self, data_point, current_internal_coordinates_values, org_int_coords, org_b_matrix, mapping_list, mask):
+    def compute_potential(self, data_point, org_int_coords):
         """Calculates the potential energy surface at self.impes_coordinate
            based on the energy, gradient and Hessian of data_point.
 
@@ -766,119 +674,9 @@ class InterpolationDriver():
         pes = 0.0
         gradient = None
         natm = data_point.cartesian_coordinates.shape[0]
-        print(len(self.qm_symmetry_data_points))
+        # print(len(self.qm_symmetry_data_points))
         if len(self.qm_symmetry_data_points) > 0:
             
-            # if self.qm_symmetry_data_points_1 is not None:
-            #     dp_label = data_point.point_label  
-            #     symmetry_data_point = self.qm_symmetry_data_points[dp_label]
-            #     symmetry_data_point_1 = self.qm_symmetry_data_points_1[data_point.point_label]
-            #     symmetry_data_point_2 = self.qm_symmetry_data_points_2[symmetry_data_point.point_label]
-                
-            #     energy = data_point.energy
-            #     grad = data_point.internal_gradient.copy()
-            #     grad_11 = data_point.internal_gradient.copy()
-            #     grad_12 = symmetry_data_point_1[0].internal_gradient.copy()
-            #     grad_13 = symmetry_data_point_1[1].internal_gradient.copy()
-
-
-            #     hessian_11 = data_point.internal_hessian
-            #     hessian_12 = symmetry_data_point_1[0].internal_hessian
-            #     hessian_13 = symmetry_data_point_1[1].internal_hessian
-
-
-            #     dist_check = (org_int_coords - data_point.internal_coordinates_values)
-            #     org_dist_check = (org_int_coords - data_point.internal_coordinates_values)
-                
-                
-            #     sym_energy = symmetry_data_point.energy
-            #     sym_grad = symmetry_data_point.internal_gradient.copy()
-            #     grad_21 = symmetry_data_point.internal_gradient.copy()
-            #     grad_22 = symmetry_data_point_2[0].internal_gradient.copy()
-            #     grad_23 = symmetry_data_point_2[1].internal_gradient.copy()
-                
-            #     hessian_21 = symmetry_data_point.internal_hessian
-            #     hessian_22 = symmetry_data_point_2[0].internal_hessian
-            #     hessian_23 = symmetry_data_point_2[1].internal_hessian
-            #     sym_dist_check = (org_int_coords - symmetry_data_point.internal_coordinates_values)
-                
-                
-            #     # org_sym_dist_check = (org_int_coords - symmetry_data_point.internal_coordinates_values)
-                
-
-            #     dist_check_11 = (org_int_coords - data_point.internal_coordinates_values)
-            #     dist_check_12 = (org_int_coords - symmetry_data_point_1[0].internal_coordinates_values)
-            #     dist_check_13 = (org_int_coords - symmetry_data_point_1[1].internal_coordinates_values)
-
-            #     dist_check_21 = (org_int_coords - symmetry_data_point.internal_coordinates_values)
-            #     dist_check_22 = (org_int_coords - symmetry_data_point_2[0].internal_coordinates_values)
-            #     dist_check_23 = (org_int_coords - symmetry_data_point_2[1].internal_coordinates_values)
-
-            #     sum_sym_dihedral_11 = 0.0
-            #     sum_sym_dihedral_12 = 0.0
-            #     sum_sym_dihedral_13 = 0.0
-            #     sum_sym_dihedral_21 = 0.0
-            #     sum_sym_dihedral_22 = 0.0
-            #     sum_sym_dihedral_23 = 0.0
-
-            #     for i, element in enumerate(self.impes_coordinate.z_matrix): 
-            #         if len(element) == 4:                                       
-                                
-            #                 # dist_check[i] = 1.0/2.0*np.sin(3.0*dist_check[i])
-                            
-            #                 # dist_check[i] = 0.5*(1+np.sin(3.0*dist_check[i] - np.pi/2.0))
-            #                 # dist_check[i] = 3.0/2.0*np.sin(dist_check[i])**2
-            #                 # org scheme
-            #                 dist_check_11[i] = np.sin(dist_check[i])
-            #                 sum_sym_dihedral_11 += self.te_weight(dist_check[i])
-                            
-            #                 dist_check_12[i] = np.sin(org_int_coords[i] - symmetry_data_point_1[0].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_12 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_1[0].internal_coordinates_values[i]))
-
-            #                 dist_check_13[i] = np.sin(org_int_coords[i] - symmetry_data_point_1[1].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_13 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_1[1].internal_coordinates_values[i]))
-
-            #                 dist_check_21[i] = np.sin(sym_dist_check[i])
-            #                 sum_sym_dihedral_21 += self.te_weight(1.0*(sym_dist_check[i]))
-                            
-            #                 dist_check_22[i] = np.sin(org_int_coords[i] - symmetry_data_point_2[0].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_22 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_2[0].internal_coordinates_values[i]))
-
-            #                 dist_check_23[i] = np.sin(org_int_coords[i] - symmetry_data_point_2[1].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_23 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_2[1].internal_coordinates_values[i]))
-
-            #                 print('dist_check', dist_check_11[i], dist_check_12[i], dist_check_13[i], dist_check_21[i], dist_check_22[i], dist_check_23[i])
-            #     v11, v12, v13, v21, v22, v23 = sum_sym_dihedral_11, sum_sym_dihedral_12, sum_sym_dihedral_13, sum_sym_dihedral_21, sum_sym_dihedral_22, sum_sym_dihedral_23
-            #     total_weight_sum = v11 + v12 + v13 + v21 + v22 + v23
-
-            #     print(v11, v12, v13, v21, v22, v23, total_weight_sum)
-
-            #     w11 = v11 / total_weight_sum
-            #     w12 = v12 / total_weight_sum    
-            #     w13 = v13 / total_weight_sum
-            #     w21 = v21 / total_weight_sum
-            #     w22 = v22 / total_weight_sum
-            #     w23 = v23 / total_weight_sum
-
-            #     print('weights', w11, w12, w13, w21, w22, w23)
-
-            #     pes_11 = (energy + np.matmul(dist_check_11.T, grad_11) +
-            #         0.5 * np.linalg.multi_dot([dist_check_11.T, hessian_11, dist_check_11]))
-            #     pes_12 = (symmetry_data_point_1[0].energy + np.matmul(dist_check_12.T, grad_12) +
-            #         0.5 * np.linalg.multi_dot([dist_check_12.T, hessian_12, dist_check_12]))
-            #     pes_13 = (symmetry_data_point_1[1].energy + np.matmul(dist_check_13.T, grad_13) +
-            #         0.5 * np.linalg.multi_dot([dist_check_13.T, hessian_13, dist_check_13]))
-            #     pes_21 = (sym_energy + np.matmul(dist_check_21.T, grad_21) +
-            #         0.5 * np.linalg.multi_dot([dist_check_21.T, hessian_21, dist_check_21]))
-            #     pes_22 = (symmetry_data_point_2[0].energy + np.matmul(dist_check_22.T, grad_22) +
-            #         0.5 * np.linalg.multi_dot([dist_check_22.T, hessian_22, dist_check_22]))
-            #     pes_23 = (symmetry_data_point_2[1].energy + np.matmul(dist_check_23.T, grad_23) +
-            #         0.5 * np.linalg.multi_dot([dist_check_23.T, hessian_23, dist_check_23]))
-                
-            #     pes = w11 * pes_11 + w12 * pes_12 + w13 * pes_13 + w21 * pes_21 + w22 * pes_22 + w23 * pes_23
-
-
-            # pes_2p = 0.0
             dp_label = data_point.point_label 
 
             
@@ -893,7 +691,7 @@ class InterpolationDriver():
                 energy = symmetry_data_point.energy
                 masks = symmetry_data_point.mapping_masks
 
-                for mask in masks:
+                for ww, mask in enumerate(masks):
                     
 
                     grad = symmetry_data_point.internal_gradient.copy()
@@ -909,10 +707,12 @@ class InterpolationDriver():
                     sum_sym_dihedral = 0.0
                     sum_sym_dihedral_prime = np.zeros_like(data_point.cartesian_coordinates.reshape(-1))
 
-                    for i, element in enumerate(self.impes_coordinate.z_matrix): 
+                    
+                    for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_sub_groups[-1][1]:], start=self.symmetry_sub_groups[-1][1]): 
+
+
                         # print('ELEMENT', sorted(element))
-                        if len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[3] or len(element) == 4 and 1 == 1:                                       
-                            print('Iam here')
+                        if len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[3]:                                       
                             dist_check[i] = np.sin(dist_org[i])
                             sum_sym_dihedral += self.te_weight_general(dist_org[i], 3)
                             sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 3)
@@ -921,13 +721,18 @@ class InterpolationDriver():
                             dist_check[i] = np.sin(dist_org[i])
                             sum_sym_dihedral += self.te_weight_general(dist_org[i], 2)
                             sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 2)      
-                        else:
-
-                            dist_check[i] = np.sin(dist_org[i])
-                                   
-
+                        elif len(element) == 4:
+       
+                            dist_check[i] = np.sin(dist_org[i])  
+                    
+                    self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_sub_groups[-1][0]])**2))))
+                    self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_sub_groups[-1][0]:self.symmetry_sub_groups[-1][1]]**2))))
+                    self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[self.symmetry_sub_groups[-1][1]:]**2))))
+                    # if sum_sym_dihedral == 0.0:
+                    #     continue
+                    # print('Weight', sum_sym_dihedral, sum_sym_dihedral_prime.reshape(natm, 3))
                     symmetry_weights.append(sum_sym_dihedral)
-                    # print(symmetry_weights)
+
                     symmetry_weight_gradients.append(sum_sym_dihedral_prime.reshape(natm, 3))
 
                     pes = (energy + np.matmul(dist_check.T, grad) +
@@ -935,7 +740,7 @@ class InterpolationDriver():
                     
                     potentials.append(pes)
                     dist_hessian = np.matmul(dist_check.T, hessian)
-                    for i, element in enumerate(self.impes_coordinate.z_matrix):
+                    for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_sub_groups[-1][1]:], start=self.symmetry_sub_groups[-1][1]):
                         if len(element) == 4:
                             grad[i] *= np.cos(dist_org[i])
                             dist_hessian[i] *= np.cos(dist_org[i])
@@ -943,31 +748,15 @@ class InterpolationDriver():
                     pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
                     pot_gradients.append(pes_prime)
 
-                    # pes_12 = (energy + np.matmul(dist_check_12.T, grad_12) +
-                    #     0.5 * np.linalg.multi_dot([dist_check_12.T, hessian_12, dist_check_12]))
-                    # pes_13 = (energy + np.matmul(dist_check_13.T, grad_13) +
-                    #     0.5 * np.linalg.multi_dot([dist_check_13.T, hessian_13, dist_check_13]))
-                    # pes_21 = (sym_energy + np.matmul(dist_check_21.T, grad_21) +
-                    #     0.5 * np.linalg.multi_dot([dist_check_21.T, hessian_21, dist_check_21]))
-                    # pes_22 = (sym_energy + np.matmul(dist_check_22.T, grad_22) +
-                    #     0.5 * np.linalg.multi_dot([dist_check_22.T, hessian_22, dist_check_22]))
-                    # pes_23 = (sym_energy + np.matmul(dist_check_23.T, grad_23) +
-                    #     0.5 * np.linalg.multi_dot([dist_check_23.T, hessian_23, dist_check_23]))
                 
             total_weight_sum = sum(symmetry_weights)
-
-                
+            
 
             weights = np.array(symmetry_weights) / total_weight_sum   
             potentials = np.array(potentials)
-
-            print('POTENTIALS', weights, potentials)
-
+            print(weights)
             pes = np.dot(potentials, weights)
             
-            # pes = np.sum(pes)
-            # print('PES', pes)
-
             total_weight_grad_sum = sum(symmetry_weight_gradients)
 
             potentials_prime = np.array(pot_gradients)
@@ -975,66 +764,10 @@ class InterpolationDriver():
             
             gradient = np.zeros_like(potentials_prime[0])
 
-            for i in range(len(weights)):
-                gradient += potentials_prime[i] * weights[i] + potentials[i] * weights_prime[i] / total_weight_sum - potentials[i] * weights[i] * total_weight_grad_sum / total_weight_sum    
+            for j in range(len(weights)):
+                # print('inside loop', j, np.linalg.norm(potentials_prime[j] * weights[j] + potentials[j] * weights_prime[j] / total_weight_sum - potentials[j] * weights[j] * total_weight_grad_sum / total_weight_sum ))
+                gradient += potentials_prime[j] * weights[j] + potentials[j] * weights_prime[j] / total_weight_sum - potentials[j] * weights[j] * total_weight_grad_sum / total_weight_sum    
 
-        
-            # print('Gradient of the new section in compute potential', gradient, '\n\n', np.linalg.norm(gradient))
-
-            # print('Energy difference', pes - pes_2p)
-    
-        # print('PESPES', pes)
-
-        energy = data_point.energy
-        grad = data_point.internal_gradient
-        hessian = data_point.internal_hessian
-        dist_check = (current_internal_coordinates_values - data_point.internal_coordinates_values.copy())
-        dist_org = (current_internal_coordinates_values - data_point.internal_coordinates_values.copy())
-        for i, element in enumerate(self.impes_coordinate.z_matrix): 
-            if len(element) == 4:                    
-                    if mapping_list is not None and 1==2:
-                        
-                        dist_check[i] =  1/3*np.sin(3.0*dist_check[i])
-                        # dist_check[i] = np.sin(dist_check[i])
-                        # org scheme:
-                        # print('dist_check_energy_symmetry', dist_check[i])                    
-                    else:
-                        
-                        # dist_check[i] = 1.0/2.0*np.sin(3.0*dist_check[i])
-                        
-                        # dist_check[i] = 0.5*(1+np.sin(3.0*dist_check[i] - np.pi/2.0))
-                        # dist_check[i] = 3.0/2.0*np.sin(dist_check[i])**2
-                        # org scheme
-                        dist_check[i] = np.sin(dist_check[i])
-                        grad[i] *= np.cos(dist_org[i])
-                        # print('dist_check', dist_check[i])
-        
-        dist_hessian = np.matmul(dist_check.T, hessian)
-        for i, element in enumerate(self.impes_coordinate.z_matrix):
-            if len(element) == 4:
-                if mapping_list is not None and 1 == 2:
-                    dist_hessian[i] *= 3.0/3.0 * np.cos(3.0 * dist_org[i])
-                    # org scheme
-                    # dist_hessian[i] *= np.cos(dist_org[i])
-                else:
-                    # dist_hessian[i] *= 3.0/3.0 * np.cos(3.0 * dist_org[i])
-                    # dist_hessian[i] *= 3.0/2.0 * np.cos(3.0 * dist_org[i])
-                    # dist_hessian[i] *= 3.0/2.0 * np.cos(-3.0*dist_org[i] + np.pi/2.0)
-                    # print('dist_hessian', dist_hessian[i])
-                    # org scheme
-                    dist_hessian[i] *= np.cos(dist_org[i])
-        internal_gradient_hess_cos = grad + dist_hessian
-        gradient_1 = (np.matmul(org_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
-        # print('gradient', gradient)
-        # if mapping_list is not None:
-        #     gradient_1[mapping_list[1]] = gradient_1[mapping_list[0]]
-        
-        # print('gradient 2', gradient_1)
-            # exit()
-        if gradient is None:
-            gradient = gradient_1
-
-        # print('Energy difference', pes - pes_1)
         return pes, gradient
 
 
@@ -1926,9 +1659,9 @@ class InterpolationDriver():
         #                                             target_coordinates)
 
         org_reference_coord = reference_coordinates.copy()
-        org_mapping_list = [i for i in range(reference_coordinates.shape[0])]
-        mapping_list = [[i for i in range(reference_coordinates.shape[0])]]
-        swapped = None
+        # org_mapping_list = [i for i in range(reference_coordinates.shape[0])]
+        # mapping_list = [[i for i in range(reference_coordinates.shape[0])]]
+        # swapped = None
     
         # non_group_atoms = []
         # for i in range(len(self.molecule.get_labels())):
@@ -1942,10 +1675,10 @@ class InterpolationDriver():
         org_reference_coord[self.symmetry_sub_groups[3]] = rotated_coordinates[self.symmetry_sub_groups[3]]
         assigned = False
         
-        if assigned and 1 == 2:
+        # if assigned and 1 == 2:
             
-            swapped = (org_mapping_list, mapping_list[0], reference_coordinates, mapping_dict)
-            print(swapped)
+        #     swapped = (org_mapping_list, mapping_list[0], reference_coordinates, mapping_dict)
+        #     print(swapped)
             # exit()
         # mapping_list = atom_mapper.perform(atom_map_1=self.symmetry_sub_groups[0], env_groups_1=self.symmetry_sub_groups[1])
 
@@ -1982,26 +1715,26 @@ class InterpolationDriver():
 
         #     print('Distance vector', i, distance, distance_org, distance_vector[i], distance_vec_org[i])
         
-        # print('\n\n')
-        natm = data_point.cartesian_coordinates.shape[0]
+        # # print('\n\n')
+        # natm = data_point.cartesian_coordinates.shape[0]
         
+        # # for i in range(15, len(self.z_matrix)):
+        # deriv_int_denominator = 0.0
+        # deriv_int_nominator = np.zeros_like(distance_vector)
+
         # for i in range(15, len(self.z_matrix)):
-        deriv_int_denominator = 0.0
-        deriv_int_nominator = np.zeros_like(distance_vector)
+        #     dihedral_dist = 1/2*(1 + np.sin(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) - np.pi/2))
+        #     deriv_int_nominator += (self.impes_coordinate.b_matrix[i,:] * 
+        #                 3.0/2.0 * np.cos(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) + np.pi/2.0)).reshape(natm, 3)
+        #     deriv_int_denominator += (dihedral_dist)**2
 
-        for i in range(15, len(self.z_matrix)):
-            dihedral_dist = 1/2*(1 + np.sin(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) - np.pi/2))
-            deriv_int_nominator += (self.impes_coordinate.b_matrix[i,:] * 
-                        3.0/2.0 * np.cos(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) + np.pi/2.0)).reshape(natm, 3)
-            deriv_int_denominator += (dihedral_dist)**2
-
-        if abs(deriv_int_denominator) < 1e-6:
-            deriv_int_denominator = 1e-6
-            deriv_int_nominator[:] = 0 
+        # if abs(deriv_int_denominator) < 1e-6:
+        #     deriv_int_denominator = 1e-6
+        #     deriv_int_nominator[:] = 0 
         
-        distance_vector_norm = np.zeros(reference_coordinates.shape[0])
-        for i in range(len(distance_vector_norm)):
-            distance_vector_norm[i] += np.linalg.norm(distance_vector[i])
+        # distance_vector_norm = np.zeros(reference_coordinates.shape[0])
+        # for i in range(len(distance_vector_norm)):
+        #     distance_vector_norm[i] += np.linalg.norm(distance_vector[i])
 
         confidence_radius = data_point.confidence_radius
 
@@ -2010,7 +1743,7 @@ class InterpolationDriver():
             distance_vector[:] = 0
         if self.interpolation_type == 'shepard':
             weight_gradient = self.shepard_weight_gradient(
-                distance_vector, distance, confidence_radius, deriv_int_nominator, deriv_int_denominator)
+                distance_vector, distance, confidence_radius, calc_cart=True)
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
                 distance_vector, distance)
@@ -2019,7 +1752,7 @@ class InterpolationDriver():
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
 
-        return distance, weight_gradient, distance_vector, swapped
+        return distance, weight_gradient, distance_vector
 
 
     def determine_important_internal_coordinates(self, qm_energy, molecule, z_matrix, datapoints):
