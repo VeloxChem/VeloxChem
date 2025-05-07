@@ -298,6 +298,14 @@ class ExcitedStateAnalysisDriver:
             nexc = nocc * nvirt
             mo_occ = mo[:, :nocc].copy()
 
+        # Check if the shape of the vector matches the number
+        # of expected excitations
+        eigvec_shape = eigvec.shape[0]
+        error_text = "eigenvectors not consistent with the expected number "
+        error_text += "of occupied and virtual orbitals" 
+        assert_msg_critical(nexc == eigvec_shape or 2*nexc == eigvec_shape,
+                            error_text)
+
         z_mat = eigvec[:nexc]
         if eigvec.shape[0] == nexc:
             tdens_mo = np.reshape(z_mat, (nocc, nvirt))
