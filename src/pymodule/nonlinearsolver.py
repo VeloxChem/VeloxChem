@@ -1470,3 +1470,14 @@ class NonlinearSolver:
 
         return (LinearSolver.lrmat2vec(mat.real, nocc, norb) +
                 1j * LinearSolver.lrmat2vec(mat.imag, nocc, norb))
+
+    @staticmethod
+    def is_imag(op):
+        """
+        Checks if an operator is imaginary.
+
+        :return:
+            True if operator is imaginary, False otherwise
+        """
+
+        return op in ['linear_momentum', 'angular_momentum', 'magnetic_dipole']

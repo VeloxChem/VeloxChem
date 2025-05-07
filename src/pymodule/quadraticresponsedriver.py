@@ -338,13 +338,13 @@ class QuadraticResponseDriver(NonlinearSolver):
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
 
-        cpp_keywords = [
+        cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
             'ri_coulomb'
-        ]
+        }
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
@@ -411,6 +411,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             mo = None
             F0 = None
             norb = None
+
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
@@ -460,27 +461,48 @@ class QuadraticResponseDriver(NonlinearSolver):
                 A2Nc = self._a2_contract(kc, op_a, d_a_mo, nocc, norb)
                 A2Nb = self._a2_contract(kb, op_a, d_a_mo, nocc, norb)
 
-                # Note: flip sign for imaginary B and C operator
-                if self._b_op_key in ['linear_momentum', 'angular_momentum']:
-                    B2Nc *= -1.0
-                if self._c_op_key in ['linear_momentum', 'angular_momentum']:
-                    C2Nb *= -1.0
-
                 NaE3NbNc = np.dot(Na.T, e3_dict[wb])
                 NaC2Nb = np.dot(Na.T, C2Nb)
                 NaB2Nc = np.dot(Na.T, B2Nc)
                 NbA2Nc = np.dot(Nb.T, A2Nc)
                 NcA2Nb = np.dot(Nc.T, A2Nb)
 
-                # Note: flip sign for imaginary A operator
-                if self._a_op_key in ['linear_momentum', 'angular_momentum']:
-                    NaE3NbNc *= -1.0
-                    NaC2Nb *= -1.0
+                op_a_type = 'imag' if self.is_imag(self._a_op_key) else 'real'
+                op_b_type = 'imag' if self.is_imag(self._b_op_key) else 'real'
+                op_c_type = 'imag' if self.is_imag(self._c_op_key) else 'real'
+
+                #         eee     eem     eme     emm     mee     mem     mme     mmm
+                # E3      +       +       +       -       +       -       -       -
+                # B2C     +       +       -       +       +       -       +       +
+                # C2B     +       -       +       +       +       +       -       +
+                # A2B     +       +       +       -       -       +       +       +
+                # A2C     +       +       +       -       -       +       +       +
+
+                # flip sign for E3 term
+                if op_a_type == 'real':
+                    if (op_b_type == op_c_type) and (op_b_type != op_a_type):
+                        NaE3NbNc *= -1.0
+                elif op_a_type == 'imag':
+                    if not ((op_b_type == op_c_type) and (op_b_type != op_a_type)):
+                        NaE3NbNc *= -1.0
+
+                # flip sign for B2C term
+                if (op_b_type != op_c_type) and (op_b_type != op_a_type):
                     NaB2Nc *= -1.0
+
+                # flip sign for C2B term
+                if (op_c_type != op_b_type) and (op_c_type != op_a_type):
+                    NaC2Nb *= -1.0
+
+                # flip sign for A2B and A2C terms
+                if (op_b_type == op_c_type) and (op_b_type != op_a_type):
+                    NbA2Nc *= -1.0
+                    NcA2Nb *= -1.0
 
                 val_X2 = -(NaC2Nb + NaB2Nc)
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
+
                 beta = val_E3 + val_A2 + val_X2
 
                 self.ostream.print_blank()
