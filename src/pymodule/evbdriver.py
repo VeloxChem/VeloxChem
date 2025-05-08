@@ -737,17 +737,19 @@ class EvbDriver():
                 "soft_core_coulomb_int": False,
                 "soft_core_lj_int": False,
             }
-        elif SolvationBuilder()._solvent_properties(name) is not None:
-            conf = {
-                "name": name,
-                "solvent": name,
-                "temperature": self.temperature,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-            }
         else:
-            raise ValueError(f"Unknown system configuration {name}")
+            try:
+                solvent = SolvationBuilder()._solvent_properties(name)
+                conf = {
+                    "name": name,
+                    "solvent": name,
+                    "temperature": self.temperature,
+                    "pressure": 1,
+                    "padding": 1.5,
+                    "ion_count": 0,
+                }
+            except:
+                raise ValueError(f"Unknown system configuration {name}")
 
         return conf
 
