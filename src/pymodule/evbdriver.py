@@ -172,7 +172,8 @@ class EvbDriver():
         breaking_bonds: list[tuple[int, int]] = [],
         name=None,
     ):
-        self.name = name
+        if self.name is None:
+            self.name = name
         cwd = Path().cwd()
         input_path = cwd / self.input_folder
         if not input_path.exists():
@@ -254,7 +255,8 @@ class EvbDriver():
             combined_reactant_name = '_'.join(reactant)
         else:
             combined_reactant_name = reactant
-        self.name = combined_reactant_name
+        if self.name is None:
+            self.name = combined_reactant_name
         combined_rea_input = self._get_input_files(combined_reactant_name)
 
         if isinstance(product, list):
