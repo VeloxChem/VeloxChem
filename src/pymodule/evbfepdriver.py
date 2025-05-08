@@ -594,7 +594,7 @@ class EvbFepDriver():
         pdb_pattern = "state_step_*.pdb"
         pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
 
-        self.ostream.print_info(pdb_files)
+        self.ostream.print_info(str(pdb_files))
 
         with open(self.run_folder / output_file, 'w') as outfile:
             for model_number, pdb_file in enumerate(pdb_files, start=1):
