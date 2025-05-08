@@ -64,9 +64,9 @@ class TestQrfOperators:
             'electric dipole',
         ]
 
-        self.run_qrf('def2-svp', wb_wc, operators, 'zzz', -1.72680998j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'xyz', -3.00108916j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'zxy', 1.02519503j)
+        self.run_qrf('def2-svp', wb_wc, operators, 'zzz', 1.72680998j)
+        self.run_qrf('def2-svp', wb_wc, operators, 'xyz', 3.00108916j)
+        self.run_qrf('def2-svp', wb_wc, operators, 'zxy', -1.02519503j)
         self.run_qrf('def2-svp', wb_wc, operators, 'yyx', 0.0j)
 
     def test_svp_qrf_vmv(self):
@@ -79,9 +79,9 @@ class TestQrfOperators:
             'linear momentum',
         ]
 
-        self.run_qrf('def2-svp', wb_wc, operators, 'zzz', -0.03225185j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'xyz', 0.53669370j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'zxy', 0.40995799j)
+        self.run_qrf('def2-svp', wb_wc, operators, 'zzz', 0.03225185j)
+        self.run_qrf('def2-svp', wb_wc, operators, 'xyz', -0.53669370j)
+        self.run_qrf('def2-svp', wb_wc, operators, 'zxy', -0.40995799j)
         self.run_qrf('def2-svp', wb_wc, operators, 'yyx', 0.0j)
 
     def test_svp_qrf_general(self):
@@ -115,13 +115,25 @@ class TestQrfOperators:
             -0.01101933,
         ]
 
-        for op_str, ref_val in zip(op_str_list, ref_val_list):
+        ref_sign_list = [
+            1.0,
+            1.0,
+            -1.0,
+            -1.0,
+            1.0,
+            1.0,
+            -1.0,
+            -1.0,
+        ]
+
+        for op_str, ref_val, ref_sign in zip(op_str_list, ref_val_list,
+                                             ref_sign_list):
 
             operators = [operator_mapping[x] for x in op_str]
 
             if op_str.count('m') % 2 == 0:
-                rsp_ref_val = ref_val
+                rsp_ref_val = ref_sign * ref_val
             else:
-                rsp_ref_val = ref_val * 1j
+                rsp_ref_val = ref_sign * ref_val * 1j
 
             self.run_qrf('def2-svp', wb_wc, operators, 'zzz', rsp_ref_val)
