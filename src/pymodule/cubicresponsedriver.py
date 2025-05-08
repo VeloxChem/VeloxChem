@@ -718,7 +718,17 @@ class CubicResponseDriver(NonlinearSolver):
                         val_A2 *= -1.0
 
                 # Cubic response function
-                gamma = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
+                crf_rsp_func = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
+
+                # flip sign for response function
+                if op_a_type == 'real':
+                    if (op_b_type != op_c_type) or (op_c_type != op_d_type):
+                        crf_rsp_func *= -1.0
+                elif op_a_type == 'imag':
+                    if (op_b_type != op_c_type) and (op_c_type == op_d_type):
+                        crf_rsp_func *= -1.0
+                    if op_b_type == 'imag':
+                        crf_rsp_func *= -1.0
 
                 self.ostream.print_blank()
                 w_str = 'Cubic response function: << {};{},{},{} >>  ({},{},{})'.format(
@@ -732,10 +742,10 @@ class CubicResponseDriver(NonlinearSolver):
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('CRF', gamma, width)
+                self._print_component('CRF', crf_rsp_func, width)
                 self.ostream.print_blank()
 
-                result[('crf', wb, wc, wd)] = gamma
+                result[('crf', wb, wc, wd)] = crf_rsp_func
 
                 result['crf_terms'] = {
                     ('crf_T4_term', wb, wc, wd): val_T4,

@@ -56,15 +56,21 @@ class TestCrfOperators:
             crf_terms = crf_result['crf_terms']
 
             for key in ref_result:
-                diff = (crf_terms[(f'crf_{key}_term', wb, wc, wd)] -
-                        ref_result[key])
+                val = crf_terms[(f'crf_{key}_term', wb, wc, wd)]
+                ref = ref_result[key]
 
-                real_diff = abs(diff.real)
-                real_diff_rel = abs(real_diff / ref_result[key].real)
+                real_diff = abs(val.real - ref.real)
+                if ref.real != 0.0:
+                    real_diff_rel = abs(val.real / ref.real - 1.0)
+                else:
+                    real_diff_rel = real_diff
                 assert real_diff < 0.01 or real_diff_rel < 0.0075
 
-                imag_diff = abs(diff.imag)
-                imag_diff_rel = abs(imag_diff / ref_result[key].imag)
+                imag_diff = abs(val.imag - ref.imag)
+                if ref.imag != 0.0:
+                    imag_diff_rel = abs(val.imag / ref.imag - 1.0)
+                else:
+                    imag_diff_rel = imag_diff
                 assert imag_diff < 0.01 or imag_diff_rel < 0.0075
 
     def test_svp_crf_general(self):
