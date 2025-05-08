@@ -604,7 +604,7 @@ class EvbDriver():
 
                 data_folder_path.mkdir(parents=True, exist_ok=True)
                 run_folder_path.mkdir(parents=True, exist_ok=True)
-            if conf.get('solvent', None) is None and conf['pressure'] > 0:
+            if conf.get('solvent', None) is None and conf.get('pressure',-1) > 0:
                 self.ostream.print_warning(
                     f"A pressure is defined for {conf['name']}, but no solvent is defined. Removing pressure definition."
                 )
