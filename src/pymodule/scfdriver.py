@@ -251,6 +251,9 @@ class ScfDriver:
         self.num_leb_points = 110
         self.tssf = 1.2
         self.discretization = 'fixed'
+        # TODO remove the two variables below added for testing purposes
+        self.homemade = False
+        self.tess_file = None
 
         # solvation model
         self.solvation_model = None
@@ -352,6 +355,8 @@ class ScfDriver:
                 'num_leb_points': ('int', 'number of grid points per sphere'),
                 'tssf': ('float', 'tessellation sphere scaling factor'),
                 'discretization': ('str', 'surface discretization method'),
+                'homemade': ('bool', 'read tessellation data from file'), # TODO: remove (added for testing purposes)
+                'tess_file': ('str', 'tessellation data file name'), # TODO: remove (added for testing purposes)
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
@@ -922,6 +927,8 @@ class ScfDriver:
                 'tssf': self.tssf,
                 'discretization': self.discretization,
                 'filename': self.filename,
+                'homemade': self.homemade, #TODO: remove (added for testing purposes)
+                'tess_file': self.tess_file #TODO: remove (added for testing purposes)
             }
 
             tess_t0 = tm.time()

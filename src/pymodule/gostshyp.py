@@ -27,6 +27,7 @@ import numpy as np
 import time as tm
 import sys
 from mpi4py import MPI
+from pathlib import Path
 
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import mpi_master
@@ -223,7 +224,17 @@ class GostshypDriver:
 
         tessellation_drv = TessellationDriver(self.comm, self.ostream)
         tessellation_drv.update_settings(tessellation_settings)
-        self.tessellation = tessellation_drv.compute(self.molecule)
+
+        # TODO remove if-statement (added for testing purposes)
+
+        if tessellation_settings['homemade'] == True:
+
+            tess_data_file = Path('.', tessellation_settings['tess_file'])
+            self.tessellation = np.genfromtxt(tess_data_file)
+
+        else:
+
+            self.tessellation = tessellation_drv.compute(self.molecule)
 
         # TODO error message if an empty tessellation is returned!
         self.num_tes_points = self.tessellation.shape[1]
