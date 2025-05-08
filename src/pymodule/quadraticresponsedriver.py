@@ -478,13 +478,11 @@ class QuadraticResponseDriver(NonlinearSolver):
                 # A2B     +       +       +       -       -       +       +       +
                 # A2C     +       +       +       -       -       +       +       +
 
-                # flip sign for E3 term
-                if op_a_type == 'real':
-                    if (op_b_type == op_c_type) and (op_b_type != op_a_type):
-                        NaE3NbNc *= -1.0
-                elif op_a_type == 'imag':
-                    if not ((op_b_type == op_c_type) and (op_b_type != op_a_type)):
-                        NaE3NbNc *= -1.0
+                # flip sign for E3 term using two if's
+                if (op_b_type == op_c_type) and (op_b_type != op_a_type):
+                    NaE3NbNc *= -1.0
+                if op_a_type == 'imag':
+                    NaE3NbNc *= -1.0
 
                 # flip sign for B2C term
                 if (op_b_type != op_c_type) and (op_b_type != op_a_type):
