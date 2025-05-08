@@ -84,51 +84,60 @@ class TransitionStateGuesser():
         self.mm_step_size = 0.001 * mmunit.picoseconds
         self.save_mm_traj = False
         self.scf_drv = None
+        self.evb_drv = None
 
-    def find_TS(self, evb, scf=True, constraints=None, scf_drv=None, charge = None, multiplicity=None):
-        #todo ideally find a way to efficiently deal with the input to the EVB object
+    def find_TS(
+        self,
+        evb_drv,
+        scf=True,
+        scf_drv=None,
+        constraints=None,
+        charge=None,
+        multiplicity=None,
+    ):
+        self.evb_drv = evb_drv
         self.scf_drv = scf_drv
-        evb.temperature = self.mm_temperature
-        config = evb.default_system_configurations("ts_guesser")
-
         if scf:
-            molecule_sanity_check(evb.reactant.molecule)
+            molecule_sanity_check(self.evb.reactant.molecule)
 
-        self.molecule = evb.reactant.molecule
+        self.molecule = self.evb.reactant.molecule
         if charge is not None:
             self.molecule.set_charge(charge)
         if multiplicity is not None:
             self.molecule.set_multiplicity(multiplicity)
-        print(f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong.")
+        print(
+            f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
+        )
 
-        evb.build_systems([config],
-                          self.lambda_vec,
-                          save_output=False,
-                          constraints=constraints)
+        self.evb = self.mm_temperature
+        self.evb.build_systems(['ts_guesser'],
+                               self.lambda_vec,
+                               save_output=False,
+                               constraints=constraints)
         self.ostream.print_blank()
         self.ostream.print_header("Starting MM scan")
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
         self.ostream.flush()
-        mm_energies, mm_geometries, ff_exception = self.scan_ff(evb)
+        mm_energies, mm_geometries, ff_exception = self.scan_ff(self.evb)
         xyz_geometries = []
         for mm_geom in mm_geometries:
-            xyz_geom = self.mm_to_xyz_geom(mm_geom, evb.reactant.molecule)
+            xyz_geom = self.mm_to_xyz_geom(mm_geom, self.evb.reactant.molecule)
             xyz_geometries.append(xyz_geom)
         self.results = {
             'mm_energies': mm_energies,
             'mm_geometries': mm_geometries,
             'xyz_geometries': xyz_geometries,
             'lambda_vec': self.lambda_vec,
-            'broken_bonds': evb.broken_bonds,
-            'formed_bonds': evb.formed_bonds,
+            'broken_bonds': self.evb.broken_bonds,
+            'formed_bonds': self.evb.formed_bonds,
         }
         # for i, (E, P) in enumerate(zip(mm_energies, mm_geometries)):
         #     self.results[self.lambda_vec[i]] = {
         #         'mm_energy': E,
         #         'mm_geometry': P,
         #     }
-        self.results['broken_bonds'] = evb.broken_bonds
-        self.results['formed_bonds'] = evb.formed_bonds
+        self.results['broken_bonds'] = self.evb.broken_bonds
+        self.results['formed_bonds'] = self.evb.formed_bonds
         if ff_exception:
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
