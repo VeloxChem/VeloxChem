@@ -593,8 +593,8 @@ class EvbFepDriver():
         
         output_file = "combined_crash.pdb"
         pdb_pattern = "*.pdb"
-        pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
-        with open(self.run_folder / output_file, 'w') as outfile:
+        pdb_files = sorted(glob.glob(os.path.join(self.run_folder, pdb_pattern)))
+        with open(self.data_folder / output_file, 'w') as outfile:
             for model_number, pdb_file in enumerate(pdb_files, start=1):
                 outfile.write(f"MODEL     {model_number}\n")
                 with open(pdb_file, 'r') as infile:
@@ -608,7 +608,7 @@ class EvbFepDriver():
         header = "step, kinetic, potential, volume,"
         header += EvbForceGroup.get_header()
         np.savetxt(
-            path / f"crash_energies.csv",
+            self.data_folder / f"crash_energies.csv",
             energies,
             delimiter=",",
             header=header,
