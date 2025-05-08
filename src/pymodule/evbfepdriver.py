@@ -555,15 +555,16 @@ class EvbFepDriver():
 
         for j, state in enumerate(states):
             step_num = step - len(states) + j
-            name = f"state_step_{j}_{step_num}"
-            with open(path / f"{name}.xml", "w") as f:
+            xml_name = f"state_step_{j}_{step_num}"
+            pdb_name = f"{step_num}"
+            with open(path / f"{xml_name}.xml", "w") as f:
                 f.write(mm.XmlSerializer.serialize(state))
 
             minim_positions = state.getPositions()
             mmapp.PDBFile.writeFile(
                 self.topology,
                 np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
-                open(self.run_folder / f"{name}.pdb", "w"),
+                open(self.run_folder / f"{pdb_name}.pdb", "w"),
             )
 
             kin = state.getKineticEnergy()
