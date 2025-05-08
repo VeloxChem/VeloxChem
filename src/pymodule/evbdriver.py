@@ -604,7 +604,7 @@ class EvbDriver():
 
                 data_folder_path.mkdir(parents=True, exist_ok=True)
                 run_folder_path.mkdir(parents=True, exist_ok=True)
-            if conf['solvent'] is None and conf['pressure'] > 0:
+            if conf.get(['solvent'], None) is None and conf['pressure'] > 0:
                 self.ostream.print_warning(
                     f"A pressure is defined for {conf['name']}, but no solvent is defined. Removing pressure definition."
                 )
@@ -681,14 +681,14 @@ class EvbDriver():
                 "name": "debug",
                 "temperature": self.temperature,
                 "pressure": 1,
-                "equil_NVT_steps" :100,
-                "equil_NPT_steps" :100,
-                "sample_steps" :1000,
-                "write_step" :1,
-                "initial_equil_NVT_steps" :0,
-                "initial_equil_NPT_steps" :0,
+                "equil_NVT_steps": 100,
+                "equil_NPT_steps": 100,
+                "sample_steps": 1000,
+                "write_step": 1,
+                "initial_equil_NVT_steps": 0,
+                "initial_equil_NPT_steps": 0,
             }
-        elif name == "water" or name =="water_NPT":
+        elif name == "water" or name == "water_NPT":
             conf = {
                 "name": "water",
                 "solvent": "spce",
@@ -864,7 +864,6 @@ class EvbDriver():
             equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
             initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
-            
 
         for conf in self.system_confs:
             self.ostream.print_blank()
