@@ -74,17 +74,19 @@ comp_prim_r2_ds(CSimdArray<double>& pbuffer,
 
         const double gfe_0 = 0.5 / (a_exp + b_exps[i] + c_exp);
 
-        gr_xx_0[i] = 2.0 * ts_0_0[i] * gfe_0 + 4.0 * ts_x_0[i] * gfe_0 * gc_x[i] + 3.0 * ts_xx_0[i] * gfe_0 + ts_xx_0[i] * rgc2_0;
+        const double gfe2_0 = gfe_0 * gfe_0;
+
+        gr_xx_0[i] = 2.0 * ts_0_0[i] * gfe2_0 + 4.0 * ts_x_0[i] * gfe_0 * gc_x[i] + 3.0 * ts_xx_0[i] * gfe_0 + ts_xx_0[i] * rgc2_0;
 
         gr_xy_0[i] = 2.0 * ts_y_0[i] * gfe_0 * gc_x[i] + 2.0 * ts_x_0[i] * gfe_0 * gc_y[i] + 3.0 * ts_xy_0[i] * gfe_0 + ts_xy_0[i] * rgc2_0;
 
         gr_xz_0[i] = 2.0 * ts_z_0[i] * gfe_0 * gc_x[i] + 2.0 * ts_x_0[i] * gfe_0 * gc_z[i] + 3.0 * ts_xz_0[i] * gfe_0 + ts_xz_0[i] * rgc2_0;
 
-        gr_yy_0[i] = 2.0 * ts_0_0[i] * gfe_0 + 4.0 * ts_y_0[i] * gfe_0 * gc_y[i] + 3.0 * ts_yy_0[i] * gfe_0 + ts_yy_0[i] * rgc2_0;
+        gr_yy_0[i] = 2.0 * ts_0_0[i] * gfe2_0 + 4.0 * ts_y_0[i] * gfe_0 * gc_y[i] + 3.0 * ts_yy_0[i] * gfe_0 + ts_yy_0[i] * rgc2_0;
 
         gr_yz_0[i] = 2.0 * ts_z_0[i] * gfe_0 * gc_y[i] + 2.0 * ts_y_0[i] * gfe_0 * gc_z[i] + 3.0 * ts_yz_0[i] * gfe_0 + ts_yz_0[i] * rgc2_0;
 
-        gr_zz_0[i] = 2.0 * ts_0_0[i] * gfe_0 + 4.0 * ts_z_0[i] * gfe_0 * gc_z[i] + 3.0 * ts_zz_0[i] * gfe_0 + ts_zz_0[i] * rgc2_0;
+        gr_zz_0[i] = 2.0 * ts_0_0[i] * gfe2_0 + 4.0 * ts_z_0[i] * gfe_0 * gc_z[i] + 3.0 * ts_zz_0[i] * gfe_0 + ts_zz_0[i] * rgc2_0;
     }
 }
 
