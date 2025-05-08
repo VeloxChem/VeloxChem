@@ -27,11 +27,6 @@ target_sources(vlxobjs
     ThreeCenterR2PrimRecFD.cpp	
     ThreeCenterR2PrimRecGG.cpp
     ThreeCenterR2PrimRecPS.cpp
-    ThreeCenterR2PrimRecHS.cpp
-    ThreeCenterR2PrimRecHP.cpp
-    ThreeCenterR2PrimRecHG.cpp
-    ThreeCenterR2PrimRecHF.cpp
-    ThreeCenterR2PrimRecHD.cpp
   )
 
 target_include_directories(vlxobjs
