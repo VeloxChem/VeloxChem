@@ -621,53 +621,68 @@ class CubicResponseDriver(NonlinearSolver):
                 op_c_type = 'imag' if self.is_imag(self._c_op_key) else 'real'
                 op_d_type = 'imag' if self.is_imag(self._d_op_key) else 'real'
 
-                # flip sign for X3 terms
+                # flip sign for X3 and X2 terms
                 if op_a_type == 'real':
                     if (op_b_type == op_c_type) and (op_c_type != op_d_type):
                         NaD3NbNc *= -1.0
                         NaD3NcNb *= -1.0
+                        NaD2Nbc *= -1.0
                     elif (op_c_type == op_d_type) and (op_d_type != op_b_type):
                         NaB3NcNd *= -1.0
                         NaB3NdNc *= -1.0
+                        NaB2Ncd *= -1.0
                     elif (op_d_type == op_b_type) and (op_b_type != op_c_type):
                         NaC3NbNd *= -1.0
                         NaC3NdNb *= -1.0
+                        NaC2Nbd *= -1.0
                 elif op_a_type == 'imag':
                     if (op_b_type == op_c_type) and (op_c_type != op_d_type):
                         if op_d_type == 'real':
                             NaD3NbNc *= -1.0
                             NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
                         else:
                             NaB3NcNd *= -1.0
                             NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
                             NaC3NbNd *= -1.0
                             NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
                     elif (op_c_type == op_d_type) and (op_d_type != op_b_type):
                         if op_b_type == 'real':
                             NaB3NcNd *= -1.0
                             NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
                         else:
                             NaC3NbNd *= -1.0
                             NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
                             NaD3NbNc *= -1.0
                             NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
                     elif (op_d_type == op_b_type) and (op_b_type != op_c_type):
                         if op_c_type == 'real':
                             NaC3NbNd *= -1.0
                             NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
                         else:
                             NaD3NbNc *= -1.0
                             NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
                             NaB3NcNd *= -1.0
                             NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
                     elif (op_b_type == op_c_type) and (op_c_type == op_d_type):
                         if op_d_type == 'imag':
                             NaB3NcNd *= -1.0
                             NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
                             NaC3NbNd *= -1.0
                             NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
                             NaD3NbNc *= -1.0
                             NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
 
                 val_T4 = -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd)
                 val_E3 = -(NaE3NbNcd)
@@ -676,32 +691,31 @@ class CubicResponseDriver(NonlinearSolver):
                 val_A3 = -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc + NcA3NbNd + NcA3NdNb)
                 val_A2 = NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
 
-                # flip sign for T4
+                # flip sign for T4 and E3
                 if op_a_type == 'real':
                     if (op_c_type == op_d_type) and (op_c_type != op_b_type):
                         val_T4 *= -1.0
+                        val_E3 *= -1.0
                     if op_b_type == 'imag':
                         val_T4 *= -1.0
+                        val_E3 *= -1.0
                 elif op_a_type == 'imag':
                     if (op_b_type != op_c_type) or (op_c_type != op_d_type):
                         val_T4 *= -1.0
+                        val_E3 *= -1.0
 
-                # flip sign for A3
+                # flip sign for A3 and A2
                 if op_a_type == 'real':
                     if (op_c_type == op_d_type) and (op_c_type != op_b_type):
                         val_A3 *= -1.0
+                        val_A2 *= -1.0
                     if op_b_type == 'imag':
                         val_A3 *= -1.0
+                        val_A2 *= -1.0
                 elif op_a_type == 'imag':
                     if (op_b_type == op_c_type) and (op_c_type == op_d_type):
                         val_A3 *= -1.0
-
-                # print('T4', -NaE4NbNcNd, -NaS4NbNcNd, -NaR4NbNcNd, val_T4)
-                # print('E3', val_E3)
-                # print('X3', NaB3NcNd, NaB3NdNc, NaC3NbNd, NaC3NdNb, NaD3NbNc, NaD3NcNb, '  sum:', val_X3)
-                # print('X2', val_X2)
-                # print('A3', val_A3)
-                # print('A2', val_A2)
+                        val_A2 *= -1.0
 
                 # Cubic response function
                 gamma = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
@@ -722,9 +736,15 @@ class CubicResponseDriver(NonlinearSolver):
                 self.ostream.print_blank()
 
                 result[('crf', wb, wc, wd)] = gamma
-                result[('crf_T4_term', wb, wc, wd)] = val_T4
-                result[('crf_X3_term', wb, wc, wd)] = val_X3
-                result[('crf_A3_term', wb, wc, wd)] = val_A3
+
+                result['crf_terms'] = {
+                    ('crf_T4_term', wb, wc, wd): val_T4,
+                    ('crf_E3_term', wb, wc, wd): val_E3,
+                    ('crf_X3_term', wb, wc, wd): val_X3,
+                    ('crf_X2_term', wb, wc, wd): val_X2,
+                    ('crf_A3_term', wb, wc, wd): val_A3,
+                    ('crf_A2_term', wb, wc, wd): val_A2,
+                }
 
         profiler.check_memory_usage('End of CRF')
 
@@ -1452,6 +1472,10 @@ class CubicResponseDriver(NonlinearSolver):
             C = X[self._c_op_key][self.c_component]
             D = X[self._d_op_key][self.d_component]
 
+            op_b_type = 'imag' if self.is_imag(self._b_op_key) else 'real'
+            op_c_type = 'imag' if self.is_imag(self._c_op_key) else 'real'
+            op_d_type = 'imag' if self.is_imag(self._d_op_key) else 'real'
+
             # BC
 
             xi = self._xi(kb, kc, fb, fc, F0_a)
@@ -1461,6 +1485,12 @@ class CubicResponseDriver(NonlinearSolver):
 
             C2Nb = 0.5 * self._x2_contract(kb.T, C, d_a_mo, nocc, norb)
             B2Nc = 0.5 * self._x2_contract(kc.T, B, d_a_mo, nocc, norb)
+
+            # flip sign for BC term
+            if op_b_type == 'imag':
+                B2Nc *= -1.0
+            if op_c_type == 'imag':
+                C2Nb *= -1.0
 
             BC[(('BC', wb, wc), wb + wc)] = E3NbNc - C2Nb - B2Nc
 
@@ -1474,6 +1504,12 @@ class CubicResponseDriver(NonlinearSolver):
             D2Nb = 0.5 * self._x2_contract(kb.T, D, d_a_mo, nocc, norb)
             B2Nd = 0.5 * self._x2_contract(kd.T, B, d_a_mo, nocc, norb)
 
+            # flip sign for BD term
+            if op_b_type == 'imag':
+                B2Nd *= -1.0
+            if op_d_type == 'imag':
+                D2Nb *= -1.0
+
             BD[(('BD', wb, wd), wb + wd)] = E3NbNd - D2Nb - B2Nd
 
             # CD
@@ -1485,6 +1521,12 @@ class CubicResponseDriver(NonlinearSolver):
 
             C2Nd = 0.5 * self._x2_contract(kd.T, C, d_a_mo, nocc, norb)
             D2Nc = 0.5 * self._x2_contract(kc.T, D, d_a_mo, nocc, norb)
+
+            # flip sign for CD term
+            if op_c_type == 'imag':
+                C2Nd *= -1.0
+            if op_d_type == 'imag':
+                D2Nc *= -1.0
 
             CD[(('CD', wc, wd), wc + wd)] = E3NcNd - C2Nd - D2Nc
 
