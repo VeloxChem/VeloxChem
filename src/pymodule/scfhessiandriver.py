@@ -33,6 +33,7 @@
 import numpy as np
 import time as tm
 import math
+import copy
 
 from .veloxchemlib import OverlapGeom200Driver
 from .veloxchemlib import OverlapGeom101Driver
@@ -617,7 +618,7 @@ class ScfHessianDriver(HessianDriver):
                               for j in range(i, natm)]
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
         else:
-            all_atom_pairs = atom_pairs
+            all_atom_pairs = copy.copy(atom_pairs)
             for i in atom_pair_atoms:
                 all_atom_pairs.append((i, i))
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
