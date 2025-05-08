@@ -14,6 +14,7 @@
 #include "ThreeCenterOverlapGradientDriver.hpp"
 #include "ThreeCenterOverlapGeomX00Driver.hpp"
 #include "ThreeCenterOverlapGradientGeomX00Driver.hpp"
+#include "ThreeCenterR2Driver.hpp"
 
 namespace vlx_t3cintegrals {
 
@@ -247,6 +248,24 @@ export_t3cintegrals(py::module& m)
                     std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
                     return geom_drv.compute(exponents, factors, points, basis, molecule, iatom); },
             "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
+
+    // CThreeCenterR2Driver class
+    PyClass<CThreeCenterR2Driver>(m, "ThreeCenterR2Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+             [](const CThreeCenterR2Driver&              t3r2_drv,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                exponents,
+               const std::vector<double>&                factors,
+               const std::vector<std::array<double, 3>>& coords) -> CMatrix {
+                auto points = std::vector<TPoint<double>>();
+                points.reserve(coords.size());
+                std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+                   return t3r2_drv.compute(exponents, factors, points, basis, molecule);
+            },
+            "Computes three center r2 matrix for given molecule, basis and vector of external scaled Gaussians.");    
 }
 
 }  // namespace vlx_t3cintegrals

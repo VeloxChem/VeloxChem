@@ -50,6 +50,7 @@
 //#include "ThreeCenterOverlapGeomX00Driver.hpp"
 #include "TwoCenterElectronRepulsionDriver.hpp"
 #include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
+//#include "ThreeCenterR2Driver.hpp"
 
 namespace vlx_t2cintegrals {
 
