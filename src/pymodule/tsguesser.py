@@ -95,6 +95,22 @@ class TransitionStateGuesser():
         charge=None,
         multiplicity=None,
     ):
+        """Find a guess for the transition state using a force field scan.
+
+        Args:
+            evb (evbDriver): An EVB driver object with built forcefields
+            scf (bool, optional): If an scf energy scan should be performed. Defaults to True.
+            scf_drv (scfDriver, optional): The scf driver to be used for the scf scan.
+            constraints (dict, optional): Dictionary of constraints, see the EVB documentation for details. Defaults to None.
+            charge (int, optional): The charge of the total system. If None (default), the charge of the evb reactant molecule will be used.
+            multiplicity (int, optional): The multiplicity of the total system. If None (default), the multiplicity of the evb reactant molecule will be used.
+
+        Raises:
+            ff_exception: If for whatever reason the force field scan crashes, an exception is raised.
+
+        Returns:
+            molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
+        """
         self.evb_drv = evb_drv
         self.scf_drv = scf_drv
         if scf:
@@ -118,10 +134,10 @@ class TransitionStateGuesser():
         self.ostream.print_header("Starting MM scan")
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
         self.ostream.flush()
-        mm_energies, mm_geometries, ff_exception = self.scan_ff(self.evb)
+        mm_energies, mm_geometries, ff_exception = self._scan_ff(self.evb)
         xyz_geometries = []
         for mm_geom in mm_geometries:
-            xyz_geom = self.mm_to_xyz_geom(mm_geom, self.evb.reactant.molecule)
+            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.evb.reactant.molecule)
             xyz_geometries.append(xyz_geom)
         self.results = {
             'mm_energies': mm_energies,
@@ -160,7 +176,7 @@ class TransitionStateGuesser():
 
             self.ostream.print_header(f"Starting SCF scan")
             self.ostream.flush()
-            scf_energies = self.scan_scf()
+            scf_energies = self._scan_scf()
             max_scf_index = np.argmax(scf_energies)
             max_scf_geom = self.results['xyz_geometries'][max_scf_index]
             max_scf_energy = scf_energies[max_scf_index]
@@ -175,11 +191,7 @@ class TransitionStateGuesser():
         self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
         return self.molecule, self.results
 
-    def get_constraint_string(self, geom=None):
-        #todo return a string that can be directly inserted in any geometry optimisation
-        pass
-
-    def scan_ff(self, EVB):
+    def _scan_ff(self, EVB):
         energies = []
         positions = []
         initial_positions = EVB.system_confs[0]['initial_positions']  #in nm
@@ -250,7 +262,7 @@ class TransitionStateGuesser():
             exception = e
         return energies, positions, exception
 
-    def scan_scf(self):
+    def _scan_scf(self):
         scf_energies = []
         for i, l in enumerate(self.lambda_vec):
             geom = self.results['mm_geometries'][i]
@@ -264,62 +276,8 @@ class TransitionStateGuesser():
 
         return scf_energies
 
-    # def scan_scf(self, starting_index=None, starting_lambda=None):
-    # if starting_index is not None:
-    #     l = self.lambda_vec[starting_index]
-    # elif starting_lambda is not None:
-    #     assert starting_lambda in self.lambda_vec
-    #     l = starting_lambda
-    #     starting_index = np.where(self.lambda_vec == l)[0][0]
-    # else:
-    #     assert_msg_critical(
-    #         False,
-    #         "Either starting_index or starting_lambda must be provided")
-
-    # if l == 1:
-    #     l = self.lambda_vec[-1]
-    #     lp1 = 1
-    # else:
-    #     lp1 = self.lambda_vec[starting_index + 1]
-    # scf_E_1 = self._get_scf_energy(self.results[l]['mm_geometry'])
-    # self.ostream.print_info(
-    #     f"Lambda: {l}, SCF Energy: {scf_E_1:.3f} Hartree")
-    # self.ostream.flush()
-    # scf_E_2 = self._get_scf_energy(self.results[lp1]['mm_geometry'])
-    # self.ostream.print_info(
-    #     f"Lambda: {lp1}, SCF Energy: {scf_E_2:.3f} Hartree")
-    # self.ostream.flush()
-    # self.results[l]['scf_energy'] = scf_E_1
-    # self.results[lp1]['scf_energy'] = scf_E_2
-
-    # if scf_E_2 > scf_E_1:
-    #     start = starting_index + 2
-    #     direction = 1
-    #     end = len(self.lambda_vec)
-    #     scf_E = scf_E_2
-    # else:
-    #     start = starting_index - 1
-    #     direction = -1
-    #     end = 0
-    #     scf_E = scf_E_1
-
-    # for i in range(start, end, direction):
-    #     last_scf_E = scf_E
-    #     l = self.lambda_vec[i]
-    #     geom = self.results[l]['mm_geometry']
-    #     scf_E = self._get_scf_energy(geom)
-    #     self.results[l]['scf_energy'] = scf_E
-
-    #     self.ostream.print_info(
-    #         f"Lambda: {l}, SCF Energy: {scf_E:.3f} Hartree")
-    #     self.ostream.flush()
-    #     self.molecule = self.set_molecule_positions(self.molecule, geom)
-    #     if last_scf_E > scf_E:
-
-    #         return self.lambda_vec[i - direction]
-
     def _get_scf_energy(self, positions):
-        self.molecule = self.set_molecule_positions(self.molecule, positions)
+        self.molecule = self._set_molecule_positions(self.molecule, positions)
         if self.scf_drv is None:
             scf_drv = ScfRestrictedDriver()
             scf_drv.xcfun = self.scf_xcfun
@@ -332,12 +290,16 @@ class TransitionStateGuesser():
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
     def show_results(self, ts_results=None, atom_indices=False):
-        """
-            Plot the convergence of the optimization
+        """Show the results of the transition state guesser.
+        This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
 
-            :param ts_results:
-                The dictionary of transition finder results.
-            """
+        Args:
+            ts_results (dict, optional): The results of the transition state guesser. If none (default), uses the current results.
+            atom_indices (bool, optional): If true, shows the atom-indices of the molecule. Defaults to False.
+
+        Raises:
+            ImportError: If ipywidgets is not installed, an ImportError is raised.
+        """
 
         try:
             import ipywidgets
@@ -466,12 +428,12 @@ class TransitionStateGuesser():
         mol.show(atom_indices=atom_indices, width=640, height=360)
 
     @staticmethod
-    def mm_to_xyz_geom(geom, molecule):
-        new_mol = TransitionStateGuesser.set_molecule_positions(molecule, geom)
+    def _mm_to_xyz_geom(geom, molecule):
+        new_mol = TransitionStateGuesser._set_molecule_positions(molecule, geom)
         return new_mol.get_xyz_string()
 
     @staticmethod
-    def set_molecule_positions(molecule, positions):
+    def _set_molecule_positions(molecule, positions):
         assert molecule.number_of_atoms() == len(positions)
         for i in range(molecule.number_of_atoms()):
             molecule.set_atom_coordinates(i, positions[i])
