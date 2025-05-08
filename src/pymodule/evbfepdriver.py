@@ -593,14 +593,17 @@ class EvbFepDriver():
         output_file = "combined_crash.pdb"
         pdb_pattern = "state_step_*.pdb"
         pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
+        
         with open(self.run_folder / output_file, 'w') as outfile:
             for model_number, pdb_file in enumerate(pdb_files, start=1):
-                outfile.write(f"MODEL     {model_number}\n")
                 with open(pdb_file, 'r') as infile:
-                    for line in infile:
-                        if line.startswith(('ATOM', 'HETATM', 'TER',
-                                            'END')):  # Skip headers/footers
-                            outfile.write(line)
+                    lines = infile.readlines()
+
+                outfile.write(f"MODEL     {model_number}\n")
+                for line in lines:
+                    if (model_number == 1 and line.startswith("CRYST1")) or line.startswith(('ATOM', 'HETATM', 'TER')):
+                        outfile.write(line)
+                    # Skip 'END' lines and anything else
                 outfile.write("ENDMDL\n")
                 os.remove(pdb_file)
 
