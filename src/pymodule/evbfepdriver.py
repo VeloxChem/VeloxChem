@@ -36,6 +36,7 @@ import numpy as np
 import time
 import sys
 import os
+import glob
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -81,8 +82,23 @@ class EvbFepDriver():
         self.systems: dict = None
         self.topology: mmapp.Topology = None
         self.Lambda: list = None
-        self.crash_reporting_interval: int = 1
 
+        self.isothermal: bool = False
+        self.isobaric: bool = False
+        self.friction = 1.0
+        self.temperature = -1
+        self.pressure = -1
+
+        self.equil_NVT_steps = 5000
+        self.equil_NPT_steps = 5000
+        self.sample_steps = 100000
+        self.write_step = 1000
+        self.initial_equil_NVT_steps = 10000
+        self.initial_equil_NPT_steps = 10000
+        self.step_size = 0.001
+        self.equil_step_size = 0.001
+
+        self.crash_reporting_interval: int = 1
         self.constrain_H: bool = False
         self.report_forces: bool = False
         self.report_velocities: bool = False
@@ -90,36 +106,93 @@ class EvbFepDriver():
         self.debug: bool = False
         self.save_frames: int = 1000
 
+        self.keywords = {
+            "friction": {
+                "type": float
+            },
+            "temperature": {
+                "type": float
+            },
+            "pressure": {
+                "type": float
+            },
+            "equil_NVT_steps": {
+                "type": int
+            },
+            "equil_NPT_steps": {
+                "type": int
+            },
+            "sample_steps": {
+                "type": int
+            },
+            "write_step": {
+                "type": int
+            },
+            "initial_equil_NVT_steps": {
+                "type": int
+            },
+            "initial_equil_NPT_steps": {
+                "type": int
+            },
+            "step_size": {
+                "type": float
+            },
+            "equil_step_size": {
+                "type": float
+            },
+            "crash_reporting_interval": {
+                "type": int
+            },
+            "constrain_H": {
+                "type": bool
+            },
+            "report_forces": {
+                "type": bool
+            },
+            "report_velocities": {
+                "type": bool
+            },
+            "report_forcegroups": {
+                "type": bool
+            },
+            "debug": {
+                "type": bool
+            },
+            "save_frames": {
+                "type": int
+            },
+        }
+
     def run_FEP(
         self,
-        equil_NVT_steps,
-        equil_NPT_steps,
-        total_sample_steps,
-        write_step,
-        initial_equil_NVT_steps,
-        initial_equil_NPT_steps,
-        step_size,
-        equil_step_size,
         Lambda,
         configuration,
         platform,
     ):
-        self.equil_NVT_steps = equil_NVT_steps
-        self.equil_NPT_steps = equil_NPT_steps
-        self.total_sample_steps = total_sample_steps
-        self.write_step = write_step
-        self.initial_equil_NVT_steps = initial_equil_NVT_steps
-        self.initial_equil_NPT_steps = initial_equil_NPT_steps
-        self.step_size = step_size
-        self.equil_step_size = equil_step_size
+        #todo add this to the configuration keywords
+
         self.platform = platform
+
+        for keyword, value in self.keywords.items():
+            if keyword in configuration:
+                if (not isinstance(configuration[keyword], value["type"])
+                        and not (isinstance(configuration[keyword], int)
+                                 and value["type"] == float)):
+                    raise ValueError(
+                        f"Configuration option {keyword} should be of type {value['type']}"
+                    )
+                else:
+                    setattr(self, keyword, configuration[keyword])
+                    self.ostream.print_info(
+                        f"{keyword}: {getattr(self, keyword)}")
+            else:
+                self.ostream.print_info(
+                    f"{keyword}: {getattr(self, keyword)} (default)")
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbFepDriver.')
-
         systems = configuration["systems"]
         topology = configuration["topology"]
-        temperature = configuration["temperature"]
         initial_positions = configuration["initial_positions"]
 
         cwd = Path.cwd()
@@ -128,30 +201,38 @@ class EvbFepDriver():
         self.Lambda = Lambda
         self.systems = systems
         self.topology = topology
-        self.NPT = configuration.get("NPT", False)
 
-        assert (total_sample_steps % write_step == 0
-                ), "write_step must be a factor of total_sample_steps"
-        assert (total_sample_steps >= 2 *
-                write_step), "total_sample_steps must be at least 2*write_step"
+        if self.temperature > 0:
+            self.isothermal = True
 
-        self.total_snapshots = total_sample_steps / write_step * len(
-            self.Lambda)
-        self.ostream.print_info(f"Lambda: {self.Lambda}")
-        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equiliberation steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
-        info += f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}\n"
-        info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
-        self.ostream.print_info(info)
+        if self.pressure > 0:
+            self.isobaric = True
+
         self.ostream.flush()
 
-        self.integrator_temperature = temperature * mmunit.kelvin  #type: ignore
-        self.integrator_friction_coeff = 1 / mmunit.picosecond
+        assert (
+            self.sample_steps %
+            self.write_step == 0), "write_step must be a factor of sample_steps"
+        assert (self.sample_steps >= 2 *
+                self.write_step), "sample_steps must be at least 2*write_step"
+
+        self.total_snapshots = self.sample_steps / self.write_step * len(
+            self.Lambda)
+        self.ostream.print_info(f"Lambda: {np.array(self.Lambda)}")
+        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {self.equil_NVT_steps}, NPT equiliberation steps: {self.equil_NPT_steps}, total sample steps: {self.sample_steps}, write step: {self.write_step}, step size: {self.step_size}\n"
+        info += f"Snapshots per lambda: {self.sample_steps / self.write_step}, snapshots to be recorded: {self.total_snapshots}\n"
+        info += f"System time per snapshot: {self.step_size * self.write_step} ps, system time per frame: {self.step_size * self.sample_steps} ps, total system time: {self.step_size * self.sample_steps * len(self.Lambda)} ps"
+        self.ostream.print_info(
+            f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
+        )
+        self.ostream.print_info(info)
+        self.ostream.flush()
 
         timer = Timer(len(self.Lambda))
 
         self.traj_roporter = mmapp.XTCReporter(
             str(self.data_folder / "trajectory.xtc"),
-            write_step,
+            self.write_step,
         )
         timer.start()
         positions = initial_positions
@@ -171,7 +252,7 @@ class EvbFepDriver():
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
 
-            equil_state = self._minimise_and_equiliberate(system, l, positions)
+            equil_state = self._minimize_and_equilibrate(system, l, positions)
 
             if self.constrain_H:
                 info = "Removing constraints involving H atoms"
@@ -183,27 +264,8 @@ class EvbFepDriver():
             positions = state.getPositions()
         self.ostream.flush()
 
-    def _minimise_and_equiliberate(self, system, l, positions):
-        equil_integrator = mm.LangevinMiddleIntegrator(
-            self.integrator_temperature,
-            self.integrator_friction_coeff,
-            self.equil_step_size * mmunit.picoseconds,
-        )
-        equil_integrator.setIntegrationForceGroups(
-            EvbForceGroup.integration_force_groups())
-        if self.platform is not None:
-            equil_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                equil_integrator,
-                mm.Platform.getPlatformByName(self.platform),
-            )
-        else:
-            equil_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                equil_integrator,
-            )
+    def _minimize_and_equilibrate(self, system, l, positions):
+        equil_simulation = self._get_simulation(system, self.equil_step_size)
         equil_simulation.context.setPositions(positions)
 
         if l == 0:
@@ -251,22 +313,26 @@ class EvbFepDriver():
         sz = self.equil_step_size * mmunit.picoseconds
         equil_simulation.integrator.setStepSize(sz)
         self.ostream.print_info(f"Equilibration with step size {sz}")
-        if self.NPT:
-            NPT_equil_reporter = mmapp.StateDataReporter(
-                str(self.run_folder / f"equil_NPT_data_{l:.3f}.csv"),
-                1,
-                step=True,
-                potentialEnergy=True,
-                kineticEnergy=True,
-                temperature=True,
-                volume=True,
-                density=True,
-                append=False,
-            )
-            equil_simulation.reporters.append(NPT_equil_reporter)
-            barostat = [force for force in equil_simulation.system.getForces() if isinstance(force,mm.MonteCarloBarostat)][0]
+
+        equil_reporter = mmapp.StateDataReporter(
+            str(self.run_folder / f"equil_data_{l:.3f}.csv"),
+            1,
+            step=True,
+            potentialEnergy=True,
+            kineticEnergy=True,
+            temperature=True,
+            volume=True,
+            density=True,
+            append=False,
+        )
+        equil_simulation.reporters.append(equil_reporter)
+        if self.isobaric:
+            barostat = [
+                force for force in equil_simulation.system.getForces()
+                if isinstance(force, mm.MonteCarloBarostat)
+            ][0]
         if l == 0:
-            if self.NPT:
+            if self.isobaric:
                 barostat.setFrequency(0)
                 self.ostream.print_info(
                     f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
@@ -291,7 +357,7 @@ class EvbFepDriver():
                     equil_simulation,
                     self.initial_equil_NVT_steps + self.initial_equil_NPT_steps)
 
-        if self.NPT:
+        if self.isobaric:
             self.ostream.print_info(
                 f"Running NVT equilibration for {self.equil_NVT_steps} steps")
             self.ostream.flush()
@@ -308,7 +374,8 @@ class EvbFepDriver():
                 f"Running equilibration for {self.equil_NVT_steps+self.equil_NPT_steps} steps"
             )
             self.ostream.flush()
-            self._safe_step(equil_simulation, self.equil_NVT_steps+self.equil_NPT_steps)
+            self._safe_step(equil_simulation,
+                            self.equil_NVT_steps + self.equil_NPT_steps)
 
         equil_state = equil_simulation.context.getState(
             getPositions=True,
@@ -331,29 +398,9 @@ class EvbFepDriver():
         return equil_state
 
     def _sample(self, system, l, initial_state):
-        run_integrator = mm.LangevinMiddleIntegrator(
-            self.integrator_temperature,
-            self.integrator_friction_coeff,
-            self.equil_step_size * mmunit.picoseconds,
-        )
-        run_integrator.setIntegrationForceGroups(
-            EvbForceGroup.integration_force_groups())
-
-        if self.platform is not None:
-            run_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                run_integrator,
-                mm.Platform.getPlatformByName(self.platform),
-            )
-        else:
-            run_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                run_integrator,
-            )
-
+        run_simulation = self._get_simulation(system, self.equil_step_size)
         run_simulation.reporters.append(self.traj_roporter)
+
         sz = self.step_size * mmunit.picoseconds
         run_simulation.integrator.setStepSize(sz)
         run_simulation.context.setState(initial_state)
@@ -405,11 +452,38 @@ class EvbFepDriver():
         run_simulation.reporters.append(evb_reporter)
 
         self.ostream.print_info(
-            f"Running sampling for {self.total_sample_steps} steps with step size {run_simulation.integrator.getStepSize()}"
+            f"Running sampling for {self.sample_steps} steps with step size {run_simulation.integrator.getStepSize()}"
         )
         self.ostream.flush()
-        states = self._safe_step(run_simulation, self.total_sample_steps)
+        states = self._safe_step(run_simulation, self.sample_steps)
         return states[-1]
+
+    def _get_simulation(self, system, step_size):
+        if self.isothermal:
+            integrator = mm.LangevinMiddleIntegrator(
+                self.temperature * mmunit.kelvin,  #type: ignore
+                self.friction / mmunit.picosecond,  #type: ignore
+                step_size * mmunit.picoseconds,
+            )
+        else:
+            integrator = mm.VerletIntegrator(step_size)
+        integrator.setIntegrationForceGroups(
+            EvbForceGroup.integration_force_groups())
+
+        if self.platform is not None:
+            simulation = mmapp.Simulation(
+                self.topology,
+                system,
+                integrator,
+                mm.Platform.getPlatformByName(self.platform),
+            )
+        else:
+            simulation = mmapp.Simulation(
+                self.topology,
+                system,
+                integrator,
+            )
+        return simulation
 
     def _constrain_H_bonds(self, system):
         harm_bond_forces = [
@@ -466,7 +540,6 @@ class EvbFepDriver():
             pot = state.getPotentialEnergy()
             pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
 
-
             states.append(state)
             if len(states) > self.save_frames:
                 states.pop(0)
@@ -482,14 +555,16 @@ class EvbFepDriver():
 
         for j, state in enumerate(states):
             step_num = step - len(states) + j
-            with open(path / f"state_step_{step_num}.xml", "w") as f:
+            xml_name = f"state_step_{j}_{step_num}"
+            pdb_name = f"{step_num}"
+            with open(path / f"{xml_name}.xml", "w") as f:
                 f.write(mm.XmlSerializer.serialize(state))
 
             minim_positions = state.getPositions()
             mmapp.PDBFile.writeFile(
                 self.topology,
                 np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
-                open(self.run_folder / f"state_step_{step_num}.pdb", "w"),
+                open(self.run_folder / f"{pdb_name}.pdb", "w"),
             )
 
             kin = state.getKineticEnergy()
@@ -505,7 +580,6 @@ class EvbFepDriver():
             energies[j, 3] = vol
 
             simulation.context.setState(state)
-            energies[j, 0]
             for k, fg in enumerate(EvbForceGroup):
                 fg_state = simulation.context.getState(
                     getEnergy=True,
@@ -513,9 +587,33 @@ class EvbFepDriver():
                 )
                 energy = fg_state.getPotentialEnergy()
                 energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
-                energies[j, k + 3] = energy
-        header = "step,kinetic,potential,volume"
-        header += ",".join([fg.name for fg in EvbForceGroup])
+                energies[j, k + 4] = energy
+
+        # Combine all saved PDB files into one and remove the sigle ones
+        input_folder = self.run_folder  # replace this
+        output_file = "combined_crash.pdb"
+        pdb_pattern = "state_step_*.pdb"
+        pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
+
+        self.ostream.print_info(str(pdb_files))
+
+        with open(self.run_folder / output_file, 'w') as outfile:
+            for model_number, pdb_file in enumerate(pdb_files, start=1):
+                with open(pdb_file, 'r') as infile:
+                    lines = infile.readlines()
+
+                outfile.write(f"MODEL     {model_number}\n")
+                for line in lines:
+                    if (model_number == 1
+                            and line.startswith("CRYST1")) or line.startswith(
+                                ('ATOM', 'HETATM', 'TER')):
+                        outfile.write(line)
+                    # Skip 'END' lines and anything else
+                outfile.write("ENDMDL\n")
+                os.remove(pdb_file)
+
+        header = "step, kinetic, potential, volume,"
+        header += EvbForceGroup.get_header()
         np.savetxt(
             path / f"crash_energies.csv",
             energies,

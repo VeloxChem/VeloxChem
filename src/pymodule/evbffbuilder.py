@@ -265,14 +265,14 @@ class EvbForceFieldBuilder():
         else:
             if input["optimize"] and optimize:
                 self.ostream.print_info("Optimising the geometry with xtb.")
-                scf_drv = XtbDriver()
+                scf_drv = XtbDriver(ostream=self.ostream)
                 opt_drv = OptimizationDriver(scf_drv)
                 opt_drv.hessian = "last"
                 opt_results = opt_drv.compute(molecule)
                 molecule = Molecule.from_xyz_string(
                     opt_results["final_geometry"])
 
-            forcefield = MMForceFieldGenerator()
+            forcefield = MMForceFieldGenerator(ostream=self.ostream)
             forcefield.eq_param = False
             #Load or calculate the charges
 
@@ -301,9 +301,9 @@ class EvbForceFieldBuilder():
                                                 "6-31G*",
                                                 ostream=None)
                 if molecule.get_multiplicity() == 1:
-                    scf_drv = ScfRestrictedDriver()
+                    scf_drv = ScfRestrictedDriver(ostream=self.ostream)
                 else:
-                    scf_drv = ScfUnrestrictedDriver()
+                    scf_drv = ScfUnrestrictedDriver(ostream=self.ostream)
                 self.ostream.flush()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
@@ -312,7 +312,7 @@ class EvbForceFieldBuilder():
                     scf_results = scf_drv.compute(molecule, basis)
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
 
-                resp_drv = RespChargesDriver()
+                resp_drv = RespChargesDriver(ostream=self.ostream)
                 self.ostream.print_info("Calculating RESP charges")
                 self.ostream.flush()
                 forcefield.partial_charges = resp_drv.compute(
@@ -394,7 +394,7 @@ class EvbForceFieldBuilder():
         for i, elem in enumerate(pro_elems):
             pro_graph.nodes[i]['elem'] = elem
 
-        rm = ReactionMatcher()
+        rm = ReactionMatcher(ostream=self.ostream)
         total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
