@@ -604,7 +604,11 @@ class EvbDriver():
 
                 data_folder_path.mkdir(parents=True, exist_ok=True)
                 run_folder_path.mkdir(parents=True, exist_ok=True)
-
+            if conf['solvent'] is None and conf['pressure'] > 0:
+                self.ostream.print_warning(
+                    f"A pressure is defined for {conf['name']}, but no solvent is defined. Removing pressure definition."
+                )
+                conf.pop("pressure")
             # build the system
             system_builder = EvbSystemBuilder(ostream=self.ostream)
             self.ostream.print_blank()
@@ -672,12 +676,6 @@ class EvbDriver():
             conf = {
                 "name": "vacuum_NVE",
             }
-        elif name == "vacuum_NPT":
-            conf = {
-                "name": "vacuum_NPT",
-                "temperature": self.temperature,
-                "pressure": 1,
-            }
         elif name == "debug":
             conf = {
                 "name": "debug",
@@ -690,13 +688,21 @@ class EvbDriver():
                 "initial_equil_NVT_steps" :0,
                 "initial_equil_NPT_steps" :0,
             }
-        elif name == "water":
+        elif name == "water" or name =="water_NPT":
             conf = {
                 "name": "water",
                 "solvent": "spce",
                 "temperature": self.temperature,
-                "NPT": True,
                 "pressure": 1,
+                "padding": 1.5,
+                "ion_count": 0,
+                "neutralize": False
+            }
+        elif name == "water_NVT":
+            conf = {
+                "name": "water",
+                "solvent": "spce",
+                "temperature": self.temperature,
                 "padding": 1.5,
                 "ion_count": 0,
                 "neutralize": False
@@ -706,7 +712,6 @@ class EvbDriver():
                 "name": "water_E_field",
                 "solvent": "spce",
                 "temperature": self.temperature,
-                "NPT": True,
                 "pressure": 1,
                 "padding": 1.5,
                 "ion_count": 0,
@@ -717,7 +722,6 @@ class EvbDriver():
                 "name": "no_reactant",
                 "solvent": "spce",
                 "temperature": self.temperature,
-                "NPT": True,
                 "pressure": 1,
                 "padding": 1.5,
                 "ion_count": 0,
@@ -844,15 +848,6 @@ class EvbDriver():
 
     def run_FEP(
         self,
-        # equil_NVT_steps=5000,
-        # equil_NPT_steps=5000,
-        # sample_steps=100000,
-        # write_step=1000,
-        # initial_equil_NVT_steps=10000,
-        # initial_equil_NPT_steps=10000,
-        # step_size=0.001,
-        # equil_step_size=0.001,
-        # initial_equil_step_size=0.001,
         saved_frames_on_crash=None,
         platform=None,
     ):
@@ -869,26 +864,7 @@ class EvbDriver():
         """
             
 
-        # if self.fast_run:
-        #     self.ostream.print_warning(
-        #         "Fast run enabled, using modest number of steps. Be careful with using results"
-        #     )
-        #     sample_steps = 25000
-
         for conf in self.system_confs:
-            # self.update_options_json(
-            #     {
-            #         "equil_steps_NVT": equil_NVT_steps,
-            #         "equil_steps_NPT": equil_NPT_steps,
-            #         "sample_steps": sample_steps,
-            #         "write_step": write_step,
-            #         "initial_equil_NVT_steps": initial_equil_NVT_steps,
-            #         "initial_equil_NPT_steps": initial_equil_NPT_steps,
-            #         "step_size": step_size,
-            #         "equil_step_size": equil_step_size,
-            #         "initial_equil_step_size": initial_equil_step_size,
-            #     }, conf)
-
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
@@ -897,14 +873,6 @@ class EvbDriver():
             if saved_frames_on_crash is not None:
                 FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
-                # equil_NVT_steps=equil_NVT_steps,
-                # equil_NPT_steps=equil_NPT_steps,
-                # total_sample_steps=sample_steps,
-                # write_step=write_step,
-                # initial_equil_NVT_steps=initial_equil_NVT_steps,
-                # initial_equil_NPT_steps=initial_equil_NPT_steps,
-                # step_size=step_size,
-                # equil_step_size=equil_step_size,
                 Lambda=self.Lambda,
                 configuration=conf,
                 platform=platform,
