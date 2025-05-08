@@ -83,7 +83,9 @@ comp_prim_r2_pp(CSimdArray<double>& pbuffer,
 
         const double gfe_0 = 0.5 / (a_exp + b_exps[i] + c_exp);
 
-        gr_x_x[i] = 2.0 * ts_0_0[i] * gfe_0 + 2.0 * ts_0_x[i] * gfe_0 * gc_x[i] + 2.0 * ts_x_0[i] * gfe_0 * gc_x[i] + 3.0 * ts_x_x[i] * gfe_0 + ts_x_x[i] * rgc2_0;
+        const double gfe2_0 = gfe_0 * gfe_0;
+
+        gr_x_x[i] = 2.0 * ts_0_0[i] * gfe2_0 + 2.0 * ts_0_x[i] * gfe_0 * gc_x[i] + 2.0 * ts_x_0[i] * gfe_0 * gc_x[i] + 3.0 * ts_x_x[i] * gfe_0 + ts_x_x[i] * rgc2_0;
 
         gr_x_y[i] = 2.0 * ts_0_y[i] * gfe_0 * gc_x[i] + 2.0 * ts_x_0[i] * gfe_0 * gc_y[i] + 3.0 * ts_x_y[i] * gfe_0 + ts_x_y[i] * rgc2_0;
 
@@ -105,9 +107,11 @@ comp_prim_r2_pp(CSimdArray<double>& pbuffer,
 
         const double gfe_0 = 0.5 / (a_exp + b_exps[i] + c_exp);
 
+        const double gfe2_0 = gfe_0 * gfe_0;
+
         gr_y_x[i] = 2.0 * ts_0_x[i] * gfe_0 * gc_y[i] + 2.0 * ts_y_0[i] * gfe_0 * gc_x[i] + 3.0 * ts_y_x[i] * gfe_0 + ts_y_x[i] * rgc2_0;
 
-        gr_y_y[i] = 2.0 * ts_0_0[i] * gfe_0 + 2.0 * ts_0_y[i] * gfe_0 * gc_y[i] + 2.0 * ts_y_0[i] * gfe_0 * gc_y[i] + 3.0 * ts_y_y[i] * gfe_0 + ts_y_y[i] * rgc2_0;
+        gr_y_y[i] = 2.0 * ts_0_0[i] * gfe2_0 + 2.0 * ts_0_y[i] * gfe_0 * gc_y[i] + 2.0 * ts_y_0[i] * gfe_0 * gc_y[i] + 3.0 * ts_y_y[i] * gfe_0 + ts_y_y[i] * rgc2_0;
 
         gr_y_z[i] = 2.0 * ts_0_z[i] * gfe_0 * gc_y[i] + 2.0 * ts_y_0[i] * gfe_0 * gc_z[i] + 3.0 * ts_y_z[i] * gfe_0 + ts_y_z[i] * rgc2_0;
     }
@@ -127,11 +131,13 @@ comp_prim_r2_pp(CSimdArray<double>& pbuffer,
 
         const double gfe_0 = 0.5 / (a_exp + b_exps[i] + c_exp);
 
+        const double gfe2_0 = gfe_0 * gfe_0;
+
         gr_z_x[i] = 2.0 * ts_0_x[i] * gfe_0 * gc_z[i] + 2.0 * ts_z_0[i] * gfe_0 * gc_x[i] + 3.0 * ts_z_x[i] * gfe_0 + ts_z_x[i] * rgc2_0;
 
         gr_z_y[i] = 2.0 * ts_0_y[i] * gfe_0 * gc_z[i] + 2.0 * ts_z_0[i] * gfe_0 * gc_y[i] + 3.0 * ts_z_y[i] * gfe_0 + ts_z_y[i] * rgc2_0;
 
-        gr_z_z[i] = 2.0 * ts_0_0[i] * gfe_0 + 2.0 * ts_0_z[i] * gfe_0 * gc_z[i] + 2.0 * ts_z_0[i] * gfe_0 * gc_z[i] + 3.0 * ts_z_z[i] * gfe_0 + ts_z_z[i] * rgc2_0;
+        gr_z_z[i] = 2.0 * ts_0_0[i] * gfe2_0 + 2.0 * ts_0_z[i] * gfe_0 * gc_z[i] + 2.0 * ts_z_0[i] * gfe_0 * gc_z[i] + 3.0 * ts_z_z[i] * gfe_0 + ts_z_z[i] * rgc2_0;
     }
 
 }
