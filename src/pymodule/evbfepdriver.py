@@ -88,15 +88,15 @@ class EvbFepDriver():
         self.friction = 1.0
         self.temperature = -1
         self.pressure = -1
-        
-        self.equil_NVT_steps=5000
-        self.equil_NPT_steps=5000
-        self.sample_steps=100000
-        self.write_step=1000
-        self.initial_equil_NVT_steps=10000
-        self.initial_equil_NPT_steps=10000
-        self.step_size=0.001
-        self.equil_step_size=0.001
+
+        self.equil_NVT_steps = 5000
+        self.equil_NPT_steps = 5000
+        self.sample_steps = 100000
+        self.write_step = 1000
+        self.initial_equil_NVT_steps = 10000
+        self.initial_equil_NPT_steps = 10000
+        self.step_size = 0.001
+        self.equil_step_size = 0.001
 
         self.crash_reporting_interval: int = 1
         self.constrain_H: bool = False
@@ -170,7 +170,7 @@ class EvbFepDriver():
         platform,
     ):
         #todo add this to the configuration keywords
-        
+
         self.platform = platform
 
         for keyword, value in self.keywords.items():
@@ -187,8 +187,7 @@ class EvbFepDriver():
                         f"{keyword}: {getattr(self, keyword)}")
             else:
                 self.ostream.print_info(
-                    f"{keyword}: {getattr(self, keyword)} (default)"
-                )
+                    f"{keyword}: {getattr(self, keyword)} (default)")
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbFepDriver.')
@@ -211,8 +210,9 @@ class EvbFepDriver():
 
         self.ostream.flush()
 
-        assert (self.sample_steps % self.write_step == 0
-                ), "write_step must be a factor of sample_steps"
+        assert (
+            self.sample_steps %
+            self.write_step == 0), "write_step must be a factor of sample_steps"
         assert (self.sample_steps >= 2 *
                 self.write_step), "sample_steps must be at least 2*write_step"
 
@@ -593,7 +593,9 @@ class EvbFepDriver():
         output_file = "combined_crash.pdb"
         pdb_pattern = "state_step_*.pdb"
         pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
-        
+
+        self.ostream.print_info(pdb_files)
+
         with open(self.run_folder / output_file, 'w') as outfile:
             for model_number, pdb_file in enumerate(pdb_files, start=1):
                 with open(pdb_file, 'r') as infile:
@@ -601,7 +603,9 @@ class EvbFepDriver():
 
                 outfile.write(f"MODEL     {model_number}\n")
                 for line in lines:
-                    if (model_number == 1 and line.startswith("CRYST1")) or line.startswith(('ATOM', 'HETATM', 'TER')):
+                    if (model_number == 1
+                            and line.startswith("CRYST1")) or line.startswith(
+                                ('ATOM', 'HETATM', 'TER')):
                         outfile.write(line)
                     # Skip 'END' lines and anything else
                 outfile.write("ENDMDL\n")
