@@ -114,9 +114,9 @@ class TransitionStateGuesser():
         self.evb_drv = evb_drv
         self.scf_drv = scf_drv
         if scf:
-            molecule_sanity_check(self.evb.reactant.molecule)
+            molecule_sanity_check(self.evb_drv.reactant.molecule)
 
-        self.molecule = self.evb.reactant.molecule
+        self.molecule = self.evb_drv.reactant.molecule
         if charge is not None:
             self.molecule.set_charge(charge)
         if multiplicity is not None:
@@ -125,8 +125,8 @@ class TransitionStateGuesser():
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
 
-        self.evb = self.mm_temperature
-        self.evb.build_systems(['ts_guesser'],
+        self.evb_drv.temperature = self.mm_temperature
+        self.evb_drv.build_systems(['ts_guesser'],
                                self.lambda_vec,
                                save_output=False,
                                constraints=constraints)
@@ -134,26 +134,26 @@ class TransitionStateGuesser():
         self.ostream.print_header("Starting MM scan")
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
         self.ostream.flush()
-        mm_energies, mm_geometries, ff_exception = self._scan_ff(self.evb)
+        mm_energies, mm_geometries, ff_exception = self._scan_ff(self.evb_drv)
         xyz_geometries = []
         for mm_geom in mm_geometries:
-            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.evb.reactant.molecule)
+            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.evb_drv.reactant.molecule)
             xyz_geometries.append(xyz_geom)
         self.results = {
             'mm_energies': mm_energies,
             'mm_geometries': mm_geometries,
             'xyz_geometries': xyz_geometries,
             'lambda_vec': self.lambda_vec,
-            'broken_bonds': self.evb.broken_bonds,
-            'formed_bonds': self.evb.formed_bonds,
+            'broken_bonds': self.evb_drv.broken_bonds,
+            'formed_bonds': self.evb_drv.formed_bonds,
         }
         # for i, (E, P) in enumerate(zip(mm_energies, mm_geometries)):
         #     self.results[self.lambda_vec[i]] = {
         #         'mm_energy': E,
         #         'mm_geometry': P,
         #     }
-        self.results['broken_bonds'] = self.evb.broken_bonds
-        self.results['formed_bonds'] = self.evb.formed_bonds
+        self.results['broken_bonds'] = self.evb_drv.broken_bonds
+        self.results['formed_bonds'] = self.evb_drv.formed_bonds
         if ff_exception:
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
