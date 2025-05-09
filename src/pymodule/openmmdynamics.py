@@ -976,9 +976,9 @@ class OpenMMDynamics:
             print(f"Only {number} conformers available, showing all.")
         for i in range(number):
             if weights is not None:
-                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict['energies'][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
             else:
-                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict['energies'][i]:.3f} kJ/mol'
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol'
             self.ostream.print_info(msg)
             self.ostream.flush()
             self.conformer_dict["molecules"][i].show(
