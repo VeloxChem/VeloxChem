@@ -503,6 +503,10 @@ class LinearResponseSolver(LinearSolver):
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
+                            # Note: flip sign for imaginary a_operator
+                            if self.is_imag(self.a_operator):
+                                rsp_funcs[(aop, bop, w)] *= -1.0
+
                         # write to h5 file for response solutions
                         if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
