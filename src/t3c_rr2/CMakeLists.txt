@@ -1,0 +1,35 @@
+target_sources(vlxobjs
+  PRIVATE
+    ThreeCenterRR2Driver.cpp
+    ThreeCenterRR2PrimRecSS.cpp
+    ThreeCenterRR2PrimRecFF.cpp
+    ThreeCenterRR2PrimRecGP.cpp
+    ThreeCenterRR2PrimRecSD.cpp
+    ThreeCenterRR2PrimRecDD.cpp
+    ThreeCenterRR2PrimRecFG.cpp
+    ThreeCenterRR2PrimRecGS.cpp
+    ThreeCenterRR2PrimRecSF.cpp
+    ThreeCenterRR2PrimRecDF.cpp
+    ThreeCenterRR2PrimRecFP.cpp
+    ThreeCenterRR2PrimRecPD.cpp	
+    ThreeCenterRR2PrimRecSG.cpp
+    ThreeCenterRR2PrimRecDG.cpp	
+    ThreeCenterRR2PrimRecFS.cpp	
+    ThreeCenterRR2PrimRecPF.cpp	
+    ThreeCenterRR2PrimRecSP.cpp
+    ThreeCenterRR2PrimRecDP.cpp
+    ThreeCenterRR2PrimRecGD.cpp
+    ThreeCenterRR2PrimRecPG.cpp
+    ThreeCenterRR2PrimRecSS.cpp
+    ThreeCenterRR2PrimRecDS.cpp
+    ThreeCenterRR2PrimRecGF.cpp
+    ThreeCenterRR2PrimRecPP.cpp
+    ThreeCenterRR2PrimRecFD.cpp	
+    ThreeCenterRR2PrimRecGG.cpp
+    ThreeCenterRR2PrimRecPS.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

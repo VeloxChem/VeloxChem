@@ -56,6 +56,7 @@ from .veloxchemlib import ThreeCenterElectronRepulsionDriver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
 from .veloxchemlib import ThreeCenterR2Driver
+from .veloxchemlib import ThreeCenterRR2Driver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import T4CScreener

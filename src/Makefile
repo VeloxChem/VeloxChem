@@ -54,6 +54,7 @@ VLX_LIBS_DIR += t3c_func
 VLX_LIBS_DIR += t3c_electron_repulsion_geom_X00
 VLX_LIBS_DIR += t3c_electron_repulsion_geom_0X0
 VLX_LIBS_DIR += t3c_r2
+VLX_LIBS_DIR += t3c_rr2
 VLX_LIBS_DIR += visualization
 VLX_LIBS_DIR +=	onee_ints
 VLX_LIBS_DIR +=	pdft_func

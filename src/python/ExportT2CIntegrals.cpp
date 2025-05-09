@@ -51,6 +51,8 @@
 #include "TwoCenterElectronRepulsionDriver.hpp"
 #include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
 //#include "ThreeCenterR2Driver.hpp"
+//#include "ThreeCenterR2Driver.hpp"
+//#include "ThreeCenterRR2Driver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -513,6 +515,60 @@ export_t2cintegrals(py::module& m)
     //                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
     //                 return geom_drv.compute(exponents, factors, points, basis, molecule, iatom); },
     //         "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
+    // COverlapGeom100Driver class
+    // PyClass<CThreeCenterOverlapGradientGeomX00Driver<1>>(m, "ThreeCenterOverlapGradientGeom100Driver")
+    //     .def(py::init<>())
+    //     .def(
+    //         "compute",
+    //         [](const CThreeCenterOverlapGradientGeomX00Driver<1>& geom_drv,
+    //            const CMolecule&                                   molecule,
+    //            const CMolecularBasis&                             basis,
+    //            const std::vector<double>&                         exponents,
+    //            const std::vector<double>&                         factors,
+    //            const std::vector<std::array<double, 3>>&          coords,
+    //            const int                                          iatom)
+    //             -> CMatrices {
+    //                 auto points = std::vector<TPoint<double>>();
+    //                 points.reserve(coords.size());
+    //                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+    //                 return geom_drv.compute(exponents, factors, points, basis, molecule, iatom); },
+    //         "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // // CThreeCenterR2Driver class
+    // PyClass<CThreeCenterR2Driver>(m, "ThreeCenterR2Driver")
+    //     .def(py::init<>())
+    //     .def(
+    //         "compute",
+    //          [](const CThreeCenterR2Driver&              t3r2_drv,
+    //            const CMolecule&                          molecule,
+    //            const CMolecularBasis&                    basis,
+    //            const std::vector<double>&                exponents,
+    //            const std::vector<double>&                factors,
+    //            const std::vector<std::array<double, 3>>& coords) -> CMatrix {
+    //             auto points = std::vector<TPoint<double>>();
+    //             points.reserve(coords.size());
+    //             std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+    //                return t3r2_drv.compute(exponents, factors, points, basis, molecule);
+    //         },
+    //         "Computes three center r2 matrix for given molecule, basis and vector of external scaled Gaussians.");
+    
+    // // CThreeCenterRR2Driver class
+    // PyClass<CThreeCenterRR2Driver>(m, "ThreeCenterRR2Driver")
+    //     .def(py::init<>())
+    //     .def(
+    //         "compute",
+    //          [](const CThreeCenterRR2Driver&             t3rr2_drv,
+    //            const CMolecule&                          molecule,
+    //            const CMolecularBasis&                    basis,
+    //            const std::vector<double>&                exponents,
+    //            const std::vector<double>&                factors,
+    //            const std::vector<std::array<double, 3>>& coords) -> CMatrices {
+    //             auto points = std::vector<TPoint<double>>();
+    //             points.reserve(coords.size());
+    //             std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+    //                return t3rr2_drv.compute(exponents, factors, points, basis, molecule);
+    //         },
+    //         "Computes r.r2 matrices for given molecule, basis and vector of external scaled Gaussians.");
 }
 
 }  // namespace vlx_t2cintegrals
