@@ -108,7 +108,8 @@ class EvbSystemBuilder():
         self.neutralize: bool = False
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
-        self.bonded_integration_fac: float = 0.5  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_bond_fac: float = 0.5  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_angle_fac: float = 0.01  # Scaling factor for the bonded integration forces.
 
         self.verbose = False
 
@@ -132,6 +133,12 @@ class EvbSystemBuilder():
             "bonded_integration": {
                 "type": bool
             },
+            "bonded_integration_bond_fac": {
+                "type": float
+            },
+            "bonded_integration_angle_fac":{
+                "type": float
+            }
             "soft_core_coulomb_pes": {
                 "type": bool
             },
@@ -143,9 +150,6 @@ class EvbSystemBuilder():
             },
             "soft_core_lj_int": {
                 "type": bool
-            },
-            "bonded_integration_fac": {
-                "type": float
             },
             "pressure": {
                 "type": float
@@ -1082,7 +1086,7 @@ class EvbSystemBuilder():
                     atom_ids,
                     bond['equilibrium'] * scale + broken_length * (1 - scale),
                     bond['force_constant'] *
-                    (1 - scale * self.bonded_integration_fac),
+                    (1 - scale * self.bonded_integration_bond_fac),
                 )
         return harmonic_force, integration_force, morse_force, max_distance
 
@@ -1125,7 +1129,7 @@ class EvbSystemBuilder():
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
                 self._add_angle(integration_force, atom_ids, broken_equil,
-                                angle['force_constant'] * (1 - scale)*self.bonded_integration_fac)
+                                angle['force_constant'] * (1 - scale)*self.bonded_integration_angle_fac)
 
         return harmonic_force, integration_force
 
