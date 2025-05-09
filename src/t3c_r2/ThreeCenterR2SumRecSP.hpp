@@ -127,8 +127,6 @@ comp_sum_r2_sp(T& distributor,
 
                 t2cfunc::comp_coordinates_p(factors, 8, 2, r_a, a_exp);
 
-                t2cfunc::comp_distances_pb_from_p(factors, 11 , 8, 2);
-
                 ovlrec::comp_prim_overlap_ss(pbuffer, 0, factors, a_exp, a_norm);
 
                 const size_t npoints = coords.size();
