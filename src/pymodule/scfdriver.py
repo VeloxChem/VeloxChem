@@ -1744,9 +1744,15 @@ class ScfDriver:
                     self._scf_results['qm_vdw_params'] = self.qm_vdw_params
 
                 if self.solvation_model is not None:
-                    self._scf_results['solvation_model'] = self.solvation_model
-                    self._scf_results[
-                        'dielectric_constant'] = self.cpcm_drv.epsilon
+                    for key in [
+                            'solvation_model',
+                            'cpcm_epsilon',
+                            'cpcm_grid_per_sphere',
+                            'cpcm_cg_thresh',
+                            'cpcm_x',
+                            'cpcm_custom_vdw_radii',
+                    ]:
+                        self._scf_results[key] = getattr(self, key)
 
             else:
                 self._scf_results = None

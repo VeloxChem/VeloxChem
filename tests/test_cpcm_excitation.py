@@ -42,9 +42,10 @@ class TestExcitationCpcm:
 
         rsp_drv.ostream.mute()
         rsp_drv.nstates = 5
-        rsp_drv.solvation_model = 'cpcm'
-        rsp_drv.cpcm_grid_per_sphere = (110, 110)
-        rsp_drv.cpcm_custom_vdw_radii = cpcm_custom_vdw_radii
+        # solvation model info in scf_results will be used
+        # rsp_drv.solvation_model = 'cpcm'
+        # rsp_drv.cpcm_grid_per_sphere = (110, 110)
+        # rsp_drv.cpcm_custom_vdw_radii = cpcm_custom_vdw_radii
         rsp_drv.non_equilibrium_solv = noneq_solv
 
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
