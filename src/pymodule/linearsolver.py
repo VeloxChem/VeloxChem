@@ -146,7 +146,7 @@ class LinearSolver:
 
         # solvation model
         self.solvation_model = None
-        self.non_equilibrium_solv = False
+        self.non_equilibrium_solv = True
 
         # C-PCM setup
         self._cpcm = False
