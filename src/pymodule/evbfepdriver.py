@@ -556,7 +556,7 @@ class EvbFepDriver():
         for j, state in enumerate(states):
             step_num = step - len(states) + j
             xml_name = f"state_step_{j}_{step_num}"
-            pdb_name = f"{step_num}"
+            pdb_name = f"state_step_{step_num}"
             with open(path / f"{xml_name}.xml", "w") as f:
                 f.write(mm.XmlSerializer.serialize(state))
 
@@ -592,7 +592,7 @@ class EvbFepDriver():
         # Combine all saved PDB files into one and remove the sigle ones
         
         output_file = "combined_crash.pdb"
-        pdb_pattern = "*.pdb"
+        pdb_pattern = "state_step_*.pdb"
         pdb_files = sorted(glob.glob(os.path.join(self.run_folder, pdb_pattern)))
         with open(self.data_folder / output_file, 'w') as outfile:
             for model_number, pdb_file in enumerate(pdb_files, start=1):
@@ -600,7 +600,7 @@ class EvbFepDriver():
                 with open(pdb_file, 'r') as infile:
                     for line in infile:
                         if line.startswith(('ATOM', 'HETATM', 'TER',
-                                            'END')) or model_number == 1 and line.startswith("CRYST1"):  # Skip headers/footers
+                                            'END')) or (model_number == 1 and line.startswith("CRYST1")):  # Skip headers/footers
                             outfile.write(line)
                 outfile.write("ENDMDL\n")
                 os.remove(pdb_file)
