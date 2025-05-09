@@ -541,8 +541,6 @@ class LinearSolver:
             self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
             self._cpcm_precond = np.hstack(self._cpcm_precond)
 
-            self._cpcm_q = None
-
             self.ostream.print_info(
                 f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
                 + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
@@ -570,11 +568,6 @@ class LinearSolver:
         else:
             (self._dist_bger, self._dist_bung, self._dist_e2bger,
              self._dist_e2bung) = dist_arrays
-
-        if self._cpcm:
-            if self.rank == mpi_master():
-                self._cpcm_q = read_cpcm_charges(self.checkpoint_file)
-            self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
 
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
@@ -1521,12 +1514,12 @@ class LinearSolver:
 
                 rhs = self.comm.bcast(rhs, root=mpi_master())
 
-                self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
+                cpcm_rsp_q = self.cpcm_drv.cg_solve_parallel_direct(
                     self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, self._cpcm_q, self.cpcm_cg_thresh)
+                    rhs, None, self.cpcm_cg_thresh)
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
-                    molecule, basis, self._cpcm_grid, self._cpcm_q)
+                    molecule, basis, self._cpcm_grid, cpcm_rsp_q)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol
@@ -1569,8 +1562,6 @@ class LinearSolver:
         if self.rank == mpi_master():
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
                                      basis, dft_dict, pe_dict, self.ostream)
-            if self._cpcm:
-                write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
