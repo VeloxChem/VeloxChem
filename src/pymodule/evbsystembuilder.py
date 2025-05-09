@@ -138,7 +138,7 @@ class EvbSystemBuilder():
             },
             "bonded_integration_angle_fac":{
                 "type": float
-            }
+            },
             "soft_core_coulomb_pes": {
                 "type": bool
             },
