@@ -101,7 +101,7 @@ def scf_results_sanity_check(obj, scf_results):
 
         if scf_results.get('solvation_model', None) is not None:
             # do not overwrite solvation_model if it is already specified
-            if obj.solvation_model is None:
+            if hasattr(obj, 'solvation_model') and obj.solvation_model is None:
                 for key in [
                         'solvation_model',
                         'cpcm_epsilon',
