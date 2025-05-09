@@ -108,8 +108,8 @@ class EvbSystemBuilder():
         self.neutralize: bool = False
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
-        self.bonded_integration_bond_fac: float = 0.5  # Scaling factor for the bonded integration forces.
-        self.bonded_integration_angle_fac: float = 0.01  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_bond_fac: float = 0.1  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_angle_fac: float = 0  # Scaling factor for the bonded integration forces.
 
         self.verbose = False
 

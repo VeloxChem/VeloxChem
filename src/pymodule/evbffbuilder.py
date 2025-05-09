@@ -85,6 +85,8 @@ class EvbForceFieldBuilder():
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
 
+        self.mute_scf: bool = True
+
         self.optimize_ff: bool = True
 
     def build_forcefields(
@@ -141,6 +143,7 @@ class EvbForceFieldBuilder():
                 self.product, 
                 broken_bonds,note='product',
             )
+        
 
         return self.reactant, self.product, formed_bonds, broken_bonds
 
@@ -259,15 +262,20 @@ class EvbForceFieldBuilder():
             forcefield.molecule = molecule
         else:
             if input["optimize"] and optimize:
-                self.ostream.print_info("Optimising the geometry with xtb.")
                 scf_drv = XtbDriver(ostream=self.ostream)
                 opt_drv = OptimizationDriver(scf_drv)
                 opt_drv.hessian = "last"
+                if self.mute_scf:
+                    self.ostream.print_info("Optimising the geometry with xtb.")
+                    self.ostream.mute()
                 opt_results = opt_drv.compute(molecule)
+                self.ostream.unmute()
                 molecule = Molecule.from_xyz_string(
                     opt_results["final_geometry"])
 
+
             forcefield = MMForceFieldGenerator(ostream=self.ostream)
+            
             forcefield.eq_param = False
             #Load or calculate the charges
 
@@ -299,19 +307,26 @@ class EvbForceFieldBuilder():
                     scf_drv = ScfRestrictedDriver(ostream=self.ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(ostream=self.ostream)
-                self.ostream.flush()
+                
+                if self.mute_scf:
+                    self.ostream.print_info("Calculating SCF for RESP charges")
+                    self.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
                     scf_drv.conv_thresh = 1.0e-4
                     scf_drv.max_iter = 200
                     scf_results = scf_drv.compute(molecule, basis)
+                self.ostream.unmute()
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
-
                 resp_drv = RespChargesDriver(ostream=self.ostream)
-                self.ostream.print_info("Calculating RESP charges")
                 self.ostream.flush()
+                if self.mute_scf:
+                    self.ostream.print_info("Calculating RESP charges")
+                    self.ostream.mute()
                 forcefield.partial_charges = resp_drv.compute(
                     molecule, basis, scf_results, 'resp')
+                
+                self.ostream.unmute()
                 self.ostream.flush()
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule,
