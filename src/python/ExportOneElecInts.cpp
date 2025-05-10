@@ -53,6 +53,7 @@
 #include "NuclearPotentialHessian101.hpp"
 #include "QuadrupoleIntegrals.hpp"
 #include "OldOneElecIntsDrivers.hpp"
+#include "OverlapHessian101.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -417,9 +418,9 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(D.shape(0));
-                auto grad = onee::computeNuclearPotentialHessian110(
+                auto hess = onee::computeNuclearPotentialHessian110(
                     molecule, basis, point_coords.data(), point_charges.data(), npoints, D.data(), naos);
-                return vlx_general::pointer_to_numpy(grad.values(), {grad.getNumberOfRows(), grad.getNumberOfColumns()});
+                return vlx_general::pointer_to_numpy(hess.values(), {hess.getNumberOfRows(), hess.getNumberOfColumns()});
             },
             "Computes nuclear potential Hessian contribution.",
              "molecule"_a,
@@ -446,9 +447,9 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(D.shape(0));
-                auto grad = onee::computeNuclearPotentialHessian101(
+                auto hess = onee::computeNuclearPotentialHessian101(
                     molecule, basis, point_coords.data(), point_charges.data(), npoints, D.data(), naos);
-                return vlx_general::pointer_to_numpy(grad.values(), {grad.getNumberOfRows(), grad.getNumberOfColumns()});
+                return vlx_general::pointer_to_numpy(hess.values(), {hess.getNumberOfRows(), hess.getNumberOfColumns()});
             },
             "Computes nuclear potential Hessian contribution.",
              "molecule"_a,
@@ -456,6 +457,24 @@ export_oneeints(py::module& m)
              "point_coords"_a,
              "point_charges"_a,
              "density"_a);
+
+    m.def("compute_overlap_hessian_101",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& W) -> py::array_t<double> {
+                std::string errstyle("compute_overlap_hessian_101: Expecting contiguous numpy arrays");
+                auto        c_style = py::detail::check_flags(W.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_electric_point_hessian_101: Expecting square matrix W");
+                errors::assertMsgCritical(W.shape(0) == W.shape(1), errshape);
+                auto naos = static_cast<int>(W.shape(0));
+                auto hess = onee::computeOverlapHessian101(molecule, basis, W.data(), naos);
+                return vlx_general::pointer_to_numpy(hess.values(), {hess.getNumberOfRows(), hess.getNumberOfColumns()});
+            },
+            "Computes overlap Hessian contribution.",
+             "molecule"_a,
+             "basis"_a,
+             "omega_ao"_a);
 
     m.def("compute_quadrupole_integrals",
             [](const CMolecule&           molecule,

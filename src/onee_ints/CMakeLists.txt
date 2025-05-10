@@ -18,6 +18,7 @@ target_sources(vlxobjs
     NuclearPotentialHessian101.cpp
     QuadrupoleIntegrals.cpp
     OldOneElecIntsDrivers.cpp
+    OverlapHessian101.cpp
   )
 
 target_include_directories(vlxobjs
