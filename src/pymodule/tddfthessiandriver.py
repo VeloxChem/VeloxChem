@@ -160,10 +160,17 @@ class TddftHessianDriver(HessianDriver):
 
         # save the electronic energy
         self.elec_energy = self.compute_energy(molecule, basis, scf_drv,
-                                               rsp_drv, tddft_grad_drv
-                                                )
+                                               rsp_drv, tddft_grad_drv)
 
-        for i in range(molecule.number_of_atoms()):
+        natoms = molecule.number_of_atoms()
+
+        for i in range(natoms):
+            self.ostream.unmute()
+            self.ostream.unmute()
+            self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            self.ostream.flush()
+            self.ostream.mute()
+
             for d in range(3):
                 coords[i, d] += self.delta_h
                 new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
@@ -310,7 +317,8 @@ class TddftHessianDriver(HessianDriver):
         if self.rank == mpi_master():
             # Multiple excited states can be computed simultaneously.
             # For the numerical Hessian, take the first excited state in the list
-            return {'gradient': tddft_grad_drv.gradient[0],
+            return {
+                    'gradient': tddft_grad_drv.gradient[0],
                     'relaxed_dipole_moment': tddft_grad_drv.relaxed_dipole_moment[0],
                     }
         else:

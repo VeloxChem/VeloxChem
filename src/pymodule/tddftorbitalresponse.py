@@ -151,6 +151,10 @@ class TddftOrbitalResponse(CphfSolver):
             unrelaxed one-particle density.
         """
 
+        # TODO: replace with a sanity check?
+        if 'eigenvectors' in rsp_results:
+            self.tamm_dancoff = True
+
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,

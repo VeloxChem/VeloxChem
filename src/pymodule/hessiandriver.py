@@ -113,6 +113,7 @@ class HessianDriver:
             'hessian': {
                 'numerical': ('bool', 'do numerical hessian'),
                 'do_four_point': ('bool', 'do four-point numerical integration'),
+                'delta_h': ('float', 'step size for numerical integration'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
                 'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient'),

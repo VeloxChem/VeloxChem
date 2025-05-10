@@ -46,6 +46,7 @@ from .veloxchemlib import make_matrix
 from .matrices import Matrices
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
+from .tdaeigensolver import TdaEigenSolver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
@@ -190,7 +191,14 @@ class TddftGradientDriver(GradientDriver):
         scf_results_sanity_check(self, self._scf_drv.scf_tensors)
         dft_sanity_check(self, 'compute')
 
+        # TODO: replace with a sanity check?
+        if isinstance(rsp_drv, TdaEigenSolver):
+            self.tamm_dancoff = True
+
         if self.rank == mpi_master():
+            if self.tamm_dancoff:
+                self.flag = 'TDA Gradient Driver'
+
             all_states = list(np.arange(1, len(rsp_results['eigenvalues'])+1))
             if self.state_deriv_index is not None:
 
@@ -771,6 +779,7 @@ class TddftGradientDriver(GradientDriver):
         """
 
         scf_drv.ostream.mute()
+        rsp_drv.ostream.mute()
 
         # numerical dipole moment of the excited states
         n_states = len(self.state_deriv_index)
@@ -778,6 +787,12 @@ class TddftGradientDriver(GradientDriver):
         field = [0.0, 0.0, 0.0]
 
         for s in range(n_states):
+
+            self.ostream.unmute()
+            self.ostream.print_info(f'Processing excited state {s + 1}/{n_states}...')
+            self.ostream.flush()
+            self.ostream.mute()
+
             for i in range(3):
                 field[i] = field_strength
                 scf_drv.electric_field = field
@@ -801,6 +816,7 @@ class TddftGradientDriver(GradientDriver):
                                          / (2.0 * field_strength) )
 
         scf_drv.ostream.unmute()
+        rsp_drv.ostream.unmute()
 
         return dipole_moment
 
