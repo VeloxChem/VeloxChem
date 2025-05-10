@@ -303,6 +303,7 @@ class ScfDriver:
                 'level_shifting_delta': ('float', 'level shifting delta'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'ovl_thresh': ('float', 'AO linear dependency threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
