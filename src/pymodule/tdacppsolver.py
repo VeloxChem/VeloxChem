@@ -44,7 +44,8 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
                          write_rsp_solution_with_multiple_keys)
@@ -294,11 +295,8 @@ class ComplexResponseTDA(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation model setup
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                'solvation_model' not in scf_tensors,
-                type(self).__name__ + ': Solvation model not implemented')
+        # check solvation setup
+        solvation_model_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -343,6 +341,9 @@ class ComplexResponseTDA(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -720,6 +721,10 @@ class ComplexResponseTDA(LinearSolver):
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
+                            # Note: flip sign for imaginary a_operator
+                            if self.is_imag(self.a_operator):
+                                rsp_funcs[(aop, bop, w)] *= -1.0
+
                         # write to h5 file for response solutions
                         if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
@@ -1042,9 +1047,9 @@ class ComplexResponseTDA(LinearSolver):
             elif x_unit.lower() == 'nm':
                 spectrum['x_data'].append(auxnm / w)
 
-            Gxx = -rsp_funcs[('x', 'x', w)].imag / (-w)
-            Gyy = -rsp_funcs[('y', 'y', w)].imag / (-w)
-            Gzz = -rsp_funcs[('z', 'z', w)].imag / (-w)
+            Gxx = -rsp_funcs[('x', 'x', w)].imag / w
+            Gyy = -rsp_funcs[('y', 'y', w)].imag / w
+            Gzz = -rsp_funcs[('z', 'z', w)].imag / w
 
             beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
             Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()

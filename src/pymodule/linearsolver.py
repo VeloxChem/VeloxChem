@@ -30,7 +30,6 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -38,8 +37,6 @@ import math
 import sys
 
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import TwoCenterElectronRepulsionDriver
-from .veloxchemlib import SubMatrix
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -47,29 +44,24 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
-from .molecularbasis import MolecularBasis
 from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
-from .profiler import Profiler
 from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import dft_sanity_check, pe_sanity_check
+from .sanitychecks import (dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
-from .checkpoint import write_rsp_hdf5
+from .checkpoint import write_rsp_hdf5, write_cpcm_charges, read_cpcm_charges
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-
-try:
-    from scipy.linalg import lu_factor, lu_solve
-except ImportError:
-    pass
+from .cpcmdriver import CpcmDriver
 
 
 class LinearSolver:
@@ -148,6 +140,23 @@ class LinearSolver:
 
         # static electric field
         self.electric_field = None
+
+        # point charges
+        self.point_charges = None
+
+        # solvation model
+        self.solvation_model = None
+        self.non_equilibrium_solv = True
+
+        # C-PCM setup
+        self._cpcm = False
+        self.cpcm_drv = None
+        self.cpcm_epsilon = 78.39
+        self.cpcm_optical_epsilon = 1.777849
+        self.cpcm_grid_per_sphere = (194, 110)
+        self.cpcm_cg_thresh = 1.0e-8
+        self.cpcm_x = 0
+        self.cpcm_custom_vdw_radii = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -230,6 +239,9 @@ class LinearSolver:
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
+                'non_equilibrium_solv':
+                    ('bool',
+                     'toggle use of non-equilibrium solvation for response'),
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
@@ -238,6 +250,18 @@ class LinearSolver:
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
+                'solvation_model': ('str', 'solvation model'),
+                'cpcm_grid_per_sphere':
+                    ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
+                'cpcm_cg_thresh':
+                    ('float', 'threshold for solving C-PCM charges'),
+                'cpcm_epsilon':
+                    ('float', 'dielectric constant of solvent (C-PCM)'),
+                'cpcm_optical_epsilon':
+                    ('float', 'optical dielectric constant of solvent (C-PCM)'),
+                'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
+                'cpcm_custom_vdw_radii':
+                    ('seq_fixed_str', 'custom vdw radii for C-PCM'),
             },
         }
 
@@ -340,6 +364,8 @@ class LinearSolver:
 
         pe_sanity_check(self, method_dict)
 
+        solvation_model_sanity_check(self)
+
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
@@ -375,7 +401,8 @@ class LinearSolver:
 
         if self.ri_coulomb:
             self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule, basis,
+            self._ri_drv.prepare_buffers(molecule,
+                                         basis,
                                          self.ri_auxiliary_basis,
                                          verbose=True)
 
@@ -476,6 +503,49 @@ class LinearSolver:
         return {
             'potfile_text': potfile_text,
         }
+
+    def _init_cpcm(self, molecule):
+        """
+        Initializes C-PCM.
+
+        :param molecule:
+            The molecule.
+        """
+
+        # C-PCM setup
+        if self._cpcm:
+            cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
+            self.ostream.print_info(cpcm_info)
+            self.ostream.print_blank()
+            iswig_ref = 'A. W. Lange, J. M. Herbert,'
+            iswig_ref += ' J. Chem. Phys. 2010, 133, 244111.'
+            self.ostream.print_reference(iswig_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
+
+            self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
+            self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.x = self.cpcm_x
+            self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
+
+            cpcm_grid_t0 = tm.time()
+
+            (self._cpcm_grid,
+             self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
+
+            cpcm_local_precond = self.cpcm_drv.form_local_precond(
+                self._cpcm_grid, self._cpcm_sw_func)
+
+            self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
+            self._cpcm_precond = np.hstack(self._cpcm_precond)
+
+            self.ostream.print_info(
+                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
+                + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -1423,6 +1493,40 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
 
+        if self._cpcm:
+
+            t0 = tm.time()
+
+            for idx in range(num_densities):
+                Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
+                                                   self._cpcm_grid,
+                                                   dens[idx] * 2.0)
+                if comm_rank == mpi_master():
+                    if self.non_equilibrium_solv:
+                        scale_f = -(self.cpcm_optical_epsilon - 1) / (
+                            self.cpcm_optical_epsilon + self.cpcm_drv.x)
+                    else:
+                        scale_f = -(self.cpcm_drv.epsilon - 1) / (
+                            self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                    rhs = scale_f * (Cvec)
+                else:
+                    rhs = None
+
+                rhs = self.comm.bcast(rhs, root=mpi_master())
+
+                cpcm_rsp_q = self.cpcm_drv.cg_solve_parallel_direct(
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
+                    rhs, None, self.cpcm_cg_thresh)
+
+                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
+                    molecule, basis, self._cpcm_grid, cpcm_rsp_q)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += Fock_sol
+
+            if profiler is not None:
+                profiler.add_timing_info('FockCPCM', tm.time() - t0)
+
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
 
@@ -1598,6 +1702,27 @@ class LinearSolver:
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._cpcm:
+            cur_str = 'Solvation Model                 : '
+            cur_str += 'C-PCM'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per Hydrogen Sphere: '
+            cur_str += f'{self.cpcm_grid_per_sphere[1]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per non-H Sphere   : '
+            cur_str += f'{self.cpcm_grid_per_sphere[0]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Non-Equilibrium solvation       : '
+            cur_str += f'{self.non_equilibrium_solv}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Dielectric Constant       : '
+            cur_str += f'{self.cpcm_epsilon}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            if self.non_equilibrium_solv:
+                cur_str = 'C-PCM Optical Dielectric Constant: '
+                cur_str += f'{self.cpcm_optical_epsilon}'
+                self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()
@@ -2680,3 +2805,21 @@ class LinearSolver:
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    @staticmethod
+    def is_imag(op):
+        """
+        Checks if an operator is imaginary.
+
+        :return:
+            True if operator is imaginary, False otherwise
+        """
+
+        return op in [
+            'linear momentum',
+            'linear_momentum',
+            'angular momentum',
+            'angular_momentum',
+            'magnetic dipole',
+            'magnetic_dipole',
+        ]

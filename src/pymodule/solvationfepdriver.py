@@ -129,7 +129,7 @@ class SolvationFepDriver:
         self.output_folder = Path("solvation_fep_output")
 
         # Options for the SolvationBuilder
-        self.padding = 2.0
+        self.padding = 1.0
         self.solvent_name = 'spce'
         self.resname = None
         
@@ -158,7 +158,7 @@ class SolvationFepDriver:
         # Single parameter for lambdas for stage 1
         # Set to 6 to be on the safe side
         self.lambdas_stage1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Asymetric lambdas for stage 2 ##TODO: see if it's possible to reduce #of lambdas here..
+        # Asymetric lambdas for stage 2 
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
         # Fixed lambda vector for stage 3 with 6 lambdas
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]

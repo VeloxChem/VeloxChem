@@ -37,6 +37,8 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
+from .oneeints import compute_linear_momentum_integrals
+from .oneeints import compute_angular_momentum_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -106,6 +108,9 @@ class QuadraticResponseDriver(NonlinearSolver):
             'b_frequencies': ('seq_range', 'B frequencies'),
             'c_frequencies': ('seq_range', 'C frequencies'),
             'damping': ('float', 'damping parameter'),
+            'a_operator': ('str_lower', 'A operator'),
+            'b_operator': ('str_lower', 'B operator'),
+            'c_operator': ('str_lower', 'C operator'),
             'a_component': ('str_lower', 'Cartesian component of A operator'),
             'b_component': ('str_lower', 'Cartesian component of B operator'),
             'c_component': ('str_lower', 'Cartesian component of C operator'),
@@ -140,6 +145,23 @@ class QuadraticResponseDriver(NonlinearSolver):
         :return:
               A dictonary containing the E[3], X[2], A[2] contractions
         """
+
+        operator_mapping = {
+            'dipole': 'electric_dipole',
+            'electric dipole': 'electric_dipole',
+            'linear momentum': 'linear_momentum',
+            'angular momentum': 'angular_momentum',
+            'magnetic dipole': 'magnetic_dipole',
+        }
+
+        if self.a_operator in operator_mapping:
+            self._a_op_key = operator_mapping[self.a_operator]
+
+        if self.b_operator in operator_mapping:
+            self._b_op_key = operator_mapping[self.b_operator]
+
+        if self.c_operator in operator_mapping:
+            self._c_op_key = operator_mapping[self.c_operator]
 
         # for backward compatibility
         if self.a_component is None and hasattr(self, 'a_components'):
@@ -215,26 +237,27 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         # Computing first-order gradient vectors
         if self.rank == mpi_master():
-            mu_dipole_mats = compute_electric_dipole_integrals(
+            dipole_mats = compute_electric_dipole_integrals(
+                molecule, ao_basis, [0.0, 0.0, 0.0])
+            linmom_mats = compute_linear_momentum_integrals(
                 molecule, ao_basis)
-            # Note: nonliear response uses r instead of mu for dipole operator
-            dipole_mats = (mu_dipole_mats[0] * (-1.0),
-                           mu_dipole_mats[1] * (-1.0),
-                           mu_dipole_mats[2] * (-1.0))
+            angmom_mats = compute_angular_momentum_integrals(
+                molecule, ao_basis, [0.0, 0.0, 0.0])
         else:
-            dipole_mats = tuple()
+            dipole_mats = None
+            linmom_mats = None
+            angmom_mats = None
 
-        operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_grad = linear_solver.get_complex_prop_grad(operator, self.a_component,
-                                                     molecule, ao_basis,
-                                                     scf_tensors)
-        b_grad = linear_solver.get_complex_prop_grad(operator, self.b_component,
-                                                     molecule, ao_basis,
-                                                     scf_tensors)
-        c_grad = linear_solver.get_complex_prop_grad(operator, self.c_component,
-                                                     molecule, ao_basis,
-                                                     scf_tensors)
+        a_grad = linear_solver.get_complex_prop_grad(self._a_op_key,
+                                                     self.a_component, molecule,
+                                                     ao_basis, scf_tensors)
+        b_grad = linear_solver.get_complex_prop_grad(self._b_op_key,
+                                                     self.b_component, molecule,
+                                                     ao_basis, scf_tensors)
+        c_grad = linear_solver.get_complex_prop_grad(self._c_op_key,
+                                                     self.c_component, molecule,
+                                                     ao_basis, scf_tensors)
 
         if self.rank == mpi_master():
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -243,21 +266,21 @@ class QuadraticResponseDriver(NonlinearSolver):
             for ind in range(len(a_grad)):
                 a_grad[ind] *= inv_sqrt_2
                 # Note: nonliear response uses r instead of mu for dipole operator
-                if operator == 'dipole':
+                if self._a_op_key == 'electric_dipole':
                     a_grad[ind] *= -1.0
 
             b_grad = list(b_grad)
             for ind in range(len(b_grad)):
                 b_grad[ind] *= inv_sqrt_2
                 # Note: nonliear response uses r instead of mu for dipole operator
-                if operator == 'dipole':
+                if self._b_op_key == 'electric_dipole':
                     b_grad[ind] *= -1.0
 
             c_grad = list(c_grad)
             for ind in range(len(c_grad)):
                 c_grad[ind] *= inv_sqrt_2
                 # Note: nonliear response uses r instead of mu for dipole operator
-                if operator == 'dipole':
+                if self._c_op_key == 'electric_dipole':
                     c_grad[ind] *= -1.0
 
         # Storing the dipole integral matrices used for the X[2] and
@@ -285,10 +308,29 @@ class QuadraticResponseDriver(NonlinearSolver):
             ABC.update(C)
 
             X = {
-                'x': 2 * self.ao2mo(mo, dipole_mats[0]),
-                'y': 2 * self.ao2mo(mo, dipole_mats[1]),
-                'z': 2 * self.ao2mo(mo, dipole_mats[2])
+                # Note: nonliear response uses r instead of mu for dipole operator
+                'electric_dipole': {
+                    'x': 2 * self.ao2mo(mo, dipole_mats[0]) * (-1.0),
+                    'y': 2 * self.ao2mo(mo, dipole_mats[1]) * (-1.0),
+                    'z': 2 * self.ao2mo(mo, dipole_mats[2]) * (-1.0),
+                },
+                'linear_momentum': {
+                    'x': 2 * self.ao2mo(mo, linmom_mats[0]) * (-1j),
+                    'y': 2 * self.ao2mo(mo, linmom_mats[1]) * (-1j),
+                    'z': 2 * self.ao2mo(mo, linmom_mats[2]) * (-1j),
+                },
+                'angular_momentum': {
+                    'x': 2 * self.ao2mo(mo, angmom_mats[0]) * (-1j),
+                    'y': 2 * self.ao2mo(mo, angmom_mats[1]) * (-1j),
+                    'z': 2 * self.ao2mo(mo, angmom_mats[2]) * (-1j),
+                },
+                'magnetic_dipole': {
+                    'x': 2 * self.ao2mo(mo, angmom_mats[0]) * (0.5j),
+                    'y': 2 * self.ao2mo(mo, angmom_mats[1]) * (0.5j),
+                    'z': 2 * self.ao2mo(mo, angmom_mats[2]) * (0.5j),
+                },
             }
+
         else:
             X = None
             self.comp = None
@@ -296,13 +338,13 @@ class QuadraticResponseDriver(NonlinearSolver):
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponse(self.comm, self.ostream)
 
-        cpp_keywords = [
+        cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
             'ri_coulomb'
-        ]
+        }
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
@@ -369,6 +411,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             mo = None
             F0 = None
             norb = None
+
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
@@ -405,9 +448,9 @@ class QuadraticResponseDriver(NonlinearSolver):
 
             if self.rank == mpi_master():
 
-                op_a = X[self.a_component]
-                op_b = X[self.b_component]
-                op_c = X[self.c_component]
+                op_a = X[self._a_op_key][self.a_component]
+                op_b = X[self._b_op_key][self.b_component]
+                op_c = X[self._c_op_key][self.c_component]
 
                 kb = self.complex_lrvec2mat(Nb, nocc, norb)
                 kc = self.complex_lrvec2mat(Nc, nocc, norb)
@@ -424,10 +467,47 @@ class QuadraticResponseDriver(NonlinearSolver):
                 NbA2Nc = np.dot(Nb.T, A2Nc)
                 NcA2Nb = np.dot(Nc.T, A2Nb)
 
+                op_a_type = 'imag' if self.is_imag(self._a_op_key) else 'real'
+                op_b_type = 'imag' if self.is_imag(self._b_op_key) else 'real'
+                op_c_type = 'imag' if self.is_imag(self._c_op_key) else 'real'
+
+                #         eee     eem     eme     emm     mee     mem     mme     mmm
+                # E3      +       +       +       -       +       -       -       -
+                # B2C     +       +       -       +       +       -       +       +
+                # C2B     +       -       +       +       +       +       -       +
+                # A2B     +       +       +       -       -       +       +       +
+                # A2C     +       +       +       -       -       +       +       +
+
+                # flip sign for E3 term using two if's
+                if (op_b_type == op_c_type) and (op_b_type != op_a_type):
+                    NaE3NbNc *= -1.0
+                if op_a_type == 'imag':
+                    NaE3NbNc *= -1.0
+
+                # flip sign for B2C term
+                if (op_b_type != op_c_type) and (op_b_type != op_a_type):
+                    NaB2Nc *= -1.0
+
+                # flip sign for C2B term
+                if (op_c_type != op_b_type) and (op_c_type != op_a_type):
+                    NaC2Nb *= -1.0
+
+                # flip sign for A2B and A2C terms
+                if (op_b_type == op_c_type) and (op_b_type != op_a_type):
+                    NbA2Nc *= -1.0
+                    NcA2Nb *= -1.0
+
                 val_X2 = -(NaC2Nb + NaB2Nc)
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
-                beta = val_E3 + val_A2 + val_X2
+
+                qrf_rsp_func = val_E3 + val_A2 + val_X2
+
+                # flip sign for response function
+                if (op_b_type != op_a_type) or (op_c_type != op_a_type):
+                    qrf_rsp_func *= -1.0
+                if op_a_type == 'imag':
+                    qrf_rsp_func *= -1.0
 
                 self.ostream.print_blank()
                 w_str = 'Quadratic response function: '
@@ -442,11 +522,11 @@ class QuadraticResponseDriver(NonlinearSolver):
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('QRF', beta, width)
+                self._print_component('QRF', qrf_rsp_func, width)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                result[('qrf', wb, wc)] = beta
+                result[('qrf', wb, wc)] = qrf_rsp_func
 
         profiler.check_memory_usage('End of QRF')
 
