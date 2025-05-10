@@ -118,7 +118,7 @@ class InterpolationDriver():
         self.perform_mapping = True
         self.symmetry_sub_groups = None
         self.use_symmetry = True
-        self.weights = []
+        self.weights = {}
         self.int_coord_weights = {}
         self.potentials = []
 
@@ -137,6 +137,7 @@ class InterpolationDriver():
         self.bond_rmsd = None
         self.angle_rmsd = None
         self.dihedral_rmsd = None
+        self.averaged_int_dist = None
         # Name lables for the QM data points
         self.labels = None
 
@@ -389,7 +390,6 @@ class InterpolationDriver():
             gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
-            self.weights.append(weight)
             self.potentials.append(potential)
             weight_gradients.append(weight_grad)
             distances_from_points.append(distance)
@@ -457,12 +457,15 @@ class InterpolationDriver():
         sum_weights_cart = 0.0
         potentials = []
         gradients = []
-        # weights = []
+        hessian_error = []
+        beysian_error = []
         weights_cart = []
+        averaged_int_dists = []
         weight_gradients_cart = []
+        used_labels = []
         sum_weight_gradients_cart = np.zeros((natms, 3))
 
-
+        bey_int_coord = self.impes_coordinate.internal_coordinates_values.copy()
 
         distances_and_gradients = []
         min_distance = float('inf')
@@ -494,7 +497,7 @@ class InterpolationDriver():
         close_distances = [
             (self.qm_data_points[index], distance, wg, distance_vec, index) 
             for distance, index, wg, distance_vec in distances_and_gradients 
-            if abs(distance) <= min_distance + self.distance_thrsh + 10000]
+            if abs(distance) <= min_distance + self.distance_thrsh]
         # distances_from_points = [] 
         # internal_distance_dict = []
         for qm_data_point, distance, weight_grad_cart, distance_vector, label_idx in close_distances:
@@ -509,9 +512,15 @@ class InterpolationDriver():
             sum_weight_gradients_cart += weight_grad_cart
 
 
-            potential, gradient = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
+            potential, gradient, r_i = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
             gradients.append(gradient)
+            # bey_int_coord[self.symmetry_sub_groups[5]] = qm_data_point.internal_coordinates_values[self.symmetry_sub_groups[5]]
+            # _, var = qm_data_point.bayes_predict(bey_int_coord)
+            averaged_int_dists.append(qm_data_point.internal_coordinates_values)
+            # beysian_error.append(var)
+            hessian_error.append(r_i)
             potentials.append(potential)
+            used_labels.append(label_idx)
             weights_cart.append(weight_cart)
             self.potentials.append(potential)
             weight_gradients_cart.append(weight_grad_cart)
@@ -532,12 +541,17 @@ class InterpolationDriver():
         weights_cart = np.array(weights_cart) / sum_weights_cart
 
         self.sum_of_weights = sum_weights
-        
+        sigma_sq = 0.0
+        self.averaged_int_dist = np.zeros_like(self.impes_coordinate.internal_coordinates_values)
         for i in range(n_points):
-
+            
+            self.weights[used_labels[i]] = weights_cart[i]
+            # sigma_sq += weights_cart[i]**2 * beysian_error[i]
             # if self.store_weights:
             #     self.int_coord_weights[self.labels[used_labels[i]]] = weights[i]
             self.impes_coordinate.energy += weights_cart[i] * potentials[i]
+
+            self.averaged_int_dist += averaged_int_dists[i] * weights_cart[i]
 
             self.impes_coordinate.gradient += (
                 weights_cart[i] * gradients[i] +
@@ -547,8 +561,10 @@ class InterpolationDriver():
             # self.impes_coordinate.energy += potentials[i]
 
             # self.impes_coordinate.gradient += ( gradients[i])
+
+            # sigma_sq += weights_cart[i] * hessian_error[i]/0.5
         
-        
+        # print('Bey Error', np.sqrt(sigma_sq) * hartree_in_kcalpermol() )
         
         # print('Energy, Gradient', self.impes_coordinate.energy, self.impes_coordinate.gradient)
 
@@ -662,8 +678,17 @@ class InterpolationDriver():
            :param data_point:
                 InterpolationDatapoint object.
         """
-        
+        def pinv_cut(mat, rcond=1e-8):
+            """Moore–Penrose pseudo‑inverse with controllable cut‑off."""
+            U, s, Vt = np.linalg.svd(mat, full_matrices=False)
+            large = s > rcond
+            Sinv = np.zeros_like(s)
+            Sinv[large] = 1.0 / s[large]
+            return (Vt.T * Sinv) @ U.T
 
+        def periodic_delta(phi, phi_ref):
+            """Return smallest signed angular difference in radians (-π, π]."""
+            return ((phi - phi_ref + np.pi) % (2*np.pi)) - np.pi
         # implement sin for keeping the structure
         # change the code so it can take on any function that is being used for the dihedral
         # TODO: check if the bond angle can be described by a function as well?
@@ -686,6 +711,7 @@ class InterpolationDriver():
             potentials = []
             pot_gradients = []
             symmetry_weight_gradients = []
+            hessian_error = []
 
             for i, symmetry_data_point in enumerate(symmetry_data_points):
                 energy = symmetry_data_point.energy
@@ -703,11 +729,12 @@ class InterpolationDriver():
 
                     dist_org = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
                     dist_check = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
+                    dist_correlation = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
                     
                     sum_sym_dihedral = 0.0
                     sum_sym_dihedral_prime = np.zeros_like(data_point.cartesian_coordinates.reshape(-1))
 
-                    
+                    symmetry_index = []
                     for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_sub_groups[-1][1]:], start=self.symmetry_sub_groups[-1][1]): 
 
 
@@ -716,28 +743,36 @@ class InterpolationDriver():
                             dist_check[i] = np.sin(dist_org[i])
                             sum_sym_dihedral += self.te_weight_general(dist_org[i], 3)
                             sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 3)
+                            dist_correlation[i] = 0.0
+
+
 
                         elif len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[2]:
                             dist_check[i] = np.sin(dist_org[i])
                             sum_sym_dihedral += self.te_weight_general(dist_org[i], 2)
                             sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 2)      
+                            dist_correlation[i] = 0.0
+
+
                         elif len(element) == 4:
        
                             dist_check[i] = np.sin(dist_org[i])  
-                    
+                            dist_correlation[i] = np.sin(dist_org[i])
+
                     self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_sub_groups[-1][0]])**2))))
                     self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_sub_groups[-1][0]:self.symmetry_sub_groups[-1][1]]**2))))
-                    self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[self.symmetry_sub_groups[-1][1]:]**2))))
-                    # if sum_sym_dihedral == 0.0:
-                    #     continue
-                    # print('Weight', sum_sym_dihedral, sum_sym_dihedral_prime.reshape(natm, 3))
+                    self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_sub_groups[-1][1]:]**2))))
+                    if sum_sym_dihedral == 0.0:
+                        continue
                     symmetry_weights.append(sum_sym_dihedral)
 
                     symmetry_weight_gradients.append(sum_sym_dihedral_prime.reshape(natm, 3))
 
                     pes = (energy + np.matmul(dist_check.T, grad) +
                         0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
-                    
+
+                    hessian_error.append(np.sqrt(abs(np.linalg.multi_dot([dist_check.T, pinv_cut(hessian), dist_check]))))
+
                     potentials.append(pes)
                     dist_hessian = np.matmul(dist_check.T, hessian)
                     for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_sub_groups[-1][1]:], start=self.symmetry_sub_groups[-1][1]):
@@ -753,6 +788,8 @@ class InterpolationDriver():
             
 
             weights = np.array(symmetry_weights) / total_weight_sum   
+
+
             potentials = np.array(potentials)
             print(weights)
             pes = np.dot(potentials, weights)
@@ -765,10 +802,14 @@ class InterpolationDriver():
             gradient = np.zeros_like(potentials_prime[0])
 
             for j in range(len(weights)):
-                # print('inside loop', j, np.linalg.norm(potentials_prime[j] * weights[j] + potentials[j] * weights_prime[j] / total_weight_sum - potentials[j] * weights[j] * total_weight_grad_sum / total_weight_sum ))
+                
+                self.bond_rmsd[j] *= weights[j]
+                self.angle_rmsd[j] *= weights[j]
+                self.dihedral_rmsd[j] *= weights[j]
+
                 gradient += potentials_prime[j] * weights[j] + potentials[j] * weights_prime[j] / total_weight_sum - potentials[j] * weights[j] * total_weight_grad_sum / total_weight_sum    
 
-        return pes, gradient
+        return pes, gradient, hessian_error
 
 
     

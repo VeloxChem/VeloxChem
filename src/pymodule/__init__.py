@@ -1,34 +1,26 @@
 #
-#                                   VELOXCHEM
-#              ----------------------------------------------------
-#                          An Electronic Structure Code
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
 #
-#  SPDX-License-Identifier: BSD-3-Clause
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
-#  Copyright 2018-2025 VeloxChem developers
+#  SPDX-License-Identifier: LGPL-3.0-or-later
 #
-#  Redistribution and use in source and binary forms, with or without modification,
-#  are permitted provided that the following conditions are met:
+#  This file is part of VeloxChem.
 #
-#  1. Redistributions of source code must retain the above copyright notice, this
-#     list of conditions and the following disclaimer.
-#  2. Redistributions in binary form must reproduce the above copyright notice,
-#     this list of conditions and the following disclaimer in the documentation
-#     and/or other materials provided with the distribution.
-#  3. Neither the name of the copyright holder nor the names of its contributors
-#     may be used to endorse or promote products derived from this software without
-#     specific prior written permission.
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
 #
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 # C++ classes
 from .veloxchemlib import AtomBasis
@@ -67,6 +59,7 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
+from .veloxchemlib import RIFockDriver
 from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
@@ -117,7 +110,6 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
-from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
@@ -146,7 +138,6 @@ from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
-from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver
@@ -185,11 +176,9 @@ from .symmetryanalyzer import SymmetryAnalyzer
 from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
-from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
-from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
@@ -203,11 +192,10 @@ from .externalhessiandriver import ExternalHessianDriver
 from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
 from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
+from .localbayesresidual import LocalBayesResidual
 from .clustermanager import ClusterManager
 from .atommapper import AtomMapper
 from .mofbuilder import MofBuilder
-from .conformergenerator import ConformerGenerator
-from .tsguesser import TransitionStateGuesser
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
@@ -231,4 +219,4 @@ set_vlxdatapath()
 set_omp_num_threads()
 configure_mkl_rt()
 
-__version__ = "1.0rc4"
+__version__ = "1.0rc3"

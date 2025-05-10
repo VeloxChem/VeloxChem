@@ -101,6 +101,7 @@ class InterpolationDatapoint:
         self.atom_labels = atom_labels
         self.internal_gradient = None
         self.internal_hessian = None
+        self.inv_sqrt_masses = None
 
         self.b_matrix = None
 
@@ -125,6 +126,14 @@ class InterpolationDatapoint:
         # InterpolationDatapoint objects.
         self.internal_coordinates_values = None
         self.cartesian_coordinates = None
+
+        # baysian block
+        self.prec_matrix = None
+        self.low_trig_chol_prec_matrix = None
+        self.rhs = None
+        self.post_mean = None
+        self.sigma2 = None
+        self.lambda_inv = None
 
         self._input_keywords = {
             'im_settings': {
@@ -269,6 +278,8 @@ class InterpolationDatapoint:
 
         if self.b_matrix is None:
             self.calculate_b_matrix()
+        
+        self.b_matrix = self.b_matrix * self.inv_sqrt_masses
 
         assert_msg_critical(self.gradient is not None, 'InterpolationDatapoint: No gradient is defined.')
 
@@ -322,6 +333,10 @@ class InterpolationDatapoint:
         dimension = self.gradient.shape[0] * 3 - 6
         if self.gradient.shape[0] == 2:
             dimension += 1
+        
+        self.b2_matrix = (self.b2_matrix *
+            self.inv_sqrt_masses.reshape(1, -1, 1) *
+            self.inv_sqrt_masses.reshape(1,  1, -1))
 
         g_matrix = np.dot(self.b_matrix, self.b_matrix.T)
 
@@ -400,6 +415,22 @@ class InterpolationDatapoint:
         self.backtransform_internal_gradient_to_cartesian_coordinates()
         self.backtransform_internal_hessian_to_cartesian_coordinates()
 
+    def transform_gradient(self):
+        """
+        Performs all steps required to transform from Cartesian coordinates
+        to the internal coordinates defined in the Z-matrix.
+
+        """
+
+        # Create the internal coordinates through geomeTRIC
+        if self.internal_coordinates is None:
+            self.define_internal_coordinates()
+
+        # Transform the gradient and Hessian to internal coordinates
+        self.transform_gradient_to_internal_coordinates()
+
+        # Save the values of the internal coordinates as a numpy array
+        self.compute_internal_coordinates_values()
 
     def transform_gradient_and_hessian(self):
         """
@@ -898,3 +929,219 @@ class InterpolationDatapoint:
                     raise ValueError(f"Shape mismatch: existing {dataset.shape}, new {np.shape(new_confidence_radius)}")
             else:
                 raise KeyError(f"{confidence_radius_label} not found in file.")
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    # def init_bayesian(
+    #         self,
+    #         sigma2      = 1.0e-6,          # observation variance for E and g   (Eh²)
+    #         sigma2_H    = 1.0e-4,          # observation variance for Hessian  (Eh²)
+    #         lambda_E    = 200 * 0.0015936, # prior variance (E)    ~100 kcal
+    #         lambda_g    =  50 * 0.0015936, # prior variance (∂E/∂q)~ 50 kcal
+    #         lambda_H    =  10 * 0.0015936  # prior variance (∂²E)  ~ 10 kcal
+    # ):
+    #     """
+    #     Allocate Bayesian containers for *this* centre and insert the centre’s own
+    #     energy, gradient **and Hessian** as the very first observation block.
+
+    #     All quantities must already be stored in
+    #         self.energy                 (float, Eh)
+    #         self.internal_gradient      (1-D array, length m, Eh)
+    #         self.internal_hessian       (2-D symmetric, shape m×m, Eh)
+    #         self.internal_coordinates_values
+    #     """
+
+    #     # ---------- dimensions ---------------------------------------------------
+    #     m = len(self.internal_coordinates_values)          # # internal DOFs
+    #     d = 1 + m + m*(m+1)//2                             # length of coeff vector
+    #     n_H = m*(m+1)//2                                   # # Hessian elements
+    #     n_rows = 1 + m + n_H                               # total rows in Φ, y
+
+    #     # ---------- prior precision  Λ₀⁻¹  (diagonal) ----------------------------
+    #     prior_E = np.full(1,          1.0 / lambda_E)
+    #     prior_g = np.full(m,          1.0 / lambda_g)
+    #     prior_H = np.full(n_H,        1.0 / lambda_H)
+    #     self.lambda_inv = np.diag(np.concatenate((prior_E, prior_g, prior_H)))
+
+    #     # ---------- containers ----------------------------------------------------
+    #     self.prec_matrix               = self.lambda_inv.copy()   # A  (d×d)
+    #     self.rhs                       = np.zeros(d)              # b  (d)
+    #     self.low_trig_chol_prec_matrix = None                     # L  (built later)
+    #     self.post_mean                 = np.zeros(d)              # c
+    #     self.sigma2                    = sigma2                   # store for updates
+
+    #     # ---------- build Φ  and  y  ---------------------------------------------
+    #     # feature-row matrix
+    #     Phi = np.zeros((n_rows, d))
+
+    #     # 1) energy row  picks coefficient c₀
+    #     Phi[0, 0] = 1.0
+    #     y_E = np.array([self.energy])
+
+    #     # 2) gradient rows  pick the linear coefficients c_i
+    #     Phi[1:1+m, 1:1+m] = np.eye(m)
+    #     y_g = self.internal_gradient.ravel()        # already  ∂E/∂q   (no minus)
+
+    #     # 3) Hessian rows  pick the quadratic coefficients c_{ij}  (upper tri only)
+    #     tri_i, tri_j = np.triu_indices(m)
+    #     offset = 1 + m                               # where Hessian block starts
+    #     for k, (i, j) in enumerate(zip(tri_i, tri_j)):
+    #         Phi[1+m+k, offset+k] = 1.0
+    #     y_H = self.internal_hessian[tri_i, tri_j]
+
+    #     # stack right-hand side
+    #     y_obs = np.concatenate((y_E, y_g, y_H))
+
+    #     # ---------- per-row weights  W^(1/2) Φ  and  W^(1/2) y -------------------
+    #     W_diag = np.concatenate((
+    #         np.full(1,      1.0 / sigma2     ),      # energy
+    #         np.full(m,      1.0 / sigma2     ),      # gradient
+    #         np.full(n_H,    1.0 / sigma2_H   )       # Hessian (looser)
+    #     ))
+    #     sqrtW  = np.sqrt(W_diag)                     # length n_rows
+
+    #     Phi_w  = sqrtW[:, None] * Phi                # broadcast rows
+    #     y_w    = sqrtW * y_obs
+
+    #     # ---------- assemble Bayesian matrices -----------------------------------
+    #     self.prec_matrix += Phi_w.T @ Phi_w          # A = Λ₀⁻¹ + ΦᵀWΦ
+    #     self.rhs         += Phi_w.T @ y_w            # b = ΦᵀW y
+
+    #     self.low_trig_chol_prec_matrix = np.linalg.cholesky(self.prec_matrix)
+    #     self.post_mean = scipy.linalg.cho_solve(
+    #                         (self.low_trig_chol_prec_matrix, True),
+    #                         self.rhs)
+
+    # # -------------- 2.  add a *new* energy/gradient row block -------------
+    # def bayes_update(self, x_obs, E_int, E_obs, g_obs, w_shep):
+    #     """Low-rank update with a ghost observation or a neighbour’s point."""
+        
+    #     dE = E_obs - E_int
+    #     v_target   = dE**2
+    #     w_diag = self._block_precisions(dE, w_shep, kappa=1.0)
+    #     w_scalar = self._target_weight(x_obs, v_target)
+    #     print('Scalar weight', w_scalar)
+
+    #     # --- feature rows --------------------------------------------------
+    #     dx_phi  = self._phi(x_obs)          # helper below
+    #     Gmat    = self._G  (x_obs)          # (m,d)
+    #     Phi     = np.vstack((dx_phi, -Gmat))
+    #     y       = np.concatenate(([E_obs], g_obs.ravel()))
+
+    #     # --- weighting -----------------------------------------------------
+    #     m          = len(self.internal_coordinates_values)
+    #     W_diag     = np.concatenate((
+    #             np.full(1 + m, w_scalar),          # E + grads
+    #             # if you have Hessian rows:
+    #             # np.full(n_H, w_scalar)
+    #          ))
+
+    #     sqrtW      = np.sqrt(W_diag)
+    #     Phi_w      = sqrtW[:, None] * Phi
+    #     y_w        = sqrtW * y
+        
+        
+    #     # sqrt_w  = np.sqrt(w_diag)
+    #     # Phi_w   = sqrt_w[:, None] * Phi
+    #     # y_w     = sqrt_w * y
+
+    #     # Bey Error 0.0665165716615336
+    #     # w_obs   = w_shep / self.sigma2
+    #     # Phi_w   = np.sqrt(w_obs) * Phi
+    #     # y_w     = np.sqrt(w_obs) * y
+
+    #     # --- rank-k downdate/update ---------------------------------------
+    #     self.prec_matrix += Phi_w.T @ Phi_w
+    #     self.rhs         += Phi_w.T @ y_w
+
+    #     # refresh Cholesky + mean
+    #     self.low_trig_chol_prec_matrix = np.linalg.cholesky(self.prec_matrix)
+    #     self.post_mean = scipy.linalg.cho_solve(
+    #                         (self.low_trig_chol_prec_matrix, True),
+    #                         self.rhs)
+
+    # # -------------- 3.  predict μ and σ² at any query point ---------------
+    # def bayes_predict(self, x_query):
+    #     dx_phi = self._phi(x_query)
+    #     mu     = dx_phi @ self.post_mean
+
+    #     # local variance  φᵀΛφ + σ²
+    #     v      = scipy.linalg.cho_solve(
+    #                 (self.low_trig_chol_prec_matrix, True), dx_phi)
+    #     var    = dx_phi @ v + self.sigma2
+    #     return mu, var
+
+    # # ------------- helpers that live inside the class --------------------
+    # def _phi(self, x):
+    #     """feature vector  [1, Δq, ½ vec(ΔqΔqᵀ)]   in *internal coordinates*"""
+    #     dx   = x - self.internal_coordinates_values           # Δq
+        
+    #     for i, element in enumerate(self.z_matrix):
+    #         if len(element) == 4:
+    #             dx[i] = np.sin(dx[i])
+    #     quad = np.outer(dx, dx)[np.triu_indices_from(
+    #                             np.empty((len(dx),)*2))]       # upper tri
+    #     return np.concatenate(([1.0], dx, 0.5*quad))
+
+    # def _G(self, x):
+    #     """Jacobian ∂φ/∂x   size (m,d)   in internal coordinates."""
+    #     dx   = x - self.internal_coordinates_values
+    #     for i, element in enumerate(self.z_matrix):
+    #         if len(element) == 4:
+    #             dx[i] = np.sin(dx[i])
+    #     m    = len(dx)
+    #     d    = 1 + m + m*(m+1)//2
+    #     Gmat = np.zeros((m, d))
+    #     Gmat[:, 1:1+m] = -np.eye(m)
+    #     col  = 1 + m
+    #     for i in range(m):
+    #         for j in range(i, m):
+    #             Gmat[i, col] += -0.5 * dx[j]
+    #             Gmat[j, col] += -0.5 * dx[i]
+    #             col += 1
+    #     return Gmat
+    
+    # def _block_precisions(self, residual_E, w_shep, kappa=0.5):
+    #     """Return per-row precisions for energy + gradient (+ Hessian)."""
+    #     s       = self.sigma2 / (self.sigma2 + kappa * residual_E**2)
+    #     w_E     = w_shep * s / self.sigma2
+    #     m       = len(self.internal_coordinates_values)
+    #     w_g     = np.full(m, w_shep * s / self.sigma2)
+    #     # If you ever add Hessian rows, include them here too:
+    #     # n_H   = m*(m+1)//2
+    #     # w_H   = np.full(n_H, w_shep * s / self.sigma2_H)
+    #     return np.concatenate(([w_E], w_g))
+    
+    # def _target_weight(self, x_obs, v_target):
+    #     """
+    #     Return the scalar precision w that makes the posterior variance
+    #     at x_obs equal to v_target (Hartree**2).
+    #     """
+    #     phi        = self._phi(x_obs)
+    #     s          = phi @ scipy.linalg.cho_solve(
+    #                     (self.low_trig_chol_prec_matrix, True), phi)
+    #     v0         = s + self.sigma2
+
+    #     if v_target >= v0:
+    #         print('#####################')
+    #         v_target = v0
+    #         # raise ValueError("Target variance not smaller than current variance")
+    #     return (v0 - v_target) / (s * v_target)
+

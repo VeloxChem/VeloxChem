@@ -335,10 +335,17 @@ class IMForceFieldGenerator:
         regrouped, rot_groups = regroup_by_rotatable_connection(symmetry_groups_ref, rotatable_bonds_zero_based, molecule.get_connectivity_matrix())
         
         non_core_atoms = [element for group in regrouped for element in group]
+        _, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups, rotatable_bonds_zero_based)
+        
+        indices_list = []
+        for key, dihedral_list in self.symmetry_dihedral_lists.items():
+           
+           for i, element in enumerate(self.z_matrix[dihedral_index:], start=dihedral_index):
 
-        self.symmetry_groups = (symmetry_groups[0], rot_groups, regrouped, non_core_atoms, rotatable_bonds_zero_based, [angle_index, dihedral_index])
+               if tuple(sorted(element)) in dihedral_list:
+                   indices_list.append(i)
 
-        _, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, self.symmetry_groups[1], self.symmetry_groups[4])
+        self.symmetry_groups = (symmetry_groups[0], rot_groups, regrouped, non_core_atoms, rotatable_bonds_zero_based, indices_list, [angle_index, dihedral_index])
 
         rotatable_dihedrals_dict = {}
 
@@ -353,9 +360,11 @@ class IMForceFieldGenerator:
 
             sorted_bond = tuple(sorted([j, k]))
             max_periodicity = get_max_periodicity(dih["periodicity"])
+            print('sortted bond', sorted_bond, dih["periodicity"], rotatable_dihedrals_dict)
 
             if sorted_bond in rotatable_bonds_zero_based:
                 if sorted_bond not in rotatable_dihedrals_dict:
+      
                     rotatable_dihedrals_dict[sorted_bond] = deepcopy(dih)
                     rotatable_dihedrals_dict[sorted_bond]["dihedral_indices"] = (i, j, k, l)
                     rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max_periodicity
@@ -371,6 +380,7 @@ class IMForceFieldGenerator:
             dihedral = rotatable_dihedrals_dict[key]['dihedral_indices']
             perodicity = rotatable_dihedrals_dict[key]['max_periodicity']
             n_sampling = 6
+            print('key', key, perodicity)
             if perodicity == 2:
                 continue
             elif perodicity == 3:
@@ -379,7 +389,14 @@ class IMForceFieldGenerator:
             else:
                 target_dihedrals.append((dihedral, perodicity, n_sampling))
        
+        print(target_dihedrals)
         self.conformal_structures = self.determine_conformal_structures(molecule, specific_dihedrals=target_dihedrals)
+
+        print(self.conformal_structures)
+
+        print('\n\n', self.symmetry_groups)
+
+        exit()
 
     def compute(self, molecule, basis):
 
@@ -631,8 +648,9 @@ class IMForceFieldGenerator:
                 key, molecules = entry
                 
                 for i, mol in enumerate(molecules):
-                    print(len(molecules))
-                    # mol.set_dihedral_in_degrees([5,0,1,6], 180)
+                    
+                    mol.set_dihedral([7,2,1,5], 30.0, 'degree')
+
                     current_dihedral_angle = list(self.allowed_deviation[key].keys())[i]
 
                     density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, imforcefieldfile)
@@ -1473,7 +1491,7 @@ class IMForceFieldGenerator:
                 masses = molecule.get_masses().copy()
                 masses_cart = np.repeat(masses, 3)
                 inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-
+                
 
                 for number in range(len(energies)):
                     if files_to_add is not None and (state + number) not in files_to_add:
@@ -1498,6 +1516,7 @@ class IMForceFieldGenerator:
                         label = f'{old_label}_symmetry_{label_counter}'
                     impes_coordinate = InterpolationDatapoint(z_matrix)
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
+                    impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
                     impes_coordinate.energy = energies[number]
                     impes_coordinate.gradient = grad_mw
                     impes_coordinate.hessian = H_mw
@@ -1632,7 +1651,6 @@ class IMForceFieldGenerator:
             for d in dihedrals:
                 middle_bond = frozenset([d[1], d[2]])
 
-                print(middle_bond, rot_bond_set)
                 if middle_bond in rot_bond_set:
                     common_elements = [x for x in [d[0], d[3]] if x in reference_set]
                     if len(common_elements) == 1:
