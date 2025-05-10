@@ -144,7 +144,7 @@ computeNuclearPotentialHessian101(const CMolecule& molecule,
         }
         else
         {
-            std::string errangmom("computeNuclearPotentialHessian101: Only implemented up to f-orbitals");
+            std::string errangmom("computeNuclearPotentialHessian101: Only implemented up to d-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
