@@ -19,6 +19,7 @@ target_sources(vlxobjs
     QuadrupoleIntegrals.cpp
     OldOneElecIntsDrivers.cpp
     OverlapHessian101.cpp
+    KineticEnergyHessian101.cpp
   )
 
 target_include_directories(vlxobjs

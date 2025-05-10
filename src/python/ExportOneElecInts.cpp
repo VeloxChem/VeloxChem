@@ -54,6 +54,7 @@
 #include "QuadrupoleIntegrals.hpp"
 #include "OldOneElecIntsDrivers.hpp"
 #include "OverlapHessian101.hpp"
+#include "KineticEnergyHessian101.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -475,6 +476,24 @@ export_oneeints(py::module& m)
              "molecule"_a,
              "basis"_a,
              "omega_ao"_a);
+
+    m.def("compute_kinetic_energy_hessian_101",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& D) -> py::array_t<double> {
+                std::string errstyle("compute_kinetic_energy_hessian_101: Expecting contiguous numpy arrays");
+                auto        c_style = py::detail::check_flags(D.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_electric_point_hessian_101: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto naos = static_cast<int>(D.shape(0));
+                auto hess = onee::computeKineticEnergyHessian101(molecule, basis, D.data(), naos);
+                return vlx_general::pointer_to_numpy(hess.values(), {hess.getNumberOfRows(), hess.getNumberOfColumns()});
+            },
+            "Computes kinetic energy Hessian contribution.",
+             "molecule"_a,
+             "basis"_a,
+             "density"_a);
 
     m.def("compute_quadrupole_integrals",
             [](const CMolecule&           molecule,
