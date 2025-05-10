@@ -66,12 +66,10 @@ class TddftOrbitalResponse(CphfSolver):
 
         self.tamm_dancoff = False
         self.state_deriv_index = None
-        self.do_first_order_prop = False
 
         self._input_keywords['orbitalresponse'].update({
             'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
             'state_deriv_index': ('seq_fixed_int', 'excited state of interest'),
-            'do_first_order_prop': ('bool', 'do first-order property'),
             }
         )
 
@@ -111,59 +109,6 @@ class TddftOrbitalResponse(CphfSolver):
 
         super().compute(molecule, basis, scf_tensors, rsp_results)
 
-        if self.do_first_order_prop:
-            first_order_prop = FirstOrderProperties(self.comm, self.ostream)
-
-            # unrelaxed density and dipole moment
-            if self.rank == mpi_master():
-                if self.tamm_dancoff:
-                    method = 'TDA'
-                else:
-                    method = 'RPA'
-                nocc = molecule.number_of_alpha_electrons()
-                mo = scf_tensors['C_alpha']
-                mo_occ = mo[:, :nocc]
-                mo_vir = mo[:, nocc:]
-
-                orbrsp_results = self.cphf_results
-
-                lambda_ov = orbrsp_results['cphf_ov']
-                unrel_dm_ao = orbrsp_results['unrelaxed_density_ao']
-                lambda_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, lambda_ov[s], mo_vir.T])
-                    for s in range(lambda_ov.shape[0])
-                ])
-                rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
-                                + 2.0 * lambda_ao.transpose(0,2,1) )
-
-                unrel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
-                                 unrel_dm_ao)
-            else:
-                unrel_density = None
-            first_order_prop.compute(molecule, basis, unrel_density)
-
-            if self.rank == mpi_master():
-                title = method + ' Unrelaxed Dipole Moment(s) '
-                first_order_prop.print_properties(molecule, title,
-                                                  self.state_deriv_index)
-
-            # relaxed density and dipole moment
-            if self.rank == mpi_master():
-                rel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
-                               rel_dm_ao)
-            else:
-                rel_density = None
-            first_order_prop.compute(molecule, basis, rel_density)
-
-            if self.rank == mpi_master():
-                self.relaxed_dipole_moment = first_order_prop.get_property(
-                        'dipole moment')
-
-                title = method + ' Relaxed Dipole Moment(s) '
-                first_order_prop.print_properties(molecule, title,
-                                                  self.state_deriv_index)
-
-                self.ostream.print_blank()
 
     @staticmethod
     def get_full_solution_vector(solution):

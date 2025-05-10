@@ -49,6 +49,7 @@ from .molecularbasis import MolecularBasis
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
@@ -108,6 +109,7 @@ class TddftGradientDriver(GradientDriver):
 
         self.do_first_order_prop = False
         self.relaxed_dipole_moment = None
+        self.unrelaxed_dipole_moment = None
 
         # option dictionaries from input
         # TODO: cleanup
@@ -115,12 +117,10 @@ class TddftGradientDriver(GradientDriver):
         self.orbrsp_dict = {}
         self.grad_dict = {}
 
-        # TODO: remove relaxed_dipole_moment (not input variable)
         self._input_keywords['gradient'].update({
             'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
             'state_deriv_index': ('seq_fixed_int', 'excited state information'),
             'do_first_order_prop': ('bool', 'do first-order property'),
-            'relaxed_dipole_moment': ( 'float','relaxed excited-state dipole moment'),
             }
         )
 
@@ -637,6 +637,23 @@ class TddftGradientDriver(GradientDriver):
             for s in range(dof):
                 self.gradient[s] += gs_grad
 
+        if self.do_first_order_prop:
+            if self.rank == mpi_master():
+                unrelaxed_total_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
+                                           unrelaxed_density_ao)
+                relaxed_total_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
+                                         relaxed_density_ao)
+            else:
+                unrelaxed_total_density = None
+                relaxed_total_density = None
+
+            self.unrelaxed_dipole_moment = self.compute_dipole_moment(molecule, basis,
+                                                                      unrelaxed_total_density,
+                                                                      dipole_moment_type='Unrelaxed')
+            self.relaxed_dipole_moment = self.compute_dipole_moment(molecule, basis,
+                                                                    relaxed_total_density,
+                                                                    dipole_moment_type='Relaxed')
+
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
         if self.timing and self.rank == mpi_master():
@@ -644,6 +661,38 @@ class TddftGradientDriver(GradientDriver):
             for key, val in grad_timing.items():
                 self.ostream.print_info(f'    {key:<25s}:  {val:.2f} sec')
             self.ostream.print_blank()
+
+    def compute_dipole_moment(self, molecule, basis, density, dipole_moment_type="Relaxed"):
+        """ Computes the dipole moment based on the density.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param density:
+            The total density matrix (alpha + beta).
+        :param dipole_moment_type:
+            The type of dipole moment (Relaxed or Unrelaxed).
+
+        """
+
+        first_order_prop = FirstOrderProperties(self.comm, self.ostream)
+        first_order_prop.compute(molecule, basis, density)
+
+        if self.rank == mpi_master():
+            if self.tamm_dancoff:
+                method = 'TDA'
+            else:
+                method = 'RPA'
+            title = method + ' ' + dipole_moment_type + ' Dipole Moment(s) '
+            first_order_prop.print_properties(molecule, title,
+                                              self.state_deriv_index)
+            self.ostream.print_blank()
+            dipole_moment = first_order_prop.get_property('dipole moment')
+            return dipole_moment
+        else:
+            return None
+
 
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """
