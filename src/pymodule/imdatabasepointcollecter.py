@@ -840,6 +840,8 @@ class IMDatabasePointCollecter:
                     
                     bayes_model = LocalBayesResidual(self.z_matrix)
                     bayes_model.compute_internal_coordinates_values(qm_data_point.cartesian_coordinates)
+                    bayes_model.symmetry_information = self.non_core_symmetry_groups
+                    bayes_model.symmetry_dihedral_lists = self.symmetry_dihedral_lists
                     bayes_model.init_bayesian()
 
                     self.bayes_models[root].append(bayes_model)

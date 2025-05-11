@@ -93,6 +93,8 @@ class LocalBayesResidual():
         self.internal_coordinates_values = None
         self.interpolation_energy = None
         self.interpolation_gradient = None
+        self.symmetry_information = None
+        self.symmetry_dihedral_lists = None
         self.qm_energy = None
         self.qm_gradient = None
         self.internal_coordinates = None
@@ -228,9 +230,13 @@ class LocalBayesResidual():
         """feature vector  [1, Δq, ½ vec(ΔqΔqᵀ)]   in *internal coordinates*"""
         dx   = x - self.internal_coordinates_values           # Δq
 
-        for i, element in enumerate(self.z_matrix):
-            if len(element) == 4:
-                dx[i] = 0.5 * (1.0 + np.cos(dx[i] + np.pi))
+        for i, element in enumerate(self.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
+            if len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[3]: 
+                dx[i] = 0.5 * (1.0 + np.cos(3.0 * dx[i] + np.pi))
+            elif len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[2]:
+                dx[i] = 0.5 * (1.0 + np.cos(2.0 * dx[i] + np.pi))
+            elif len(element) == 4:
+                dx[i] = 0.5 * (1.0 + np.cos(1.0 * dx[i] + np.pi)) 
 
         quad = np.outer(dx, dx)[np.triu_indices_from(
                                 np.empty((len(dx),)*2))]       # upper tri
@@ -238,9 +244,14 @@ class LocalBayesResidual():
     def _G(self, x):
         """Jacobian ∂φ/∂x   size (m,d)   in internal coordinates."""
         dx   = x - self.internal_coordinates_values
-        for i, element in enumerate(self.z_matrix):
-            if len(element) == 4:
-                dx[i] = 0.5 * (1.0 + np.cos(dx[i] + np.pi))
+        for i, element in enumerate(self.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
+            if len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[3]: 
+                dx[i] = 0.5 * (1.0 + np.cos(3.0 * dx[i] + np.pi))
+            elif len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[2]:
+                dx[i] = 0.5 * (1.0 + np.cos(2.0 * dx[i] + np.pi))
+            elif len(element) == 4:
+                dx[i] = 0.5 * (1.0 + np.cos(1.0 * dx[i] + np.pi)) 
+        
         m    = len(dx)
         d    = 1 + m + m*(m+1)//2
         Gmat = np.zeros((m, d))

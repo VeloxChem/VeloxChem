@@ -82,6 +82,7 @@ class ConformerGenerator:
         self.top_file_name = None
         self.partial_charges = None
         self.resp_charges = True
+        self.dihedral_candidates = None
 
         self.save_xyz_files = False
         self.save_path = None
@@ -181,6 +182,7 @@ class ConformerGenerator:
                     for idx in connected_set
                 ]
                 if tuple(connected_elements) == ("H", "H", "H"):
+                    print('methy group detected!')
                     return True
 
         return False
@@ -246,7 +248,9 @@ class ConformerGenerator:
         one_based_equiv_atoms_groups = self._analyze_equiv(molecule)
 
         for k, v in rotatable_dihedrals_dict.items():
+
             max_periodicity = v["max_periodicity"]
+            print('max periodicity', max_periodicity)
             if max_periodicity == 2:
                 dih_angle = [0, 180]
             elif max_periodicity == 3:
@@ -464,7 +468,7 @@ class ConformerGenerator:
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
             self._get_dihedral_candidates(molecule, top_file_name,
                                           self.partial_charges))
-
+        self.dihedral_candidates = dihedrals_candidates
         # exit early if there is no candidate dihedral to rotate
         if not dihedrals_candidates:
             self.ostream.print_info(
@@ -530,6 +534,7 @@ class ConformerGenerator:
 
             value_atom_index = dih_comb_arr_rank[i, :, 0:4] + 1
 
+            print('diff dihedral indices', diff_dih_ind)
             for j in diff_dih_ind:
                 new_molecule.set_dihedral_in_degrees(
                     value_atom_index[j], dih_comb_arr_rank[i, j, 4])
