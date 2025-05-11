@@ -2492,7 +2492,9 @@ class ScfDriver:
             e_a = self.molecular_orbitals.ea_to_numpy()
             occ_a = self.molecular_orbitals.occa_to_numpy()
 
-            for col in range(mo_a.shape[1]):
+            # Note: in case of linear dependency, mo_a and ref_mo_a may have
+            # different number of MOs
+            for col in range(min(mo_a.shape[1], ref_mo_a.shape[1])):
                 if np.dot(mo_a[:, col], ref_mo_a[:, col]) < 0.0:
                     mo_a[:, col] *= -1.0
 
