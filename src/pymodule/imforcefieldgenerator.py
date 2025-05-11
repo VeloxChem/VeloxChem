@@ -53,6 +53,7 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 # from .imdatabasedriver import IMDatabaseDriver
 #from .impesforcefieldgenerator_parallel import ImpesForceFieldGeneratorParallel
 from .mmforcefieldgenerator import MMForceFieldGenerator
+from .conformergenerator import ConformerGenerator
 from .optimizationdriver import OptimizationDriver
 from .atommapper import AtomMapper
 import openmm as mm
@@ -348,55 +349,76 @@ class IMForceFieldGenerator:
         self.symmetry_groups = (symmetry_groups[0], rot_groups, regrouped, non_core_atoms, rotatable_bonds_zero_based, indices_list, [angle_index, dihedral_index])
 
         rotatable_dihedrals_dict = {}
-
-        def get_max_periodicity(periodicity):
-            if isinstance(periodicity, list):
-                return max([abs(p) for p in periodicity])
-            else:
-                return periodicity
-
-        # only pick one dihedral for each rotatable bond
-        for (i, j, k, l), dih in dihedrals_dict.items():
-
-            sorted_bond = tuple(sorted([j, k]))
-            max_periodicity = get_max_periodicity(dih["periodicity"])
-            print('sortted bond', sorted_bond, dih["periodicity"], rotatable_dihedrals_dict)
-
-            if sorted_bond in rotatable_bonds_zero_based:
-                if sorted_bond not in rotatable_dihedrals_dict:
-      
-                    rotatable_dihedrals_dict[sorted_bond] = deepcopy(dih)
-                    rotatable_dihedrals_dict[sorted_bond]["dihedral_indices"] = (i, j, k, l)
-                    rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max_periodicity
-                else:
-                    curr_periodicity = rotatable_dihedrals_dict[sorted_bond]["max_periodicity"]
-                    rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max(
-                        curr_periodicity, max_periodicity)          
         
-        target_dihedrals = []
+        conformer_generator = ConformerGenerator()
+        conformal_structures = conformer_generator.generate(molecule)
+        dihedral_canditates = conformer_generator.dihedral_candidates
+        
+        
+        conf_molecule_xyz = conformal_structures['molecules'][0].get_xyz_string()
 
-        for key in rotatable_dihedrals_dict.keys():
+        for entries in dihedral_canditates:
             
-            dihedral = rotatable_dihedrals_dict[key]['dihedral_indices']
-            perodicity = rotatable_dihedrals_dict[key]['max_periodicity']
-            n_sampling = 6
-            print('key', key, perodicity)
-            if perodicity == 2:
-                continue
-            elif perodicity == 3:
+            dihedral = entries[0]
+            periodicity = len(entries[1])
+
+            for i in range(len(entries[1])):
+                current_molecule = Molecule.from_xyz_string(conf_molecule_xyz)
+                if i + 1 < len(entries[1]):
+                    new_angle = entries[1][i] - (entries[1][i + 1]/periodicity)
+                    current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
+                    conformal_structures['molecules'].append(current_molecule)
+                    print(new_angle)
+                else:
+                    new_angle = entries[1][i] - (entries[1][i]/2)
+                    current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
+                    conformal_structures['molecules'].append(current_molecule)
+                    print(new_angle)
+        # def get_max_periodicity(periodicity):
+        #     if isinstance(periodicity, list):
+        #         return max([abs(p) for p in periodicity])
+        #     else:
+        #         return periodicity
+
+        # # only pick one dihedral for each rotatable bond
+        # for (i, j, k, l), dih in dihedrals_dict.items():
+
+        #     sorted_bond = tuple(sorted([j, k]))
+        #     max_periodicity = get_max_periodicity(dih["periodicity"])
+        #     print('sortted bond', sorted_bond, dih["periodicity"], rotatable_dihedrals_dict)
+
+        #     if sorted_bond in rotatable_bonds_zero_based:
+        #         if sorted_bond not in rotatable_dihedrals_dict:
+      
+        #             rotatable_dihedrals_dict[sorted_bond] = deepcopy(dih)
+        #             rotatable_dihedrals_dict[sorted_bond]["dihedral_indices"] = (i, j, k, l)
+        #             rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max_periodicity
+        #         else:
+        #             curr_periodicity = rotatable_dihedrals_dict[sorted_bond]["max_periodicity"]
+        #             rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max(
+        #                 curr_periodicity, max_periodicity)          
+        
+        # target_dihedrals = []
+
+        # for key in rotatable_dihedrals_dict.keys():
+            
+        #     dihedral = rotatable_dihedrals_dict[key]['dihedral_indices']
+        #     perodicity = rotatable_dihedrals_dict[key]['max_periodicity']
+        #     n_sampling = 6
+        #     print('key', key, perodicity)
+        #     if perodicity == 2:
+        #         continue
+        #     elif perodicity == 3:
                 
-                continue            
-            else:
-                target_dihedrals.append((dihedral, perodicity, n_sampling))
+        #         continue            
+        #     else:
+        #         target_dihedrals.append((dihedral, perodicity, n_sampling))
        
-        print(target_dihedrals)
-        self.conformal_structures = self.determine_conformal_structures(molecule, specific_dihedrals=target_dihedrals)
+        # print(target_dihedrals)
+        # self.conformal_structures = self.determine_conformal_structures(molecule, specific_dihedrals=target_dihedrals)
+        
+        self.conformal_structures = {None : conformal_structures['molecules']}
 
-        print(self.conformal_structures)
-
-        print('\n\n', self.symmetry_groups)
-
-        exit()
 
     def compute(self, molecule, basis):
 
@@ -590,8 +612,6 @@ class IMForceFieldGenerator:
                                         'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
                                         'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow}
             
-
-            
             
             if self.add_conformal_structures and not os.path.exists(imforcefieldfile):
                 for counter, entry in enumerate(self.conformal_structures.items()):
@@ -649,7 +669,7 @@ class IMForceFieldGenerator:
                 
                 for i, mol in enumerate(molecules):
                     
-                    mol.set_dihedral([7,2,1,5], 30.0, 'degree')
+                    # mol.set_dihedral([7,2,1,5], 30.0, 'degree')
 
                     current_dihedral_angle = list(self.allowed_deviation[key].keys())[i]
 
