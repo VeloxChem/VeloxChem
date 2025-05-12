@@ -95,7 +95,6 @@ class EvbDriver():
         self.name: str = None
         self.results = None
         self.system_confs: list[dict] = []
-        self.debug = False
         self.fast_run = False
 
         self.t_label = int(time.time())
@@ -148,15 +147,11 @@ class EvbDriver():
         self.ostream.print_header("Running FEP")
         self.ostream.flush()
         self.run_FEP()
-        if not self.debug:
-            self.ostream.print_blank()
-            self.ostream.print_header("Computing energy profiles")
-            self.ostream.flush()
-            self.compute_energy_profiles(barrier, free_energy)
-        else:
-            self.ostream.print_info(
-                "Debugging option enabled. Skipping energy profile calculation because recalculation is necessary."
-            )
+
+        self.ostream.print_blank()
+        self.ostream.print_header("Computing energy profiles")
+        self.ostream.flush()
+        self.compute_energy_profiles(barrier, free_energy)
 
         self.ostream.flush()
 
@@ -541,7 +536,7 @@ class EvbDriver():
         configurations: list[str] | list[dict],  # type: ignore
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
-        save_output=True,
+        debug_Lambda=False,
     ):
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
@@ -557,16 +552,13 @@ class EvbDriver():
                             'openmm is required for EvbDriver.')
 
         if Lambda is None:
-            if not self.debug:
-                if self.fast_run:
-                    Lambda = np.linspace(0, 0.1, 6)
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
-                else:
-                    Lambda = np.linspace(0, 0.1, 11)
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
+            if not debug_Lambda:
+                Lambda = np.linspace(0, 0.1, 11)
+                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
+                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
                 Lambda = np.round(Lambda, 3)
+                self.ostream.print_info(
+                    f"Using default lambda vector: {list(Lambda)}")
             else:
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
         assert (Lambda[0] == 0 and Lambda[-1]
@@ -595,18 +587,30 @@ class EvbDriver():
         #Per configuration
         for conf in self.configurations:
             #create folders,
-            if save_output:
+            data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
+            while Path(data_folder).exists():
+                self.t_label += 1
                 data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
-                conf["data_folder"] = data_folder
-                run_folder = str(Path(data_folder) / "run")
-                conf["run_folder"] = run_folder
-                cwd = Path().cwd()
-                data_folder_path = cwd / data_folder
-                run_folder_path = cwd / run_folder
 
-                data_folder_path.mkdir(parents=True, exist_ok=True)
-                run_folder_path.mkdir(parents=True, exist_ok=True)
-            if conf.get('solvent', None) is None and conf.get('pressure',-1) > 0:
+            run_folder = str(Path(data_folder) / "run")
+            conf["data_folder"] = data_folder
+            conf["run_folder"] = run_folder
+
+            cwd = Path().cwd()
+            data_folder_path = cwd / data_folder
+            run_folder_path = cwd / run_folder
+
+            data_folder_path.mkdir(parents=True)
+            run_folder_path.mkdir(parents=True)
+
+            #
+            self.reactant.molecule.write_xyz_file(
+                str(data_folder_path / "reactant_struct.xyz"))
+            self.product.molecule.write_xyz_file(
+                str(data_folder_path / "product_struct.xyz"))
+
+            if conf.get('solvent', None) is None and conf.get('pressure',
+                                                              -1) > 0:
                 self.ostream.print_warning(
                     f"A pressure is defined for {conf['name']}, but no solvent is defined. Removing pressure definition."
                 )
@@ -628,36 +632,35 @@ class EvbDriver():
             conf["topology"] = topology
             conf["initial_positions"] = initial_positions
 
-            if save_output:
-                self.ostream.print_info(f"Saving files to {data_folder_path}")
-                self.ostream.flush()
-                self.save_systems_as_xml(systems, conf["run_folder"])
+            self.ostream.print_info(f"Saving files to {data_folder_path}")
+            self.ostream.flush()
+            self.save_systems_as_xml(systems, conf["run_folder"])
 
-                top_path = cwd / data_folder / "topology.pdb"
+            top_path = cwd / data_folder / "topology.pdb"
 
-                mmapp.PDBFile.writeFile(
-                    topology,
-                    initial_positions *
-                    10,  # positions are handled in nanometers, but pdb's should be in angstroms
-                    open(top_path, "w"),
-                )
+            mmapp.PDBFile.writeFile(
+                topology,
+                initial_positions *
+                10,  # positions are handled in nanometers, but pdb's should be in angstroms
+                open(top_path, "w"),
+            )
 
-                dump_conf = copy.copy(conf)
-                dump_conf.pop('systems')
-                dump_conf.pop('topology')
-                dump_conf.pop('initial_positions')
-                self.update_options_json(dump_conf, conf)
-                self.update_options_json(
-                    {
-                        "Lambda":
-                        Lambda,
-                        "integration forcegroups":
-                        list(EvbForceGroup.integration_force_groups()),
-                        "pes forcegroups":
-                        list(EvbForceGroup.pes_force_groups()),
-                    },
-                    conf,
-                )
+            dump_conf = copy.copy(conf)
+            dump_conf.pop('systems')
+            dump_conf.pop('topology')
+            dump_conf.pop('initial_positions')
+            self.update_options_json(dump_conf, conf)
+            self.update_options_json(
+                {
+                    "Lambda":
+                    Lambda,
+                    "integration forcegroups":
+                    list(EvbForceGroup.integration_force_groups()),
+                    "pes forcegroups":
+                    list(EvbForceGroup.pes_force_groups()),
+                },
+                conf,
+            )
 
         self.system_confs = configurations
         self.ostream.flush()
@@ -872,7 +875,6 @@ class EvbDriver():
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver(ostream=self.ostream)
-            FEP.debug = self.debug
             if saved_frames_on_crash is not None:
                 FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
