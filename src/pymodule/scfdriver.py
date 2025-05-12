@@ -259,7 +259,7 @@ class ScfDriver:
         self._dipole_origin = None
 
         # scf tensors
-        self._scf_tensors = None
+        self._scf_results = None
 
         # scf properties
         self._scf_prop = None
@@ -303,6 +303,7 @@ class ScfDriver:
                 'level_shifting_delta': ('float', 'level shifting delta'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'ovl_thresh': ('float', 'AO linear dependency threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -437,12 +438,20 @@ class ScfDriver:
         return self._molecular_orbitals
 
     @property
-    def scf_tensors(self):
+    def scf_results(self):
         """
-        Returns the SCF tensors.
+        Returns the SCF results.
         """
 
-        return self._scf_tensors
+        return self._scf_results
+
+    @property
+    def scf_tensors(self):
+        """
+        Returns the SCF results.
+        """
+
+        return self._scf_results
 
     @property
     def history(self):
@@ -923,7 +932,7 @@ class ScfDriver:
         if self.rank == mpi_master():
             self._print_scf_energy()
 
-            s2 = self.compute_s2(molecule, self.scf_tensors)
+            s2 = self.compute_s2(molecule, self.scf_results)
             self._print_ground_state(molecule, s2)
 
             if self.print_level == 2:
@@ -938,7 +947,7 @@ class ScfDriver:
 
             self.ostream.flush()
 
-        return self.scf_tensors
+        return self.scf_results
 
     def gen_initial_density_sad(self, molecule, ao_basis, min_basis):
         """
@@ -1312,7 +1321,7 @@ class ScfDriver:
             The profiler.
         """
 
-        self._scf_tensors = None
+        self._scf_results = None
 
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
@@ -1687,7 +1696,7 @@ class ScfDriver:
                             if self.scf_type == 'restricted' else denmat.unrest)
                 self._density = AODensityMatrix(self._density, den_type)
 
-                self._scf_tensors = {
+                self._scf_results = {
                     # eri info
                     'eri_thresh': self.eri_thresh,
                     # scf info
@@ -1710,45 +1719,51 @@ class ScfDriver:
                 }
 
                 # for backward compatibility only
-                self._scf_tensors['F'] = (F_alpha, F_beta)
+                self._scf_results['F'] = (F_alpha, F_beta)
 
                 if self.ri_coulomb:
                     # RI info
-                    self._scf_tensors['ri_coulomb'] = self.ri_coulomb
-                    self._scf_tensors[
+                    self._scf_results['ri_coulomb'] = self.ri_coulomb
+                    self._scf_results[
                         'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
                 if self._dft:
                     # dft info
-                    self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                    self._scf_results['xcfun'] = self.xcfun.get_func_label()
                     if self.grid_level is not None:
-                        self._scf_tensors['grid_level'] = self.grid_level
+                        self._scf_results['grid_level'] = self.grid_level
 
                 if self._pe:
                     # pe info, energy and potential matrix
-                    self._scf_tensors['potfile'] = self.potfile
-                    self._scf_tensors['E_emb'] = e_emb
-                    self._scf_tensors['F_emb'] = V_emb
+                    self._scf_results['potfile'] = self.potfile
+                    self._scf_results['E_emb'] = e_emb
+                    self._scf_results['F_emb'] = V_emb
 
                 if self.point_charges is not None:
-                    self._scf_tensors['point_charges'] = self.point_charges
+                    self._scf_results['point_charges'] = self.point_charges
                 if self.qm_vdw_params is not None:
-                    self._scf_tensors['qm_vdw_params'] = self.qm_vdw_params
+                    self._scf_results['qm_vdw_params'] = self.qm_vdw_params
 
                 if self.solvation_model is not None:
-                    self._scf_tensors['solvation_model'] = self.solvation_model
-                    self._scf_tensors[
-                        'dielectric_constant'] = self.cpcm_drv.epsilon
+                    for key in [
+                            'solvation_model',
+                            'cpcm_epsilon',
+                            'cpcm_grid_per_sphere',
+                            'cpcm_cg_thresh',
+                            'cpcm_x',
+                            'cpcm_custom_vdw_radii',
+                    ]:
+                        self._scf_results[key] = getattr(self, key)
 
             else:
-                self._scf_tensors = None
+                self._scf_results = None
                 self._density = AODensityMatrix()
 
             self._scf_prop.compute_scf_prop(molecule, ao_basis,
-                                            self.scf_tensors)
+                                            self.scf_results)
 
             if self.rank == mpi_master():
-                self._scf_tensors['dipole_moment'] = np.array(
+                self._scf_results['dipole_moment'] = np.array(
                     self._scf_prop.get_property('dipole_moment'))
 
                 self._write_final_hdf5(molecule, ao_basis)
@@ -2857,13 +2872,13 @@ class ScfDriver:
 
         return (mol_orbs[:, molist], mol_eigs[molist])
 
-    def compute_s2(self, molecule, scf_tensors):
+    def compute_s2(self, molecule, scf_results):
         """
         Computes expectation value of the S**2 operator.
 
         :param molecule:
             The molecule.
-        :param scf_tensors:
+        :param scf_results:
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
@@ -2873,9 +2888,9 @@ class ScfDriver:
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
 
-        smat = scf_tensors['S']
-        Cocc_a = scf_tensors['C_alpha'][:, :nalpha].copy()
-        Cocc_b = scf_tensors['C_beta'][:, :nbeta].copy()
+        smat = scf_results['S']
+        Cocc_a = scf_results['C_alpha'][:, :nalpha].copy()
+        Cocc_b = scf_results['C_beta'][:, :nbeta].copy()
 
         a_b = float(nalpha - nbeta) / 2.0
         s2_exact = a_b * (a_b + 1.0)
@@ -3006,7 +3021,7 @@ class ScfDriver:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_results,
                                   self.history)
 
         self.ostream.print_blank()
