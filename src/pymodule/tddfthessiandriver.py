@@ -317,6 +317,14 @@ class TddftHessianDriver(HessianDriver):
 
         tddft_grad_drv.compute_analytical(molecule, basis, rsp_results)
 
+        print("\nCoordinates")
+        print(molecule.get_xyz_string())
+        print("\nGradient")
+        print(tddft_grad_drv.gradient)
+        print("\nDipole Moment:")
+        print(tddft_grad_drv.relaxed_dipole_moment[0])
+        print()
+
         if self.rank == mpi_master():
             # Multiple excited states can be computed simultaneously.
             # For the numerical Hessian, take the first excited state in the list

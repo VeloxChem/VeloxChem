@@ -1148,7 +1148,8 @@ class CphfSolver(LinearSolver):
             # Create the list of DistributedArrays
             solutions = []
             for i in range(dof):
-                solutions.append(DistributedArray(cphf_ov[i], self.comm))
+                vec_cphf_ov = cphf_ov[i].reshape(nocc*nvir)
+                solutions.append(DistributedArray(vec_cphf_ov, self.comm))
 
         # merge the rhs dict with the solution
         return {
