@@ -47,6 +47,7 @@
 #include "ThreeCenterOverlapGradientDriver.hpp"
 #include "ThreeCenterOverlapGeomX00Driver.hpp"
 #include "ThreeCenterOverlapGradientGeomX00Driver.hpp"
+#include "ThreeCenterOverlapGradientGeom00XDriver.hpp"
 #include "TwoCenterElectronRepulsionDriver.hpp"
 #include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
 #include "ThreeCenterR2Driver.hpp"
@@ -532,6 +533,25 @@ export_t2cintegrals(py::module& m)
                    return t3rr2_drv.compute(exponents, factors, points, basis, molecule);
             },
             "Computes r.r2 matrices for given molecule, basis and vector of external scaled Gaussians.");
+    
+    // COverlapGeom001Driver class
+    PyClass<CThreeCenterOverlapGradientGeom00XDriver<1>>(m, "ThreeCenterOverlapGradientGeom001Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CThreeCenterOverlapGradientGeom00XDriver<1>& geom_drv,
+               const CMolecule&                                   molecule,
+               const CMolecularBasis&                             basis,
+               const std::vector<double>&                         exponents,
+               const std::vector<double>&                         factors,
+               const std::vector<std::array<double, 3>>&          coords,
+               const int                                          iatom)
+                -> CMatrices {
+                    auto points = std::vector<TPoint<double>>();
+                    points.reserve(coords.size());
+                    std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+                    return geom_drv.compute(exponents, factors, points, basis, molecule, iatom); },
+            "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
 }
 
 }  // namespace vlx_t2cintegrals
