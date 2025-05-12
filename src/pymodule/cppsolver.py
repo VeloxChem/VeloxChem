@@ -1261,14 +1261,18 @@ class ComplexResponse(LinearSolver):
             hf.create_dataset(xlabel, data=rsp_results['frequencies'])
 
             spectrum = self.get_spectrum(rsp_results, 'au')
-            y_data = np.array(spectrum['y_data'])
 
-            if self.cpp_flag == 'absorption':
-                ylabel = 'rsp/sigma'
-            elif self.cpp_flag == 'ecd':
-                ylabel = 'rsp/delta-epsilon'
-            if ylabel in hf:
-                del hf[ylabel]
-            hf.create_dataset(ylabel, data=y_data)
+            # Write spectrum if an absorption or ecd calculation
+            # has been performed. Otherwise there is nothing to write.
+            if spectrum is not None:
+                y_data = np.array(spectrum['y_data'])
+
+                if self.cpp_flag == 'absorption':
+                    ylabel = 'rsp/sigma'
+                elif self.cpp_flag == 'ecd':
+                    ylabel = 'rsp/delta-epsilon'
+                if ylabel in hf:
+                    del hf[ylabel]
+                hf.create_dataset(ylabel, data=y_data)
 
             hf.close()
