@@ -187,19 +187,19 @@ class CubicResponseDriver(NonlinearSolver):
 
         # sanity check
         assert_msg_critical(
-            self.a_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.a_component, self.a_operator),
             'CubicResponseDriver: Undefined or invalid a_component')
 
         assert_msg_critical(
-            self.b_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.b_component, self.b_operator),
             'CubicResponseDriver: Undefined or invalid b_component')
 
         assert_msg_critical(
-            self.c_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.c_component, self.c_operator),
             'CubicResponseDriver: Undefined or invalid c_component')
 
         assert_msg_critical(
-            self.d_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.d_component, self.d_operator),
             'CubicResponseDriver: Undefined or invalid d_component')
 
         if self.norm_thresh is None:
@@ -268,16 +268,20 @@ class CubicResponseDriver(NonlinearSolver):
             angmom_mats = None
 
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_grad = linear_solver.get_complex_prop_grad(self._a_op_key, self.a_component,
+        a_grad = linear_solver.get_complex_prop_grad(self._a_op_key,
+                                                     [self.a_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        b_grad = linear_solver.get_complex_prop_grad(self._b_op_key, self.b_component,
+        b_grad = linear_solver.get_complex_prop_grad(self._b_op_key,
+                                                     [self.b_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        c_grad = linear_solver.get_complex_prop_grad(self._c_op_key, self.c_component,
+        c_grad = linear_solver.get_complex_prop_grad(self._c_op_key,
+                                                     [self.c_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        d_grad = linear_solver.get_complex_prop_grad(self._d_op_key, self.d_component,
+        d_grad = linear_solver.get_complex_prop_grad(self._d_op_key,
+                                                     [self.d_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
 
@@ -287,29 +291,29 @@ class CubicResponseDriver(NonlinearSolver):
             a_grad = list(a_grad)
             for ind in range(len(a_grad)):
                 a_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if self._a_op_key == 'electric_dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._a_op_key in ['electric_dipole', 'electric_quadrupole']:
                     a_grad[ind] *= -1.0
 
             b_grad = list(b_grad)
             for ind in range(len(b_grad)):
                 b_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if self._b_op_key == 'electric_dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._b_op_key in ['electric_dipole', 'electric_quadrupole']:
                     b_grad[ind] *= -1.0
 
             c_grad = list(c_grad)
             for ind in range(len(c_grad)):
                 c_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if self._c_op_key == 'electric_dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._c_op_key in ['electric_dipole', 'electric_quadrupole']:
                     c_grad[ind] *= -1.0
 
             d_grad = list(d_grad)
             for ind in range(len(d_grad)):
                 d_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if self._d_op_key == 'electric_dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._d_op_key in ['electric_dipole', 'electric_quadrupole']:
                     d_grad[ind] *= -1.0
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
@@ -353,26 +357,21 @@ class CubicResponseDriver(NonlinearSolver):
             ABCD.update(C)
             ABCD.update(D)
 
-            quadrupole_r2 = (quadrupole_mats[0] + quadrupole_mats[3] +
-                             quadrupole_mats[5])
-
             X = {
-                # Note: nonliear response uses r instead of mu for dipole operator
+                # Note: nonliear response uses r for dipole operator
                 'electric_dipole': {
                     'x': 2 * self.ao2mo(mo, dipole_mats[0]) * (-1.0),
                     'y': 2 * self.ao2mo(mo, dipole_mats[1]) * (-1.0),
                     'z': 2 * self.ao2mo(mo, dipole_mats[2]) * (-1.0),
                 },
+                # Note: nonliear response uses rr^T for quadrupole operator
                 'electric_quadrupole': {
-                    'xx': 2 * self.ao2mo(
-                        mo, quadrupole_mats[0] * 3.0 - quadrupole_r2) * (-1.0),
+                    'xx': 2 * self.ao2mo(mo, quadrupole_mats[0]) * (-1.0),
                     'xy': 2 * self.ao2mo(mo, quadrupole_mats[1]) * (-1.0),
                     'xz': 2 * self.ao2mo(mo, quadrupole_mats[2]) * (-1.0),
-                    'yy': 2 * self.ao2mo(
-                        mo, quadrupole_mats[3] * 3.0 - quadrupole_r2) * (-1.0),
+                    'yy': 2 * self.ao2mo(mo, quadrupole_mats[3]) * (-1.0),
                     'yz': 2 * self.ao2mo(mo, quadrupole_mats[4]) * (-1.0),
-                    'zz': 2 * self.ao2mo(
-                        mo, quadrupole_mats[5] * 3.0 - quadrupole_r2) * (-1.0),
+                    'zz': 2 * self.ao2mo(mo, quadrupole_mats[5]) * (-1.0),
                 },
                 'linear_momentum': {
                     'x': 2 * self.ao2mo(mo, linmom_mats[0]) * (-1j),
