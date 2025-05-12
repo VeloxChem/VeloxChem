@@ -1001,11 +1001,16 @@ class EvbDriver():
             E_file = str(cwd / folder / "Energies.csv")
             data_file = str(cwd / folder / "Data_combined.csv")
             options_file = str(cwd / folder / "options.json")
-            specific, common = self._load_output_files(E_file, data_file,
-                                                       options_file,
-                                                       lambda_sub_sample,
-                                                       lambda_sub_sample_ends,
-                                                       time_sub_sample)
+            rea_fg_file = str(cwd/folder/"ForceGroups_pro.csv")
+            pro_fg_file = str(cwd/folder/"ForceGroups_rea.csv")
+            specific, common = self._load_output_files(E_file,
+                                                        rea_fg_file,
+                                                        pro_fg_file,
+                                                        data_file, 
+                                                        options_file,
+                                                        lambda_sub_sample,
+                                                        lambda_sub_sample_ends,
+                                                        time_sub_sample)
             specific_results.update({name: specific})
             common_results.append(common)
 
@@ -1026,12 +1031,14 @@ class EvbDriver():
         return results
 
     def _load_output_files(self,
-                           E_file,
-                           data_file,
-                           options_file,
-                           lambda_sub_sample=1,
-                           lambda_sub_sample_ends=False,
-                           time_sub_sample=1):
+                            E_file,
+                            fg_rea_file,
+                            fg_pro_file,    
+                            data_file,
+                            options_file,
+                            lambda_sub_sample=1,
+                            lambda_sub_sample_ends=False,
+                            time_sub_sample=1):
         with open(options_file, "r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
@@ -1058,6 +1065,8 @@ class EvbDriver():
             Lambda = np.append(Lambda, 1)
 
         E_data = np.loadtxt(E_file, skiprows=1, delimiter=',').T
+        rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
+        pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
 
         sub_indices = l_sub_indices[::time_sub_sample]
@@ -1083,6 +1092,8 @@ class EvbDriver():
             "E2_int": E2_int,
             "E_m_pes": E_m_pes,
             "E_m_int": E_m_int,
+            "E1_fg": rea_fg_data,
+            "E2_fg": pro_fg_data,
             "Ep": Ep,
             "Ek": Ek,
             "Temp_step": Temp,

@@ -1705,6 +1705,7 @@ class EvbForceGroup(Enum):
         ])
 
     @classmethod
+    #Simple method for printing a descrpitive header to be used in force group logging files
     def get_header(cls):
         header = ""
         integration_forcegroups = cls.integration_force_groups()
@@ -1712,7 +1713,7 @@ class EvbForceGroup(Enum):
         for fg in cls:
             in_int = fg.value in integration_forcegroups
             in_pes = fg.value in pes_forcegroups
-            fg_cat = 'b'
+            fg_cat = 'b' # For both
             if in_int and not in_pes:
                 fg_cat = 'i'
             if not in_int and in_pes:

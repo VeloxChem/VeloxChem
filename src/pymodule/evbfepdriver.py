@@ -170,7 +170,7 @@ class EvbFepDriver():
         platform,
     ):
         #todo add this to the configuration keywords
-
+        
         self.platform = platform
 
         for keyword, value in self.keywords.items():

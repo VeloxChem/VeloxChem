@@ -141,9 +141,21 @@ class EvbReporter():
             self.report_forcegroups = False
         else:
             self.report_forcegroups = True
+            no_ext = forcegroup_file.split('.')[0]
+            ext = forcegroup_file.split('.')[1]
+            rea_fg = no_ext + '_rea.' + ext
+            pro_fg = no_ext + '_pro.' + ext
+
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
+            self.rea_FG_out = open(rea_fg, 'a' if append else 'w')
+            self.pro_FG_out = open(pro_fg, 'a' if append else 'w')
+
             if not append:
                 self.FG_out.write(EvbForceGroup.get_header())
+                self.rea_FG_out.write(EvbForceGroup.get_header())
+                self.pro_FG_out.write(EvbForceGroup.get_header())
+
+
 
     def __del__(self):
         self.E_out.close()
@@ -224,8 +236,40 @@ class EvbReporter():
                         f"Force group {fg.name}({fg.value}) energy is too large: {e}")
                 line += f"{e}, "
             line = line[:-2] + '\n'
+            self.FG_out.write(line)
 
-        self.FG_out.write(line)
+            line = ""
+            reasim = self.simulation_dicts['reactant_integration']['simulation']
+            for fg in EvbForceGroup:
+                e = reasim.context.getState(
+                    getEnergy=True,
+                    groups=set([fg.value]),
+                ).getPotentialEnergy().value_in_unit(
+                    mm.unit.kilojoules_per_mole)
+                fg_E.append(e)
+                if e> 1e9:
+                    raise ValueError(
+                        f"Force group {fg.name}({fg.value}) energy is too large: {e}")
+                line += f"{e}, "
+            line = line[:-2] + '\n'
+            self.rea_FG_out.write(line)
+
+            line = ""
+            prosim = self.simulation_dicts['reactant_integration']['simulation']
+            for fg in EvbForceGroup:
+                e = prosim.context.getState(
+                    getEnergy=True,
+                    groups=set([fg.value]),
+                ).getPotentialEnergy().value_in_unit(
+                    mm.unit.kilojoules_per_mole)
+                fg_E.append(e)
+                if e> 1e9:
+                    raise ValueError(
+                        f"Force group {fg.name}({fg.value}) energy is too large: {e}")
+                line += f"{e}, "
+            line = line[:-2] + '\n'
+            self.pro_FG_out.write(line)
+
 
         if self.debug:
 
@@ -264,6 +308,7 @@ class EvbReporter():
                         pes_fg_recalc += e
                     if i + 1 in EvbForceGroup.integration_force_groups():
                         int_fg_recalc += e
+                    
                 if abs(pes_fg_recalc - Em_pes) > 1e-1:
                     self.ostream.print_info(
                         f"Force group pes difference: {Em_pes - pes_fg_recalc}")
