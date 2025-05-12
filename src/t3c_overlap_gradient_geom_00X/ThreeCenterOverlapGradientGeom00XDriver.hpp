@@ -110,10 +110,10 @@ CThreeCenterOverlapGradientGeom00XDriver<N>::compute(const std::vector<double>  
     {
 #pragma omp single nowait
         {
-            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {iatom, });
+            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
             
-            const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
-
+            const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {iatom, });
+            
             const auto tasks = omp::make_work_tasks(bra_gto_blocks, ket_gto_blocks);
 
             std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
