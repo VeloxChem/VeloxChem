@@ -41,7 +41,6 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfhessiandriver import ScfHessianDriver
-from .tddftgradientdriver import TddftGradientDriver
 from .tddfthessiandriver import TddftHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -754,7 +753,7 @@ class VibrationalAnalysis:
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-       
+
         width = 52
         for k in idx_lst:
 

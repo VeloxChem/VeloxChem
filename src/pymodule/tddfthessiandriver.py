@@ -28,7 +28,9 @@ import time as tm
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .hessiandriver import HessianDriver
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
+
 
 class TddftHessianDriver(HessianDriver):
     """
@@ -40,7 +42,7 @@ class TddftHessianDriver(HessianDriver):
     :param rsp_drv:
         The response driver.
     :param tddft_grad_drv:
-        The TDDFT or TDHF gradient driver 
+        The TDDFT or TDHF gradient driver
 
     Instance variables
         - hessian: The Hessian in Hartree per Bohr**2.
@@ -60,9 +62,7 @@ class TddftHessianDriver(HessianDriver):
         self.tddft_grad_drv = tddft_grad_drv
         self.do_print_hessian = False
 
-
-    def update_settings(self, method_dict, hessian_dict=None,
-                        cphf_dict=None):
+    def update_settings(self, method_dict, hessian_dict=None, cphf_dict=None):
         """
         Updates settings in TddftHessianDriver.
 
@@ -104,7 +104,8 @@ class TddftHessianDriver(HessianDriver):
             if self.do_print_hessian:
                 self.print_geometry(molecule)
                 self.ostream.print_blank()
-                title = "Numerical TDDFT Hessian based on analytical gradient (Hartree/Bohr**2)"
+                title = "Numerical TDDFT Hessian based on analytical "
+                title += "gradient (Hartree/Bohr**2)"
                 self.print_hessian(molecule, title=title)
 
             valstr = '*** Time spent in Hessian calculation: '
@@ -114,7 +115,6 @@ class TddftHessianDriver(HessianDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    
     def compute_numerical_with_analytical_gradient(self, molecule, basis):
         """
         Computes the numerical Hessian based on the analytical TDDFT gradient.
@@ -177,8 +177,8 @@ class TddftHessianDriver(HessianDriver):
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
 
-                results_dict = self.compute_gradient_and_dipole_moment(new_mol, basis, scf_drv,
-                                                                       rsp_drv, tddft_grad_drv)
+                results_dict = self.compute_gradient_and_dipole_moment(
+                    new_mol, basis, scf_drv, rsp_drv, tddft_grad_drv)
 
                 grad_plus = results_dict['gradient']
                 dipmom_plus = results_dict['relaxed_dipole_moment']
@@ -188,8 +188,8 @@ class TddftHessianDriver(HessianDriver):
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
 
-                results_dict = self.compute_gradient_and_dipole_moment(new_mol, basis, scf_drv,
-                                                                       rsp_drv, tddft_grad_drv)
+                results_dict = self.compute_gradient_and_dipole_moment(
+                    new_mol, basis, scf_drv, rsp_drv, tddft_grad_drv)
 
                 grad_minus = results_dict['gradient']
                 dipmom_minus = results_dict['relaxed_dipole_moment']
@@ -200,8 +200,8 @@ class TddftHessianDriver(HessianDriver):
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
 
-                    results_dict = self.compute_gradient_and_dipole_moment(new_mol, basis, scf_drv,
-                                                                       rsp_drv, tddft_grad_drv)
+                    results_dict = self.compute_gradient_and_dipole_moment(
+                        new_mol, basis, scf_drv, rsp_drv, tddft_grad_drv)
 
                     grad_minus2 = results_dict['gradient']
                     dipmom_minus2 = results_dict['relaxed_dipole_moment']
@@ -211,31 +211,32 @@ class TddftHessianDriver(HessianDriver):
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
 
-                    results_dict = self.compute_gradient_and_dipole_moment(new_mol, basis, scf_drv,
-                                                                       rsp_drv, tddft_grad_drv)
+                    results_dict = self.compute_gradient_and_dipole_moment(
+                        new_mol, basis, scf_drv, rsp_drv, tddft_grad_drv)
 
                     grad_plus2 = results_dict['gradient']
                     dipmom_plus2 = results_dict['relaxed_dipole_moment']
 
                     coords[i, d] -= 2.0 * self.delta_h
-                    hessian[i, d] = (
-                        (grad_minus2 - 8 * grad_minus + 8 * grad_plus - grad_plus2) /
-                        (12.0 * self.delta_h))
+                    hessian[i, d] = ((grad_minus2 - 8 * grad_minus +
+                                      8 * grad_plus - grad_plus2) /
+                                     (12.0 * self.delta_h))
                     if self.do_dipole_gradient:
                         dipole_gradient[i, d] = (
-                            (dipmom_minus2 - 8 * dipmom_minus + 8 * dipmom_plus - dipmom_plus2) /
+                            (dipmom_minus2 - 8 * dipmom_minus +
+                             8 * dipmom_plus - dipmom_plus2) /
                             (12.0 * self.delta_h))
                 else:
                     coords[i, d] += self.delta_h
                     hessian[i, d] = ((grad_plus - grad_minus) /
-                                           (2.0 * self.delta_h))
+                                     (2.0 * self.delta_h))
                     if self.do_dipole_gradient:
                         dipole_gradient[i, d] = ((dipmom_plus - dipmom_minus) /
-                                                        (2.0 * self.delta_h))
+                                                 (2.0 * self.delta_h))
 
         # restore energy and gradient
-        results_dict = self.compute_gradient_and_dipole_moment(molecule, basis, scf_drv,
-                                                               rsp_drv, tddft_grad_drv)
+        results_dict = self.compute_gradient_and_dipole_moment(
+            molecule, basis, scf_drv, rsp_drv, tddft_grad_drv)
 
         # unmute ostreams
         scf_drv.ostream.unmute()
@@ -243,11 +244,12 @@ class TddftHessianDriver(HessianDriver):
         tddft_grad_drv.ostream.unmute()
 
         # save Hessian in the usual shape
-        self.hessian = hessian.reshape((natm*3, natm*3))
+        self.hessian = hessian.reshape((natm * 3, natm * 3))
 
         if self.do_dipole_gradient:
             # save the dipole moment gradient in the expected shape
-            self.dipole_gradient = dipole_gradient.transpose(2, 0, 1).reshape(3, natm*3)
+            self.dipole_gradient = dipole_gradient.transpose(2, 0, 1).reshape(
+                3, natm * 3)
 
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, tddft_grad_drv):
         """
@@ -286,10 +288,11 @@ class TddftHessianDriver(HessianDriver):
 
         return energy
 
-
-    def compute_gradient_and_dipole_moment(self, molecule, basis, scf_drv, rsp_drv, tddft_grad_drv):
+    def compute_gradient_and_dipole_moment(self, molecule, basis, scf_drv,
+                                           rsp_drv, tddft_grad_drv):
         """
-        Computes the TDDFT gradient and relaxed dipole moment at the current molecular geometry.
+        Computes the TDDFT gradient and relaxed dipole moment
+        at the current molecular geometry.
 
         :param molecule:
             The molecule.
@@ -318,12 +321,12 @@ class TddftHessianDriver(HessianDriver):
             # Multiple excited states can be computed simultaneously.
             # For the numerical Hessian, take the first excited state in the list
             return {
-                    'gradient': tddft_grad_drv.gradient[0],
-                    'relaxed_dipole_moment': tddft_grad_drv.relaxed_dipole_moment[0],
-                    }
+                'gradient': tddft_grad_drv.gradient[0],
+                'relaxed_dipole_moment':
+                    tddft_grad_drv.relaxed_dipole_moment[0],
+            }
         else:
             return None
-
 
     def print_header(self):
         """

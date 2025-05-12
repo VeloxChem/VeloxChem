@@ -1110,8 +1110,12 @@ class CphfSolver(LinearSolver):
                                          dft_dict, pe_dict, *args)
 
         if self.rank == mpi_master():
-            cphf_rhs = cphf_rhs_dict['cphf_rhs']
-            dof = cphf_rhs.shape[0]
+            list_rhs = []
+            for vec in cphf_rhs_dict['dist_cphf_rhs']:
+                vec_np = self.get_full_solution_vector(vec)
+                list_rhs.append(vec_np[:nocc * nvir])
+            cphf_rhs = np.array(list_rhs)
+            dof = len(list_rhs)
             cphf_rhs = cphf_rhs.reshape(dof, nocc, nvir)
         else:
             cphf_rhs = None
@@ -1125,7 +1129,7 @@ class CphfSolver(LinearSolver):
             molecule,
             basis,
             scf_tensors,
-            cphf_rhs,  # TODO: possibly change the shape
+            cphf_rhs,
         )
 
         profiler.print_timing(self.ostream)
@@ -1141,10 +1145,16 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
-        # merge the rhs dict with the solution
-        cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
+            # Create the list of DistributedArrays
+            solutions = []
+            for i in range(dof):
+                solutions.append(DistributedArray(cphf_ov[i], self.comm))
 
-        return cphf_ov_dict
+        # merge the rhs dict with the solution
+        return {
+            **cphf_rhs_dict,
+            'dist_cphf_ov': solutions,
+        }
 
     def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs):
         """
