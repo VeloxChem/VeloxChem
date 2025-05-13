@@ -115,6 +115,8 @@ class EvbSystemBuilder():
         self.bonded_integration_bond_fac: float = 0.01  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0  # Scaling factor for the bonded integration forces.
 
+        self.int_nb_const_exceptions = True # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
+
         self.verbose = False
 
         self.constraints: list[dict] = []
@@ -159,6 +161,9 @@ class EvbSystemBuilder():
                 "type": bool
             },
             "no_int_lj": {
+                "type": bool
+            },
+            "int_nb_const_exceptions": {
                 "type": bool
             },
             "pressure": {
@@ -942,9 +947,10 @@ class EvbSystemBuilder():
         # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude these nonbonded interactions over the entire lambda vector.
         # This is compensated through the extra bonded interactions (labeled with integration)
         # This only affects the integration potential as the hard core interactions are used for integration
+        
         intlj, intcoul = self._create_nonbonded_forces(
             lam,
-            bonded=self.bonded_integration,
+            constant_exceptions=self.int_nb_const_exceptions,
             lj_soft_core=self.soft_core_lj_int,
             coul_soft_core=self.soft_core_coulomb_int,
         )
@@ -956,7 +962,7 @@ class EvbSystemBuilder():
         # The soft core forces are used for the PES calculations, and thus always have the 'correct' exceptions
         peslj, pescoul = self._create_nonbonded_forces(
             lam,
-            bonded=False,
+            constant_exceptions=False,
             lj_soft_core=self.soft_core_lj_pes,
             coul_soft_core=self.soft_core_coulomb_pes,
         )
@@ -1380,7 +1386,7 @@ class EvbSystemBuilder():
 
     def _create_nonbonded_forces(self,
                                  lam,
-                                 bonded=False,
+                                 constant_exceptions=False,
                                  lj_soft_core=False,
                                  coul_soft_core=False):
 
@@ -1409,13 +1415,14 @@ class EvbSystemBuilder():
         lj_force.addPerBondParameter("epsilonB")
         lj_force.addGlobalParameter("l", lam)
 
-        if not bonded:
-            reactant_bonds = self.reactant.bonds
-            product_bonds = self.product.bonds
-        else:
+        # The bonded parameter forces the same exceptions across the entire reaction
+        if constant_exceptions:
             bonds = list(set(self.reactant.bonds) | set(self.product.bonds))
             reactant_bonds = bonds
             product_bonds = bonds
+        else:
+            reactant_bonds = self.reactant.bonds
+            product_bonds = self.product.bonds
         reactant_exceptions = self._create_exceptions_from_bonds(
             self.reactant.atoms, reactant_bonds)
         product_exceptions = self._create_exceptions_from_bonds(
