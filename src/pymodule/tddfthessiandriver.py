@@ -315,15 +315,11 @@ class TddftHessianDriver(HessianDriver):
         assert_msg_critical(rsp_drv.is_converged,
                             'TddftHessianDriver: response did not converge')
 
+        # reset tddft_grad_drv instance variable to the results
+        # for the current molecular geometry - required by how compute_analytical works.
+        tddft_grad_drv._scf_drv = scf_drv
+        tddft_grad_drv._rsp_results = None
         tddft_grad_drv.compute_analytical(molecule, basis, rsp_results)
-
-        print("\nCoordinates")
-        print(molecule.get_xyz_string())
-        print("\nGradient")
-        print(tddft_grad_drv.gradient)
-        print("\nDipole Moment:")
-        print(tddft_grad_drv.relaxed_dipole_moment[0])
-        print()
 
         if self.rank == mpi_master():
             # Multiple excited states can be computed simultaneously.

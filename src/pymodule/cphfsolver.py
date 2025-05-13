@@ -1112,8 +1112,7 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             list_rhs = []
             for vec in cphf_rhs_dict['dist_cphf_rhs']:
-                vec_np = self.get_full_solution_vector(vec)
-                list_rhs.append(vec_np[:nocc * nvir])
+                list_rhs.append(vec.array())
             cphf_rhs = np.array(list_rhs)
             dof = len(list_rhs)
             cphf_rhs = cphf_rhs.reshape(dof, nocc, nvir)
@@ -1148,7 +1147,7 @@ class CphfSolver(LinearSolver):
             # Create the list of DistributedArrays
             solutions = []
             for i in range(dof):
-                vec_cphf_ov = cphf_ov[i].reshape(nocc*nvir)
+                vec_cphf_ov = cphf_ov[i].reshape(nocc * nvir)
                 solutions.append(DistributedArray(vec_cphf_ov, self.comm))
 
         # merge the rhs dict with the solution
