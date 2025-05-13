@@ -95,17 +95,21 @@ class EvbSystemBuilder():
         self.lj14_scale: float = 0.5
         self.minimal_nb_cutoff: float = 1  # nm, minimal cutoff for the nonbonded force
 
-        self.soft_core_coulomb_pes = True
-        self.soft_core_lj_pes = True
-
-        self.soft_core_coulomb_int = False
-        self.soft_core_lj_int = False
         self.pressure: float = -1.
         self.solvent: str = None  #type: ignore
         self.padding: float = 1.
         self.no_reactant: bool = False
         self.E_field: list[float] = [0, 0, 0]
         self.neutralize: bool = False
+
+        self.soft_core_coulomb_pes = True
+        self.soft_core_lj_pes = True
+
+        self.soft_core_coulomb_int = False
+        self.soft_core_lj_int = False
+
+        self.no_int_coul = False
+        self.no_int_lj = False
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.01  # Scaling factor for the bonded integration forces.
@@ -149,6 +153,12 @@ class EvbSystemBuilder():
                 "type": bool
             },
             "soft_core_lj_int": {
+                "type": bool
+            },
+            "no_int_coul": {
+                "type": bool
+            },
+            "no_int_lj": {
                 "type": bool
             },
             "pressure": {
@@ -938,6 +948,11 @@ class EvbSystemBuilder():
             lj_soft_core=self.soft_core_lj_int,
             coul_soft_core=self.soft_core_coulomb_int,
         )
+        intljname = intlj.getName() + "(int)"
+        intlj.setName(intljname)
+        intcoulname = intcoul.getName() + "(int)"
+        intcoul.setName(intcoulname)
+        
         # The soft core forces are used for the PES calculations, and thus always have the 'correct' exceptions
         peslj, pescoul = self._create_nonbonded_forces(
             lam,
@@ -945,7 +960,9 @@ class EvbSystemBuilder():
             lj_soft_core=self.soft_core_lj_pes,
             coul_soft_core=self.soft_core_coulomb_pes,
         )
-        # The hard
+        pesljname = peslj.getName() + "(pes)"
+        peslj.setName(pesljname)
+        
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
 
@@ -954,8 +971,10 @@ class EvbSystemBuilder():
         torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
 
-        intlj.setForceGroup(EvbForceGroup.INTLJ.value)
-        intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
+        if not self.no_int_lj:
+            intlj.setForceGroup(EvbForceGroup.INTLJ.value)
+        if not self.no_int_coul:
+            intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
         peslj.setForceGroup(EvbForceGroup.PESLJ.value)
         pescoul.setForceGroup(EvbForceGroup.PESCOUL.value)
         bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
