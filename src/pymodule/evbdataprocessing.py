@@ -489,7 +489,7 @@ class EvbDataProcessing:
 
         for result in self.results.values():
             E1_fg = result["E1_fg"]
-            E2_fg = result["E2_fg"]
+            E2_fg = result["E2_fg"]§
             dGfep_fg = []
             dGevb_fg = []
             for i, fg in enumerate(EvbForceGroup):
