@@ -351,17 +351,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_x_xx_xx[i] = 2.0 * ts_x_xx[i] * gfe2_0 + 2.0 * gr_x_xx[i] * gfe_0 + 2.0 * ts_xx_x[i] * gfe2_0 + 2.0 * gr_xx_x[i] * gfe_0 + ts_xx_xx[i] * gfe_0 * gc_x[i] + gr_xx_xx[i] * gc_x[i];
+        grr_x_xx_xx[i] = 4.0 * ts_x_xx[i] * gfe2_0 + 2.0 * gr_x_xx[i] * gfe_0 + 4.0 * ts_xx_x[i] * gfe2_0 + 2.0 * gr_xx_x[i] * gfe_0 + 2.0 * ts_xx_xx[i] * gfe_0 * gc_x[i] + gr_xx_xx[i] * gc_x[i];
 
-        grr_x_xx_xy[i] = 2.0 * ts_x_xy[i] * gfe2_0 + 2.0 * gr_x_xy[i] * gfe_0 + ts_xx_y[i] * gfe2_0 + gr_xx_y[i] * gfe_0 + ts_xx_xy[i] * gfe_0 * gc_x[i] + gr_xx_xy[i] * gc_x[i];
+        grr_x_xx_xy[i] = 4.0 * ts_x_xy[i] * gfe2_0 + 2.0 * gr_x_xy[i] * gfe_0 + 2.0 * ts_xx_y[i] * gfe2_0 + gr_xx_y[i] * gfe_0 + 2.0 * ts_xx_xy[i] * gfe_0 * gc_x[i] + gr_xx_xy[i] * gc_x[i];
 
-        grr_x_xx_xz[i] = 2.0 * ts_x_xz[i] * gfe2_0 + 2.0 * gr_x_xz[i] * gfe_0 + ts_xx_z[i] * gfe2_0 + gr_xx_z[i] * gfe_0 + ts_xx_xz[i] * gfe_0 * gc_x[i] + gr_xx_xz[i] * gc_x[i];
+        grr_x_xx_xz[i] = 4.0 * ts_x_xz[i] * gfe2_0 + 2.0 * gr_x_xz[i] * gfe_0 + 2.0 * ts_xx_z[i] * gfe2_0 + gr_xx_z[i] * gfe_0 + 2.0 * ts_xx_xz[i] * gfe_0 * gc_x[i] + gr_xx_xz[i] * gc_x[i];
 
-        grr_x_xx_yy[i] = 2.0 * ts_x_yy[i] * gfe2_0 + 2.0 * gr_x_yy[i] * gfe_0 + ts_xx_yy[i] * gfe_0 * gc_x[i] + gr_xx_yy[i] * gc_x[i];
+        grr_x_xx_yy[i] = 4.0 * ts_x_yy[i] * gfe2_0 + 2.0 * gr_x_yy[i] * gfe_0 + 2.0 * ts_xx_yy[i] * gfe_0 * gc_x[i] + gr_xx_yy[i] * gc_x[i];
 
-        grr_x_xx_yz[i] = 2.0 * ts_x_yz[i] * gfe2_0 + 2.0 * gr_x_yz[i] * gfe_0 + ts_xx_yz[i] * gfe_0 * gc_x[i] + gr_xx_yz[i] * gc_x[i];
+        grr_x_xx_yz[i] = 4.0 * ts_x_yz[i] * gfe2_0 + 2.0 * gr_x_yz[i] * gfe_0 + 2.0 * ts_xx_yz[i] * gfe_0 * gc_x[i] + gr_xx_yz[i] * gc_x[i];
 
-        grr_x_xx_zz[i] = 2.0 * ts_x_zz[i] * gfe2_0 + 2.0 * gr_x_zz[i] * gfe_0 + ts_xx_zz[i] * gfe_0 * gc_x[i] + gr_xx_zz[i] * gc_x[i];
+        grr_x_xx_zz[i] = 4.0 * ts_x_zz[i] * gfe2_0 + 2.0 * gr_x_zz[i] * gfe_0 + 2.0 * ts_xx_zz[i] * gfe_0 * gc_x[i] + gr_xx_zz[i] * gc_x[i];
     }
 
     // Set up 6-12 components of targeted buffer : DD
@@ -385,17 +385,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_x_xy_xx[i] = ts_y_xx[i] * gfe2_0 + gr_y_xx[i] * gfe_0 + 2.0 * ts_xy_x[i] * gfe2_0 + 2.0 * gr_xy_x[i] * gfe_0 + ts_xy_xx[i] * gfe_0 * gc_x[i] + gr_xy_xx[i] * gc_x[i];
+        grr_x_xy_xx[i] = 2.0 * ts_y_xx[i] * gfe2_0 + gr_y_xx[i] * gfe_0 + 4.0 * ts_xy_x[i] * gfe2_0 + 2.0 * gr_xy_x[i] * gfe_0 + 2.0 * ts_xy_xx[i] * gfe_0 * gc_x[i] + gr_xy_xx[i] * gc_x[i];
 
-        grr_x_xy_xy[i] = ts_y_xy[i] * gfe2_0 + gr_y_xy[i] * gfe_0 + ts_xy_y[i] * gfe2_0 + gr_xy_y[i] * gfe_0 + ts_xy_xy[i] * gfe_0 * gc_x[i] + gr_xy_xy[i] * gc_x[i];
+        grr_x_xy_xy[i] = 2.0 * ts_y_xy[i] * gfe2_0 + gr_y_xy[i] * gfe_0 + 2.0 * ts_xy_y[i] * gfe2_0 + gr_xy_y[i] * gfe_0 + 2.0 * ts_xy_xy[i] * gfe_0 * gc_x[i] + gr_xy_xy[i] * gc_x[i];
 
-        grr_x_xy_xz[i] = ts_y_xz[i] * gfe2_0 + gr_y_xz[i] * gfe_0 + ts_xy_z[i] * gfe2_0 + gr_xy_z[i] * gfe_0 + ts_xy_xz[i] * gfe_0 * gc_x[i] + gr_xy_xz[i] * gc_x[i];
+        grr_x_xy_xz[i] = 2.0 * ts_y_xz[i] * gfe2_0 + gr_y_xz[i] * gfe_0 + 2.0 * ts_xy_z[i] * gfe2_0 + gr_xy_z[i] * gfe_0 + 2.0 * ts_xy_xz[i] * gfe_0 * gc_x[i] + gr_xy_xz[i] * gc_x[i];
 
-        grr_x_xy_yy[i] = ts_y_yy[i] * gfe2_0 + gr_y_yy[i] * gfe_0 + ts_xy_yy[i] * gfe_0 * gc_x[i] + gr_xy_yy[i] * gc_x[i];
+        grr_x_xy_yy[i] = 2.0 * ts_y_yy[i] * gfe2_0 + gr_y_yy[i] * gfe_0 + 2.0 * ts_xy_yy[i] * gfe_0 * gc_x[i] + gr_xy_yy[i] * gc_x[i];
 
-        grr_x_xy_yz[i] = ts_y_yz[i] * gfe2_0 + gr_y_yz[i] * gfe_0 + ts_xy_yz[i] * gfe_0 * gc_x[i] + gr_xy_yz[i] * gc_x[i];
+        grr_x_xy_yz[i] = 2.0 * ts_y_yz[i] * gfe2_0 + gr_y_yz[i] * gfe_0 + 2.0 * ts_xy_yz[i] * gfe_0 * gc_x[i] + gr_xy_yz[i] * gc_x[i];
 
-        grr_x_xy_zz[i] = ts_y_zz[i] * gfe2_0 + gr_y_zz[i] * gfe_0 + ts_xy_zz[i] * gfe_0 * gc_x[i] + gr_xy_zz[i] * gc_x[i];
+        grr_x_xy_zz[i] = 2.0 * ts_y_zz[i] * gfe2_0 + gr_y_zz[i] * gfe_0 + 2.0 * ts_xy_zz[i] * gfe_0 * gc_x[i] + gr_xy_zz[i] * gc_x[i];
     }
 
     // Set up 12-18 components of targeted buffer : DD
@@ -419,17 +419,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_x_xz_xx[i] = ts_z_xx[i] * gfe2_0 + gr_z_xx[i] * gfe_0 + 2.0 * ts_xz_x[i] * gfe2_0 + 2.0 * gr_xz_x[i] * gfe_0 + ts_xz_xx[i] * gfe_0 * gc_x[i] + gr_xz_xx[i] * gc_x[i];
+        grr_x_xz_xx[i] = 2.0 * ts_z_xx[i] * gfe2_0 + gr_z_xx[i] * gfe_0 + 4.0 * ts_xz_x[i] * gfe2_0 + 2.0 * gr_xz_x[i] * gfe_0 + 2.0 * ts_xz_xx[i] * gfe_0 * gc_x[i] + gr_xz_xx[i] * gc_x[i];
 
-        grr_x_xz_xy[i] = ts_z_xy[i] * gfe2_0 + gr_z_xy[i] * gfe_0 + ts_xz_y[i] * gfe2_0 + gr_xz_y[i] * gfe_0 + ts_xz_xy[i] * gfe_0 * gc_x[i] + gr_xz_xy[i] * gc_x[i];
+        grr_x_xz_xy[i] = 2.0 * ts_z_xy[i] * gfe2_0 + gr_z_xy[i] * gfe_0 + 2.0 * ts_xz_y[i] * gfe2_0 + gr_xz_y[i] * gfe_0 + 2.0 * ts_xz_xy[i] * gfe_0 * gc_x[i] + gr_xz_xy[i] * gc_x[i];
 
-        grr_x_xz_xz[i] = ts_z_xz[i] * gfe2_0 + gr_z_xz[i] * gfe_0 + ts_xz_z[i] * gfe2_0 + gr_xz_z[i] * gfe_0 + ts_xz_xz[i] * gfe_0 * gc_x[i] + gr_xz_xz[i] * gc_x[i];
+        grr_x_xz_xz[i] = 2.0 * ts_z_xz[i] * gfe2_0 + gr_z_xz[i] * gfe_0 + 2.0 * ts_xz_z[i] * gfe2_0 + gr_xz_z[i] * gfe_0 + 2.0 * ts_xz_xz[i] * gfe_0 * gc_x[i] + gr_xz_xz[i] * gc_x[i];
 
-        grr_x_xz_yy[i] = ts_z_yy[i] * gfe2_0 + gr_z_yy[i] * gfe_0 + ts_xz_yy[i] * gfe_0 * gc_x[i] + gr_xz_yy[i] * gc_x[i];
+        grr_x_xz_yy[i] = 2.0 * ts_z_yy[i] * gfe2_0 + gr_z_yy[i] * gfe_0 + 2.0 * ts_xz_yy[i] * gfe_0 * gc_x[i] + gr_xz_yy[i] * gc_x[i];
 
-        grr_x_xz_yz[i] = ts_z_yz[i] * gfe2_0 + gr_z_yz[i] * gfe_0 + ts_xz_yz[i] * gfe_0 * gc_x[i] + gr_xz_yz[i] * gc_x[i];
+        grr_x_xz_yz[i] = 2.0 * ts_z_yz[i] * gfe2_0 + gr_z_yz[i] * gfe_0 + 2.0 * ts_xz_yz[i] * gfe_0 * gc_x[i] + gr_xz_yz[i] * gc_x[i];
 
-        grr_x_xz_zz[i] = ts_z_zz[i] * gfe2_0 + gr_z_zz[i] * gfe_0 + ts_xz_zz[i] * gfe_0 * gc_x[i] + gr_xz_zz[i] * gc_x[i];
+        grr_x_xz_zz[i] = 2.0 * ts_z_zz[i] * gfe2_0 + gr_z_zz[i] * gfe_0 + 2.0 * ts_xz_zz[i] * gfe_0 * gc_x[i] + gr_xz_zz[i] * gc_x[i];
     }
 
     // Set up 18-24 components of targeted buffer : DD
@@ -453,17 +453,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_x_yy_xx[i] = 2.0 * ts_yy_x[i] * gfe2_0 + 2.0 * gr_yy_x[i] * gfe_0 + ts_yy_xx[i] * gfe_0 * gc_x[i] + gr_yy_xx[i] * gc_x[i];
+        grr_x_yy_xx[i] = 4.0 * ts_yy_x[i] * gfe2_0 + 2.0 * gr_yy_x[i] * gfe_0 + 2.0 * ts_yy_xx[i] * gfe_0 * gc_x[i] + gr_yy_xx[i] * gc_x[i];
 
-        grr_x_yy_xy[i] = ts_yy_y[i] * gfe2_0 + gr_yy_y[i] * gfe_0 + ts_yy_xy[i] * gfe_0 * gc_x[i] + gr_yy_xy[i] * gc_x[i];
+        grr_x_yy_xy[i] = 2.0 * ts_yy_y[i] * gfe2_0 + gr_yy_y[i] * gfe_0 + 2.0 * ts_yy_xy[i] * gfe_0 * gc_x[i] + gr_yy_xy[i] * gc_x[i];
 
-        grr_x_yy_xz[i] = ts_yy_z[i] * gfe2_0 + gr_yy_z[i] * gfe_0 + ts_yy_xz[i] * gfe_0 * gc_x[i] + gr_yy_xz[i] * gc_x[i];
+        grr_x_yy_xz[i] = 2.0 * ts_yy_z[i] * gfe2_0 + gr_yy_z[i] * gfe_0 + 2.0 * ts_yy_xz[i] * gfe_0 * gc_x[i] + gr_yy_xz[i] * gc_x[i];
 
-        grr_x_yy_yy[i] = ts_yy_yy[i] * gfe_0 * gc_x[i] + gr_yy_yy[i] * gc_x[i];
+        grr_x_yy_yy[i] = 2.0 * ts_yy_yy[i] * gfe_0 * gc_x[i] + gr_yy_yy[i] * gc_x[i];
 
-        grr_x_yy_yz[i] = ts_yy_yz[i] * gfe_0 * gc_x[i] + gr_yy_yz[i] * gc_x[i];
+        grr_x_yy_yz[i] = 2.0 * ts_yy_yz[i] * gfe_0 * gc_x[i] + gr_yy_yz[i] * gc_x[i];
 
-        grr_x_yy_zz[i] = ts_yy_zz[i] * gfe_0 * gc_x[i] + gr_yy_zz[i] * gc_x[i];
+        grr_x_yy_zz[i] = 2.0 * ts_yy_zz[i] * gfe_0 * gc_x[i] + gr_yy_zz[i] * gc_x[i];
     }
 
     // Set up 24-30 components of targeted buffer : DD
@@ -487,17 +487,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_x_yz_xx[i] = 2.0 * ts_yz_x[i] * gfe2_0 + 2.0 * gr_yz_x[i] * gfe_0 + ts_yz_xx[i] * gfe_0 * gc_x[i] + gr_yz_xx[i] * gc_x[i];
+        grr_x_yz_xx[i] = 4.0 * ts_yz_x[i] * gfe2_0 + 2.0 * gr_yz_x[i] * gfe_0 + 2.0 * ts_yz_xx[i] * gfe_0 * gc_x[i] + gr_yz_xx[i] * gc_x[i];
 
-        grr_x_yz_xy[i] = ts_yz_y[i] * gfe2_0 + gr_yz_y[i] * gfe_0 + ts_yz_xy[i] * gfe_0 * gc_x[i] + gr_yz_xy[i] * gc_x[i];
+        grr_x_yz_xy[i] = 2.0 * ts_yz_y[i] * gfe2_0 + gr_yz_y[i] * gfe_0 + 2.0 * ts_yz_xy[i] * gfe_0 * gc_x[i] + gr_yz_xy[i] * gc_x[i];
 
-        grr_x_yz_xz[i] = ts_yz_z[i] * gfe2_0 + gr_yz_z[i] * gfe_0 + ts_yz_xz[i] * gfe_0 * gc_x[i] + gr_yz_xz[i] * gc_x[i];
+        grr_x_yz_xz[i] = 2.0 * ts_yz_z[i] * gfe2_0 + gr_yz_z[i] * gfe_0 + 2.0 * ts_yz_xz[i] * gfe_0 * gc_x[i] + gr_yz_xz[i] * gc_x[i];
 
-        grr_x_yz_yy[i] = ts_yz_yy[i] * gfe_0 * gc_x[i] + gr_yz_yy[i] * gc_x[i];
+        grr_x_yz_yy[i] = 2.0 * ts_yz_yy[i] * gfe_0 * gc_x[i] + gr_yz_yy[i] * gc_x[i];
 
-        grr_x_yz_yz[i] = ts_yz_yz[i] * gfe_0 * gc_x[i] + gr_yz_yz[i] * gc_x[i];
+        grr_x_yz_yz[i] = 2.0 * ts_yz_yz[i] * gfe_0 * gc_x[i] + gr_yz_yz[i] * gc_x[i];
 
-        grr_x_yz_zz[i] = ts_yz_zz[i] * gfe_0 * gc_x[i] + gr_yz_zz[i] * gc_x[i];
+        grr_x_yz_zz[i] = 2.0 * ts_yz_zz[i] * gfe_0 * gc_x[i] + gr_yz_zz[i] * gc_x[i];
     }
 
     // Set up 30-36 components of targeted buffer : DD
@@ -521,17 +521,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_x_zz_xx[i] = 2.0 * ts_zz_x[i] * gfe2_0 + 2.0 * gr_zz_x[i] * gfe_0 + ts_zz_xx[i] * gfe_0 * gc_x[i] + gr_zz_xx[i] * gc_x[i];
+        grr_x_zz_xx[i] = 4.0 * ts_zz_x[i] * gfe2_0 + 2.0 * gr_zz_x[i] * gfe_0 + 2.0 * ts_zz_xx[i] * gfe_0 * gc_x[i] + gr_zz_xx[i] * gc_x[i];
 
-        grr_x_zz_xy[i] = ts_zz_y[i] * gfe2_0 + gr_zz_y[i] * gfe_0 + ts_zz_xy[i] * gfe_0 * gc_x[i] + gr_zz_xy[i] * gc_x[i];
+        grr_x_zz_xy[i] = 2.0 * ts_zz_y[i] * gfe2_0 + gr_zz_y[i] * gfe_0 + 2.0 * ts_zz_xy[i] * gfe_0 * gc_x[i] + gr_zz_xy[i] * gc_x[i];
 
-        grr_x_zz_xz[i] = ts_zz_z[i] * gfe2_0 + gr_zz_z[i] * gfe_0 + ts_zz_xz[i] * gfe_0 * gc_x[i] + gr_zz_xz[i] * gc_x[i];
+        grr_x_zz_xz[i] = 2.0 * ts_zz_z[i] * gfe2_0 + gr_zz_z[i] * gfe_0 + 2.0 * ts_zz_xz[i] * gfe_0 * gc_x[i] + gr_zz_xz[i] * gc_x[i];
 
-        grr_x_zz_yy[i] = ts_zz_yy[i] * gfe_0 * gc_x[i] + gr_zz_yy[i] * gc_x[i];
+        grr_x_zz_yy[i] = 2.0 * ts_zz_yy[i] * gfe_0 * gc_x[i] + gr_zz_yy[i] * gc_x[i];
 
-        grr_x_zz_yz[i] = ts_zz_yz[i] * gfe_0 * gc_x[i] + gr_zz_yz[i] * gc_x[i];
+        grr_x_zz_yz[i] = 2.0 * ts_zz_yz[i] * gfe_0 * gc_x[i] + gr_zz_yz[i] * gc_x[i];
 
-        grr_x_zz_zz[i] = ts_zz_zz[i] * gfe_0 * gc_x[i] + gr_zz_zz[i] * gc_x[i];
+        grr_x_zz_zz[i] = 2.0 * ts_zz_zz[i] * gfe_0 * gc_x[i] + gr_zz_zz[i] * gc_x[i];
     }
 
     // Set up 36-42 components of targeted buffer : DD
@@ -555,17 +555,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_y_xx_xx[i] = ts_xx_xx[i] * gfe_0 * gc_y[i] + gr_xx_xx[i] * gc_y[i];
+        grr_y_xx_xx[i] = 2.0 * ts_xx_xx[i] * gfe_0 * gc_y[i] + gr_xx_xx[i] * gc_y[i];
 
-        grr_y_xx_xy[i] = ts_xx_x[i] * gfe2_0 + gr_xx_x[i] * gfe_0 + ts_xx_xy[i] * gfe_0 * gc_y[i] + gr_xx_xy[i] * gc_y[i];
+        grr_y_xx_xy[i] = 2.0 * ts_xx_x[i] * gfe2_0 + gr_xx_x[i] * gfe_0 + 2.0 * ts_xx_xy[i] * gfe_0 * gc_y[i] + gr_xx_xy[i] * gc_y[i];
 
-        grr_y_xx_xz[i] = ts_xx_xz[i] * gfe_0 * gc_y[i] + gr_xx_xz[i] * gc_y[i];
+        grr_y_xx_xz[i] = 2.0 * ts_xx_xz[i] * gfe_0 * gc_y[i] + gr_xx_xz[i] * gc_y[i];
 
-        grr_y_xx_yy[i] = 2.0 * ts_xx_y[i] * gfe2_0 + 2.0 * gr_xx_y[i] * gfe_0 + ts_xx_yy[i] * gfe_0 * gc_y[i] + gr_xx_yy[i] * gc_y[i];
+        grr_y_xx_yy[i] = 4.0 * ts_xx_y[i] * gfe2_0 + 2.0 * gr_xx_y[i] * gfe_0 + 2.0 * ts_xx_yy[i] * gfe_0 * gc_y[i] + gr_xx_yy[i] * gc_y[i];
 
-        grr_y_xx_yz[i] = ts_xx_z[i] * gfe2_0 + gr_xx_z[i] * gfe_0 + ts_xx_yz[i] * gfe_0 * gc_y[i] + gr_xx_yz[i] * gc_y[i];
+        grr_y_xx_yz[i] = 2.0 * ts_xx_z[i] * gfe2_0 + gr_xx_z[i] * gfe_0 + 2.0 * ts_xx_yz[i] * gfe_0 * gc_y[i] + gr_xx_yz[i] * gc_y[i];
 
-        grr_y_xx_zz[i] = ts_xx_zz[i] * gfe_0 * gc_y[i] + gr_xx_zz[i] * gc_y[i];
+        grr_y_xx_zz[i] = 2.0 * ts_xx_zz[i] * gfe_0 * gc_y[i] + gr_xx_zz[i] * gc_y[i];
     }
 
     // Set up 42-48 components of targeted buffer : DD
@@ -589,17 +589,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_y_xy_xx[i] = ts_x_xx[i] * gfe2_0 + gr_x_xx[i] * gfe_0 + ts_xy_xx[i] * gfe_0 * gc_y[i] + gr_xy_xx[i] * gc_y[i];
+        grr_y_xy_xx[i] = 2.0 * ts_x_xx[i] * gfe2_0 + gr_x_xx[i] * gfe_0 + 2.0 * ts_xy_xx[i] * gfe_0 * gc_y[i] + gr_xy_xx[i] * gc_y[i];
 
-        grr_y_xy_xy[i] = ts_x_xy[i] * gfe2_0 + gr_x_xy[i] * gfe_0 + ts_xy_x[i] * gfe2_0 + gr_xy_x[i] * gfe_0 + ts_xy_xy[i] * gfe_0 * gc_y[i] + gr_xy_xy[i] * gc_y[i];
+        grr_y_xy_xy[i] = 2.0 * ts_x_xy[i] * gfe2_0 + gr_x_xy[i] * gfe_0 + 2.0 * ts_xy_x[i] * gfe2_0 + gr_xy_x[i] * gfe_0 + 2.0 * ts_xy_xy[i] * gfe_0 * gc_y[i] + gr_xy_xy[i] * gc_y[i];
 
-        grr_y_xy_xz[i] = ts_x_xz[i] * gfe2_0 + gr_x_xz[i] * gfe_0 + ts_xy_xz[i] * gfe_0 * gc_y[i] + gr_xy_xz[i] * gc_y[i];
+        grr_y_xy_xz[i] = 2.0 * ts_x_xz[i] * gfe2_0 + gr_x_xz[i] * gfe_0 + 2.0 * ts_xy_xz[i] * gfe_0 * gc_y[i] + gr_xy_xz[i] * gc_y[i];
 
-        grr_y_xy_yy[i] = ts_x_yy[i] * gfe2_0 + gr_x_yy[i] * gfe_0 + 2.0 * ts_xy_y[i] * gfe2_0 + 2.0 * gr_xy_y[i] * gfe_0 + ts_xy_yy[i] * gfe_0 * gc_y[i] + gr_xy_yy[i] * gc_y[i];
+        grr_y_xy_yy[i] = 2.0 * ts_x_yy[i] * gfe2_0 + gr_x_yy[i] * gfe_0 + 4.0 * ts_xy_y[i] * gfe2_0 + 2.0 * gr_xy_y[i] * gfe_0 + 2.0 * ts_xy_yy[i] * gfe_0 * gc_y[i] + gr_xy_yy[i] * gc_y[i];
 
-        grr_y_xy_yz[i] = ts_x_yz[i] * gfe2_0 + gr_x_yz[i] * gfe_0 + ts_xy_z[i] * gfe2_0 + gr_xy_z[i] * gfe_0 + ts_xy_yz[i] * gfe_0 * gc_y[i] + gr_xy_yz[i] * gc_y[i];
+        grr_y_xy_yz[i] = 2.0 * ts_x_yz[i] * gfe2_0 + gr_x_yz[i] * gfe_0 + 2.0 * ts_xy_z[i] * gfe2_0 + gr_xy_z[i] * gfe_0 + 2.0 * ts_xy_yz[i] * gfe_0 * gc_y[i] + gr_xy_yz[i] * gc_y[i];
 
-        grr_y_xy_zz[i] = ts_x_zz[i] * gfe2_0 + gr_x_zz[i] * gfe_0 + ts_xy_zz[i] * gfe_0 * gc_y[i] + gr_xy_zz[i] * gc_y[i];
+        grr_y_xy_zz[i] = 2.0 * ts_x_zz[i] * gfe2_0 + gr_x_zz[i] * gfe_0 + 2.0 * ts_xy_zz[i] * gfe_0 * gc_y[i] + gr_xy_zz[i] * gc_y[i];
     }
 
     // Set up 48-54 components of targeted buffer : DD
@@ -623,17 +623,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_y_xz_xx[i] = ts_xz_xx[i] * gfe_0 * gc_y[i] + gr_xz_xx[i] * gc_y[i];
+        grr_y_xz_xx[i] = 2.0 * ts_xz_xx[i] * gfe_0 * gc_y[i] + gr_xz_xx[i] * gc_y[i];
 
-        grr_y_xz_xy[i] = ts_xz_x[i] * gfe2_0 + gr_xz_x[i] * gfe_0 + ts_xz_xy[i] * gfe_0 * gc_y[i] + gr_xz_xy[i] * gc_y[i];
+        grr_y_xz_xy[i] = 2.0 * ts_xz_x[i] * gfe2_0 + gr_xz_x[i] * gfe_0 + 2.0 * ts_xz_xy[i] * gfe_0 * gc_y[i] + gr_xz_xy[i] * gc_y[i];
 
-        grr_y_xz_xz[i] = ts_xz_xz[i] * gfe_0 * gc_y[i] + gr_xz_xz[i] * gc_y[i];
+        grr_y_xz_xz[i] = 2.0 * ts_xz_xz[i] * gfe_0 * gc_y[i] + gr_xz_xz[i] * gc_y[i];
 
-        grr_y_xz_yy[i] = 2.0 * ts_xz_y[i] * gfe2_0 + 2.0 * gr_xz_y[i] * gfe_0 + ts_xz_yy[i] * gfe_0 * gc_y[i] + gr_xz_yy[i] * gc_y[i];
+        grr_y_xz_yy[i] = 4.0 * ts_xz_y[i] * gfe2_0 + 2.0 * gr_xz_y[i] * gfe_0 + 2.0 * ts_xz_yy[i] * gfe_0 * gc_y[i] + gr_xz_yy[i] * gc_y[i];
 
-        grr_y_xz_yz[i] = ts_xz_z[i] * gfe2_0 + gr_xz_z[i] * gfe_0 + ts_xz_yz[i] * gfe_0 * gc_y[i] + gr_xz_yz[i] * gc_y[i];
+        grr_y_xz_yz[i] = 2.0 * ts_xz_z[i] * gfe2_0 + gr_xz_z[i] * gfe_0 + 2.0 * ts_xz_yz[i] * gfe_0 * gc_y[i] + gr_xz_yz[i] * gc_y[i];
 
-        grr_y_xz_zz[i] = ts_xz_zz[i] * gfe_0 * gc_y[i] + gr_xz_zz[i] * gc_y[i];
+        grr_y_xz_zz[i] = 2.0 * ts_xz_zz[i] * gfe_0 * gc_y[i] + gr_xz_zz[i] * gc_y[i];
     }
 
     // Set up 54-60 components of targeted buffer : DD
@@ -657,17 +657,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_y_yy_xx[i] = 2.0 * ts_y_xx[i] * gfe2_0 + 2.0 * gr_y_xx[i] * gfe_0 + ts_yy_xx[i] * gfe_0 * gc_y[i] + gr_yy_xx[i] * gc_y[i];
+        grr_y_yy_xx[i] = 4.0 * ts_y_xx[i] * gfe2_0 + 2.0 * gr_y_xx[i] * gfe_0 + 2.0 * ts_yy_xx[i] * gfe_0 * gc_y[i] + gr_yy_xx[i] * gc_y[i];
 
-        grr_y_yy_xy[i] = 2.0 * ts_y_xy[i] * gfe2_0 + 2.0 * gr_y_xy[i] * gfe_0 + ts_yy_x[i] * gfe2_0 + gr_yy_x[i] * gfe_0 + ts_yy_xy[i] * gfe_0 * gc_y[i] + gr_yy_xy[i] * gc_y[i];
+        grr_y_yy_xy[i] = 4.0 * ts_y_xy[i] * gfe2_0 + 2.0 * gr_y_xy[i] * gfe_0 + 2.0 * ts_yy_x[i] * gfe2_0 + gr_yy_x[i] * gfe_0 + 2.0 * ts_yy_xy[i] * gfe_0 * gc_y[i] + gr_yy_xy[i] * gc_y[i];
 
-        grr_y_yy_xz[i] = 2.0 * ts_y_xz[i] * gfe2_0 + 2.0 * gr_y_xz[i] * gfe_0 + ts_yy_xz[i] * gfe_0 * gc_y[i] + gr_yy_xz[i] * gc_y[i];
+        grr_y_yy_xz[i] = 4.0 * ts_y_xz[i] * gfe2_0 + 2.0 * gr_y_xz[i] * gfe_0 + 2.0 * ts_yy_xz[i] * gfe_0 * gc_y[i] + gr_yy_xz[i] * gc_y[i];
 
-        grr_y_yy_yy[i] = 2.0 * ts_y_yy[i] * gfe2_0 + 2.0 * gr_y_yy[i] * gfe_0 + 2.0 * ts_yy_y[i] * gfe2_0 + 2.0 * gr_yy_y[i] * gfe_0 + ts_yy_yy[i] * gfe_0 * gc_y[i] + gr_yy_yy[i] * gc_y[i];
+        grr_y_yy_yy[i] = 4.0 * ts_y_yy[i] * gfe2_0 + 2.0 * gr_y_yy[i] * gfe_0 + 4.0 * ts_yy_y[i] * gfe2_0 + 2.0 * gr_yy_y[i] * gfe_0 + 2.0 * ts_yy_yy[i] * gfe_0 * gc_y[i] + gr_yy_yy[i] * gc_y[i];
 
-        grr_y_yy_yz[i] = 2.0 * ts_y_yz[i] * gfe2_0 + 2.0 * gr_y_yz[i] * gfe_0 + ts_yy_z[i] * gfe2_0 + gr_yy_z[i] * gfe_0 + ts_yy_yz[i] * gfe_0 * gc_y[i] + gr_yy_yz[i] * gc_y[i];
+        grr_y_yy_yz[i] = 4.0 * ts_y_yz[i] * gfe2_0 + 2.0 * gr_y_yz[i] * gfe_0 + 2.0 * ts_yy_z[i] * gfe2_0 + gr_yy_z[i] * gfe_0 + 2.0 * ts_yy_yz[i] * gfe_0 * gc_y[i] + gr_yy_yz[i] * gc_y[i];
 
-        grr_y_yy_zz[i] = 2.0 * ts_y_zz[i] * gfe2_0 + 2.0 * gr_y_zz[i] * gfe_0 + ts_yy_zz[i] * gfe_0 * gc_y[i] + gr_yy_zz[i] * gc_y[i];
+        grr_y_yy_zz[i] = 4.0 * ts_y_zz[i] * gfe2_0 + 2.0 * gr_y_zz[i] * gfe_0 + 2.0 * ts_yy_zz[i] * gfe_0 * gc_y[i] + gr_yy_zz[i] * gc_y[i];
     }
 
     // Set up 60-66 components of targeted buffer : DD
@@ -691,17 +691,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_y_yz_xx[i] = ts_z_xx[i] * gfe2_0 + gr_z_xx[i] * gfe_0 + ts_yz_xx[i] * gfe_0 * gc_y[i] + gr_yz_xx[i] * gc_y[i];
+        grr_y_yz_xx[i] = 2.0 * ts_z_xx[i] * gfe2_0 + gr_z_xx[i] * gfe_0 + 2.0 * ts_yz_xx[i] * gfe_0 * gc_y[i] + gr_yz_xx[i] * gc_y[i];
 
-        grr_y_yz_xy[i] = ts_z_xy[i] * gfe2_0 + gr_z_xy[i] * gfe_0 + ts_yz_x[i] * gfe2_0 + gr_yz_x[i] * gfe_0 + ts_yz_xy[i] * gfe_0 * gc_y[i] + gr_yz_xy[i] * gc_y[i];
+        grr_y_yz_xy[i] = 2.0 * ts_z_xy[i] * gfe2_0 + gr_z_xy[i] * gfe_0 + 2.0 * ts_yz_x[i] * gfe2_0 + gr_yz_x[i] * gfe_0 + 2.0 * ts_yz_xy[i] * gfe_0 * gc_y[i] + gr_yz_xy[i] * gc_y[i];
 
-        grr_y_yz_xz[i] = ts_z_xz[i] * gfe2_0 + gr_z_xz[i] * gfe_0 + ts_yz_xz[i] * gfe_0 * gc_y[i] + gr_yz_xz[i] * gc_y[i];
+        grr_y_yz_xz[i] = 2.0 * ts_z_xz[i] * gfe2_0 + gr_z_xz[i] * gfe_0 + 2.0 * ts_yz_xz[i] * gfe_0 * gc_y[i] + gr_yz_xz[i] * gc_y[i];
 
-        grr_y_yz_yy[i] = ts_z_yy[i] * gfe2_0 + gr_z_yy[i] * gfe_0 + 2.0 * ts_yz_y[i] * gfe2_0 + 2.0 * gr_yz_y[i] * gfe_0 + ts_yz_yy[i] * gfe_0 * gc_y[i] + gr_yz_yy[i] * gc_y[i];
+        grr_y_yz_yy[i] = 2.0 * ts_z_yy[i] * gfe2_0 + gr_z_yy[i] * gfe_0 + 4.0 * ts_yz_y[i] * gfe2_0 + 2.0 * gr_yz_y[i] * gfe_0 + 2.0 * ts_yz_yy[i] * gfe_0 * gc_y[i] + gr_yz_yy[i] * gc_y[i];
 
-        grr_y_yz_yz[i] = ts_z_yz[i] * gfe2_0 + gr_z_yz[i] * gfe_0 + ts_yz_z[i] * gfe2_0 + gr_yz_z[i] * gfe_0 + ts_yz_yz[i] * gfe_0 * gc_y[i] + gr_yz_yz[i] * gc_y[i];
+        grr_y_yz_yz[i] = 2.0 * ts_z_yz[i] * gfe2_0 + gr_z_yz[i] * gfe_0 + 2.0 * ts_yz_z[i] * gfe2_0 + gr_yz_z[i] * gfe_0 + 2.0 * ts_yz_yz[i] * gfe_0 * gc_y[i] + gr_yz_yz[i] * gc_y[i];
 
-        grr_y_yz_zz[i] = ts_z_zz[i] * gfe2_0 + gr_z_zz[i] * gfe_0 + ts_yz_zz[i] * gfe_0 * gc_y[i] + gr_yz_zz[i] * gc_y[i];
+        grr_y_yz_zz[i] = 2.0 * ts_z_zz[i] * gfe2_0 + gr_z_zz[i] * gfe_0 + 2.0 * ts_yz_zz[i] * gfe_0 * gc_y[i] + gr_yz_zz[i] * gc_y[i];
     }
 
     // Set up 66-72 components of targeted buffer : DD
@@ -725,17 +725,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_y_zz_xx[i] = ts_zz_xx[i] * gfe_0 * gc_y[i] + gr_zz_xx[i] * gc_y[i];
+        grr_y_zz_xx[i] = 2.0 * ts_zz_xx[i] * gfe_0 * gc_y[i] + gr_zz_xx[i] * gc_y[i];
 
-        grr_y_zz_xy[i] = ts_zz_x[i] * gfe2_0 + gr_zz_x[i] * gfe_0 + ts_zz_xy[i] * gfe_0 * gc_y[i] + gr_zz_xy[i] * gc_y[i];
+        grr_y_zz_xy[i] = 2.0 * ts_zz_x[i] * gfe2_0 + gr_zz_x[i] * gfe_0 + 2.0 * ts_zz_xy[i] * gfe_0 * gc_y[i] + gr_zz_xy[i] * gc_y[i];
 
-        grr_y_zz_xz[i] = ts_zz_xz[i] * gfe_0 * gc_y[i] + gr_zz_xz[i] * gc_y[i];
+        grr_y_zz_xz[i] = 2.0 * ts_zz_xz[i] * gfe_0 * gc_y[i] + gr_zz_xz[i] * gc_y[i];
 
-        grr_y_zz_yy[i] = 2.0 * ts_zz_y[i] * gfe2_0 + 2.0 * gr_zz_y[i] * gfe_0 + ts_zz_yy[i] * gfe_0 * gc_y[i] + gr_zz_yy[i] * gc_y[i];
+        grr_y_zz_yy[i] = 4.0 * ts_zz_y[i] * gfe2_0 + 2.0 * gr_zz_y[i] * gfe_0 + 2.0 * ts_zz_yy[i] * gfe_0 * gc_y[i] + gr_zz_yy[i] * gc_y[i];
 
-        grr_y_zz_yz[i] = ts_zz_z[i] * gfe2_0 + gr_zz_z[i] * gfe_0 + ts_zz_yz[i] * gfe_0 * gc_y[i] + gr_zz_yz[i] * gc_y[i];
+        grr_y_zz_yz[i] = 2.0 * ts_zz_z[i] * gfe2_0 + gr_zz_z[i] * gfe_0 + 2.0 * ts_zz_yz[i] * gfe_0 * gc_y[i] + gr_zz_yz[i] * gc_y[i];
 
-        grr_y_zz_zz[i] = ts_zz_zz[i] * gfe_0 * gc_y[i] + gr_zz_zz[i] * gc_y[i];
+        grr_y_zz_zz[i] = 2.0 * ts_zz_zz[i] * gfe_0 * gc_y[i] + gr_zz_zz[i] * gc_y[i];
     }
 
     // Set up 72-78 components of targeted buffer : DD
@@ -759,17 +759,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_z_xx_xx[i] = ts_xx_xx[i] * gfe_0 * gc_z[i] + gr_xx_xx[i] * gc_z[i];
+        grr_z_xx_xx[i] = 2.0 * ts_xx_xx[i] * gfe_0 * gc_z[i] + gr_xx_xx[i] * gc_z[i];
 
-        grr_z_xx_xy[i] = ts_xx_xy[i] * gfe_0 * gc_z[i] + gr_xx_xy[i] * gc_z[i];
+        grr_z_xx_xy[i] = 2.0 * ts_xx_xy[i] * gfe_0 * gc_z[i] + gr_xx_xy[i] * gc_z[i];
 
-        grr_z_xx_xz[i] = ts_xx_x[i] * gfe2_0 + gr_xx_x[i] * gfe_0 + ts_xx_xz[i] * gfe_0 * gc_z[i] + gr_xx_xz[i] * gc_z[i];
+        grr_z_xx_xz[i] = 2.0 * ts_xx_x[i] * gfe2_0 + gr_xx_x[i] * gfe_0 + 2.0 * ts_xx_xz[i] * gfe_0 * gc_z[i] + gr_xx_xz[i] * gc_z[i];
 
-        grr_z_xx_yy[i] = ts_xx_yy[i] * gfe_0 * gc_z[i] + gr_xx_yy[i] * gc_z[i];
+        grr_z_xx_yy[i] = 2.0 * ts_xx_yy[i] * gfe_0 * gc_z[i] + gr_xx_yy[i] * gc_z[i];
 
-        grr_z_xx_yz[i] = ts_xx_y[i] * gfe2_0 + gr_xx_y[i] * gfe_0 + ts_xx_yz[i] * gfe_0 * gc_z[i] + gr_xx_yz[i] * gc_z[i];
+        grr_z_xx_yz[i] = 2.0 * ts_xx_y[i] * gfe2_0 + gr_xx_y[i] * gfe_0 + 2.0 * ts_xx_yz[i] * gfe_0 * gc_z[i] + gr_xx_yz[i] * gc_z[i];
 
-        grr_z_xx_zz[i] = 2.0 * ts_xx_z[i] * gfe2_0 + 2.0 * gr_xx_z[i] * gfe_0 + ts_xx_zz[i] * gfe_0 * gc_z[i] + gr_xx_zz[i] * gc_z[i];
+        grr_z_xx_zz[i] = 4.0 * ts_xx_z[i] * gfe2_0 + 2.0 * gr_xx_z[i] * gfe_0 + 2.0 * ts_xx_zz[i] * gfe_0 * gc_z[i] + gr_xx_zz[i] * gc_z[i];
     }
 
     // Set up 78-84 components of targeted buffer : DD
@@ -793,17 +793,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_z_xy_xx[i] = ts_xy_xx[i] * gfe_0 * gc_z[i] + gr_xy_xx[i] * gc_z[i];
+        grr_z_xy_xx[i] = 2.0 * ts_xy_xx[i] * gfe_0 * gc_z[i] + gr_xy_xx[i] * gc_z[i];
 
-        grr_z_xy_xy[i] = ts_xy_xy[i] * gfe_0 * gc_z[i] + gr_xy_xy[i] * gc_z[i];
+        grr_z_xy_xy[i] = 2.0 * ts_xy_xy[i] * gfe_0 * gc_z[i] + gr_xy_xy[i] * gc_z[i];
 
-        grr_z_xy_xz[i] = ts_xy_x[i] * gfe2_0 + gr_xy_x[i] * gfe_0 + ts_xy_xz[i] * gfe_0 * gc_z[i] + gr_xy_xz[i] * gc_z[i];
+        grr_z_xy_xz[i] = 2.0 * ts_xy_x[i] * gfe2_0 + gr_xy_x[i] * gfe_0 + 2.0 * ts_xy_xz[i] * gfe_0 * gc_z[i] + gr_xy_xz[i] * gc_z[i];
 
-        grr_z_xy_yy[i] = ts_xy_yy[i] * gfe_0 * gc_z[i] + gr_xy_yy[i] * gc_z[i];
+        grr_z_xy_yy[i] = 2.0 * ts_xy_yy[i] * gfe_0 * gc_z[i] + gr_xy_yy[i] * gc_z[i];
 
-        grr_z_xy_yz[i] = ts_xy_y[i] * gfe2_0 + gr_xy_y[i] * gfe_0 + ts_xy_yz[i] * gfe_0 * gc_z[i] + gr_xy_yz[i] * gc_z[i];
+        grr_z_xy_yz[i] = 2.0 * ts_xy_y[i] * gfe2_0 + gr_xy_y[i] * gfe_0 + 2.0 * ts_xy_yz[i] * gfe_0 * gc_z[i] + gr_xy_yz[i] * gc_z[i];
 
-        grr_z_xy_zz[i] = 2.0 * ts_xy_z[i] * gfe2_0 + 2.0 * gr_xy_z[i] * gfe_0 + ts_xy_zz[i] * gfe_0 * gc_z[i] + gr_xy_zz[i] * gc_z[i];
+        grr_z_xy_zz[i] = 4.0 * ts_xy_z[i] * gfe2_0 + 2.0 * gr_xy_z[i] * gfe_0 + 2.0 * ts_xy_zz[i] * gfe_0 * gc_z[i] + gr_xy_zz[i] * gc_z[i];
     }
 
     // Set up 84-90 components of targeted buffer : DD
@@ -827,17 +827,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_z_xz_xx[i] = ts_x_xx[i] * gfe2_0 + gr_x_xx[i] * gfe_0 + ts_xz_xx[i] * gfe_0 * gc_z[i] + gr_xz_xx[i] * gc_z[i];
+        grr_z_xz_xx[i] = 2.0 * ts_x_xx[i] * gfe2_0 + gr_x_xx[i] * gfe_0 + 2.0 * ts_xz_xx[i] * gfe_0 * gc_z[i] + gr_xz_xx[i] * gc_z[i];
 
-        grr_z_xz_xy[i] = ts_x_xy[i] * gfe2_0 + gr_x_xy[i] * gfe_0 + ts_xz_xy[i] * gfe_0 * gc_z[i] + gr_xz_xy[i] * gc_z[i];
+        grr_z_xz_xy[i] = 2.0 * ts_x_xy[i] * gfe2_0 + gr_x_xy[i] * gfe_0 + 2.0 * ts_xz_xy[i] * gfe_0 * gc_z[i] + gr_xz_xy[i] * gc_z[i];
 
-        grr_z_xz_xz[i] = ts_x_xz[i] * gfe2_0 + gr_x_xz[i] * gfe_0 + ts_xz_x[i] * gfe2_0 + gr_xz_x[i] * gfe_0 + ts_xz_xz[i] * gfe_0 * gc_z[i] + gr_xz_xz[i] * gc_z[i];
+        grr_z_xz_xz[i] = 2.0 * ts_x_xz[i] * gfe2_0 + gr_x_xz[i] * gfe_0 + 2.0 * ts_xz_x[i] * gfe2_0 + gr_xz_x[i] * gfe_0 + 2.0 * ts_xz_xz[i] * gfe_0 * gc_z[i] + gr_xz_xz[i] * gc_z[i];
 
-        grr_z_xz_yy[i] = ts_x_yy[i] * gfe2_0 + gr_x_yy[i] * gfe_0 + ts_xz_yy[i] * gfe_0 * gc_z[i] + gr_xz_yy[i] * gc_z[i];
+        grr_z_xz_yy[i] = 2.0 * ts_x_yy[i] * gfe2_0 + gr_x_yy[i] * gfe_0 + 2.0 * ts_xz_yy[i] * gfe_0 * gc_z[i] + gr_xz_yy[i] * gc_z[i];
 
-        grr_z_xz_yz[i] = ts_x_yz[i] * gfe2_0 + gr_x_yz[i] * gfe_0 + ts_xz_y[i] * gfe2_0 + gr_xz_y[i] * gfe_0 + ts_xz_yz[i] * gfe_0 * gc_z[i] + gr_xz_yz[i] * gc_z[i];
+        grr_z_xz_yz[i] = 2.0 * ts_x_yz[i] * gfe2_0 + gr_x_yz[i] * gfe_0 + 2.0 * ts_xz_y[i] * gfe2_0 + gr_xz_y[i] * gfe_0 + 2.0 * ts_xz_yz[i] * gfe_0 * gc_z[i] + gr_xz_yz[i] * gc_z[i];
 
-        grr_z_xz_zz[i] = ts_x_zz[i] * gfe2_0 + gr_x_zz[i] * gfe_0 + 2.0 * ts_xz_z[i] * gfe2_0 + 2.0 * gr_xz_z[i] * gfe_0 + ts_xz_zz[i] * gfe_0 * gc_z[i] + gr_xz_zz[i] * gc_z[i];
+        grr_z_xz_zz[i] = 2.0 * ts_x_zz[i] * gfe2_0 + gr_x_zz[i] * gfe_0 + 4.0 * ts_xz_z[i] * gfe2_0 + 2.0 * gr_xz_z[i] * gfe_0 + 2.0 * ts_xz_zz[i] * gfe_0 * gc_z[i] + gr_xz_zz[i] * gc_z[i];
     }
 
     // Set up 90-96 components of targeted buffer : DD
@@ -861,17 +861,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_z_yy_xx[i] = ts_yy_xx[i] * gfe_0 * gc_z[i] + gr_yy_xx[i] * gc_z[i];
+        grr_z_yy_xx[i] = 2.0 * ts_yy_xx[i] * gfe_0 * gc_z[i] + gr_yy_xx[i] * gc_z[i];
 
-        grr_z_yy_xy[i] = ts_yy_xy[i] * gfe_0 * gc_z[i] + gr_yy_xy[i] * gc_z[i];
+        grr_z_yy_xy[i] = 2.0 * ts_yy_xy[i] * gfe_0 * gc_z[i] + gr_yy_xy[i] * gc_z[i];
 
-        grr_z_yy_xz[i] = ts_yy_x[i] * gfe2_0 + gr_yy_x[i] * gfe_0 + ts_yy_xz[i] * gfe_0 * gc_z[i] + gr_yy_xz[i] * gc_z[i];
+        grr_z_yy_xz[i] = 2.0 * ts_yy_x[i] * gfe2_0 + gr_yy_x[i] * gfe_0 + 2.0 * ts_yy_xz[i] * gfe_0 * gc_z[i] + gr_yy_xz[i] * gc_z[i];
 
-        grr_z_yy_yy[i] = ts_yy_yy[i] * gfe_0 * gc_z[i] + gr_yy_yy[i] * gc_z[i];
+        grr_z_yy_yy[i] = 2.0 * ts_yy_yy[i] * gfe_0 * gc_z[i] + gr_yy_yy[i] * gc_z[i];
 
-        grr_z_yy_yz[i] = ts_yy_y[i] * gfe2_0 + gr_yy_y[i] * gfe_0 + ts_yy_yz[i] * gfe_0 * gc_z[i] + gr_yy_yz[i] * gc_z[i];
+        grr_z_yy_yz[i] = 2.0 * ts_yy_y[i] * gfe2_0 + gr_yy_y[i] * gfe_0 + 2.0 * ts_yy_yz[i] * gfe_0 * gc_z[i] + gr_yy_yz[i] * gc_z[i];
 
-        grr_z_yy_zz[i] = 2.0 * ts_yy_z[i] * gfe2_0 + 2.0 * gr_yy_z[i] * gfe_0 + ts_yy_zz[i] * gfe_0 * gc_z[i] + gr_yy_zz[i] * gc_z[i];
+        grr_z_yy_zz[i] = 4.0 * ts_yy_z[i] * gfe2_0 + 2.0 * gr_yy_z[i] * gfe_0 + 2.0 * ts_yy_zz[i] * gfe_0 * gc_z[i] + gr_yy_zz[i] * gc_z[i];
     }
 
     // Set up 96-102 components of targeted buffer : DD
@@ -895,17 +895,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_z_yz_xx[i] = ts_y_xx[i] * gfe2_0 + gr_y_xx[i] * gfe_0 + ts_yz_xx[i] * gfe_0 * gc_z[i] + gr_yz_xx[i] * gc_z[i];
+        grr_z_yz_xx[i] = 2.0 * ts_y_xx[i] * gfe2_0 + gr_y_xx[i] * gfe_0 + 2.0 * ts_yz_xx[i] * gfe_0 * gc_z[i] + gr_yz_xx[i] * gc_z[i];
 
-        grr_z_yz_xy[i] = ts_y_xy[i] * gfe2_0 + gr_y_xy[i] * gfe_0 + ts_yz_xy[i] * gfe_0 * gc_z[i] + gr_yz_xy[i] * gc_z[i];
+        grr_z_yz_xy[i] = 2.0 * ts_y_xy[i] * gfe2_0 + gr_y_xy[i] * gfe_0 + 2.0 * ts_yz_xy[i] * gfe_0 * gc_z[i] + gr_yz_xy[i] * gc_z[i];
 
-        grr_z_yz_xz[i] = ts_y_xz[i] * gfe2_0 + gr_y_xz[i] * gfe_0 + ts_yz_x[i] * gfe2_0 + gr_yz_x[i] * gfe_0 + ts_yz_xz[i] * gfe_0 * gc_z[i] + gr_yz_xz[i] * gc_z[i];
+        grr_z_yz_xz[i] = 2.0 * ts_y_xz[i] * gfe2_0 + gr_y_xz[i] * gfe_0 + 2.0 * ts_yz_x[i] * gfe2_0 + gr_yz_x[i] * gfe_0 + 2.0 * ts_yz_xz[i] * gfe_0 * gc_z[i] + gr_yz_xz[i] * gc_z[i];
 
-        grr_z_yz_yy[i] = ts_y_yy[i] * gfe2_0 + gr_y_yy[i] * gfe_0 + ts_yz_yy[i] * gfe_0 * gc_z[i] + gr_yz_yy[i] * gc_z[i];
+        grr_z_yz_yy[i] = 2.0 * ts_y_yy[i] * gfe2_0 + gr_y_yy[i] * gfe_0 + 2.0 * ts_yz_yy[i] * gfe_0 * gc_z[i] + gr_yz_yy[i] * gc_z[i];
 
-        grr_z_yz_yz[i] = ts_y_yz[i] * gfe2_0 + gr_y_yz[i] * gfe_0 + ts_yz_y[i] * gfe2_0 + gr_yz_y[i] * gfe_0 + ts_yz_yz[i] * gfe_0 * gc_z[i] + gr_yz_yz[i] * gc_z[i];
+        grr_z_yz_yz[i] = 2.0 * ts_y_yz[i] * gfe2_0 + gr_y_yz[i] * gfe_0 + 2.0 * ts_yz_y[i] * gfe2_0 + gr_yz_y[i] * gfe_0 + 2.0 * ts_yz_yz[i] * gfe_0 * gc_z[i] + gr_yz_yz[i] * gc_z[i];
 
-        grr_z_yz_zz[i] = ts_y_zz[i] * gfe2_0 + gr_y_zz[i] * gfe_0 + 2.0 * ts_yz_z[i] * gfe2_0 + 2.0 * gr_yz_z[i] * gfe_0 + ts_yz_zz[i] * gfe_0 * gc_z[i] + gr_yz_zz[i] * gc_z[i];
+        grr_z_yz_zz[i] = 2.0 * ts_y_zz[i] * gfe2_0 + gr_y_zz[i] * gfe_0 + 4.0 * ts_yz_z[i] * gfe2_0 + 2.0 * gr_yz_z[i] * gfe_0 + 2.0 * ts_yz_zz[i] * gfe_0 * gc_z[i] + gr_yz_zz[i] * gc_z[i];
     }
 
     // Set up 102-108 components of targeted buffer : DD
@@ -929,17 +929,17 @@ comp_prim_r_r2_dd(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_z_zz_xx[i] = 2.0 * ts_z_xx[i] * gfe2_0 + 2.0 * gr_z_xx[i] * gfe_0 + ts_zz_xx[i] * gfe_0 * gc_z[i] + gr_zz_xx[i] * gc_z[i];
+        grr_z_zz_xx[i] = 4.0 * ts_z_xx[i] * gfe2_0 + 2.0 * gr_z_xx[i] * gfe_0 + 2.0 * ts_zz_xx[i] * gfe_0 * gc_z[i] + gr_zz_xx[i] * gc_z[i];
 
-        grr_z_zz_xy[i] = 2.0 * ts_z_xy[i] * gfe2_0 + 2.0 * gr_z_xy[i] * gfe_0 + ts_zz_xy[i] * gfe_0 * gc_z[i] + gr_zz_xy[i] * gc_z[i];
+        grr_z_zz_xy[i] = 4.0 * ts_z_xy[i] * gfe2_0 + 2.0 * gr_z_xy[i] * gfe_0 + 2.0 * ts_zz_xy[i] * gfe_0 * gc_z[i] + gr_zz_xy[i] * gc_z[i];
 
-        grr_z_zz_xz[i] = 2.0 * ts_z_xz[i] * gfe2_0 + 2.0 * gr_z_xz[i] * gfe_0 + ts_zz_x[i] * gfe2_0 + gr_zz_x[i] * gfe_0 + ts_zz_xz[i] * gfe_0 * gc_z[i] + gr_zz_xz[i] * gc_z[i];
+        grr_z_zz_xz[i] = 4.0 * ts_z_xz[i] * gfe2_0 + 2.0 * gr_z_xz[i] * gfe_0 + 2.0 * ts_zz_x[i] * gfe2_0 + gr_zz_x[i] * gfe_0 + 2.0 * ts_zz_xz[i] * gfe_0 * gc_z[i] + gr_zz_xz[i] * gc_z[i];
 
-        grr_z_zz_yy[i] = 2.0 * ts_z_yy[i] * gfe2_0 + 2.0 * gr_z_yy[i] * gfe_0 + ts_zz_yy[i] * gfe_0 * gc_z[i] + gr_zz_yy[i] * gc_z[i];
+        grr_z_zz_yy[i] = 4.0 * ts_z_yy[i] * gfe2_0 + 2.0 * gr_z_yy[i] * gfe_0 + 2.0 * ts_zz_yy[i] * gfe_0 * gc_z[i] + gr_zz_yy[i] * gc_z[i];
 
-        grr_z_zz_yz[i] = 2.0 * ts_z_yz[i] * gfe2_0 + 2.0 * gr_z_yz[i] * gfe_0 + ts_zz_y[i] * gfe2_0 + gr_zz_y[i] * gfe_0 + ts_zz_yz[i] * gfe_0 * gc_z[i] + gr_zz_yz[i] * gc_z[i];
+        grr_z_zz_yz[i] = 4.0 * ts_z_yz[i] * gfe2_0 + 2.0 * gr_z_yz[i] * gfe_0 + 2.0 * ts_zz_y[i] * gfe2_0 + gr_zz_y[i] * gfe_0 + 2.0 * ts_zz_yz[i] * gfe_0 * gc_z[i] + gr_zz_yz[i] * gc_z[i];
 
-        grr_z_zz_zz[i] = 2.0 * ts_z_zz[i] * gfe2_0 + 2.0 * gr_z_zz[i] * gfe_0 + 2.0 * ts_zz_z[i] * gfe2_0 + 2.0 * gr_zz_z[i] * gfe_0 + ts_zz_zz[i] * gfe_0 * gc_z[i] + gr_zz_zz[i] * gc_z[i];
+        grr_z_zz_zz[i] = 4.0 * ts_z_zz[i] * gfe2_0 + 2.0 * gr_z_zz[i] * gfe_0 + 4.0 * ts_zz_z[i] * gfe2_0 + 2.0 * gr_zz_z[i] * gfe_0 + 2.0 * ts_zz_zz[i] * gfe_0 * gc_z[i] + gr_zz_zz[i] * gc_z[i];
     }
 
 }
