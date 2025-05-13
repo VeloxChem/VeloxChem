@@ -49,6 +49,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
                          write_rsp_solution_with_multiple_keys)
+from .inputparser import parse_seq_fixed
 
 
 class ComplexResponseTDA(LinearSolver):
@@ -267,6 +268,24 @@ class ComplexResponseTDA(LinearSolver):
             dictionary containing solutions and kappa values when called from
             a non-linear response module.
         """
+
+        # take care of quadrupole components
+        if self.is_quadrupole(self.a_operator):
+            if isinstance(self.a_components, str):
+                self.a_components = parse_seq_fixed(self.a_components, 'str')
+        if self.is_quadrupole(self.b_operator):
+            if isinstance(self.b_components, str):
+                self.b_components = parse_seq_fixed(self.b_components, 'str')
+
+        # check operator components
+        for comp in self.a_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.a_operator),
+                'ComplexResponse: Undefined or invalid a_component')
+        for comp in self.b_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.b_operator),
+                'ComplexResponse: Undefined or invalid b_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -1178,6 +1197,9 @@ class ComplexResponseTDA(LinearSolver):
             'dipole': 'Dipole',
             'electric dipole': 'Dipole',
             'electric_dipole': 'Dipole',
+            'quadrupole': 'Quadru',
+            'electric quadrupole': 'Quadru',
+            'electric_quadrupole': 'Quadru',
             'linear_momentum': 'LinMom',
             'linear momentum': 'LinMom',
             'angular_momentum': 'AngMom',

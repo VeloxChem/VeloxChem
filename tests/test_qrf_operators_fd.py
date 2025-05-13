@@ -12,7 +12,7 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 @pytest.mark.timeconsuming
 class TestQrfOperatorsFD:
 
-    def test_qrf_op_fd(self):
+    def run_qrf_op_fd(self, op_comp_pairs, tol):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -28,12 +28,8 @@ class TestQrfOperatorsFD:
 
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
-        ops = ['linear momentum', 'electric dipole']
-
         wb, wc = (0.0656, 0.0)
         wa = -(wb + wc)
-
-        a, b, c = 'zzz'
 
         # SCF
 
@@ -62,12 +58,11 @@ class TestQrfOperatorsFD:
 
         qrf = QuadraticResponseDriver(comm, ostream)
 
-        tol = 1.0e-4
-
-        for op_a in ops:
-            for op_b in ops:
+        for op_a, a in op_comp_pairs:
+            for op_b, b in op_comp_pairs:
 
                 op_c = 'electric dipole'
+                c = 'z'
 
                 # finite difference
 
@@ -190,3 +185,25 @@ class TestQrfOperatorsFD:
                            rsp_func_fd.real) < tol
                 assert abs(qrf_result[('qrf', wc, wb)].imag -
                            rsp_func_fd.imag) < tol
+
+    def test_qrf_op_fd_lmom_edip(self):
+
+        op_comp_pairs = [
+            ('linear momentum', 'z'),
+            ('electric dipole', 'z'),
+        ]
+
+        tol = 1.0e-4
+
+        self.run_qrf_op_fd(op_comp_pairs, tol)
+
+    def test_qrf_op_fd_lmom_quad(self):
+
+        op_comp_pairs = [
+            ('linear momentum', 'z'),
+            ('electric quadrupole', 'zz'),
+        ]
+
+        tol = 5.0e-3
+
+        self.run_qrf_op_fd(op_comp_pairs, tol)
