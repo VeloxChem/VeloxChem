@@ -32,6 +32,12 @@ target_sources(vlxobjs
     ThreeCenterOverlapPrimRecHG.cpp
     ThreeCenterOverlapPrimRecHF.cpp
     ThreeCenterOverlapPrimRecHD.cpp
+    ThreeCenterOverlapPrimRecDH.cpp
+    ThreeCenterOverlapPrimRecFH.cpp
+    ThreeCenterOverlapPrimRecGH.cpp
+    ThreeCenterOverlapPrimRecHH.cpp
+    ThreeCenterOverlapPrimRecPH.cpp
+    ThreeCenterOverlapPrimRecSH.cpp
   )
 
 target_include_directories(vlxobjs

@@ -37,6 +37,31 @@ target_sources(vlxobjs
     GeometricalDerivatives2X0ForGY.cpp
     GeometricalDerivatives2X0ForPY.cpp
     GeometricalDerivatives2X0ForSY.cpp
+    GeometricalDerivatives0X1ForDD.cpp
+    GeometricalDerivatives0X1ForDF.cpp
+    GeometricalDerivatives0X1ForDG.cpp
+    GeometricalDerivatives0X1ForDP.cpp
+    GeometricalDerivatives0X1ForDS.cpp
+    GeometricalDerivatives0X1ForFD.cpp
+    GeometricalDerivatives0X1ForFF.cpp
+    GeometricalDerivatives0X1ForFG.cpp
+    GeometricalDerivatives0X1ForFP.cpp
+    GeometricalDerivatives0X1ForFS.cpp
+    GeometricalDerivatives0X1ForGD.cpp
+    GeometricalDerivatives0X1ForGF.cpp
+    GeometricalDerivatives0X1ForGG.cpp
+    GeometricalDerivatives0X1ForGP.cpp
+    GeometricalDerivatives0X1ForGS.cpp
+    GeometricalDerivatives0X1ForPD.cpp
+    GeometricalDerivatives0X1ForPF.cpp
+    GeometricalDerivatives0X1ForPG.cpp
+    GeometricalDerivatives0X1ForPP.cpp
+    GeometricalDerivatives0X1ForPS.cpp
+    GeometricalDerivatives0X1ForSD.cpp
+    GeometricalDerivatives0X1ForSF.cpp
+    GeometricalDerivatives0X1ForSG.cpp
+    GeometricalDerivatives0X1ForSP.cpp
+    GeometricalDerivatives0X1ForSS.cpp
   )
 
 target_include_directories(vlxobjs
