@@ -283,10 +283,6 @@ class EvbDriver():
             self.product = combined_pro_input["forcefield"]
             self.ostream.flush()
         else:
-            if force_recalculation:
-                self.ostream.print_warning(
-                    f"Forcing recalculation of forcefields, even though they might all be present"
-                )
             rea_input = self._process_file_input(
                 reactant,
                 reactant_charge,
@@ -306,6 +302,14 @@ class EvbDriver():
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
 
+            if force_recalculation:
+                self.ostream.print_warning(
+                    f"Forcing recalculation of forcefields, even though they might all be present"
+                )
+                for rea in rea_input:
+                    rea['forcefield'] = None
+                for pro in pro_input:
+                    pro['forcefield'] = None
             self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,

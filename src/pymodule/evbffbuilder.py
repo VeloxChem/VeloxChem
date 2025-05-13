@@ -34,6 +34,7 @@ from mpi4py import MPI
 import numpy as np
 import networkx as nx
 import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
@@ -194,12 +195,13 @@ class EvbForceFieldBuilder():
             forcefield.bonds.pop(bond)
 
         pdb = mmapp.PDBFile(f'{name}.pdb')
+        ff = mmapp.ForceField(f'{name}.xml')
+
         modeller = mmapp.Modeller(pdb.topology,pdb.positions)
             
         top = modeller.getTopology()
         pos = modeller.getPositions()
 
-        ff = mmapp.ForceField(f'{name}.xml')
 
         mmsys = ff.createSystem(
             top,
@@ -226,6 +228,9 @@ class EvbForceFieldBuilder():
                         nbforce.addException(i, j,0,1,0)
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
+        os.unlink(f'{name}.xml')
+        os.unlink(f'{name}.pdb')
+        os.unlink(f'{name}_sys.xml')
         integrator = mm.VerletIntegrator(0.001)
         sim = mmapp.Simulation(top, mmsys, integrator)
         sim.context.setPositions(pos)
