@@ -489,13 +489,6 @@ class QuadraticResponseDriver(NonlinearSolver):
                 op_b_type = 'imag' if self.is_imag(self._b_op_key) else 'real'
                 op_c_type = 'imag' if self.is_imag(self._c_op_key) else 'real'
 
-                #         eee     eem     eme     emm     mee     mem     mme     mmm
-                # E3      +       +       +       -       +       -       -       -
-                # B2C     +       +       -       +       +       -       +       +
-                # C2B     +       -       +       +       +       +       -       +
-                # A2B     +       +       +       -       -       +       +       +
-                # A2C     +       +       +       -       -       +       +       +
-
                 # flip sign for E3 term using two if's
                 if (op_b_type == op_c_type) and (op_b_type != op_a_type):
                     NaE3NbNc *= -1.0
@@ -545,6 +538,12 @@ class QuadraticResponseDriver(NonlinearSolver):
                 self.ostream.flush()
 
                 result[('qrf', wb, wc)] = qrf_rsp_func
+
+                result['qrf_terms'] = {
+                    ('qrf_E3_term', wb, wc): val_E3,
+                    ('qrf_X2_term', wb, wc): val_X2,
+                    ('qrf_A2_term', wb, wc): val_A2,
+                }
 
         profiler.check_memory_usage('End of QRF')
 
