@@ -94,7 +94,6 @@ class LocalBayesResidual():
         self.interpolation_energy = None
         self.interpolation_gradient = None
         self.symmetry_information = None
-        self.symmetry_dihedral_lists = None
         self.qm_energy = None
         self.qm_gradient = None
         self.internal_coordinates = None
@@ -231,9 +230,9 @@ class LocalBayesResidual():
         dx   = x - self.internal_coordinates_values           # Δq
 
         for i, element in enumerate(self.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
-            if len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[3]: 
+            if len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][3]: 
                 dx[i] = 0.5 * (1.0 + np.cos(3.0 * dx[i] + np.pi))
-            elif len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[2]:
+            elif len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][2]:
                 dx[i] = 0.5 * (1.0 + np.cos(2.0 * dx[i] + np.pi))
             elif len(element) == 4:
                 dx[i] = 0.5 * (1.0 + np.cos(1.0 * dx[i] + np.pi)) 
@@ -245,9 +244,9 @@ class LocalBayesResidual():
         """Jacobian ∂φ/∂x   size (m,d)   in internal coordinates."""
         dx   = x - self.internal_coordinates_values
         for i, element in enumerate(self.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
-            if len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[3]: 
+            if len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][3]: 
                 dx[i] = 0.5 * (1.0 + np.cos(3.0 * dx[i] + np.pi))
-            elif len(element) == 4 and len(self.symmetry_dihedral_lists) != 0 and tuple(sorted(element)) in self.symmetry_dihedral_lists[2]:
+            elif len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][2]:
                 dx[i] = 0.5 * (1.0 + np.cos(2.0 * dx[i] + np.pi))
             elif len(element) == 4:
                 dx[i] = 0.5 * (1.0 + np.cos(1.0 * dx[i] + np.pi)) 
@@ -286,7 +285,7 @@ class LocalBayesResidual():
             
             Phi_w = np.sqrt(w_obs) * Phi
             y_w = np.sqrt(w_obs) * y
-            
+
             self.prec_matrix += Phi_w.T @ Phi_w
             self.rhs += Phi_w.T @ y_w
         
