@@ -606,6 +606,42 @@ export_t2cintegrals(py::module& m)
     //                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
     //                 return geom_drv.compute(exponents, factors, points, basis, molecule, iatom); },
     //         "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
+    // PyClass<CThreeCenterOverlapGradientGeom00XDriver<1>>(m, "ThreeCenterOverlapGradientGeom001Driver")
+    //     .def(py::init<>())
+    //     .def(
+    //         "compute",
+    //         [](const CThreeCenterOverlapGradientGeom00XDriver<1>& geom_drv,
+    //            const CMolecule&                                   molecule,
+    //            const CMolecularBasis&                             basis,
+    //            const std::vector<double>&                         exponents,
+    //            const std::vector<double>&                         factors,
+    //            const std::vector<std::array<double, 3>>&          coords,
+    //            const int                                          iatom)
+    //             -> CMatrices {
+    //                 auto points = std::vector<TPoint<double>>();
+    //                 points.reserve(coords.size());
+    //                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+    //                 return geom_drv.compute(exponents, factors, points, basis, molecule, iatom); },
+    //         "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // // COverlapGeom001Driver class
+    // PyClass<CThreeCenterOverlapGeom00XDriver<1>>(m, "ThreeCenterOverlapGeom001Driver")
+    //     .def(py::init<>())
+    //     .def(
+    //         "compute",
+    //         [](const CThreeCenterOverlapGeom00XDriver<1>& geom_drv,
+    //            const CMolecule&                           molecule,
+    //            const CMolecularBasis&                     basis,
+    //            const std::vector<double>&                 exponents,
+    //            const std::vector<double>&                 factors,
+    //            const std::vector<std::array<double, 3>>&  coords,
+    //            const int                                  iatom)
+    //             -> CMatrices {
+    //                 auto points = std::vector<TPoint<double>>();
+    //                 points.reserve(coords.size());
+    //                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+    //                 return geom_drv.compute(exponents, factors, points, basis, molecule, iatom); },
+    //         "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
 }
 
 }  // namespace vlx_t2cintegrals

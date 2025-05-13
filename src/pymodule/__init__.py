@@ -51,6 +51,7 @@ from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import ThreeCenterOverlapDriver
 from .veloxchemlib import ThreeCenterOverlapGradientDriver
 from .veloxchemlib import ThreeCenterOverlapGeom100Driver
+from .veloxchemlib import ThreeCenterOverlapGeom001Driver
 from .veloxchemlib import ThreeCenterOverlapGradientGeom100Driver
 from .veloxchemlib import ThreeCenterOverlapGradientGeom001Driver
 from .veloxchemlib import ThreeCenterElectronRepulsionDriver
