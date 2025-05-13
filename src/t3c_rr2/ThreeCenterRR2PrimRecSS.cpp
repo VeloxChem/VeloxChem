@@ -47,11 +47,11 @@ comp_prim_r_r2_ss(CSimdArray<double>& pbuffer,
     {
         const double gfe_0 = 0.5 / (a_exp + b_exps[i] + c_exp);
 
-        grr_x_0_0[i] = ts_0_0[i] * gfe_0 * gc_x[i] + gr_0_0[i] * gc_x[i];
+        grr_x_0_0[i] = 2.0 * ts_0_0[i] * gfe_0 * gc_x[i] + gr_0_0[i] * gc_x[i];
 
-        grr_y_0_0[i] = ts_0_0[i] * gfe_0 * gc_y[i] + gr_0_0[i] * gc_y[i];
+        grr_y_0_0[i] = 2.0 * ts_0_0[i] * gfe_0 * gc_y[i] + gr_0_0[i] * gc_y[i];
 
-        grr_z_0_0[i] = ts_0_0[i] * gfe_0 * gc_z[i] + gr_0_0[i] * gc_z[i];
+        grr_z_0_0[i] = 2.0 * ts_0_0[i] * gfe_0 * gc_z[i] + gr_0_0[i] * gc_z[i];
     }
 }
 

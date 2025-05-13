@@ -79,23 +79,23 @@ comp_prim_r_r2_sp(CSimdArray<double>& pbuffer,
 
         const double gfe2_0 = gfe_0 * gfe_0;
 
-        grr_x_0_x[i] = ts_0_0[i] * gfe2_0 + gr_0_0[i] * gfe_0 + ts_0_x[i] * gfe_0 * gc_x[i] + gr_0_x[i] * gc_x[i];
+        grr_x_0_x[i] = 2.0 * ts_0_0[i] * gfe2_0 + gr_0_0[i] * gfe_0 + 2.0 * ts_0_x[i] * gfe_0 * gc_x[i] + gr_0_x[i] * gc_x[i];
 
-        grr_x_0_y[i] = ts_0_y[i] * gfe_0 * gc_x[i] + gr_0_y[i] * gc_x[i];
+        grr_x_0_y[i] = 2.0 * ts_0_y[i] * gfe_0 * gc_x[i] + gr_0_y[i] * gc_x[i];
 
-        grr_x_0_z[i] = ts_0_z[i] * gfe_0 * gc_x[i] + gr_0_z[i] * gc_x[i];
+        grr_x_0_z[i] = 2.0 * ts_0_z[i] * gfe_0 * gc_x[i] + gr_0_z[i] * gc_x[i];
 
-        grr_y_0_x[i] = ts_0_x[i] * gfe_0 * gc_y[i] + gr_0_x[i] * gc_y[i];
+        grr_y_0_x[i] = 2.0 * ts_0_x[i] * gfe_0 * gc_y[i] + gr_0_x[i] * gc_y[i];
 
-        grr_y_0_y[i] = ts_0_0[i] * gfe2_0 + gr_0_0[i] * gfe_0 + ts_0_y[i] * gfe_0 * gc_y[i] + gr_0_y[i] * gc_y[i];
+        grr_y_0_y[i] = 2.0 * ts_0_0[i] * gfe2_0 + gr_0_0[i] * gfe_0 + 2.0 * ts_0_y[i] * gfe_0 * gc_y[i] + gr_0_y[i] * gc_y[i];
 
-        grr_y_0_z[i] = ts_0_z[i] * gfe_0 * gc_y[i] + gr_0_z[i] * gc_y[i];
+        grr_y_0_z[i] = 2.0 * ts_0_z[i] * gfe_0 * gc_y[i] + gr_0_z[i] * gc_y[i];
 
-        grr_z_0_x[i] = ts_0_x[i] * gfe_0 * gc_z[i] + gr_0_x[i] * gc_z[i];
+        grr_z_0_x[i] = 2.0 * ts_0_x[i] * gfe_0 * gc_z[i] + gr_0_x[i] * gc_z[i];
 
-        grr_z_0_y[i] = ts_0_y[i] * gfe_0 * gc_z[i] + gr_0_y[i] * gc_z[i];
+        grr_z_0_y[i] = 2.0 * ts_0_y[i] * gfe_0 * gc_z[i] + gr_0_y[i] * gc_z[i];
 
-        grr_z_0_z[i] = ts_0_0[i] * gfe2_0 + gr_0_0[i] * gfe_0 + ts_0_z[i] * gfe_0 * gc_z[i] + gr_0_z[i] * gc_z[i];
+        grr_z_0_z[i] = 2.0 * ts_0_0[i] * gfe2_0 + gr_0_0[i] * gfe_0 + 2.0 * ts_0_z[i] * gfe_0 * gc_z[i] + gr_0_z[i] * gc_z[i];
     }
 }
 
