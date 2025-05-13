@@ -145,7 +145,7 @@ class EvbForceFieldBuilder():
             )
         
 
-        return self.reactant, self.product, formed_bonds, broken_bonds
+        return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products
 
     @staticmethod
     def _combine_molecule(molecules):

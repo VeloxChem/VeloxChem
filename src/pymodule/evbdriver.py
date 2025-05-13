@@ -191,7 +191,7 @@ class EvbDriver():
         if isinstance(breaking_bonds, tuple):
             breaking_bonds = [breaking_bonds]
 
-        self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
+        self.reactant, self.product, self.formed_bonds, self.broken_bonds,self.reactants,self.products = ffbuilder.build_forcefields(
             rea_input,
             pro_input,
             ordered_input,
@@ -245,6 +245,7 @@ class EvbDriver():
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] = [],
         save_output: bool = True,
+        force_recalculation: bool = False,
     ):
         if isinstance(reactant, list):
             combined_reactant_name = '_'.join(reactant)
@@ -269,7 +270,8 @@ class EvbDriver():
         if (combined_rea_input['forcefield'] is not None
                 and combined_rea_input['molecule'] is not None
                 and combined_pro_input['forcefield'] is not None
-                and mapped_product_path.exists()):
+                and mapped_product_path.exists()
+                and not force_recalculation):
             mapped_product_molecule = Molecule.read_xyz_file(
                 str(mapped_product_path))
             combined_pro_input['forcefield'].molecule = mapped_product_molecule
@@ -281,7 +283,10 @@ class EvbDriver():
             self.product = combined_pro_input["forcefield"]
             self.ostream.flush()
         else:
-
+            if force_recalculation:
+                self.ostream.print_warning(
+                    f"Forcing recalculation of forcefields, even though they might all be present"
+                )
             rea_input = self._process_file_input(
                 reactant,
                 reactant_charge,
@@ -301,7 +306,7 @@ class EvbDriver():
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
 
-            self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
+            self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
                 ordered_input,

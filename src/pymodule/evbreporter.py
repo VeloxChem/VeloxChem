@@ -141,8 +141,8 @@ class EvbReporter():
             self.report_forcegroups = False
         else:
             self.report_forcegroups = True
-            no_ext = forcegroup_file.split('.')[0]
-            ext = forcegroup_file.split('.')[1]
+            no_ext = '.'.join(forcegroup_file.split('.')[:-1])
+            ext = forcegroup_file.split('.')[-1]
             rea_fg = no_ext + '_rea.' + ext
             pro_fg = no_ext + '_pro.' + ext
 
