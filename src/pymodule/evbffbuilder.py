@@ -433,6 +433,7 @@ class EvbForceFieldBuilder():
         forcefield.dihedrals = {}
         forcefield.impropers = {}
         atom_count = 0
+        forcefield.unique_atom_types = []
         
         for i, ff in enumerate(forcefields):
             # Shift all atom keys by the current atom count so that every atom has a unique ID
@@ -451,6 +452,8 @@ class EvbForceFieldBuilder():
             forcefield.angles.update(ff.angles)
             forcefield.dihedrals.update(ff.dihedrals)
             forcefield.impropers.update(ff.impropers)
+
+            forcefield.unique_atom_types += ff.unique_atom_types
 
         return forcefield
 

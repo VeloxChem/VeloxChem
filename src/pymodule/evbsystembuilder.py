@@ -115,7 +115,7 @@ class EvbSystemBuilder():
         self.bonded_integration_bond_fac: float = 0.01  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0  # Scaling factor for the bonded integration forces.
 
-        self.int_nb_const_exceptions = True # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
+        self.int_nb_const_exceptions = False  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
         self.verbose = False
 
@@ -142,7 +142,7 @@ class EvbSystemBuilder():
             "bonded_integration_bond_fac": {
                 "type": float
             },
-            "bonded_integration_angle_fac":{
+            "bonded_integration_angle_fac": {
                 "type": float
             },
             "soft_core_coulomb_pes": {
@@ -947,7 +947,7 @@ class EvbSystemBuilder():
         # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude these nonbonded interactions over the entire lambda vector.
         # This is compensated through the extra bonded interactions (labeled with integration)
         # This only affects the integration potential as the hard core interactions are used for integration
-        
+
         intlj, intcoul = self._create_nonbonded_forces(
             lam,
             constant_exceptions=self.int_nb_const_exceptions,
@@ -958,7 +958,7 @@ class EvbSystemBuilder():
         intlj.setName(intljname)
         intcoulname = intcoul.getName() + "(int)"
         intcoul.setName(intcoulname)
-        
+
         # The soft core forces are used for the PES calculations, and thus always have the 'correct' exceptions
         peslj, pescoul = self._create_nonbonded_forces(
             lam,
@@ -968,7 +968,7 @@ class EvbSystemBuilder():
         )
         pesljname = peslj.getName() + "(pes)"
         peslj.setName(pesljname)
-        
+
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
 
@@ -1153,8 +1153,10 @@ class EvbSystemBuilder():
 
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
-                self._add_angle(integration_force, atom_ids, broken_equil,
-                                angle['force_constant'] * (1 - scale)*self.bonded_integration_angle_fac)
+                self._add_angle(
+                    integration_force, atom_ids, broken_equil,
+                    angle['force_constant'] * (1 - scale) *
+                    self.bonded_integration_angle_fac)
 
         return harmonic_force, integration_force
 
@@ -1739,7 +1741,7 @@ class EvbForceGroup(Enum):
         for fg in cls:
             in_int = fg.value in integration_forcegroups
             in_pes = fg.value in pes_forcegroups
-            fg_cat = 'b' # For both
+            fg_cat = 'b'  # For both
             if in_int and not in_pes:
                 fg_cat = 'i'
             if not in_int and in_pes:
