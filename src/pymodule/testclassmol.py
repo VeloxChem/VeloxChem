@@ -330,7 +330,8 @@ class MPC1:
         )
     
     def generate_data_matrix(self):
-        num_atoms = len(self.resp_charges)
+        num_atoms = self.molecule.number_of_atoms()
+    
         data_matrix = np.zeros((num_atoms, 22))
 
         for i, atom_idx in enumerate(range(num_atoms)):
