@@ -317,7 +317,7 @@ export_gpu(py::module& m)
 
     m.def("compute_kinetic_energy_gradient_gpu", &gpu::computeKineticEnergyGradientOnGPU, "Computes kinetic energy integral gradient using GPU.");
 
-    // m.def("compute_nuclear_potential_gradient_gpu", &gpu::computeNuclearPotentialGradientOnGPU, "Computes nuclear potential integral gradient using GPU.");
+    m.def("compute_nuclear_potential_gradient_gpu", &gpu::computeNuclearPotentialGradientOnGPU, "Computes nuclear potential integral gradient using GPU.");
 
     m.def("compute_nuclear_potential_integrals_gpu", &gpu::computeNuclearPotentialIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
 

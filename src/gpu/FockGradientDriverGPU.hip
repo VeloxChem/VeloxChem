@@ -67,7 +67,7 @@
 #include "MultiTimer.hpp"
 #include "OverlapGradient.hpp"
 #include "KineticEnergyGradient.hpp"
-//#include "NuclearPotentialGradient.hpp"
+#include "NuclearPotentialGradient.hpp"
 #include "StringFormat.hpp"
 
 namespace gpu {  // gpu namespace
@@ -1167,9 +1167,12 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
     return T_grad_t;
 }
 
-/*
 auto
-computeNuclearPotentialGradientOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CGradientScreeningData& screening) -> CDenseMatrix
+computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
+                                     const CMolecularBasis& basis,
+                                     const CGradientScreeningData& screening,
+                                     const int64_t rank,
+                                     const int64_t nnodes) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -1177,10 +1180,6 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule, const CMolecular
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
@@ -1211,9 +1210,9 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule, const CMolecular
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     // auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -1783,7 +1782,6 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule, const CMolecular
 
     return V_grad_t;
 }
-*/
 
 auto
 computeFockGradientOnGPU(const              CMolecule& molecule,
