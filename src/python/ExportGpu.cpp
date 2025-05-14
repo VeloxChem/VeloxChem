@@ -313,7 +313,7 @@ export_gpu(py::module& m)
 
     m.def("compute_overlap_and_kinetic_energy_integrals_gpu", &gpu::computeOverlapAndKineticEnergyIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
 
-    // m.def("compute_overlap_gradient_gpu", &gpu::computeOverlapGradientOnGPU, "Computes overlap integral gradient using GPU.");
+    m.def("compute_overlap_gradient_gpu", &gpu::computeOverlapGradientOnGPU, "Computes overlap integral gradient using GPU.");
 
     // m.def("compute_kinetic_energy_gradient_gpu", &gpu::computeKineticEnergyGradientOnGPU, "Computes kinetic energy integral gradient using GPU.");
 
