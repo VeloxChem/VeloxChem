@@ -42,8 +42,10 @@
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "FockDriverGPU.hpp"
+#include "FockGradientDriverGPU.hpp"
 #include "GpuDevices.hpp"
 #include "ScreeningData.hpp"
+#include "GradientScreeningData.hpp"
 #include "XCIntegratorGPU.hpp"
 
 namespace py = pybind11;
@@ -78,6 +80,12 @@ export_gpu(py::module& m)
                 return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
             },
             "Gets Q matrix.");
+
+    // CGradientScreeningData class
+
+    py::class_<CGradientScreeningData, std::shared_ptr<CGradientScreeningData>>(m, "GradientScreeningData")
+        .def(py::init<const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const CDenseMatrix&, const int64_t, const double, const double, const int, const int>())
+        .def("get_num_gpus_per_node", &CGradientScreeningData::getNumGpusPerNode);
 
     m.def(
         "compute_gto_values",
@@ -299,9 +307,17 @@ export_gpu(py::module& m)
 
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 
+    m.def("compute_fock_gradient_gpu", &gpu::computeFockGradientOnGPU, "Computes Fock gradient using GPU.");
+
     m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
 
     m.def("compute_overlap_and_kinetic_energy_integrals_gpu", &gpu::computeOverlapAndKineticEnergyIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
+
+    // m.def("compute_overlap_gradient_gpu", &gpu::computeOverlapGradientOnGPU, "Computes overlap integral gradient using GPU.");
+
+    // m.def("compute_kinetic_energy_gradient_gpu", &gpu::computeKineticEnergyGradientOnGPU, "Computes kinetic energy integral gradient using GPU.");
+
+    // m.def("compute_nuclear_potential_gradient_gpu", &gpu::computeNuclearPotentialGradientOnGPU, "Computes nuclear potential integral gradient using GPU.");
 
     m.def("compute_nuclear_potential_integrals_gpu", &gpu::computeNuclearPotentialIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
 

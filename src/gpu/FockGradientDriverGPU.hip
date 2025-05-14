@@ -1,0 +1,7065 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+//#include <hipsolver/hipsolver.h>
+#include <magma_v2.h>
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include "ScreeningData.hpp"
+#include "GradientScreeningData.hpp"
+#include "BoysFuncTable.hpp"
+#include "FockDriverGPU.hpp"
+#include "FockGradientDriverGPU.hpp"
+#include "EriCoulombGradient.hpp"
+#include "EriExchangeGradient.hpp"
+#include "ErrorHandler.hpp"
+#include "GpuConstants.hpp"
+#include "GpuSafeChecks.hpp"
+#include "GpuDevices.hpp"
+#include "GtoFunc.hpp"
+#include "GtoInfo.hpp"
+#include "MathConst.hpp"
+#include "MathFunc.hpp"
+#include "MatrixFunc.hpp"
+#include "MultiTimer.hpp"
+//#include "OverlapGradient.hpp"
+//#include "KineticEnergyGradient.hpp"
+//#include "NuclearPotentialGradient.hpp"
+#include "StringFormat.hpp"
+
+namespace gpu {  // gpu namespace
+
+__global__ void
+zeroGradientData(double* d_data, const uint32_t n)
+{
+    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (i < n) d_data[i] = 0.0;
+}
+
+/*
+auto
+computeOverlapGradientOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CGradientScreeningData& screening) -> CDenseMatrix
+{
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // TODO use communicator from arguments
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    std::vector<CDenseMatrix> S_grad_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        S_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+    }
+
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    double*   d_s_prim_info;
+
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    double*   d_d_prim_info;
+
+    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // GTO block pairs
+
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
+    const auto& pd_first_inds_local = screening.get_pd_first_inds_local(gpu_id);
+    const auto& dd_first_inds_local = screening.get_dd_first_inds_local(gpu_id);
+
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
+    const auto& pd_second_inds_local = screening.get_pd_second_inds_local(gpu_id);
+    const auto& dd_second_inds_local = screening.get_dd_second_inds_local(gpu_id);
+
+    const auto& ss_mat_W_local = screening.get_ss_mat_W_local(gpu_id);
+    const auto& sp_mat_W_local = screening.get_sp_mat_W_local(gpu_id);
+    const auto& sd_mat_W_local = screening.get_sd_mat_W_local(gpu_id);
+    const auto& pp_mat_W_local = screening.get_pp_mat_W_local(gpu_id);
+    const auto& pd_mat_W_local = screening.get_pd_mat_W_local(gpu_id);
+    const auto& dd_mat_W_local = screening.get_dd_mat_W_local(gpu_id);
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
+                                                     pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+    std::vector<double> mat_S(max_prim_pair_count_local);
+
+    // S and T on device
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    double *d_ss_mat_W_local, *d_sp_mat_W_local, *d_sd_mat_W_local, *d_pp_mat_W_local, *d_pd_mat_W_local, *d_dd_mat_W_local;
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_ss_mat_W_local, ss_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_mat_W_local, sp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_mat_W_local, sd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_mat_W_local, pp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_mat_W_local, pd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_mat_W_local, dd_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_mat_W_local, ss_mat_W_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_mat_W_local, sp_mat_W_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_mat_W_local, sd_mat_W_local.data(), sd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_mat_W_local, pp_mat_W_local.data(), pp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_mat_W_local, pd_mat_W_local.data(), pd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_mat_W_local, dd_mat_W_local.data(), dd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+
+    S_grad_omp[gpu_id].zero();
+
+    hipSafe(hipDeviceSynchronize());
+
+    // set up primitive Cartesian AO to atom mapping
+
+    const auto cart_ao_to_atom_inds = screening.getCartesianAOtoAtomIndices();
+
+    const auto all_prim_count = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
+
+    std::vector<uint32_t> prim_cart_ao_to_atom_inds(all_prim_count);
+
+    uint32_t *d_prim_cart_ao_to_atom_inds;
+
+    hipSafe(hipMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+
+    for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+    {
+        const auto i = ss_first_inds_local[ij];
+        const auto j = ss_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+        const auto j_cgto = s_prim_aoinds[j];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+    {
+        const auto i = sp_first_inds_local[ij];
+        const auto j = sp_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+
+        // TODO: think about the ordering of cartesian components
+        const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+    {
+        const auto i = sd_first_inds_local[ij];
+        const auto j = sd_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+
+        // TODO: think about the ordering of cartesian components
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+    {
+        const auto i = pp_first_inds_local[ij];
+        const auto j = pp_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+        const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+    {
+        const auto i = pd_first_inds_local[ij];
+        const auto j = pd_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+    {
+        const auto i = dd_first_inds_local[ij];
+        const auto j = dd_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // gradient
+
+    double *d_grad_x, *d_grad_y, *d_grad_z;
+
+    hipSafe(hipMalloc(&d_grad_x, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_y, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_z, natoms * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_grad_x, S_grad_omp[gpu_id].row(0), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_y, S_grad_omp[gpu_id].row(1), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_z, S_grad_omp[gpu_id].row(2), natoms * sizeof(double), hipMemcpyHostToDevice));
+
+    double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
+
+    // SS
+
+    if (ss_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeOverlapGradientSS<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_mat_W_local,
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds);
+        }
+    }
+
+    // SP
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeOverlapGradientSP<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_mat_W_local,
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds);
+        }
+    }
+
+    // SD
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeOverlapGradientSD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_mat_W_local,
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(p_prim_count));
+        }
+    }
+
+    // PP
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeOverlapGradientPP<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_mat_W_local,
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count));
+        }
+    }
+
+    // PD
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeOverlapGradientPD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_mat_W_local,
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count));
+        }
+    }
+
+    // DD
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeOverlapGradientDD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_mat_W_local,
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<uint32_t>(p_prim_count));
+        }
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipMemcpy(S_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(S_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(S_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_grad_x));
+    hipSafe(hipFree(d_grad_y));
+    hipSafe(hipFree(d_grad_z));
+
+    hipSafe(hipFree(d_prim_cart_ao_to_atom_inds));
+
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_d_prim_info));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
+    hipSafe(hipFree(d_pd_first_inds_local));
+    hipSafe(hipFree(d_pd_second_inds_local));
+    hipSafe(hipFree(d_dd_first_inds_local));
+    hipSafe(hipFree(d_dd_second_inds_local));
+
+    hipSafe(hipFree(d_ss_mat_W_local));
+    hipSafe(hipFree(d_sp_mat_W_local));
+    hipSafe(hipFree(d_sd_mat_W_local));
+    hipSafe(hipFree(d_pp_mat_W_local));
+    hipSafe(hipFree(d_pd_mat_W_local));
+    hipSafe(hipFree(d_dd_mat_W_local));
+
+    }}
+
+    CDenseMatrix S_grad_t(natoms, 3);
+
+    S_grad_t.zero();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        for (int64_t a = 0; a < natoms; a++)
+        {
+            for (int64_t d = 0; d < 3; d++)
+            {
+                S_grad_t.row(a)[d] += S_grad_omp[gpu_id].row(d)[a];
+            }
+        }
+    }
+
+    return S_grad_t;
+}
+
+auto
+computeKineticEnergyGradientOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CGradientScreeningData& screening) -> CDenseMatrix
+{
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // TODO use communicator from arguments
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    std::vector<CDenseMatrix> T_grad_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        T_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+    }
+
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    double*   d_s_prim_info;
+
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    double*   d_d_prim_info;
+
+    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // GTO block pairs
+
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
+    const auto& pd_first_inds_local = screening.get_pd_first_inds_local(gpu_id);
+    const auto& dd_first_inds_local = screening.get_dd_first_inds_local(gpu_id);
+
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
+    const auto& pd_second_inds_local = screening.get_pd_second_inds_local(gpu_id);
+    const auto& dd_second_inds_local = screening.get_dd_second_inds_local(gpu_id);
+
+    const auto& ss_mat_D_local = screening.get_ss_mat_D_local(gpu_id);
+    const auto& sp_mat_D_local = screening.get_sp_mat_D_local(gpu_id);
+    const auto& sd_mat_D_local = screening.get_sd_mat_D_local(gpu_id);
+    const auto& pp_mat_D_local = screening.get_pp_mat_D_local(gpu_id);
+    const auto& pd_mat_D_local = screening.get_pd_mat_D_local(gpu_id);
+    const auto& dd_mat_D_local = screening.get_dd_mat_D_local(gpu_id);
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
+                                                     pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+    std::vector<double> mat_S(max_prim_pair_count_local);
+
+    // S and T on device
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    double *d_ss_mat_D_local, *d_sp_mat_D_local, *d_sd_mat_D_local, *d_pp_mat_D_local, *d_pd_mat_D_local, *d_dd_mat_D_local;
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+
+    T_grad_omp[gpu_id].zero();
+
+    hipSafe(hipDeviceSynchronize());
+
+    // set up primitive Cartesian AO to atom mapping
+
+    const auto cart_ao_to_atom_inds = screening.getCartesianAOtoAtomIndices();
+
+    const auto all_prim_count = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
+
+    std::vector<uint32_t> prim_cart_ao_to_atom_inds(all_prim_count);
+
+    uint32_t *d_prim_cart_ao_to_atom_inds;
+
+    hipSafe(hipMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+
+    for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+    {
+        const auto i = ss_first_inds_local[ij];
+        const auto j = ss_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+        const auto j_cgto = s_prim_aoinds[j];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+    {
+        const auto i = sp_first_inds_local[ij];
+        const auto j = sp_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+
+        // TODO: think about the ordering of cartesian components
+        const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+    {
+        const auto i = sd_first_inds_local[ij];
+        const auto j = sd_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+
+        // TODO: think about the ordering of cartesian components
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+    {
+        const auto i = pp_first_inds_local[ij];
+        const auto j = pp_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+        const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+    {
+        const auto i = pd_first_inds_local[ij];
+        const auto j = pd_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+    {
+        const auto i = dd_first_inds_local[ij];
+        const auto j = dd_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // gradient
+
+    double *d_grad_x, *d_grad_y, *d_grad_z;
+
+    hipSafe(hipMalloc(&d_grad_x, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_y, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_z, natoms * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_grad_x, T_grad_omp[gpu_id].row(0), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_y, T_grad_omp[gpu_id].row(1), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_z, T_grad_omp[gpu_id].row(2), natoms * sizeof(double), hipMemcpyHostToDevice));
+
+    double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
+
+    // SS
+
+    if (ss_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeKineticEnergyGradientSS<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_mat_D_local,
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds);
+        }
+    }
+
+    // SP
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeKineticEnergyGradientSP<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_mat_D_local,
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds);
+        }
+    }
+
+    // SD
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeKineticEnergyGradientSD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_mat_D_local,
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(p_prim_count));
+        }
+    }
+
+    // PP
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeKineticEnergyGradientPP<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_mat_D_local,
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count));
+        }
+    }
+
+    // PD
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeKineticEnergyGradientPD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_mat_D_local,
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count));
+        }
+    }
+
+    // DD
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeKineticEnergyGradientDD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_mat_D_local,
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<uint32_t>(p_prim_count));
+        }
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipMemcpy(T_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(T_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(T_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_grad_x));
+    hipSafe(hipFree(d_grad_y));
+    hipSafe(hipFree(d_grad_z));
+
+    hipSafe(hipFree(d_prim_cart_ao_to_atom_inds));
+
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_d_prim_info));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
+    hipSafe(hipFree(d_pd_first_inds_local));
+    hipSafe(hipFree(d_pd_second_inds_local));
+    hipSafe(hipFree(d_dd_first_inds_local));
+    hipSafe(hipFree(d_dd_second_inds_local));
+
+    hipSafe(hipFree(d_ss_mat_D_local));
+    hipSafe(hipFree(d_sp_mat_D_local));
+    hipSafe(hipFree(d_sd_mat_D_local));
+    hipSafe(hipFree(d_pp_mat_D_local));
+    hipSafe(hipFree(d_pd_mat_D_local));
+    hipSafe(hipFree(d_dd_mat_D_local));
+
+    }}
+
+    CDenseMatrix T_grad_t(natoms, 3);
+
+    T_grad_t.zero();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        for (int64_t a = 0; a < natoms; a++)
+        {
+            for (int64_t d = 0; d < 3; d++)
+            {
+                T_grad_t.row(a)[d] += T_grad_omp[gpu_id].row(d)[a];
+            }
+        }
+    }
+
+    return T_grad_t;
+}
+
+auto
+computeNuclearPotentialGradientOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CGradientScreeningData& screening) -> CDenseMatrix
+{
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // TODO use communicator from arguments
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    const auto mol_charges = molecule.getCharges();
+    const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    std::vector<double> points_info(natoms * 4);
+
+    for (int64_t a = 0; a < natoms; a++)
+    {
+        points_info[a + natoms * 0] = mol_coords[a][0];
+        points_info[a + natoms * 1] = mol_coords[a][1];
+        points_info[a + natoms * 2] = mol_coords[a][2];
+        points_info[a + natoms * 3] = mol_charges[a];
+    }
+
+    std::vector<CDenseMatrix> V_grad_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        V_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    // Boys function (tabulated for order 0-28)
+
+    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
+
+    double* d_boys_func_table;
+
+    hipSafe(hipMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
+
+    double* d_boys_func_ft;
+
+    hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+    }
+
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    double*   d_s_prim_info;
+
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    double*   d_d_prim_info;
+
+    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // GTO block pairs
+
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
+    const auto& pd_first_inds_local = screening.get_pd_first_inds_local(gpu_id);
+    const auto& dd_first_inds_local = screening.get_dd_first_inds_local(gpu_id);
+
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
+    const auto& pd_second_inds_local = screening.get_pd_second_inds_local(gpu_id);
+    const auto& dd_second_inds_local = screening.get_dd_second_inds_local(gpu_id);
+
+    const auto& ss_mat_D_local = screening.get_ss_mat_D_local(gpu_id);
+    const auto& sp_mat_D_local = screening.get_sp_mat_D_local(gpu_id);
+    const auto& sd_mat_D_local = screening.get_sd_mat_D_local(gpu_id);
+    const auto& pp_mat_D_local = screening.get_pp_mat_D_local(gpu_id);
+    const auto& pd_mat_D_local = screening.get_pd_mat_D_local(gpu_id);
+    const auto& dd_mat_D_local = screening.get_dd_mat_D_local(gpu_id);
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
+                                                     pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+    std::vector<double> mat_V(max_prim_pair_count_local);
+
+    // V on device
+
+    double *d_mat_V;
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    double *d_ss_mat_D_local, *d_sp_mat_D_local, *d_sd_mat_D_local, *d_pp_mat_D_local, *d_pd_mat_D_local, *d_dd_mat_D_local;
+
+    hipSafe(hipMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+
+    V_grad_omp[gpu_id].zero();
+
+    double *d_points_info;
+
+    const auto npoints = natoms;
+
+    hipSafe(hipMalloc(&d_points_info, npoints * 4 * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_points_info, points_info.data(), npoints * 4 * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipDeviceSynchronize());
+
+    // set up primitive Cartesian AO to atom mapping
+
+    const auto cart_ao_to_atom_inds = screening.getCartesianAOtoAtomIndices();
+
+    const auto all_prim_count = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
+
+    std::vector<uint32_t> prim_cart_ao_to_atom_inds(all_prim_count);
+
+    uint32_t *d_prim_cart_ao_to_atom_inds;
+
+    hipSafe(hipMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+
+    for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+    {
+        const auto i = ss_first_inds_local[ij];
+        const auto j = ss_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+        const auto j_cgto = s_prim_aoinds[j];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+    {
+        const auto i = sp_first_inds_local[ij];
+        const auto j = sp_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+
+        // TODO: think about the ordering of cartesian components
+        const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+    {
+        const auto i = sd_first_inds_local[ij];
+        const auto j = sd_second_inds_local[ij];
+
+        const auto i_cgto = s_prim_aoinds[i];
+
+        // TODO: think about the ordering of cartesian components
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+    {
+        const auto i = pp_first_inds_local[ij];
+        const auto j = pp_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+        const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+    {
+        const auto i = pd_first_inds_local[ij];
+        const auto j = pd_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+    {
+        const auto i = dd_first_inds_local[ij];
+        const auto j = dd_second_inds_local[ij];
+
+        // TODO: think about the ordering of cartesian components
+        const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+        const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+        prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+    }
+
+    hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // gradient
+
+    double *d_grad_x, *d_grad_y, *d_grad_z;
+
+    hipSafe(hipMalloc(&d_grad_x, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_y, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_z, natoms * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_grad_x, V_grad_omp[gpu_id].row(0), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_y, V_grad_omp[gpu_id].row(1), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_z, V_grad_omp[gpu_id].row(2), natoms * sizeof(double), hipMemcpyHostToDevice));
+
+    double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
+
+    // SS
+
+    if (ss_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeNuclearPotentialGradientSS<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_mat_D_local,
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           d_points_info,
+                           static_cast<uint32_t>(npoints),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+        }
+    }
+
+    // SP
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeNuclearPotentialGradientSP<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_mat_D_local,
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           d_points_info,
+                           static_cast<uint32_t>(npoints),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+        }
+    }
+
+    // SD
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeNuclearPotentialGradientSD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_mat_D_local,
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_points_info,
+                           static_cast<uint32_t>(npoints),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+        }
+    }
+
+    // PP
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeNuclearPotentialGradientPP<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_mat_D_local,
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_points_info,
+                           static_cast<uint32_t>(npoints),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+        }
+    }
+
+    // PD
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeNuclearPotentialGradientPD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_mat_D_local,
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_points_info,
+                           static_cast<uint32_t>(npoints),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+        }
+    }
+
+    // DD
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeNuclearPotentialGradientDD<<<num_blocks,threads_per_block>>>(
+                           d_grad_array[grad_cart_ind],
+                           static_cast<uint32_t>(grad_cart_ind),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_mat_D_local,
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           d_prim_cart_ao_to_atom_inds,
+                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<uint32_t>(p_prim_count),
+                           d_points_info,
+                           static_cast<uint32_t>(npoints),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+        }
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipMemcpy(V_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(V_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(V_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_grad_x));
+    hipSafe(hipFree(d_grad_y));
+    hipSafe(hipFree(d_grad_z));
+
+    hipSafe(hipFree(d_prim_cart_ao_to_atom_inds));
+
+    hipSafe(hipFree(d_boys_func_table));
+    hipSafe(hipFree(d_boys_func_ft));
+
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_d_prim_info));
+
+    hipSafe(hipFree(d_mat_V));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
+    hipSafe(hipFree(d_pd_first_inds_local));
+    hipSafe(hipFree(d_pd_second_inds_local));
+    hipSafe(hipFree(d_dd_first_inds_local));
+    hipSafe(hipFree(d_dd_second_inds_local));
+
+    hipSafe(hipFree(d_points_info));
+
+    hipSafe(hipFree(d_ss_mat_D_local));
+    hipSafe(hipFree(d_sp_mat_D_local));
+    hipSafe(hipFree(d_sd_mat_D_local));
+    hipSafe(hipFree(d_pp_mat_D_local));
+    hipSafe(hipFree(d_pd_mat_D_local));
+    hipSafe(hipFree(d_dd_mat_D_local));
+
+    }}
+
+    CDenseMatrix V_grad_t(natoms, 3);
+
+    V_grad_t.zero();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        for (int64_t a = 0; a < natoms; a++)
+        {
+            for (int64_t d = 0; d < 3; d++)
+            {
+                V_grad_t.row(a)[d] += V_grad_omp[gpu_id].row(d)[a];
+            }
+        }
+    }
+
+    return V_grad_t;
+}
+*/
+
+auto
+computeFockGradientOnGPU(const              CMolecule& molecule,
+                         const              CMolecularBasis& basis,
+                         const              CAODensityMatrix& densityMatrix,
+                         const double       prefac_coulomb,
+                         const double       frac_exact_exchange,
+                         const double       omega,
+                         const std::string& flag_K,
+                         const double       eri_threshold,
+                         const double       prelink_threshold,
+                         CGradientScreeningData& screening,
+                         const int64_t      rank,
+                         const int64_t      nnodes) -> CDenseMatrix
+{
+    // TODO sanity check for flag_K: SYMM or ANTISYMM
+
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    auto gpu_rank = rank * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    CMultiTimer timer;
+
+    timer.start("Prep. blocks");
+
+    const auto natoms = molecule.getNumberOfAtoms();
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    int64_t s_prim_count = 0, s_ao_count = 0;
+    int64_t p_prim_count = 0, p_ao_count = 0;
+    int64_t d_prim_count = 0, d_ao_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0)
+        {
+            s_prim_count += npgtos * ncgtos;
+            s_ao_count += ncgtos;
+        }
+        else if (gto_ang == 1)
+        {
+            p_prim_count += npgtos * ncgtos;
+            p_ao_count += ncgtos;
+        }
+        else if (gto_ang == 2)
+        {
+            d_prim_count += npgtos * ncgtos;
+            d_ao_count += ncgtos;
+        }
+    }
+
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    timer.stop("Prep. blocks");
+
+    timer.start("Prep. SphToCart");
+
+    // spherical to Cartesian index mapping
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> sph_cart_map;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        auto m = gto_block.getSphericalToCartesianMapping();
+
+        for (const auto& [sph_ind, cart_ind_coef] : m)
+        {
+            sph_cart_map[sph_ind] = cart_ind_coef;
+        }
+    }
+
+    const auto cart_naos = s_ao_count + p_ao_count * 3 + d_ao_count * 6; 
+
+    CDenseMatrix cart_dens_mat(cart_naos, cart_naos);
+    cart_dens_mat.zero();
+
+    auto cart_dens_ptr = cart_dens_mat.values();
+    auto sph_dens_ptr = densityMatrix.alphaDensity(0);
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
+
+    for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
+    {
+        for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
+        {
+            for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
+            {
+                auto i_cgto_cart = i_cgto_cart_ind_coef.first;
+                auto i_coef_cart = i_cgto_cart_ind_coef.second;
+
+                for (const auto& j_cgto_cart_ind_coef : sph_cart_map[j_cgto])
+                {
+                    auto j_cgto_cart = j_cgto_cart_ind_coef.first;
+                    auto j_coef_cart = j_cgto_cart_ind_coef.second;
+
+                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += 
+                        sph_dens_ptr[i_cgto * naos + j_cgto] * i_coef_cart * j_coef_cart;
+                }
+            }
+        }
+    }
+
+    timer.stop("Prep. SphToCart");
+
+    timer.start("Prep. sortQD");
+
+    screening.sortQD(s_prim_count, p_prim_count, d_prim_count,
+                     s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
+                     s_prim_info, p_prim_info, d_prim_info,
+                     cart_naos, cart_dens_ptr, eri_threshold);
+
+    timer.stop("Prep. sortQD");
+
+    CTimer prelink_timer;
+
+    prelink_timer.start();
+
+    timer.start("Prep. Q_prime");
+
+    // preLinK
+    // J. Chem. Phys. 138, 134114 (2013)
+
+    // TODO distribute computation of Q_prime
+
+    double *d_matrix_A, *d_matrix_B, *d_matrix_C;
+
+    auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
+
+    hipSafe(hipMalloc(&d_matrix_A, mat_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_B, mat_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_C, mat_full.getNumberOfElements() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+
+    mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, d_prim_count, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds, cart_naos, cart_dens_ptr);
+
+    hipSafe(hipMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+
+    const auto all_prim_count = mat_full.getNumberOfRows();
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto n = static_cast<int32_t>(all_prim_count);
+
+    // compute A^T * (B^T * A^T) since hipblas is column-major
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+
+    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+    hipSafe(hipFree(d_matrix_A));
+    hipSafe(hipFree(d_matrix_B));
+    hipSafe(hipFree(d_matrix_C));
+
+    timer.stop("Prep. Q_prime");
+
+    prelink_timer.stop();
+
+    auto prelink_elapsed_time = prelink_timer.getElapsedTime();
+
+    screening.setPreLinkTime(prelink_elapsed_time);
+
+    timer.start("Prep. preLinK");
+
+    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, prelink_threshold);
+
+    mat_full = CDenseMatrix();
+
+    // max densities are needed by exchange Fock
+    screening.findMaxDensities(s_prim_count, p_prim_count, d_prim_count,
+                               s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
+                               cart_naos, cart_dens_ptr);
+
+    timer.stop("Prep. preLinK");
+
+    std::string errnaos("gpu::computeFockGPU: Inconsistent number of AOs");
+    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
+
+    std::vector<CDenseMatrix> Fock_grad_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        Fock_grad_omp[gpu_id] = CDenseMatrix(3, natoms);
+    }
+
+    screening.initTimers(num_gpus_per_node);
+
+    // std::cout << "\nTiming of prep. on rank " << rank << "\n";
+    // std::cout << "-------------------------\n";
+    // std::cout << timer.getSummary() << std::endl;
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id < num_gpus_per_node)
+    {
+    auto gpu_id = thread_id;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Boys func. prep.");
+
+    // Boys function (tabulated for order 0-28)
+
+    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
+
+    double* d_boys_func_table;
+
+    hipSafe(hipMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
+
+    double* d_boys_func_ft;
+
+    hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    timer.stop("Boys func. prep.");
+
+    timer.start("GTO block prep.");
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    double*   d_s_prim_info;
+    uint32_t* d_s_prim_aoinds;
+
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+    uint32_t* d_p_prim_aoinds;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // D gto block
+
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    double*   d_d_prim_info;
+    uint32_t* d_d_prim_aoinds;
+
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    hipSafe(hipMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_d_prim_aoinds, d_prim_aoinds.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    timer.stop("GTO block prep.");
+
+    // GTO block pairs
+
+    timer.start("Coulomb prep.");
+
+    const auto cart_ao_to_atom_inds = screening.getCartesianAOtoAtomIndices();
+
+    std::vector<uint32_t> prim_cart_ao_to_atom_inds(all_prim_count);
+
+    const auto ss_mat_Q_orig = screening.getQMatrixSS();
+    const auto sp_mat_Q_orig = screening.getQMatrixSP();
+    const auto sd_mat_Q_orig = screening.getQMatrixSD();
+    const auto pp_mat_Q_orig = screening.getQMatrixPP();
+    const auto pd_mat_Q_orig = screening.getQMatrixPD();
+    const auto dd_mat_Q_orig = screening.getQMatrixDD();
+
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
+    const auto& pd_first_inds_local = screening.get_pd_first_inds_local(gpu_id);
+    const auto& dd_first_inds_local = screening.get_dd_first_inds_local(gpu_id);
+
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& sd_second_inds_local = screening.get_sd_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
+    const auto& pd_second_inds_local = screening.get_pd_second_inds_local(gpu_id);
+    const auto& dd_second_inds_local = screening.get_dd_second_inds_local(gpu_id);
+
+    const auto& ss_mat_Q_local = screening.get_ss_mat_Q_local(gpu_id);
+    const auto& sp_mat_Q_local = screening.get_sp_mat_Q_local(gpu_id);
+    const auto& sd_mat_Q_local = screening.get_sd_mat_Q_local(gpu_id);
+    const auto& pp_mat_Q_local = screening.get_pp_mat_Q_local(gpu_id);
+    const auto& pd_mat_Q_local = screening.get_pd_mat_Q_local(gpu_id);
+    const auto& dd_mat_Q_local = screening.get_dd_mat_Q_local(gpu_id);
+
+    const auto& ss_mat_D_local = screening.get_ss_mat_D_local(gpu_id);
+    const auto& sp_mat_D_local = screening.get_sp_mat_D_local(gpu_id);
+    const auto& sd_mat_D_local = screening.get_sd_mat_D_local(gpu_id);
+    const auto& pp_mat_D_local = screening.get_pp_mat_D_local(gpu_id);
+    const auto& pd_mat_D_local = screening.get_pd_mat_D_local(gpu_id);
+    const auto& dd_mat_D_local = screening.get_dd_mat_D_local(gpu_id);
+
+    const auto& ss_pair_data_local = screening.get_ss_pair_data_local(gpu_id);
+    const auto& sp_pair_data_local = screening.get_sp_pair_data_local(gpu_id);
+    const auto& sd_pair_data_local = screening.get_sd_pair_data_local(gpu_id);
+    const auto& pp_pair_data_local = screening.get_pp_pair_data_local(gpu_id);
+    const auto& pd_pair_data_local = screening.get_pd_pair_data_local(gpu_id);
+    const auto& dd_pair_data_local = screening.get_dd_pair_data_local(gpu_id);
+
+    const auto& ss_first_inds = screening.get_ss_first_inds();
+    const auto& sp_first_inds = screening.get_sp_first_inds();
+    const auto& sd_first_inds = screening.get_sd_first_inds();
+    const auto& pp_first_inds = screening.get_pp_first_inds();
+    const auto& pd_first_inds = screening.get_pd_first_inds();
+    const auto& dd_first_inds = screening.get_dd_first_inds();
+
+    const auto& ss_second_inds = screening.get_ss_second_inds();
+    const auto& sp_second_inds = screening.get_sp_second_inds();
+    const auto& sd_second_inds = screening.get_sd_second_inds();
+    const auto& pp_second_inds = screening.get_pp_second_inds();
+    const auto& pd_second_inds = screening.get_pd_second_inds();
+    const auto& dd_second_inds = screening.get_dd_second_inds();
+
+    const auto& ss_mat_Q = screening.get_ss_mat_Q(); 
+    const auto& sp_mat_Q = screening.get_sp_mat_Q(); 
+    const auto& sd_mat_Q = screening.get_sd_mat_Q(); 
+    const auto& pp_mat_Q = screening.get_pp_mat_Q(); 
+    const auto& pd_mat_Q = screening.get_pd_mat_Q(); 
+    const auto& dd_mat_Q = screening.get_dd_mat_Q(); 
+
+    const auto& ss_mat_D = screening.get_ss_mat_D(); 
+    const auto& sp_mat_D = screening.get_sp_mat_D(); 
+    const auto& sd_mat_D = screening.get_sd_mat_D(); 
+    const auto& pp_mat_D = screening.get_pp_mat_D(); 
+    const auto& pd_mat_D = screening.get_pd_mat_D(); 
+    const auto& dd_mat_D = screening.get_dd_mat_D(); 
+
+    const auto& ss_pair_data = screening.get_ss_pair_data(); 
+    const auto& sp_pair_data = screening.get_sp_pair_data(); 
+    const auto& sd_pair_data = screening.get_sd_pair_data(); 
+    const auto& pp_pair_data = screening.get_pp_pair_data(); 
+    const auto& pd_pair_data = screening.get_pd_pair_data(); 
+    const auto& dd_pair_data = screening.get_dd_pair_data(); 
+
+    const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
+    const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
+    const auto sd_prim_pair_count = static_cast<int64_t>(sd_first_inds.size());
+    const auto pp_prim_pair_count = static_cast<int64_t>(pp_first_inds.size());
+    const auto pd_prim_pair_count = static_cast<int64_t>(pd_first_inds.size());
+    const auto dd_prim_pair_count = static_cast<int64_t>(dd_first_inds.size());
+
+    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count,
+                                               pp_prim_pair_count, pd_prim_pair_count, dd_prim_pair_count});
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local,
+                                                     sd_prim_pair_count_local, pp_prim_pair_count_local,
+                                                     pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+    std::vector<double> mat_J(max_prim_pair_count_local);
+
+    // sorted Q, D, and indices on device
+
+    uint32_t *d_prim_cart_ao_to_atom_inds;
+
+    double *d_mat_J, *d_mat_D;
+    double *d_ss_mat_Q, *d_sp_mat_Q, *d_sd_mat_Q, *d_pp_mat_Q, *d_pd_mat_Q, *d_dd_mat_Q;
+
+    uint32_t *d_ss_first_inds, *d_ss_second_inds;
+    uint32_t *d_sp_first_inds, *d_sp_second_inds;
+    uint32_t *d_sd_first_inds, *d_sd_second_inds;
+    uint32_t *d_pp_first_inds, *d_pp_second_inds;
+    uint32_t *d_pd_first_inds, *d_pd_second_inds;
+    uint32_t *d_dd_first_inds, *d_dd_second_inds;
+
+    double *d_ss_pair_data, *d_sp_pair_data, *d_sd_pair_data,
+           *d_pp_pair_data, *d_pd_pair_data, *d_dd_pair_data;
+
+    double *d_ss_mat_Q_local, *d_sp_mat_Q_local, *d_sd_mat_Q_local, *d_pp_mat_Q_local, *d_pd_mat_Q_local, *d_dd_mat_Q_local;
+    double *d_ss_mat_D_local, *d_sp_mat_D_local, *d_sd_mat_D_local, *d_pp_mat_D_local, *d_pd_mat_D_local, *d_dd_mat_D_local;
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    double *d_ss_pair_data_local, *d_sp_pair_data_local, *d_sd_pair_data_local,
+           *d_pp_pair_data_local, *d_pd_pair_data_local, *d_dd_pair_data_local;
+
+    hipSafe(hipMalloc(&d_prim_cart_ao_to_atom_inds, all_prim_count * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_mat_D, max_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_J, max_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_mat_Q, ss_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_mat_Q, sp_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_mat_Q, sd_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_mat_Q, pp_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_mat_Q, pd_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_mat_Q, dd_prim_pair_count * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_first_inds, ss_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds, ss_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds, sp_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds, sp_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sd_first_inds, sd_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds, sd_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds, pp_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds, pp_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pd_first_inds, pd_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pd_second_inds, pd_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_dd_first_inds, dd_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_dd_second_inds, dd_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_ss_pair_data, ss_pair_data.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_pair_data, sp_pair_data.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_pair_data, sd_pair_data.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_pair_data, pp_pair_data.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_pair_data, pd_pair_data.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_pair_data, dd_pair_data.size() * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_mat_Q_local, ss_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_mat_Q_local, sp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_mat_Q_local, sd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_mat_Q_local, pp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_mat_Q_local, pd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_mat_Q_local, dd_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_mat_D_local, ss_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_mat_D_local, sp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_mat_D_local, sd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_mat_D_local, pp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_mat_D_local, pd_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_mat_D_local, dd_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_ss_pair_data_local, ss_pair_data_local.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_pair_data_local, sp_pair_data_local.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_sd_pair_data_local, sd_pair_data_local.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_pair_data_local, pp_pair_data_local.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pd_pair_data_local, pd_pair_data_local.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_dd_pair_data_local, dd_pair_data_local.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_mat_Q, sd_mat_Q.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_mat_Q, pp_mat_Q.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_mat_Q, pd_mat_Q.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_mat_Q, dd_mat_Q.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_first_inds, ss_first_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds, sp_first_inds.data(), sp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds, sd_first_inds.data(), sd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds, pp_first_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pd_first_inds, pd_first_inds.data(), pd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_dd_first_inds, dd_first_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_mat_D_local, ss_mat_D_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_mat_D_local, sp_mat_D_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_mat_D_local, sd_mat_D_local.data(), sd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_mat_D_local, pp_mat_D_local.data(), pp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_mat_D_local, pd_mat_D_local.data(), pd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_mat_D_local, dd_mat_D_local.data(), dd_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    timer.stop("Coulomb prep.");
+
+    Fock_grad_omp[gpu_id].zero();
+
+    hipSafe(hipDeviceSynchronize());
+
+    // gradient
+
+    double *d_grad_x, *d_grad_y, *d_grad_z;
+
+    hipSafe(hipMalloc(&d_grad_x, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_y, natoms * sizeof(double)));
+    hipSafe(hipMalloc(&d_grad_z, natoms * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_grad_x, Fock_grad_omp[gpu_id].row(0), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_y, Fock_grad_omp[gpu_id].row(1), natoms * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grad_z, Fock_grad_omp[gpu_id].row(2), natoms * sizeof(double), hipMemcpyHostToDevice));
+
+    double *d_grad_array[3] = {d_grad_x, d_grad_y, d_grad_z};
+
+    CTimer coulomb_timer;
+
+    coulomb_timer.start();
+
+    timer.start("J computation");
+
+    // compute J
+
+    if (std::fabs(prefac_coulomb) > 1.0e-13)
+    {
+
+    // J: S-S block
+
+    if (ss_prim_pair_count_local > 0)
+    {
+        timer.start("  J block SS");
+
+        // zeroize J on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(ss_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for J
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+        {
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto j_cgto = s_prim_aoinds[j];
+
+            prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // J: (SS|SS)
+        //     **
+
+        if (ss_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSSSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_ss_mat_D_local,
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               d_ss_pair_data_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               d_ss_pair_data,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SS|SP)
+        //     **
+
+        if (sp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSSSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_ss_mat_D_local,
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               d_ss_pair_data_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               d_sp_pair_data,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SS|SD)
+        //     **
+
+        if (sd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSSSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_ss_mat_D_local,
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               d_ss_pair_data_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               d_sd_pair_data,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SS|PP)
+        //     **
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSSPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_ss_mat_D_local,
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               d_ss_pair_data_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               d_pp_pair_data,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SS|PD)
+        //     **
+
+        if (pd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSSPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_ss_mat_D_local,
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               d_ss_pair_data_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               d_pd_pair_data,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SS|DD)
+        //     **
+
+        if (dd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSSDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_ss_mat_D_local,
+                               d_mat_D,
+                               d_ss_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_ss_first_inds_local,
+                               d_ss_second_inds_local,
+                               d_ss_pair_data_local,
+                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        timer.stop("  J block SS");
+    }
+
+    // J: S-P block
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        timer.start("  J block SP");
+
+        // zeroize J on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sp_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for J
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+        {
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // J: (SP|SS)
+        //     **
+
+        if (ss_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSPSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               d_ss_pair_data,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SP|SP)
+        //     **
+
+        if (sp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSPSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               d_sp_pair_data,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SP|SD)
+        //     **
+
+        if (sd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSPSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               d_sd_pair_data,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SP|PP)
+        //     **
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSPPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               d_pp_pair_data,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SP|PD)
+        //     **
+
+        if (pd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSPPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               d_pd_pair_data,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SP|DD)
+        //     **
+
+        if (dd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSPDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sp_mat_D_local,
+                               d_mat_D,
+                               d_sp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sp_first_inds_local,
+                               d_sp_second_inds_local,
+                               d_sp_pair_data_local,
+                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        timer.stop("  J block SP");
+    }
+
+    // J: P-P block
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        timer.start("  J block PP");
+
+        // zeroize J on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pp_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for J
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+        {
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // J: (PP|SS)
+        //     **
+
+        if (ss_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPPSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_pp_mat_D_local,
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               d_pp_pair_data_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               d_ss_pair_data,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PP|SP)
+        //     **
+
+        if (sp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPPSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_pp_mat_D_local,
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               d_pp_pair_data_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               d_sp_pair_data,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PP|SD)
+        //     **
+
+        if (sd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPPSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pp_mat_D_local,
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               d_pp_pair_data_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               d_sd_pair_data,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PP|PP)
+        //     **
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPPPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_pp_mat_D_local,
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               d_pp_pair_data_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               d_pp_pair_data,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PP|PD)
+        //     **
+
+        if (pd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPPPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pp_mat_D_local,
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               d_pp_pair_data_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               d_pd_pair_data,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PP|DD)
+        //     **
+
+        if (dd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPPDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pp_mat_D_local,
+                               d_mat_D,
+                               d_pp_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_pp_first_inds_local,
+                               d_pp_second_inds_local,
+                               d_pp_pair_data_local,
+                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        timer.stop("  J block PP");
+    }
+
+    // J: S-D block
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        timer.start("  J block SD");
+
+        // zeroize J on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(sd_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for J
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+        {
+            const auto i = sd_first_inds_local[ij];
+            const auto j = sd_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // J: (SD|SS)
+        //     **
+
+        if (ss_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSDSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sd_mat_D_local,
+                               d_mat_D,
+                               d_sd_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_sd_first_inds_local,
+                               d_sd_second_inds_local,
+                               d_sd_pair_data_local,
+                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               d_ss_pair_data,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SD|SP)
+        //     **
+
+        if (sp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSDSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sd_mat_D_local,
+                               d_mat_D,
+                               d_sd_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_sd_first_inds_local,
+                               d_sd_second_inds_local,
+                               d_sd_pair_data_local,
+                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               d_sp_pair_data,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SD|SD)
+        //     **
+
+        if (sd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSDSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sd_mat_D_local,
+                               d_mat_D,
+                               d_sd_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_sd_first_inds_local,
+                               d_sd_second_inds_local,
+                               d_sd_pair_data_local,
+                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               d_sd_pair_data,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SD|PP)
+        //     **
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSDPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sd_mat_D_local,
+                               d_mat_D,
+                               d_sd_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_sd_first_inds_local,
+                               d_sd_second_inds_local,
+                               d_sd_pair_data_local,
+                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               d_pp_pair_data,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SD|PD)
+        //     **
+
+        if (pd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSDPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sd_mat_D_local,
+                               d_mat_D,
+                               d_sd_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_sd_first_inds_local,
+                               d_sd_second_inds_local,
+                               d_sd_pair_data_local,
+                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               d_pd_pair_data,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (SD|DD)
+        //     **
+
+        if (dd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientSDDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_sd_mat_D_local,
+                               d_mat_D,
+                               d_sd_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_sd_first_inds_local,
+                               d_sd_second_inds_local,
+                               d_sd_pair_data_local,
+                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        timer.stop("  J block SD");
+    }
+
+    // J: P-D block
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        timer.start("  J block PD");
+
+        // zeroize J on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(pd_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for J
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+        {
+            const auto i = pd_first_inds_local[ij];
+            const auto j = pd_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // J: (PD|SS)
+        //     **
+
+        if (ss_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPDSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pd_mat_D_local,
+                               d_mat_D,
+                               d_pd_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_pd_first_inds_local,
+                               d_pd_second_inds_local,
+                               d_pd_pair_data_local,
+                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               d_ss_pair_data,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PD|SP)
+        //     **
+
+        if (sp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPDSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pd_mat_D_local,
+                               d_mat_D,
+                               d_pd_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_pd_first_inds_local,
+                               d_pd_second_inds_local,
+                               d_pd_pair_data_local,
+                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               d_sp_pair_data,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PD|SD)
+        //     **
+
+        if (sd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPDSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pd_mat_D_local,
+                               d_mat_D,
+                               d_pd_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_pd_first_inds_local,
+                               d_pd_second_inds_local,
+                               d_pd_pair_data_local,
+                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               d_sd_pair_data,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PD|PP)
+        //     **
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPDPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pd_mat_D_local,
+                               d_mat_D,
+                               d_pd_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_pd_first_inds_local,
+                               d_pd_second_inds_local,
+                               d_pd_pair_data_local,
+                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               d_pp_pair_data,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PD|PD)
+        //     **
+
+        if (pd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPDPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pd_mat_D_local,
+                               d_mat_D,
+                               d_pd_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_pd_first_inds_local,
+                               d_pd_second_inds_local,
+                               d_pd_pair_data_local,
+                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               d_pd_pair_data,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (PD|DD)
+        //     **
+
+        if (dd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientPDDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_pd_mat_D_local,
+                               d_mat_D,
+                               d_pd_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_pd_first_inds_local,
+                               d_pd_second_inds_local,
+                               d_pd_pair_data_local,
+                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        timer.stop("  J block PD");
+    }
+
+    // J: D-D block
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        timer.start("  J block DD");
+
+        // zeroize J on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_J,static_cast<uint32_t>(dd_prim_pair_count_local));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for J
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+        {
+            const auto i = dd_first_inds_local[ij];
+            const auto j = dd_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+            const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
+
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j] = static_cast<uint32_t>(cart_ao_to_atom_inds[j_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // J: (DD|SS)
+        //     **
+
+        if (ss_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientDDSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_dd_mat_D_local,
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_ss_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               d_dd_pair_data_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_ss_first_inds,
+                               d_ss_second_inds,
+                               d_ss_pair_data,
+                               static_cast<uint32_t>(ss_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (DD|SP)
+        //     **
+
+        if (sp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientDDSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_dd_mat_D_local,
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_sp_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               d_dd_pair_data_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_sp_first_inds,
+                               d_sp_second_inds,
+                               d_sp_pair_data,
+                               static_cast<uint32_t>(sp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (DD|SD)
+        //     **
+
+        if (sd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientDDSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_s_prim_info,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_dd_mat_D_local,
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_sd_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               d_dd_pair_data_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_sd_first_inds,
+                               d_sd_second_inds,
+                               d_sd_pair_data,
+                               static_cast<uint32_t>(sd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (DD|PP)
+        //     **
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientDDPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_dd_mat_D_local,
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_pp_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               d_dd_pair_data_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pp_first_inds,
+                               d_pp_second_inds,
+                               d_pp_pair_data,
+                               static_cast<uint32_t>(pp_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (DD|PD)
+        //     **
+
+        if (pd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientDDPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_p_prim_info,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_dd_mat_D_local,
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_pd_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               d_dd_pair_data_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_pd_first_inds,
+                               d_pd_second_inds,
+                               d_pd_pair_data,
+                               static_cast<uint32_t>(pd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        // J: (DD|DD)
+        //     **
+
+        if (dd_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+            {
+                gpu::computeCoulombGradientDDDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               prefac_coulomb,
+                               d_d_prim_info,
+                               static_cast<uint32_t>(d_prim_count),
+                               d_dd_mat_D_local,
+                               d_mat_D,
+                               d_dd_mat_Q_local,
+                               d_dd_mat_Q,
+                               d_dd_first_inds_local,
+                               d_dd_second_inds_local,
+                               d_dd_pair_data_local,
+                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               d_dd_first_inds,
+                               d_dd_second_inds,
+                               d_dd_pair_data,
+                               static_cast<uint32_t>(dd_prim_pair_count),
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               eri_threshold);
+            }
+
+            hipSafe(hipDeviceSynchronize());
+        }
+
+        timer.stop("  J block DD");
+    }
+
+    }  // end of compute J
+
+    timer.stop("J computation");
+
+    hipSafe(hipDeviceSynchronize());
+
+    coulomb_timer.stop();
+
+    auto coulomb_elapsed_time = coulomb_timer.getElapsedTime();
+
+    screening.setCoulombTime(gpu_id, coulomb_elapsed_time);
+
+    hipSafe(hipFree(d_mat_D));
+    hipSafe(hipFree(d_mat_J));
+
+    hipSafe(hipFree(d_ss_mat_Q));
+    hipSafe(hipFree(d_sp_mat_Q));
+    hipSafe(hipFree(d_sd_mat_Q));
+    hipSafe(hipFree(d_pp_mat_Q));
+    hipSafe(hipFree(d_pd_mat_Q));
+    hipSafe(hipFree(d_dd_mat_Q));
+
+    hipSafe(hipFree(d_ss_first_inds));
+    hipSafe(hipFree(d_ss_second_inds));
+    hipSafe(hipFree(d_sp_first_inds));
+    hipSafe(hipFree(d_sp_second_inds));
+    hipSafe(hipFree(d_sd_first_inds));
+    hipSafe(hipFree(d_sd_second_inds));
+    hipSafe(hipFree(d_pp_first_inds));
+    hipSafe(hipFree(d_pp_second_inds));
+    hipSafe(hipFree(d_pd_first_inds));
+    hipSafe(hipFree(d_pd_second_inds));
+    hipSafe(hipFree(d_dd_first_inds));
+    hipSafe(hipFree(d_dd_second_inds));
+
+    hipSafe(hipFree(d_ss_pair_data));
+    hipSafe(hipFree(d_sp_pair_data));
+    hipSafe(hipFree(d_sd_pair_data));
+    hipSafe(hipFree(d_pp_pair_data));
+    hipSafe(hipFree(d_pd_pair_data));
+    hipSafe(hipFree(d_dd_pair_data));
+
+    hipSafe(hipFree(d_ss_mat_Q_local));
+    hipSafe(hipFree(d_sp_mat_Q_local));
+    hipSafe(hipFree(d_sd_mat_Q_local));
+    hipSafe(hipFree(d_pp_mat_Q_local));
+    hipSafe(hipFree(d_pd_mat_Q_local));
+    hipSafe(hipFree(d_dd_mat_Q_local));
+
+    hipSafe(hipFree(d_ss_mat_D_local));
+    hipSafe(hipFree(d_sp_mat_D_local));
+    hipSafe(hipFree(d_sd_mat_D_local));
+    hipSafe(hipFree(d_pp_mat_D_local));
+    hipSafe(hipFree(d_pd_mat_D_local));
+    hipSafe(hipFree(d_dd_mat_D_local));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_sd_first_inds_local));
+    hipSafe(hipFree(d_sd_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
+    hipSafe(hipFree(d_pd_first_inds_local));
+    hipSafe(hipFree(d_pd_second_inds_local));
+    hipSafe(hipFree(d_dd_first_inds_local));
+    hipSafe(hipFree(d_dd_second_inds_local));
+
+    hipSafe(hipFree(d_ss_pair_data_local));
+    hipSafe(hipFree(d_sp_pair_data_local));
+    hipSafe(hipFree(d_sd_pair_data_local));
+    hipSafe(hipFree(d_pp_pair_data_local));
+    hipSafe(hipFree(d_pd_pair_data_local));
+    hipSafe(hipFree(d_dd_pair_data_local));
+
+    timer.start("Exchange prep.");
+
+    // K preparation
+
+    const auto& Q_K_ss = screening.get_Q_K_ss();
+    const auto& Q_K_sp = screening.get_Q_K_sp();
+    const auto& Q_K_ps = screening.get_Q_K_ps();
+    const auto& Q_K_sd = screening.get_Q_K_sd();
+    const auto& Q_K_ds = screening.get_Q_K_ds();
+    const auto& Q_K_pp = screening.get_Q_K_pp();
+    const auto& Q_K_pd = screening.get_Q_K_pd();
+    const auto& Q_K_dp = screening.get_Q_K_dp();
+    const auto& Q_K_dd = screening.get_Q_K_dd();
+
+    const auto& D_inds_K_ss = screening.get_D_inds_K_ss();
+    const auto& D_inds_K_sp = screening.get_D_inds_K_sp();
+    const auto& D_inds_K_ps = screening.get_D_inds_K_ps();
+    const auto& D_inds_K_sd = screening.get_D_inds_K_sd();
+    const auto& D_inds_K_ds = screening.get_D_inds_K_ds();
+    const auto& D_inds_K_pp = screening.get_D_inds_K_pp();
+    const auto& D_inds_K_pd = screening.get_D_inds_K_pd();
+    const auto& D_inds_K_dp = screening.get_D_inds_K_dp();
+    const auto& D_inds_K_dd = screening.get_D_inds_K_dd();
+
+    const auto& pair_displs_K_ss = screening.get_pair_displs_K_ss();
+    const auto& pair_displs_K_sp = screening.get_pair_displs_K_sp();
+    const auto& pair_displs_K_ps = screening.get_pair_displs_K_ps();
+    const auto& pair_displs_K_sd = screening.get_pair_displs_K_sd();
+    const auto& pair_displs_K_ds = screening.get_pair_displs_K_ds();
+    const auto& pair_displs_K_pp = screening.get_pair_displs_K_pp();
+    const auto& pair_displs_K_pd = screening.get_pair_displs_K_pd();
+    const auto& pair_displs_K_dp = screening.get_pair_displs_K_dp();
+    const auto& pair_displs_K_dd = screening.get_pair_displs_K_dd();
+
+    const auto& pair_counts_K_ss = screening.get_pair_counts_K_ss();
+    const auto& pair_counts_K_sp = screening.get_pair_counts_K_sp();
+    const auto& pair_counts_K_ps = screening.get_pair_counts_K_ps();
+    const auto& pair_counts_K_sd = screening.get_pair_counts_K_sd();
+    const auto& pair_counts_K_ds = screening.get_pair_counts_K_ds();
+    const auto& pair_counts_K_pp = screening.get_pair_counts_K_pp();
+    const auto& pair_counts_K_pd = screening.get_pair_counts_K_pd();
+    const auto& pair_counts_K_dp = screening.get_pair_counts_K_dp();
+    const auto& pair_counts_K_dd = screening.get_pair_counts_K_dd();
+
+    const auto& pair_data_K_ss = screening.get_pair_data_K_ss();
+    const auto& pair_data_K_sp = screening.get_pair_data_K_sp();
+    const auto& pair_data_K_ps = screening.get_pair_data_K_ps();
+    const auto& pair_data_K_sd = screening.get_pair_data_K_sd();
+    const auto& pair_data_K_ds = screening.get_pair_data_K_ds();
+    const auto& pair_data_K_pp = screening.get_pair_data_K_pp();
+    const auto& pair_data_K_pd = screening.get_pair_data_K_pd();
+    const auto& pair_data_K_dp = screening.get_pair_data_K_dp();
+    const auto& pair_data_K_dd = screening.get_pair_data_K_dd();
+
+    const auto ss_max_D = screening.get_ss_max_D(); 
+    const auto sp_max_D = screening.get_sp_max_D(); 
+    const auto sd_max_D = screening.get_sd_max_D(); 
+    const auto pp_max_D = screening.get_pp_max_D(); 
+    const auto pd_max_D = screening.get_pd_max_D(); 
+    const auto dd_max_D = screening.get_dd_max_D(); 
+
+    // Note: assuming symmetric D
+    // TODO: double check if this needs to be changed as it requires
+    // the density to be either symmetric or antisymmetric
+    const auto ps_max_D = screening.get_sp_max_D(); 
+    const auto ds_max_D = screening.get_sd_max_D(); 
+    const auto dp_max_D = screening.get_pd_max_D(); 
+
+    const auto& pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss(gpu_id);
+    const auto& pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss(gpu_id);
+
+    const auto& pair_inds_i_for_K_sp = screening.get_local_pair_inds_i_for_K_sp(gpu_id);
+    const auto& pair_inds_k_for_K_sp = screening.get_local_pair_inds_k_for_K_sp(gpu_id);
+
+    const auto& pair_inds_i_for_K_sd = screening.get_local_pair_inds_i_for_K_sd(gpu_id);
+    const auto& pair_inds_k_for_K_sd = screening.get_local_pair_inds_k_for_K_sd(gpu_id);
+
+    const auto& pair_inds_i_for_K_pp = screening.get_local_pair_inds_i_for_K_pp(gpu_id);
+    const auto& pair_inds_k_for_K_pp = screening.get_local_pair_inds_k_for_K_pp(gpu_id);
+
+    const auto& pair_inds_i_for_K_pd = screening.get_local_pair_inds_i_for_K_pd(gpu_id);
+    const auto& pair_inds_k_for_K_pd = screening.get_local_pair_inds_k_for_K_pd(gpu_id);
+
+    const auto& pair_inds_i_for_K_dd = screening.get_local_pair_inds_i_for_K_dd(gpu_id);
+    const auto& pair_inds_k_for_K_dd = screening.get_local_pair_inds_k_for_K_dd(gpu_id);
+
+    auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
+    auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
+    auto pair_inds_count_for_K_sd = static_cast<uint32_t>(pair_inds_i_for_K_sd.size());
+    auto pair_inds_count_for_K_pp = static_cast<uint32_t>(pair_inds_i_for_K_pp.size());
+    auto pair_inds_count_for_K_pd = static_cast<uint32_t>(pair_inds_i_for_K_pd.size());
+    auto pair_inds_count_for_K_dd = static_cast<uint32_t>(pair_inds_i_for_K_dd.size());
+
+    double*   d_mat_K;
+    uint32_t *d_pair_inds_i_for_K_ss, *d_pair_inds_k_for_K_ss;
+    uint32_t *d_pair_inds_i_for_K_sp, *d_pair_inds_k_for_K_sp;
+    uint32_t *d_pair_inds_i_for_K_sd, *d_pair_inds_k_for_K_sd;
+    uint32_t *d_pair_inds_i_for_K_pp, *d_pair_inds_k_for_K_pp;
+    uint32_t *d_pair_inds_i_for_K_pd, *d_pair_inds_k_for_K_pd;
+    uint32_t *d_pair_inds_i_for_K_dd, *d_pair_inds_k_for_K_dd;
+
+    const auto max_pair_inds_count = std::max({pair_inds_count_for_K_ss, pair_inds_count_for_K_sp, pair_inds_count_for_K_pp,
+                                               pair_inds_count_for_K_sd, pair_inds_count_for_K_pd, pair_inds_count_for_K_dd});
+
+    std::vector<double> mat_K(max_pair_inds_count);
+
+    hipSafe(hipMalloc(&d_mat_K, max_pair_inds_count * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_sp, pair_inds_count_for_K_sp * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_sd, pair_inds_count_for_K_sd * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_pp, pair_inds_count_for_K_pp * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_pd, pair_inds_count_for_K_pd * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k_for_K_dd, pair_inds_count_for_K_dd * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_count_for_K_ss * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_count_for_K_sd * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_count_for_K_pp * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_count_for_K_pd * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    double* d_mat_D_full_AO;
+
+    double   *d_Q_K_ss, *d_Q_K_sp, *d_Q_K_ps,
+             *d_Q_K_sd, *d_Q_K_ds, *d_Q_K_pp,
+             *d_Q_K_pd, *d_Q_K_dp, *d_Q_K_dd;
+
+    uint32_t *d_D_inds_K_ss, *d_D_inds_K_sp, *d_D_inds_K_ps,
+             *d_D_inds_K_sd, *d_D_inds_K_ds, *d_D_inds_K_pp,
+             *d_D_inds_K_pd, *d_D_inds_K_dp, *d_D_inds_K_dd;
+
+    uint32_t *d_pair_displs_K_ss, *d_pair_displs_K_sp, *d_pair_displs_K_ps,
+             *d_pair_displs_K_sd, *d_pair_displs_K_ds, *d_pair_displs_K_pp,
+             *d_pair_displs_K_pd, *d_pair_displs_K_dp, *d_pair_displs_K_dd;
+
+    uint32_t *d_pair_counts_K_ss, *d_pair_counts_K_sp, *d_pair_counts_K_ps,
+             *d_pair_counts_K_sd, *d_pair_counts_K_ds, *d_pair_counts_K_pp,
+             *d_pair_counts_K_pd, *d_pair_counts_K_dp, *d_pair_counts_K_dd;
+
+    double   *d_pair_data_K_ss, *d_pair_data_K_sp, *d_pair_data_K_ps,
+             *d_pair_data_K_sd, *d_pair_data_K_ds, *d_pair_data_K_pp,
+             *d_pair_data_K_pd, *d_pair_data_K_dp, *d_pair_data_K_dd;
+
+    hipSafe(hipMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_Q_K_ss, Q_K_ss.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_sp, Q_K_sp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_ps, Q_K_ps.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_sd, Q_K_sd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_ds, Q_K_ds.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_pp, Q_K_pp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_pd, Q_K_pd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_dp, Q_K_dp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_Q_K_dd, Q_K_dd.size() * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_D_inds_K_ss, D_inds_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_sp, D_inds_K_sp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_ps, D_inds_K_ps.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_sd, D_inds_K_sd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_ds, D_inds_K_ds.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_pp, D_inds_K_pp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_pd, D_inds_K_pd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_dp, D_inds_K_dp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_D_inds_K_dd, D_inds_K_dd.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_displs_K_ss, pair_displs_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_sp, pair_displs_K_sp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_ps, pair_displs_K_ps.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_sd, pair_displs_K_sd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_ds, pair_displs_K_ds.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_pp, pair_displs_K_pp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_pd, pair_displs_K_pd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_dp, pair_displs_K_dp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_displs_K_dd, pair_displs_K_dd.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_counts_K_ss, pair_counts_K_ss.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_sp, pair_counts_K_sp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_ps, pair_counts_K_ps.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_sd, pair_counts_K_sd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_ds, pair_counts_K_ds.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_pp, pair_counts_K_pp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_pd, pair_counts_K_pd.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_dp, pair_counts_K_dp.size() * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_counts_K_dd, pair_counts_K_dd.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pair_data_K_ss, pair_data_K_ss.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_sp, pair_data_K_sp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_ps, pair_data_K_ps.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_sd, pair_data_K_sd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_ds, pair_data_K_ds.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_pp, pair_data_K_pp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_pd, pair_data_K_pd.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_dp, pair_data_K_dp.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_pair_data_K_dd, pair_data_K_dd.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_mat_D_full_AO, cart_dens_ptr, cart_naos * cart_naos * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_Q_K_ss, Q_K_ss.data(), Q_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_sp, Q_K_sp.data(), Q_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_ps, Q_K_ps.data(), Q_K_ps.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_sd, Q_K_sd.data(), Q_K_sd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_ds, Q_K_ds.data(), Q_K_ds.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_pp, Q_K_pp.data(), Q_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_pd, Q_K_pd.data(), Q_K_pd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_ps, pair_data_K_ps.data(), pair_data_K_ps.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_sd, pair_data_K_sd.data(), pair_data_K_sd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_ds, pair_data_K_ds.data(), pair_data_K_ds.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_pp, pair_data_K_pp.data(), pair_data_K_pp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_pd, pair_data_K_pd.data(), pair_data_K_pd.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    timer.stop("Exchange prep.");
+
+    hipSafe(hipDeviceSynchronize());
+
+    CTimer exchange_timer;
+
+    exchange_timer.start();
+
+    timer.start("K computation");
+
+    // compute K
+
+    if (std::fabs(frac_exact_exchange) > 1.0e-13)
+    {
+
+    // K: S-S block
+
+    if (pair_inds_count_for_K_ss > 0)
+    {
+        timer.start("  K block SS");
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_ss));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_ss, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
+        {
+            const auto i = pair_inds_i_for_K_ss[ik];
+            const auto k = pair_inds_k_for_K_ss[ik];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto k_cgto = s_prim_aoinds[k];
+
+            prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[k] = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // K: (SS|SS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               ss_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_D_inds_K_ss,
+                               d_pair_displs_K_ss,
+                               d_pair_counts_K_ss,
+                               d_pair_data_K_ss,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SS|SP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               sp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_sp,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_sp,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_sp,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_sp,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_sp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SS|SD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_sd,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_sd,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_sd,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_sd,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_sd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|SS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               ps_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_ss,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_ss,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_ss,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_ss,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_ss,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|SP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               pp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_D_inds_K_sp,
+                               d_pair_displs_K_sp,
+                               d_pair_counts_K_sp,
+                               d_pair_data_K_sp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|SD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_sd,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_sd,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_sd,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_sd,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_sd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|SS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDSS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ds_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_ss,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_ss,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_ss,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_ss,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_ss,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|SP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDSP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_sp,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_sp,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_sp,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_sp,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_sp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|SD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDSD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_ss,
+                               d_pair_inds_k_for_K_ss,
+                               static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_D_inds_K_sd,
+                               d_pair_displs_K_sd,
+                               d_pair_counts_K_sd,
+                               d_pair_data_K_sd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("  K block SS");
+    }
+
+    // K: S-P block
+
+    if (pair_inds_count_for_K_sp > 0)
+    {
+        timer.start("  K block SP");
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sp));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_sp, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
+        {
+            const auto i = pair_inds_i_for_K_sp[ik];
+            const auto k = pair_inds_k_for_K_sp[ik];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
+
+            prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + k] = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // K: (SS|PS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSPS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               ss_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_ps,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_ps,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_ps,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_ps,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_ps,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SS|PP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               sp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_pp,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_pp,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_pp,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_pp,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_pp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SS|PD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_pd,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_pd,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_pd,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_pd,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_pd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|PS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPPS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               ps_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_ps,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_ps,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_ps,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_ps,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_ps,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|PP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               pp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_pp,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_pp,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_pp,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_pp,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_pp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|PD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_pd,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_pd,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_pd,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_pd,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_pd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|PS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDPS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ds_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_ps,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_ps,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_ps,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_ps,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_ps,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|PP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_pp,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_pp,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_pp,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_pp,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_pp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|PD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sp,
+                               d_pair_inds_k_for_K_sp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_pd,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_pd,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_pd,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_pd,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_pd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("  K block SP");
+    }
+
+    // K: P-P block
+
+    if (pair_inds_count_for_K_pp > 0)
+    {
+        timer.start("  K block PP");
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pp));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_pp, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
+        {
+            const auto i = pair_inds_i_for_K_pp[ik];
+            const auto k = pair_inds_k_for_K_pp[ik];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
+
+            prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + k] = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // K: (PS|PS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPSPS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               ss_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_D_inds_K_ps,
+                               d_pair_displs_K_ps,
+                               d_pair_counts_K_ps,
+                               d_pair_data_K_ps,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PS|PP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPSPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               sp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_pp,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_pp,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_pp,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_pp,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_pp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PS|PD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPSPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_pd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_pd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_pd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_pd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_pd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PP|PS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPPPS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               ps_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pp,
+                               d_Q_K_ps,
+                               d_D_inds_K_pp,
+                               d_D_inds_K_ps,
+                               d_pair_displs_K_pp,
+                               d_pair_displs_K_ps,
+                               d_pair_counts_K_pp,
+                               d_pair_counts_K_ps,
+                               d_pair_data_K_pp,
+                               d_pair_data_K_ps,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PP|PP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPPPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               pp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pp,
+                               d_D_inds_K_pp,
+                               d_pair_displs_K_pp,
+                               d_pair_counts_K_pp,
+                               d_pair_data_K_pp,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PP|PD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPPPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pp,
+                               d_Q_K_pd,
+                               d_D_inds_K_pp,
+                               d_D_inds_K_pd,
+                               d_pair_displs_K_pp,
+                               d_pair_displs_K_pd,
+                               d_pair_counts_K_pp,
+                               d_pair_counts_K_pd,
+                               d_pair_data_K_pp,
+                               d_pair_data_K_pd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PD|PS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPDPS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ds_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pd,
+                               d_Q_K_ps,
+                               d_D_inds_K_pd,
+                               d_D_inds_K_ps,
+                               d_pair_displs_K_pd,
+                               d_pair_displs_K_ps,
+                               d_pair_counts_K_pd,
+                               d_pair_counts_K_ps,
+                               d_pair_data_K_pd,
+                               d_pair_data_K_ps,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PD|PP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPDPP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pd,
+                               d_Q_K_pp,
+                               d_D_inds_K_pd,
+                               d_D_inds_K_pp,
+                               d_pair_displs_K_pd,
+                               d_pair_displs_K_pp,
+                               d_pair_counts_K_pd,
+                               d_pair_counts_K_pp,
+                               d_pair_data_K_pd,
+                               d_pair_data_K_pp,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PD|PD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPDPD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pp,
+                               d_pair_inds_k_for_K_pp,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pd,
+                               d_D_inds_K_pd,
+                               d_pair_displs_K_pd,
+                               d_pair_counts_K_pd,
+                               d_pair_data_K_pd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("  K block PP");
+    }
+
+    // K: S-D block
+
+    if (pair_inds_count_for_K_sd > 0)
+    {
+        timer.start("  K block SD");
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_sd));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_sd, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_sd; ik++)
+        {
+            const auto i = pair_inds_i_for_K_sd[ik];
+            const auto k = pair_inds_k_for_K_sd[ik];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto k_cgto = d_prim_aoinds[(k / 6) + d_prim_count * (k % 6)];
+
+            prim_cart_ao_to_atom_inds[i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k] = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // K: (SS|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ss_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_ds,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SS|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_dp,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SS|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSSDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ss,
+                               d_Q_K_dd,
+                               d_D_inds_K_ss,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ss,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ss,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ss,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ps_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_ds,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_dp,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SP|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSPDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sp,
+                               d_Q_K_dd,
+                               d_D_inds_K_sp,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_sp,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_sp,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_sp,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ds_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_ds,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_dp,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (SD|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientSDDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_sd,
+                               d_pair_inds_k_for_K_sd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_sd,
+                               d_Q_K_dd,
+                               d_D_inds_K_sd,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_sd,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_sd,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_sd,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("  K block SD");
+    }
+
+    // K: P-D block
+
+    if (pair_inds_count_for_K_pd > 0)
+    {
+        timer.start("  K block PD");
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_pd));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_pd, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_pd; ik++)
+        {
+            const auto i = pair_inds_i_for_K_pd[ik];
+            const auto k = pair_inds_k_for_K_pd[ik];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto k_cgto = d_prim_aoinds[(k / 6) + d_prim_count * (k % 6)];
+
+            prim_cart_ao_to_atom_inds[s_prim_count + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k] = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // K: (PS|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPSDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ss_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_ds,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PS|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPSDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dp,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PS|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPSDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ps,
+                               d_Q_K_dd,
+                               d_D_inds_K_ps,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ps,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ps,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ps,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PP|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPPDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ps_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pp,
+                               d_Q_K_ds,
+                               d_D_inds_K_pp,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_pp,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_pp,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_pp,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PP|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPPDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pp,
+                               d_Q_K_dp,
+                               d_D_inds_K_pp,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_pp,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_pp,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_pp,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PP|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPPDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pp,
+                               d_Q_K_dd,
+                               d_D_inds_K_pp,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_pp,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_pp,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_pp,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PD|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPDDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ds_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pd,
+                               d_Q_K_ds,
+                               d_D_inds_K_pd,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_pd,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_pd,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_pd,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PD|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPDDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pd,
+                               d_Q_K_dp,
+                               d_D_inds_K_pd,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_pd,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_pd,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_pd,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (PD|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientPDDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_pd,
+                               d_pair_inds_k_for_K_pd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_pd,
+                               d_Q_K_dd,
+                               d_D_inds_K_pd,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_pd,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_pd,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_pd,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("  K block PD");
+    }
+
+    // K: D-D block
+
+    if (pair_inds_count_for_K_dd > 0)
+    {
+        timer.start("  K block DD");
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::zeroGradientData<<<num_blocks,threads_per_block>>>(d_mat_K,static_cast<uint32_t>(pair_inds_count_for_K_dd));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_dd, 1);
+
+        // set up primitive Cartesian AO to atom mapping
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_dd; ik++)
+        {
+            const auto i = pair_inds_i_for_K_dd[ik];
+            const auto k = pair_inds_k_for_K_dd[ik];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
+            const auto k_cgto = d_prim_aoinds[(k / 6) + d_prim_count * (k % 6)];
+
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i] = static_cast<uint32_t>(cart_ao_to_atom_inds[i_cgto]);
+            prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k] = static_cast<uint32_t>(cart_ao_to_atom_inds[k_cgto]);
+        }
+
+        hipSafe(hipMemcpy(d_prim_cart_ao_to_atom_inds, prim_cart_ao_to_atom_inds.data(), all_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+        // K: (DS|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDSDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ss_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ds,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DS|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDSDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ds,
+                               d_Q_K_dp,
+                               d_D_inds_K_ds,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_ds,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_ds,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_ds,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DS|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDSDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               sd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_ds,
+                               d_Q_K_dd,
+                               d_D_inds_K_ds,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_ds,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_ds,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_ds,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DP|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDPDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ps_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_dp,
+                               d_Q_K_ds,
+                               d_D_inds_K_dp,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_dp,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_dp,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_dp,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DP|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDPDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_dp,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DP|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDPDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               pd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_dp,
+                               d_Q_K_dd,
+                               d_D_inds_K_dp,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_dp,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_dp,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_dp,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DD|DS)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDDDS<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_s_prim_info,
+                               d_s_prim_aoinds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               ds_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_dd,
+                               d_Q_K_ds,
+                               d_D_inds_K_dd,
+                               d_D_inds_K_ds,
+                               d_pair_displs_K_dd,
+                               d_pair_displs_K_ds,
+                               d_pair_counts_K_dd,
+                               d_pair_counts_K_ds,
+                               d_pair_data_K_dd,
+                               d_pair_data_K_ds,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DD|DP)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDDDP<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_p_prim_info,
+                               d_p_prim_aoinds,
+                               static_cast<uint32_t>(p_prim_count),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dp_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_dd,
+                               d_Q_K_dp,
+                               d_D_inds_K_dd,
+                               d_D_inds_K_dp,
+                               d_pair_displs_K_dd,
+                               d_pair_displs_K_dp,
+                               d_pair_counts_K_dd,
+                               d_pair_counts_K_dp,
+                               d_pair_data_K_dd,
+                               d_pair_data_K_dp,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        // K: (DD|DD)
+        //     * *
+
+        for (int64_t grad_cart_ind = 0; grad_cart_ind < 3; grad_cart_ind++)
+        {
+            gpu::computeExchangeGradientDDDD<<<num_blocks,threads_per_block>>>(
+                               d_grad_array[grad_cart_ind],
+                               static_cast<uint32_t>(grad_cart_ind),
+                               frac_exact_exchange,
+                               d_pair_inds_i_for_K_dd,
+                               d_pair_inds_k_for_K_dd,
+                               static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                               d_d_prim_info,
+                               d_d_prim_aoinds,
+                               static_cast<uint32_t>(d_prim_count),
+                               dd_max_D,
+                               d_mat_D_full_AO,
+                               static_cast<uint32_t>(cart_naos),
+                               d_Q_K_dd,
+                               d_D_inds_K_dd,
+                               d_pair_displs_K_dd,
+                               d_pair_counts_K_dd,
+                               d_pair_data_K_dd,
+                               d_prim_cart_ao_to_atom_inds,
+                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<uint32_t>(p_prim_count),
+                               d_boys_func_table,
+                               d_boys_func_ft,
+                               omega,
+                               eri_threshold);
+        }
+
+        hipSafe(hipDeviceSynchronize());
+
+        timer.stop("  K block DD");
+    }
+
+    }  // end of compute K
+
+    timer.stop("K computation");
+
+    hipSafe(hipDeviceSynchronize());
+
+    exchange_timer.stop();
+
+    auto exchange_elapsed_time = exchange_timer.getElapsedTime();
+
+    screening.setExchangeTime(gpu_id, exchange_elapsed_time);
+
+    hipSafe(hipFree(d_boys_func_table));
+    hipSafe(hipFree(d_boys_func_ft));
+
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_s_prim_aoinds));
+
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_p_prim_aoinds));
+
+    hipSafe(hipFree(d_d_prim_info));
+    hipSafe(hipFree(d_d_prim_aoinds));
+
+    hipSafe(hipFree(d_mat_K));
+
+    hipSafe(hipFree(d_pair_inds_i_for_K_ss));
+    hipSafe(hipFree(d_pair_inds_k_for_K_ss));
+    hipSafe(hipFree(d_pair_inds_i_for_K_sp));
+    hipSafe(hipFree(d_pair_inds_k_for_K_sp));
+    hipSafe(hipFree(d_pair_inds_i_for_K_sd));
+    hipSafe(hipFree(d_pair_inds_k_for_K_sd));
+    hipSafe(hipFree(d_pair_inds_i_for_K_pp));
+    hipSafe(hipFree(d_pair_inds_k_for_K_pp));
+    hipSafe(hipFree(d_pair_inds_i_for_K_pd));
+    hipSafe(hipFree(d_pair_inds_k_for_K_pd));
+    hipSafe(hipFree(d_pair_inds_i_for_K_dd));
+    hipSafe(hipFree(d_pair_inds_k_for_K_dd));
+
+    hipSafe(hipFree(d_mat_D_full_AO));
+
+    hipSafe(hipFree(d_Q_K_ss));
+    hipSafe(hipFree(d_Q_K_sp));
+    hipSafe(hipFree(d_Q_K_ps));
+    hipSafe(hipFree(d_Q_K_sd));
+    hipSafe(hipFree(d_Q_K_ds));
+    hipSafe(hipFree(d_Q_K_pp));
+    hipSafe(hipFree(d_Q_K_pd));
+    hipSafe(hipFree(d_Q_K_dp));
+    hipSafe(hipFree(d_Q_K_dd));
+
+    hipSafe(hipFree(d_D_inds_K_ss));
+    hipSafe(hipFree(d_D_inds_K_sp));
+    hipSafe(hipFree(d_D_inds_K_ps));
+    hipSafe(hipFree(d_D_inds_K_sd));
+    hipSafe(hipFree(d_D_inds_K_ds));
+    hipSafe(hipFree(d_D_inds_K_pp));
+    hipSafe(hipFree(d_D_inds_K_pd));
+    hipSafe(hipFree(d_D_inds_K_dp));
+    hipSafe(hipFree(d_D_inds_K_dd));
+
+    hipSafe(hipFree(d_pair_displs_K_ss));
+    hipSafe(hipFree(d_pair_displs_K_sp));
+    hipSafe(hipFree(d_pair_displs_K_ps));
+    hipSafe(hipFree(d_pair_displs_K_sd));
+    hipSafe(hipFree(d_pair_displs_K_ds));
+    hipSafe(hipFree(d_pair_displs_K_pp));
+    hipSafe(hipFree(d_pair_displs_K_pd));
+    hipSafe(hipFree(d_pair_displs_K_dp));
+    hipSafe(hipFree(d_pair_displs_K_dd));
+
+    hipSafe(hipFree(d_pair_counts_K_ss));
+    hipSafe(hipFree(d_pair_counts_K_sp));
+    hipSafe(hipFree(d_pair_counts_K_ps));
+    hipSafe(hipFree(d_pair_counts_K_sd));
+    hipSafe(hipFree(d_pair_counts_K_ds));
+    hipSafe(hipFree(d_pair_counts_K_pp));
+    hipSafe(hipFree(d_pair_counts_K_pd));
+    hipSafe(hipFree(d_pair_counts_K_dp));
+    hipSafe(hipFree(d_pair_counts_K_dd));
+
+    hipSafe(hipFree(d_pair_data_K_ss));
+    hipSafe(hipFree(d_pair_data_K_sp));
+    hipSafe(hipFree(d_pair_data_K_ps));
+    hipSafe(hipFree(d_pair_data_K_sd));
+    hipSafe(hipFree(d_pair_data_K_ds));
+    hipSafe(hipFree(d_pair_data_K_pp));
+    hipSafe(hipFree(d_pair_data_K_pd));
+    hipSafe(hipFree(d_pair_data_K_dp));
+    hipSafe(hipFree(d_pair_data_K_dd));
+
+    timer.stop("Total timing");
+
+    // std::cout << "\nTiming of ERIs on GPU " << gpu_rank << "\n";
+    // std::cout << "-----------------------\n";
+    // std::cout << timer.getSummary() << std::endl;
+
+    // copy gradient to host
+
+    hipSafe(hipMemcpy(Fock_grad_omp[gpu_id].row(0), d_grad_x, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(Fock_grad_omp[gpu_id].row(1), d_grad_y, natoms * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(Fock_grad_omp[gpu_id].row(2), d_grad_z, natoms * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_grad_x));
+    hipSafe(hipFree(d_grad_y));
+    hipSafe(hipFree(d_grad_z));
+
+    hipSafe(hipFree(d_prim_cart_ao_to_atom_inds));
+
+    }}
+
+    CDenseMatrix Fock_grad_T (natoms, 3);
+
+    Fock_grad_T.zero();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        for (int64_t a = 0; a < natoms; a++)
+        {
+            for (int64_t d = 0; d < 3; d++)
+            {
+                Fock_grad_T.row(a)[d] += Fock_grad_omp[gpu_id].row(d)[a];
+            }
+        }
+    }
+
+    return Fock_grad_T;
+}
+
+}  // namespace gpu

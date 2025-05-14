@@ -129,7 +129,7 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     // TODO: double check by using different number of gpus per MPI
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
@@ -597,7 +597,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -1184,7 +1184,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -1758,7 +1758,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -2384,7 +2384,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -2993,7 +2993,7 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -3945,7 +3945,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     omptimers[thread_id].start("Set device");
 
