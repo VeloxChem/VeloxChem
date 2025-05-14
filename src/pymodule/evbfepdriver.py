@@ -560,10 +560,11 @@ class EvbFepDriver():
                 f.write(mm.XmlSerializer.serialize(state))
 
             positions = np.array(state.getPositions().value_in_unit(mm.unit.angstrom))
+
             # Make sure that openmm PDB writing doesn't crash when encountering too large values
-            positions = np.clip(positions, -9999999 , 99999999)
-            positions[positions==np.inf] = 99999999
-            positions[positions==-np.inf] = -9999999
+            positions = np.clip(positions, -9999998 , 99999998)
+            positions[positions==np.inf] = 99999998
+            positions[positions==-np.inf] = -9999998
             positions[positions==np.nan] = 0
 
             mmapp.PDBFile.writeFile(
