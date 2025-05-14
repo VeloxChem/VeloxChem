@@ -94,6 +94,7 @@ class LocalBayesResidual():
         self.interpolation_energy = None
         self.interpolation_gradient = None
         self.symmetry_information = None
+        self.symmetry_dihedral_lists = None
         self.qm_energy = None
         self.qm_gradient = None
         self.internal_coordinates = None
@@ -213,6 +214,7 @@ class LocalBayesResidual():
         
     # -------------- 3.  predict μ and σ² at any query point ---------------
     def bayes_predict(self, x_query):
+        from scipy.linalg import solve_triangular
         dx_phi = self._phi(x_query)
 
         mu     = dx_phi @ self.post_mean
@@ -220,8 +222,8 @@ class LocalBayesResidual():
         # print('in predict', dx_phi, self.post_mean, mu)
 
         # local variance  φᵀΛφ + σ²
-        v      = scipy.linalg.cho_solve(
-                    (self.low_trig_chol_prec_matrix, True), dx_phi)
+        v = scipy.linalg.solve_triangular(
+        self.low_trig_chol_prec_matrix, dx_phi, lower=True)
         var    = dx_phi @ v + self.sigma2
         return mu, var
     # ------------- helpers that live inside the class --------------------
@@ -230,11 +232,11 @@ class LocalBayesResidual():
         dx   = x - self.internal_coordinates_values           # Δq
 
         for i, element in enumerate(self.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
-            if len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][3]: 
+            if tuple(sorted(element)) in self.symmetry_information[6][3]: 
                 dx[i] = 0.5 * (1.0 + np.cos(3.0 * dx[i] + np.pi))
-            elif len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][2]:
+            elif tuple(sorted(element)) in self.symmetry_information[6][2]:
                 dx[i] = 0.5 * (1.0 + np.cos(2.0 * dx[i] + np.pi))
-            elif len(element) == 4:
+            else:
                 dx[i] = 0.5 * (1.0 + np.cos(1.0 * dx[i] + np.pi)) 
 
         quad = np.outer(dx, dx)[np.triu_indices_from(
@@ -244,12 +246,12 @@ class LocalBayesResidual():
         """Jacobian ∂φ/∂x   size (m,d)   in internal coordinates."""
         dx   = x - self.internal_coordinates_values
         for i, element in enumerate(self.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
-            if len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][3]: 
+            if tuple(sorted(element)) in self.symmetry_information[6][3]: 
                 dx[i] = 0.5 * (1.0 + np.cos(3.0 * dx[i] + np.pi))
-            elif len(element) == 4 and len(self.symmetry_information[6]) != 0 and tuple(sorted(element)) in self.symmetry_information[6][2]:
+            elif tuple(sorted(element)) in self.symmetry_information[6][2]:
                 dx[i] = 0.5 * (1.0 + np.cos(2.0 * dx[i] + np.pi))
-            elif len(element) == 4:
-                dx[i] = 0.5 * (1.0 + np.cos(1.0 * dx[i] + np.pi)) 
+            else:
+                dx[i] = 0.5 * (1.0 + np.cos(1.0 * dx[i] + np.pi))
         
         m    = len(dx)
         d    = 1 + m + m*(m+1)//2
@@ -285,7 +287,7 @@ class LocalBayesResidual():
             
             Phi_w = np.sqrt(w_obs) * Phi
             y_w = np.sqrt(w_obs) * y
-
+            
             self.prec_matrix += Phi_w.T @ Phi_w
             self.rhs += Phi_w.T @ y_w
         

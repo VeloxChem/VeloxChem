@@ -24,6 +24,7 @@
 
 import numpy as np
 import math
+import itertools
 import os
 import random
 from contextlib import redirect_stderr
@@ -395,7 +396,6 @@ class IMForceFieldGenerator:
 
                 self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [angle_index, dihedral_index])
 
-
         rotatable_dihedrals_dict = {}
         
         conformer_generator = ConformerGenerator()
@@ -716,7 +716,8 @@ class IMForceFieldGenerator:
                 
                 for i, mol in enumerate(molecules):
                     
-                    # mol.set_dihedral([7,2,1,5], 30.0, 'degree')
+                    # mol.set_dihedral([7,2,1,5], 0.0, 'degree')
+                    
 
                     current_dihedral_angle = list(self.allowed_deviation[key].keys())[i]
 
@@ -944,9 +945,10 @@ class IMForceFieldGenerator:
             impes_driver.imforcefield_file = imforcefieldfile
             self.qmlabels, self.z_matrix = impes_driver.read_labels()
             for label in self.qmlabels:
-                qm_data_point = InterpolationDatapoint(self.z_matrix)
-                qm_data_point.read_hdf5(imforcefieldfile, label)
-                qm_datapoints.append(qm_data_point)
+                if '_symmetry' not in label:
+                    qm_data_point = InterpolationDatapoint(self.z_matrix)
+                    qm_data_point.read_hdf5(imforcefieldfile, label)
+                    qm_datapoints.append(qm_data_point)
 
         reseted_point_densities_dict = {outer_key: {key: 0 for key in point_densities_dict[outer_key].keys()} for outer_key in point_densities_dict.keys()}
         
@@ -1489,8 +1491,6 @@ class IMForceFieldGenerator:
         """
         if len(self.drivers) == 0:
             raise ValueError("No energy driver defined.")
-
-        import itertools
            
         # define impesdriver to determine if stucture should be added:
         
@@ -1505,12 +1505,12 @@ class IMForceFieldGenerator:
 
  
         if len(symmetry_information) != 0:
-            
+
             for key, sym_inf in symmetry_information.items():
                 if 'gs' == key and 0 in self.roots_to_follow and len(sym_inf[2]) != 0:
                     symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
-                    symmetry_exclusion_groups = [item for element in sym_inf[0] for item in element]
-                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, sym_inf[1], sym_inf[2])
+                    symmetry_exclusion_groups = [item for element in sym_inf[1] for item in element]
+                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, sym_inf[1], sym_inf[4])
                     
                     # Generate all combinations
                     keys = list(sym_dihedrals.keys())
@@ -1532,8 +1532,8 @@ class IMForceFieldGenerator:
                         adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change))
                 elif 'es' == key and any(x > 0 for x in self.roots_to_follow) and len(sym_inf[2]) != 0:
                     symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
-                    symmetry_exclusion_groups = [item for element in sym_inf[0] for item in element]
-                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, sym_inf[1], sym_inf[2])
+                    symmetry_exclusion_groups = [item for element in sym_inf[1] for item in element]
+                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, sym_inf[1], sym_inf[4])
                     
                     # Generate all combinations
                     keys = list(sym_dihedrals.keys())
@@ -1775,6 +1775,7 @@ class IMForceFieldGenerator:
              
             symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
             symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
+
             if len(symmetry_group) == 3:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])

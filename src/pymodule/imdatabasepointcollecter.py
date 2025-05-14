@@ -27,6 +27,7 @@ import numpy as np
 from scipy.optimize import minimize
 import scipy
 import h5py
+import itertools
 import re
 import os
 from pathlib import Path
@@ -802,6 +803,7 @@ class IMDatabasePointCollecter:
 
         self.bayes_models = {root: [] for root in self.roots_to_follow}
         self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
+        self.qm_symmetry_datapoint_dict = {root: {} for root in self.roots_to_follow}
         self.qm_energies_dict = {root: [] for root in self.roots_to_follow}
         self.impes_drivers = {root: None for root in self.roots_to_follow}
         self.sampled_molecules = {root: {'molecules': [], 'im_energies': [], 'qm_energies': [], 'distances': []} for root in self.roots_to_follow}
@@ -820,13 +822,12 @@ class IMDatabasePointCollecter:
             driver_object = InterpolationDriver(self.z_matrix)
             driver_object.update_settings(self.interpolation_settings[root])
             if root == 0:
-                driver_object.symmetry_sub_groups = self.non_core_symmetry_groups['gs']
+                driver_object.symmetry_information = self.non_core_symmetry_groups['gs']
             else:
-                driver_object.symmetry_sub_groups = self.non_core_symmetry_groups['es']
+                driver_object.symmetry_information = self.non_core_symmetry_groups['es']
             driver_object.use_symmetry = self.use_symmetry
 
             im_labels, _ = driver_object.read_labels()
-            self.sorted_state_spec_im_labels[root] = im_labels
             print('beginning labels', im_labels)
             self.qm_data_points = []
             self.qm_energies = []
@@ -842,6 +843,7 @@ class IMDatabasePointCollecter:
                     
                     bayes_model = LocalBayesResidual(self.z_matrix)
                     bayes_model.compute_internal_coordinates_values(qm_data_point.cartesian_coordinates)
+                    self.sorted_state_spec_im_labels[root].append(label)
                     if root == 0:
                         bayes_model.symmetry_information = self.non_core_symmetry_groups['gs']
                     else:
@@ -853,12 +855,14 @@ class IMDatabasePointCollecter:
                     
                     old_label = qm_data_point.point_label
                     driver_object.qm_symmetry_data_points[old_label] = [qm_data_point]
+                    self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
+
                 else:
                     symmetry_data_point = InterpolationDatapoint(self.z_matrix)
                     symmetry_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
                     
                     driver_object.qm_symmetry_data_points[old_label].append(symmetry_data_point)
-
+                    self.qm_symmetry_datapoint_dict[root][old_label].append(symmetry_data_point)
                     
                     # driver_object.qm_symmetry_data_points_1 = {old_label: [self.qm_data_point_dict[root][2], self.qm_data_point_dict[root][4]]}
                     # driver_object.qm_symmetry_data_points_2 = {old_label: [self.qm_data_point_dict[root][3], self.qm_data_point_dict[root][5]]}
@@ -1630,12 +1634,6 @@ class IMDatabasePointCollecter:
                 self.qm_force_index = i
                 break
 
-    def calculate_translation_coordinates(self, coordinates, rotation_point=None):
-        """Center the molecule by translating its geometric center to (0, 0, 0)."""
-        center = np.mean(coordinates, axis=0)
-        translated_coordinates = coordinates - center
-
-        return translated_coordinates, center
 
     def cartesian_just_distance(self, coordinate_1, coordinate_2):
         """Calculates and returns the cartesian distance between
@@ -1646,8 +1644,8 @@ class IMDatabasePointCollecter:
                 InterpolationDatapoint object
         """
         # First, translate the cartesian coordinates to zero
-        target_coordinates, center_target = self.calculate_translation_coordinates(coordinate_1)
-        reference_coordinates, center_reference = (
+        target_coordinates = self.calculate_translation_coordinates(coordinate_1)
+        reference_coordinates = (
             self.calculate_translation_coordinates(coordinate_2))
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
@@ -1923,26 +1921,23 @@ class IMDatabasePointCollecter:
 
                     if mean_bond_rmsd > 0.1 or mean_angle_rmsd > 0.1 or mean_dihedral_rmsd > 1.0:
 
-                        self.add_a_point = True
+                        scanned = False
+                        for checked_molecule in self.allowed_molecules[self.current_state]['molecules']:
+                            checked_distance = self.cartesian_just_distance(checked_molecule.get_coordinates_in_bohr(), new_molecule.get_coordinates_in_bohr())
+                            if (np.linalg.norm(checked_distance) / np.sqrt(len(new_molecule.get_labels()))) * bohr_in_angstrom() <= self.distance_thrsh - 0.05:
+                                scanned = True 
+                                break
+                        if not scanned:
+                            for i, qm_data_point in enumerate(self.qm_data_point_dict[self.current_state], start=1):
 
-                    
-                # scanned = False
-                # for checked_molecule in self.allowed_molecules[self.current_state]['molecules']:
-                #     checked_distance = self.cartesian_just_distance(checked_molecule.get_coordinates_in_bohr(), new_molecule.get_coordinates_in_bohr())
-                #     if (np.linalg.norm(checked_distance) / np.sqrt(len(new_molecule.get_labels()))) * bohr_in_angstrom() <= self.distance_thrsh - 0.05:
-                #         scanned = True 
-                #         break
-                # if not scanned:
-                #     for i, qm_data_point in enumerate(self.qm_data_point_dict[self.current_state], start=1):
+                                length_vectors = (self.impes_drivers[self.current_state].impes_coordinate.cartesian_distance_vector(qm_data_point))
+                                
+                                if (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom() <= self.distance_thrsh:
+                                    self.add_a_point = False
+                                    break          
 
-                #         length_vectors = (self.impes_drivers[self.current_state].impes_coordinate.cartesian_distance_vector(qm_data_point))
-                        
-                #         if (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom() <= self.distance_thrsh:
-                #             self.add_a_point = False
-                #             break          
-
-                #         if i == len(self.qm_data_point_dict[self.current_state]):
-                #             self.add_a_point = True
+                                if i == len(self.qm_data_point_dict[self.current_state]):
+                                    self.add_a_point = True
 
             else:
                 self.skipping_value -= 1
@@ -2173,18 +2168,20 @@ class IMDatabasePointCollecter:
                     opt_drv = OptimizationDriver(opt_qm_driver)
                     opt_drv.ostream.mute()
                     
-                    interpolation_driver = InterpolationDriver(self.z_matrix)
-                    interpolation_driver.update_settings(self.interpolation_settings[self.current_state])
-                    if self.current_state == 0:
-                        interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups['gs']
-                    else:
-                        interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups['es']
+                    # interpolation_driver = InterpolationDriver(self.z_matrix)
+                    # interpolation_driver.update_settings(self.interpolation_settings[self.current_state])
+                    # if self.current_state == 0:
+                    #     interpolation_driver.symmetry_information = self.non_core_symmetry_groups['gs']
+                    # else:
+                    #     interpolation_driver.symmetry_information = self.non_core_symmetry_groups['es']
 
-                    interpolation_driver.distance_thrsh = 1000
-                    interpolation_driver.exponent_p = 2
-                    interpolation_driver.store_weights = True
-                    interpolation_driver.compute(molecule)
-                    current_weights = interpolation_driver.weights
+                    # interpolation_driver.distance_thrsh = 1000
+                    # interpolation_driver.exponent_p = 2
+                    # interpolation_driver.store_weights = True
+                    # interpolation_driver.qm_
+                    # interpolation_driver.compute(molecule)
+                    self.impes_drivers[self.current_state].compute(molecule)
+                    current_weights = self.impes_drivers[self.current_state].weights
 
                     weights = [value for _, value in current_weights.items()]
                     used_labels = [label_idx for label_idx, _ in current_weights.items()]
@@ -2198,7 +2195,7 @@ class IMDatabasePointCollecter:
                             break
 
                     # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
-                    constraints = interpolation_driver.determine_important_internal_coordinates(qm_energy, molecule, self.z_matrix, internal_coordinate_datapoints)
+                    constraints = self.impes_drivers[self.current_state].determine_important_internal_coordinates(qm_energy, molecule, self.z_matrix, internal_coordinate_datapoints)
                     
                     
                     print('FINAL WIEGHTS', current_weights)
@@ -2223,22 +2220,22 @@ class IMDatabasePointCollecter:
                     opt_current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
                     qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
                     print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-
+                    
                     label = f"point_{len(self.sorted_state_spec_im_labels[self.current_state]) + 1}"
-                    self.add_point(optimized_molecule, label, opt_current_basis, scf_results=scf_tensors)
+                    self.add_point(optimized_molecule, label, current_basis, self.non_core_symmetry_groups)
                     self.last_point_added = self.point_checker - 1
                     self.point_checker = 0
                     self.point_adding_molecule[self.step] = (molecule, qm_energy, label)
                 
                 else:
                     label = f"point_{len(self.sorted_state_spec_im_labels[self.current_state]) + 1}"
-                    self.add_point(molecule, label, current_basis, scf_results=scf_tensors)
+                    self.add_point(molecule, label, current_basis, self.non_core_symmetry_groups)
                     self.last_point_added = self.point_checker - 1
                     self.point_checker = 0
                     self.point_adding_molecule[self.step] = (molecule, qm_energy, label)
 
 
-    def add_point(self, molecule, label, basis=None, scf_results=None):
+    def add_point(self, molecule, label, basis, symmetry_information):
         """ Adds a new point to the database.
 
             :param molecule:
@@ -2253,6 +2250,67 @@ class IMDatabasePointCollecter:
                 the scf_results of previous QM calculation (if required).
         """
 
+        adjusted_molecule = {'gs': [], 'es': []}
+        symmetry_mapping_groups = []
+        symmetry_exclusion_groups = []
+        new_label = label
+        category_label = None
+ 
+        if len(symmetry_information) != 0:
+
+            for key, sym_inf in symmetry_information.items():
+                if 'gs' == key and 0 in self.roots_to_follow and len(sym_inf[2]) != 0:
+                    symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
+                    symmetry_exclusion_groups = [item for element in sym_inf[1] for item in element]
+                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(sym_inf[1], sym_inf[4])
+                    
+                    # Generate all combinations
+                    keys = list(sym_dihedrals.keys())
+                    values = list(sym_dihedrals.values())
+                    combinations = list(itertools.product(*values))
+
+                    # Convert to list of dictionaries
+                    molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
+                    print('MOlecule configs', molecule_configs)
+                    for i, molecule_config in enumerate(molecule_configs):
+                        cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                        dihedral_to_change = []
+                        for dihedral, angle in molecule_config.items():
+                            cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], angle, 'radian')
+                            dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+
+                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                        adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change))
+                elif 'es' == key and any(x > 0 for x in self.roots_to_follow) and len(sym_inf[2]) != 0:
+                    symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
+                    symmetry_exclusion_groups = [item for element in sym_inf[1] for item in element]
+                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(sym_inf[1], sym_inf[4])
+                    
+                    # Generate all combinations
+                    keys = list(sym_dihedrals.keys())
+                    values = list(sym_dihedrals.values())
+                    combinations = list(itertools.product(*values))
+
+                    # Convert to list of dictionaries
+                    molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
+
+                    for i, molecule_config in enumerate(molecule_configs):
+                        cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                        dihedral_to_change = []
+                        for dihedral, angle in molecule_config.items():
+                            cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], angle, 'radian')
+                            dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+
+                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                        adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change))
+                else:
+                    adjusted_molecule['gs'].append((molecule, basis, 1, None))  
+                    adjusted_molecule['es'].append((molecule, basis, 1, None))
+        
+        else:
+            adjusted_molecule['gs'].append((molecule, basis, 1, None))  
+            adjusted_molecule['es'].append((molecule, basis, 1, None))
+        
         for state, key in enumerate(self.drivers.keys()):
             
             drivers = None
@@ -2265,161 +2323,287 @@ class IMDatabasePointCollecter:
             else:
                 continue
             
-            energies, scf_results = self.compute_energy(drivers[0], molecule, basis)
-
-            gradients = self.compute_gradient(drivers[1], molecule, basis, scf_results)
-            hessians = self.compute_hessian(drivers[2], molecule, basis)
-
-            natoms = molecule.number_of_atoms()
-            elem = molecule.get_labels()
-            coords = molecule.get_coordinates_in_bohr().reshape(natoms * 3)
-
-            masses = molecule.get_masses().copy()
-            masses_cart = np.repeat(masses, 3)
-            inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-
-            for i in range(len(energies)):
-
-            #     vib_frequencies, normal_modes_vec, gibbs_energy = (
-            #         geometric.normal_modes.frequency_analysis(
-            #             coords,
-            #             hessians[i],
-            #             elem,
-            #             energy=energies[i],
-            #             temperature=self.temperature_number,
-            #             pressure=self.pressure,
-            #             outfnm=f'vibrational_point_{energies[i]}',
-            #             normalized=False))
-
-
-                # print('Vibrational frequencies', vib_frequencies, gibbs_energy)
-
-                grad_mw = gradients[i] / np.sqrt(masses)[:, None]
-                H_mw = hessians[i] * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
+            for mol_state, entries in adjusted_molecule.items():
                 
-                impes_coordinate = InterpolationDatapoint(self.z_matrix)
-                impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
-                impes_coordinate.energy = energies[i]
-                impes_coordinate.gradient = grad_mw
-                impes_coordinate.hessian = H_mw
-                impes_coordinate.transform_gradient_and_hessian()
-                # trust_radius = impes_coordinate.determine_trust_radius(molecule, self.interpolation_settings, self.dynamics_settings, label, specific_coordiante, self.allowed_deviation, symmetry_groups=self.symmetry_groups)
-                sampled_space = False
-                sampled_distances = []
-                impes_coordinate.confidence_radius = float(self.use_opt_confidence_radius[2])
+                if state == 0 and mol_state != 'gs':
+                    continue
+                if state == 1 and mol_state != 'es':
+                    continue
                 
+                for label_counter, mol_basis in enumerate(entries):
+                    
+                    energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
 
-                bayes_model = LocalBayesResidual(self.z_matrix)
-                bayes_model.compute_internal_coordinates_values(qm_data_point.cartesian_coordinates)
-                if root == 0:
-                    bayes_model.symmetry_information = self.non_core_symmetry_groups['gs']
-                else:
-                    bayes_model.symmetry_information = self.non_core_symmetry_groups['es']
-                self.bayes_models[state + i].append(bayes_model)
-                
-                while not sampled_space and self.use_opt_confidence_radius[0]:
-                    # selected_molecules = random.sample(self.state_specific_molecules[state + i], 30 - len(self.allowed_molecules[state + i]))
-                    
-                    for mol in self.state_specific_molecules[state + i]:
-                        _, distance, _ = self.calculate_distance_to_ref(mol.get_coordinates_in_bohr(), molecule.get_coordinates_in_bohr())
-                        sampled_distances.append(distance)
+                    gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
+                    hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
 
-                    sampled_distances_np = np.array(sampled_distances)
-                    mu = np.mean(sampled_distances_np)
-                    sigma = np.std(sampled_distances_np)
+                    masses = molecule.get_masses().copy()
+                    masses_cart = np.repeat(masses, 3)
+                    inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
 
-                    weights = np.exp(-((sampled_distances_np - mu) ** 2) / (2 * sigma ** 2))
-                    # kT = 4.0  # You can tune this value
-                    # weights = np.exp(-sampled_distances_np / kT)
-                    
-                    probabilities = weights / sum(weights)
-                    
-                    num_samples = 20
-                    sampled_indices = np.random.choice(len(sampled_distances), size=num_samples, replace=False, p=probabilities)
-                    print(sampled_indices)
-                    chosen_structures = np.array(self.state_specific_molecules[state + i])[sampled_indices]
-                    
-                    for sel_mol in chosen_structures:
-                        energies, scf_results = self.compute_energy(drivers[0], sel_mol, basis)
-                        self.impes_drivers[state + i].qm_data_points = self.qm_data_point_dict[state + i]
-                        self.impes_drivers[state + i].compute(sel_mol)
-                        if abs(energies[i] - self.impes_drivers[state + i].get_energy()) * hartree_in_kcalpermol() < self.energy_threshold:
-                            self.sampled_molecules[state + i]['molecules'].append(sel_mol)
-                            self.sampled_molecules[state + i]['im_energies'].append(self.impes_drivers[state + i].get_energy())
-                            self.sampled_molecules[state + i]['qm_energies'].append(energies[i])
-                    sampled_space = True
-                self.qm_data_point_dict[state + i].append(impes_coordinate)
-                self.sorted_state_spec_im_labels[state + i].append(label)
-                impes_coordinate.write_hdf5(self.interpolation_settings[state + i]['imforcefield_file'], label)
-                # trust_radius = self.determine_trust_radius_single(self.sampled_molecules['molecules'], self.sampled_molecules['qm_energies'], self.sampled_molecules['im_energies'], self.qm_data_point_dict[state + i][:-1], impes_coordinate, self.interpolation_settings[state + i])
-                # impes_coordinate.confidence_radius = 0.5
-                print('data list', len(self.sampled_molecules[state + i]['molecules']))
-                # if len(self.qm_data_point_dict[state + i]) > 2:
-                #     remove_datapoints = False
-                #     cut_off = 0
-                #     for counter in range(3, len(self.qm_data_point_dict[state + i])):
-    
-                #         if not remove_datapoints:
-                #             trust_radius_multi = self.determine_trust_radius(self.sampled_molecules['molecules'], self.sampled_molecules['qm_energies'], self.sampled_molecules['im_energies'], self.qm_data_point_dict[state + i][:counter], self.interpolation_settings[state + i])
+                    for number in range(len(energies)):
+
+                        grad_mw = gradients[number] / np.sqrt(masses)[:, None]
+                        H_mw = hessians[number] * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
+                        
+                        impes_coordinate = InterpolationDatapoint(self.z_matrix)
+                        impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
+                        impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+                        impes_coordinate.energy = energies[number]
+                        impes_coordinate.gradient = grad_mw
+                        impes_coordinate.hessian = H_mw
+                        impes_coordinate.transform_gradient_and_hessian()
+                        # trust_radius = impes_coordinate.determine_trust_radius(molecule, self.interpolation_settings, self.dynamics_settings, label, specific_coordiante, self.allowed_deviation, symmetry_groups=self.symmetry_groups)
+                        sampled_space = False
+                        sampled_distances = []
+                        impes_coordinate.confidence_radius = float(self.use_opt_confidence_radius[2])
+
+                        if label_counter > 0:
+                            new_label = f'{label}_symmetry_{label_counter}'
+
+                        print('Org Molecules', mol_basis[0].get_xyz_string())
+
+                        if mol_basis[2] > 1:
+                                
+                            rotation_combinations = None
                             
-                #             for idx, trust_radius in enumerate(trust_radius_multi):
-
-                #                 self.qm_data_point_dict[state + i][idx].confidence_radius = trust_radius
-
-                #             interpolation_driver = InterpolationDriver(self.z_matrix)
-                #             interpolation_driver.update_settings(self.interpolation_settings[state + i])
-                #             interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
-                #             interpolation_driver.distance_thrsh = 1000
-                #             interpolation_driver.exponent_p = 2
-                #             interpolation_driver.print = False
-                #             interpolation_driver.qm_data_points = self.qm_data_point_dict[state + i][:len(trust_radius_multi) - 1]
-                #             curr_dp_molecule = Molecule(molecule.get_labels(), self.qm_data_point_dict[state + i][len(trust_radius_multi)].cartesian_coordinates, 'bohr')
-                #             interpolation_driver.compute(curr_dp_molecule)
-                #             new_im_energy = interpolation_driver.get_energy()
-                #             diff = abs(new_im_energy - self.qm_data_point_dict[state + i][len(trust_radius_multi)].energy) * hartree_in_kcalpermol()
-                #             print('DIFF for removeale', diff)
-                #             if diff < self.energy_threshold - self.energy_threshold / 3.0:
-                #                 remove_datapoints = True
+                            if mol_basis[2] == 3:
+                                from itertools import product
+                                rotations = [0.0, 2*np.pi/3, 4*np.pi/3]
+                                dihedrals = mol_basis[3]  # your list of rotatable dihedrals
+                                rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+                            
+                            if mol_basis[2] == 2:
+                                from itertools import product
+                                rotations = [0.0, np.pi]
+                                dihedrals = mol_basis[3]  # your list of rotatable dihedrals
+                                rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+                            print('rot comb', rotation_combinations)
+                            
+                            org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                            masks = [org_mask]
+                            for combo in rotation_combinations:
+                                if all(r == 0 for r in combo):
+                                    continue  # skip the base geometry if desired
+                                
                         
-                #         if remove_datapoints:
-                #             self.qm_data_point_dict[state + i][counter - 1].remove_point_from_hdf5(self.interpolation_settings[state + i]['imforcefield_file'], self.sorted_state_spec_im_labels[state + i][counter - 1], use_inverse_bond_length=True, use_cosine_dihedral=False)
-                #             cut_off = counter
-                #     if remove_datapoints:
-                #         self.qm_data_point_dict[state + i] = self.qm_data_point_dict[state + i][:cut_off - 1]
+                                rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
+                                for angle, dihedral in zip(combo, dihedrals):
+                                    
+                                    rot_mol.set_dihedral(dihedral, mol_basis[0].get_dihedral(dihedral, 'radian') - angle, 'radian')
+                                print('rot_molecules', combo, rot_mol.get_xyz_string())
+                                target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
+                                reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
+                                
+                                target_coordinates_core = target_coordinates.copy()
+                                reference_coordinates_core = reference_coordinates.copy()
+                                    
+                                target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
+                                reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
+                                rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
+                                                                        reference_coordinates_core)
+                                # Rotate the data point
+                                rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+                                rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
+        
+                                mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
+                                                                                    mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
+                                z_matrix_dict = {tuple(sorted(element)): i 
+                                    for i, element in enumerate(impes_coordinate.z_matrix)}
+                                
+                                mapping_dict = [mapping_dict_12]
+                                
+                                
+                                reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
+            
+                                for ord in range(len(mapping_dict)):
+                                    mask = []
+                                    reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
+                                    for i, element in enumerate(impes_coordinate.z_matrix):
+                                        # Otherwise, reorder the element
+                                        reordered_element = [mapping_dict[ord].get(x, x) for x in element]
+                                        key = tuple(sorted(reordered_element))
+                                        z_mat_index = z_matrix_dict.get(key)
+                                        mask.append(z_mat_index)
+                                        reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
+                                    reorded_int_coords.append(reorded_int_coord)
+                                    masks.append(mask)
 
-                #         exit()  
-                
-                print('use confidence radius', self.use_opt_confidence_radius)
-                if self.use_opt_confidence_radius[0]:
+                            impes_coordinate.mapping_masks = masks
+                        else:
+                            org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                            masks = [org_mask]
+                            impes_coordinate.mapping_masks = masks
                     
-                    trust_radius = None
-                    if self.use_opt_confidence_radius[1] == 'single':
-                        trust_radius = self.determine_trust_radius_single(self.sampled_molecules[state + i]['molecules'], self.sampled_molecules[state + i]['qm_energies'], self.sampled_molecules[state + i]['im_energies'], self.qm_data_point_dict[state + i][:-1], self.qm_data_point_dict[state + i][-1], self.interpolation_settings[state + i])
+                    # while not sampled_space and self.use_opt_confidence_radius[0]:
+                    #     # selected_molecules = random.sample(self.state_specific_molecules[state + i], 30 - len(self.allowed_molecules[state + i]))
+                        
+                    #     for mol in self.state_specific_molecules[state + i]:
+                    #         _, distance, _ = self.calculate_distance_to_ref(mol.get_coordinates_in_bohr(), molecule.get_coordinates_in_bohr())
+                    #         sampled_distances.append(distance)
 
-                    elif self.use_opt_confidence_radius[1] == 'multi':
-                        trust_radius = self.determine_trust_radius(self.sampled_molecules[state + i]['molecules'], self.sampled_molecules[state + i]['qm_energies'], self.sampled_molecules[state + i]['im_energies'], self.qm_data_point_dict[state + i], self.interpolation_settings[state + i])
+                    #     sampled_distances_np = np.array(sampled_distances)
+                    #     mu = np.mean(sampled_distances_np)
+                    #     sigma = np.std(sampled_distances_np)
+
+                    #     weights = np.exp(-((sampled_distances_np - mu) ** 2) / (2 * sigma ** 2))
+                    #     # kT = 4.0  # You can tune this value
+                    #     # weights = np.exp(-sampled_distances_np / kT)
+                        
+                    #     probabilities = weights / sum(weights)
+                        
+                    #     num_samples = 20
+                    #     sampled_indices = np.random.choice(len(sampled_distances), size=num_samples, replace=False, p=probabilities)
+                    #     print(sampled_indices)
+                    #     chosen_structures = np.array(self.state_specific_molecules[state + i])[sampled_indices]
+                        
+                    #     for sel_mol in chosen_structures:
+                    #         energies, scf_results = self.compute_energy(drivers[0], sel_mol, basis)
+                    #         self.impes_drivers[state + i].qm_data_points = self.qm_data_point_dict[state + i]
+                    #         self.impes_drivers[state + i].compute(sel_mol)
+                    #         if abs(energies[i] - self.impes_drivers[state + i].get_energy()) * hartree_in_kcalpermol() < self.energy_threshold:
+                    #             self.sampled_molecules[state + i]['molecules'].append(sel_mol)
+                    #             self.sampled_molecules[state + i]['im_energies'].append(self.impes_drivers[state + i].get_energy())
+                    #             self.sampled_molecules[state + i]['qm_energies'].append(energies[i])
+                    #     sampled_space = True
                     
+                    
+                    if label_counter == 0:
+
+                        category_label = label
+                        if impes_coordinate.use_inverse_bond_length:
+                            category_label += "_rinv"
+                        else:
+                            category_label += "_r"
+
+                        if impes_coordinate.use_cosine_dihedral:
+                            category_label += "_cosine"
+                        else:
+                            category_label += "_dihedral"
+
+                        print('dict and key', self.impes_drivers[state + number].qm_symmetry_data_points, category_label)
+                        self.qm_data_point_dict[state + number].append(impes_coordinate)
+                        self.sorted_state_spec_im_labels[state + number].append(new_label)
+                        self.qm_symmetry_datapoint_dict[state + number][category_label] = [impes_coordinate]
+                        self.impes_drivers[state + number].qm_symmetry_data_points[category_label] = [impes_coordinate]
+                        impes_coordinate.point_label = category_label
+
+                        self.qm_energies_dict[state + number].append(energies[number])
+                        
+                        self.impes_drivers[state + number].qm_data_points = self.qm_data_point_dict[self.current_state]
+                        self.impes_drivers[state + number].labels = self.sorted_state_spec_im_labels[self.current_state]
+
+                        print('I am writing the file', label, self.interpolation_settings[state + number]['imforcefield_file'])
+                    
+
+                        self.density_around_data_point[0][state + number] += 1
+
+                        bayes_model = LocalBayesResidual(self.z_matrix)
+                        bayes_model.compute_internal_coordinates_values(impes_coordinate.cartesian_coordinates)
+                        if state + number == 0:
+                            bayes_model.symmetry_information = self.non_core_symmetry_groups['gs']
+                        else:
+                            bayes_model.symmetry_information = self.non_core_symmetry_groups['es']
+
+                        bayes_model.init_bayesian()
+
+                        self.bayes_models[state + number].append(bayes_model)
+
+
+
                     else:
-                        trust_radius = self.determine_beysian_trust_radius(self.sampled_molecules[state + i]['molecules'], self.sampled_molecules[state + i]['qm_energies'], self.qm_data_point_dict[state + i], self.interpolation_settings[state + i])
-                
-                    # exit()
-                    for idx, trust_radius in enumerate(trust_radius):
                         
-                        self.qm_data_point_dict[state + i][idx].update_confidence_radius(self.interpolation_settings[state + i]['imforcefield_file'], self.sorted_state_spec_im_labels[state + i][idx], trust_radius)
-                        self.qm_data_point_dict[state + i][idx].confidence_radius = trust_radius
-                
-                
-                self.qm_energies_dict[state + i].append(energies[i])
-                
-                self.impes_drivers[state + i].qm_data_points = self.qm_data_point_dict[self.current_state]
-                self.impes_drivers[state + i].labels = self.sorted_state_spec_im_labels[self.current_state]
+                        self.qm_symmetry_datapoint_dict[state + number][category_label].append(impes_coordinate)
+                        self.impes_drivers[state + number].qm_symmetry_data_points[category_label].append(impes_coordinate)
+                    
+                    impes_coordinate.confidence_radius = 0.5
+                    impes_coordinate.write_hdf5(self.interpolation_settings[state + number]['imforcefield_file'], new_label)
+                    # trust_radius = self.determine_trust_radius_single(self.sampled_molecules['molecules'], self.sampled_molecules['qm_energies'], self.sampled_molecules['im_energies'], self.qm_data_point_dict[state + i][:-1], impes_coordinate, self.interpolation_settings[state + i])
+                    
+                    print('data list', len(self.sampled_molecules[state + number]['molecules']))
+                    # if len(self.qm_data_point_dict[state + i]) > 2:
+                    #     remove_datapoints = False
+                    #     cut_off = 0
+                    #     for counter in range(3, len(self.qm_data_point_dict[state + i])):
+        
+                    #         if not remove_datapoints:
+                    #             trust_radius_multi = self.determine_trust_radius(self.sampled_molecules['molecules'], self.sampled_molecules['qm_energies'], self.sampled_molecules['im_energies'], self.qm_data_point_dict[state + i][:counter], self.interpolation_settings[state + i])
+                                
+                    #             for idx, trust_radius in enumerate(trust_radius_multi):
 
-                print('I am writing the file', label, self.interpolation_settings[state + i]['imforcefield_file'])
-                
+                    #                 self.qm_data_point_dict[state + i][idx].confidence_radius = trust_radius
 
-                self.density_around_data_point[0][state + i] += 1
+                    #             interpolation_driver = InterpolationDriver(self.z_matrix)
+                    #             interpolation_driver.update_settings(self.interpolation_settings[state + i])
+                    #             interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
+                    #             interpolation_driver.distance_thrsh = 1000
+                    #             interpolation_driver.exponent_p = 2
+                    #             interpolation_driver.print = False
+                    #             interpolation_driver.qm_data_points = self.qm_data_point_dict[state + i][:len(trust_radius_multi) - 1]
+                    #             curr_dp_molecule = Molecule(molecule.get_labels(), self.qm_data_point_dict[state + i][len(trust_radius_multi)].cartesian_coordinates, 'bohr')
+                    #             interpolation_driver.compute(curr_dp_molecule)
+                    #             new_im_energy = interpolation_driver.get_energy()
+                    #             diff = abs(new_im_energy - self.qm_data_point_dict[state + i][len(trust_radius_multi)].energy) * hartree_in_kcalpermol()
+                    #             print('DIFF for removeale', diff)
+                    #             if diff < self.energy_threshold - self.energy_threshold / 3.0:
+                    #                 remove_datapoints = True
+                            
+                    #         if remove_datapoints:
+                    #             self.qm_data_point_dict[state + i][counter - 1].remove_point_from_hdf5(self.interpolation_settings[state + i]['imforcefield_file'], self.sorted_state_spec_im_labels[state + i][counter - 1], use_inverse_bond_length=True, use_cosine_dihedral=False)
+                    #             cut_off = counter
+                    #     if remove_datapoints:
+                    #         self.qm_data_point_dict[state + i] = self.qm_data_point_dict[state + i][:cut_off - 1]
 
-    def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting):
+                    #         exit()  
+                    
+                    if label_counter == 0:
+                        if self.use_opt_confidence_radius[0]:
+                            
+                            trust_radius = None
+                            if self.use_opt_confidence_radius[1] == 'single':
+                                sym_dict = self.non_core_symmetry_groups['gs']
+                                if state + number > 0:
+                                    sym_dict = self.non_core_symmetry_groups['es']
+                                    
+                                trust_radius = self.determine_trust_radius_single(self.sampled_molecules[state + number]['molecules'], 
+                                                                                self.sampled_molecules[state + number]['qm_energies'],
+                                                                                self.sampled_molecules[state + number]['im_energies'], 
+                                                                                self.qm_data_point_dict[state + number][:-1], 
+                                                                                self.qm_data_point_dict[state + number][-1], 
+                                                                                self.interpolation_settings[state + number],
+                                                                                self.qm_symmetry_datapoint_dict[state + number],
+                                                                                sym_dict)
+
+                            elif self.use_opt_confidence_radius[1] == 'multi':
+                                
+                                sym_dict = self.non_core_symmetry_groups['gs']
+                                if state + number > 0:
+                                    sym_dict = self.non_core_symmetry_groups['es']
+
+                                trust_radius = self.determine_trust_radius(self.sampled_molecules[state + number]['molecules'], 
+                                                                        self.sampled_molecules[state + number]['qm_energies'], 
+                                                                        self.sampled_molecules[state + number]['im_energies'], 
+                                                                        self.qm_data_point_dict[state + number], 
+                                                                        self.interpolation_settings[state + number],
+                                                                        self.qm_symmetry_datapoint_dict[state + number],
+                                                                        sym_dict)
+                            
+                            else:
+                                trust_radius = self.determine_beysian_trust_radius(self.sampled_molecules[state + number]['molecules'], 
+                                                                                self.sampled_molecules[state + number]['qm_energies'], 
+                                                                                self.qm_data_point_dict[state + number], 
+                                                                                self.interpolation_settings[state + number], 
+                                                                                self.qm_symmetry_datapoint_dict[state + number],
+                                                                                sym_dict)
+                        
+                            # exit()
+                            for idx, trust_radius in enumerate(trust_radius):
+                                print(self.sorted_state_spec_im_labels[state + number][idx])
+                                self.qm_data_point_dict[state + number][idx].update_confidence_radius(self.interpolation_settings[state + number]['imforcefield_file'], self.sorted_state_spec_im_labels[state + number][idx], trust_radius)
+                                self.qm_data_point_dict[state + number][idx].confidence_radius = trust_radius
+                    
+
+    def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict):
     
         trust_radii = []
         for dp in current_datapoints:   
@@ -2433,7 +2617,8 @@ class IMDatabasePointCollecter:
 
                 interpolation_driver = InterpolationDriver(self.z_matrix)
                 interpolation_driver.update_settings(interpolation_setting)
-                interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
+                interpolation_driver.symmetry_information = sym_dict
+                interpolation_driver.qm_symmetry_data_points = sym_datapoints
                 interpolation_driver.distance_thrsh = 1000
                 interpolation_driver.exponent_p = 2
                 interpolation_driver.print = False
@@ -2451,7 +2636,7 @@ class IMDatabasePointCollecter:
             
         return trust_radii
     
-    def determine_beysian_grad_trust_radius(self, molecules, qm_energies, current_datapoint, interpolation_setting):
+    def determine_beysian_grad_trust_radius(self, molecules, qm_energies, current_datapoint, interpolation_setting, sym_datapoints, sym_dict):
     
                 
         sum_sq_error = 0.0
@@ -2461,7 +2646,8 @@ class IMDatabasePointCollecter:
 
             interpolation_driver = InterpolationDriver(self.z_matrix)
             interpolation_driver.update_settings(interpolation_setting)
-            interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
+            interpolation_driver.symmetry_information = sym_dict
+            interpolation_driver.qm_symmetry_data_points = sym_datapoints
             interpolation_driver.distance_thrsh = 1000
             interpolation_driver.exponent_p = 2
             interpolation_driver.print = False
@@ -2476,9 +2662,9 @@ class IMDatabasePointCollecter:
 
         return bey_trust_radius
 
-    def determine_trust_radius(self, molecules, qm_energies, im_energies, datapoints, interpolation_setting):
+    def determine_trust_radius(self, molecules, qm_energies, im_energies, datapoints, interpolation_setting, sym_datapoints, sym_dict):
         
-        def obj_energy_function(alphas, structure_list, qm_e, im_e, dps, impes_dict):
+        def obj_energy_function(alphas, structure_list, qm_e, im_e, dps, impes_dict, sym_datapoints, sym_dict):
                 
             sum_sq_error = 0.
 
@@ -2489,7 +2675,8 @@ class IMDatabasePointCollecter:
 
                 interpolation_driver = InterpolationDriver(self.z_matrix)
                 interpolation_driver.update_settings(impes_dict)
-                interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
+                interpolation_driver.symmetry_information = sym_dict
+                interpolation_driver.qm_symmetry_data_points = sym_datapoints
                 interpolation_driver.distance_thrsh = 1000
                 interpolation_driver.exponent_p = 2
                 interpolation_driver.print = False
@@ -2503,7 +2690,7 @@ class IMDatabasePointCollecter:
             print('sum_of_sqaure', sum_sq_error, alphas)
             return sum_sq_error
         
-        def obj_gradient_function(alphas, structure_list, qm_e, im_e, dps, impes_dict):
+        def obj_gradient_function(alphas, structure_list, qm_e, im_e, dps, impes_dict, sym_datapoints, sym_dict):
             
             n_points = len(dps)
             dF_dalphas = np.zeros(n_points, dtype=float)
@@ -2514,7 +2701,8 @@ class IMDatabasePointCollecter:
             for i, mol in enumerate(structure_list):
                 interpolation_driver = InterpolationDriver(self.z_matrix)
                 interpolation_driver.update_settings(impes_dict)
-                interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
+                interpolation_driver.symmetry_information = sym_dict
+                interpolation_driver.qm_symmetry_data_points = sym_datapoints
                 interpolation_driver.distance_thrsh = 1000
                 interpolation_driver.exponent_p = 2
                 interpolation_driver.qm_data_points = dps
@@ -2534,10 +2722,11 @@ class IMDatabasePointCollecter:
 
                     part_1 = 0.0
 
-                    for element in range(len(interpolation_driver.weights)):
+                    for element, weight_entry in enumerate(interpolation_driver.weights.items()):
+
                         if element == j:
                             continue
-                        part_1 += -1.0 * gradient_weight * interpolation_driver.weights[element] * interpolation_driver.potentials[element] * hartree_in_kcalpermol()
+                        part_1 += -1.0 * gradient_weight * weight_entry[1] * interpolation_driver.potentials[element] * hartree_in_kcalpermol()
                 
                 
                     part_2 = (gradient_weight * interpolation_driver.potentials[j] * hartree_in_kcalpermol() * sum_of_weights - interpolation_driver.weights[j] * interpolation_driver.potentials[j] * hartree_in_kcalpermol() * gradient_weight)
@@ -2554,14 +2743,14 @@ class IMDatabasePointCollecter:
 
             return dF_dalphas
         
-        def optimize_trust_radius(alphas, geom_list, E_ref_list, E_im_list, dps, impes_dict):
+        def optimize_trust_radius(alphas, geom_list, E_ref_list, E_im_list, dps, impes_dict, sym_datapoints, sym_dict):
             """
             Perform the gradient-based optimization to find R*
             that minimizes the sum of squared errors to reference QM energies.
             """
 
             # We pass the data as extra arguments to avoid repeated global references:
-            args = (geom_list, E_ref_list, E_im_list, dps, impes_dict)
+            args = (geom_list, E_ref_list, E_im_list, dps, impes_dict, sym_datapoints, sym_dict)
 
             # Minimizer expects a function returning just the objective,
             # plus a function returning the gradient if we pass `jac=True`.
@@ -2583,14 +2772,14 @@ class IMDatabasePointCollecter:
 
         print('INPUT Trust radius', inital_alphas)
 
-        trust_radius = optimize_trust_radius(inital_alphas, molecules, qm_energies, im_energies, datapoints, interpolation_setting)
+        trust_radius = optimize_trust_radius(inital_alphas, molecules, qm_energies, im_energies, datapoints, interpolation_setting, sym_datapoints, sym_dict)
         
         return trust_radius['x']
     
 
-    def determine_trust_radius_single(self, molecules, qm_energies, im_energies, old_datapoints, current_datapoint, interpolation_setting):
+    def determine_trust_radius_single(self, molecules, qm_energies, im_energies, old_datapoints, current_datapoint, interpolation_setting, sym_datapoints, sym_dict):
         
-        def obj_energy_function(alpha, structure_list, qm_e, im_e, old_dps, curr_dp, impes_dict):
+        def obj_energy_function(alpha, structure_list, qm_e, im_e, old_dps, curr_dp, impes_dict, sym_datapoints, sym_dict):
                 
             sum_sq_error = 0.0
             new_datapoint = curr_dp
@@ -2603,7 +2792,8 @@ class IMDatabasePointCollecter:
 
                 interpolation_driver = InterpolationDriver(self.z_matrix)
                 interpolation_driver.update_settings(impes_dict)
-                interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
+                interpolation_driver.symmetry_information = sym_dict
+                interpolation_driver.qm_symmetry_data_points = sym_datapoints
                 interpolation_driver.distance_thrsh = 1000
                 interpolation_driver.exponent_p = 2
                 interpolation_driver.print = False
@@ -2620,7 +2810,7 @@ class IMDatabasePointCollecter:
             print('sum_of_sqaure', sum_sq_error, alpha)
             return sum_sq_error
         
-        def obj_gradient_function(alpha, structure_list, qm_e, im_e, old_dps, curr_dp, impes_dict):
+        def obj_gradient_function(alpha, structure_list, qm_e, im_e, old_dps, curr_dp, impes_dict, sym_datapoints, sym_dict):
             
             dF_dalpha = 0.0
             new_datapoint = curr_dp
@@ -2631,7 +2821,8 @@ class IMDatabasePointCollecter:
             for i, mol in enumerate(structure_list):
                 interpolation_driver = InterpolationDriver(self.z_matrix)
                 interpolation_driver.update_settings(impes_dict)
-                interpolation_driver.symmetry_sub_groups = self.non_core_symmetry_groups
+                interpolation_driver.symmetry_information = sym_dict
+                interpolation_driver.qm_symmetry_data_points = sym_datapoints
                 interpolation_driver.distance_thrsh = 1000
                 interpolation_driver.exponent_p = 2
                 interpolation_driver.qm_data_points = combined_datapoints
@@ -2644,10 +2835,12 @@ class IMDatabasePointCollecter:
                 
                 diff = (new_im_energy - qm_e[i]) * hartree_in_kcalpermol()
                 part_1 = 0.0
-                for element in range(len(interpolation_driver.weights[:-1])):
+                final_weight = None
+                for element, weight_entry in enumerate(interpolation_driver.weights.items()):
 
-                    part_1 += -1.0 * gradient_weight * interpolation_driver.weights[element] * interpolation_driver.potentials[element] * hartree_in_kcalpermol()
-                part_2 = (gradient_weight * interpolation_driver.potentials[-1] * hartree_in_kcalpermol() * sum_of_weights - interpolation_driver.weights[-1] * interpolation_driver.potentials[-1] * hartree_in_kcalpermol() * gradient_weight)
+                    part_1 += -1.0 * gradient_weight * weight_entry[1] * interpolation_driver.potentials[element] * hartree_in_kcalpermol()
+                    final_weight = weight_entry[1]
+                part_2 = (gradient_weight * interpolation_driver.potentials[-1] * hartree_in_kcalpermol() * sum_of_weights - final_weight * interpolation_driver.potentials[-1] * hartree_in_kcalpermol() * gradient_weight)
 
                 energy_gradient_nominator = (part_1 + part_2)
                 energy_gradient_denominator = sum_of_weights**2
@@ -2658,14 +2851,14 @@ class IMDatabasePointCollecter:
 
             return dF_dalpha
         
-        def optimize_trust_radius(alpha, geom_list, E_ref_list, E_im_list, old_dps, curr_dp, impes_dict):
+        def optimize_trust_radius(alpha, geom_list, E_ref_list, E_im_list, old_dps, curr_dp, impes_dict, sym_datapoints, sym_dict):
             """
             Perform the gradient-based optimization to find R*
             that minimizes the sum of squared errors to reference QM energies.
             """
 
             # We pass the data as extra arguments to avoid repeated global references:
-            args = (geom_list, E_ref_list, E_im_list, old_dps, curr_dp, impes_dict)
+            args = (geom_list, E_ref_list, E_im_list, old_dps, curr_dp, impes_dict, sym_datapoints, sym_dict)
 
             # Minimizer expects a function returning just the objective,
             # plus a function returning the gradient if we pass `jac=True`.
@@ -2685,10 +2878,80 @@ class IMDatabasePointCollecter:
 
         print('INPUT Trust radius', current_datapoint.confidence_radius)
         current_dps_list = old_datapoints.copy()
-        trust_radius = optimize_trust_radius(current_datapoint.confidence_radius, molecules, qm_energies, im_energies, current_dps_list, current_datapoint, interpolation_setting)
+        trust_radius = optimize_trust_radius(current_datapoint.confidence_radius, molecules, qm_energies, im_energies, current_dps_list, current_datapoint, interpolation_setting, sym_datapoints, sym_dict)
         
         return trust_radius['x']
 
+    
+    
+    def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
+        """ Performs the atom mapping. """
+        from scipy.optimize import linear_sum_assignment
+        new_map = np.array(atom_map.copy())
+        mapping_dict = {}
+        # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
+        cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
+        row, col = linear_sum_assignment(cost)
+        assigned = False
+        if not np.equal(row, col).all():
+            assigned = True
+            
+            # atom_maps = self.linear_assignment_solver(cost)
+
+            reordred_arr = np.array(sym_group)[col]
+            new_map[sym_group] = new_map[reordred_arr]
+
+            mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
+        
+        return mapping_dict
+
+    def adjust_symmetry_dihedrals(self, symmetry_groups, rot_bonds):
+        
+        def symmetry_group_dihedral(reference_set, dihedrals, rot_bonds):
+            rot_bond_set = {frozenset(bond) for bond in rot_bonds}
+
+            filtered_dihedrals = []
+            for d in dihedrals:
+                middle_bond = frozenset([d[1], d[2]])
+
+                if middle_bond in rot_bond_set:
+                    common_elements = [x for x in [d[0], d[3]] if x in reference_set]
+                    if len(common_elements) == 1:
+                        filtered_dihedrals.append(d)
+            return filtered_dihedrals
+        
+        all_dihedrals = [element for element in self.z_matrix if len(element) == 4]
+
+        symmetry_group_dihedral_dict = {} 
+        angles_to_set = {}
+        periodicities = {}
+        dihedral_groups = {2: [], 3: []}
+
+        for symmetry_group in symmetry_groups:
+             
+            symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
+
+            symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
+            if len(symmetry_group) == 3:
+
+                # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/3.0])
+
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 3
+                dihedral_groups[3].extend([tuple(sorted(element)) for element in symmetry_group_dihedral_list])
+
+            elif len(symmetry_group) == 2:
+
+                # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/2.0])
+
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 2
+                dihedral_groups[2].extend([tuple(sorted(element)) for element in symmetry_group_dihedral_list])
+
+        return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups       
+    
+    
+    
     def compute_energy(self, qm_driver, molecule, basis=None):
         """ Computes the QM energy using self.qm_driver.
 
@@ -3094,7 +3357,7 @@ class IMDatabasePointCollecter:
 
         return reference_molecules_check
 
-    def calculate_translation_coordinates_analysis(self, given_coordinates):
+    def calculate_translation_coordinates(self, given_coordinates):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
         center = np.mean(given_coordinates, axis=0)
         translated_coordinates = given_coordinates - center
@@ -3113,8 +3376,8 @@ class IMDatabasePointCollecter:
         """
 
         # First, translate the cartesian coordinates to zero
-        target_coordinates = self.calculate_translation_coordinates_analysis(datapoint_coordinate)
-        reference_coordinates = self.calculate_translation_coordinates_analysis(current_coordinates)
+        target_coordinates = self.calculate_translation_coordinates(datapoint_coordinate)
+        reference_coordinates = self.calculate_translation_coordinates(current_coordinates)
 
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
