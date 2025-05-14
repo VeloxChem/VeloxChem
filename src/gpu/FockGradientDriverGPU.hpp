@@ -50,9 +50,14 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
                             const int64_t rank,
                             const int64_t nnodes) -> CDenseMatrix;
 
-/*
-auto computeKineticEnergyGradientOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CGradientScreeningData& screening) -> CDenseMatrix;
+auto
+computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
+                                  const CMolecularBasis& basis,
+                                  const CGradientScreeningData& screening,
+                                  const int64_t rank,
+                                  const int64_t nnodes) -> CDenseMatrix;
 
+/*
 auto computeNuclearPotentialGradientOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CGradientScreeningData& screening) -> CDenseMatrix;
 */
 
