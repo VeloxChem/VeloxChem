@@ -34,6 +34,7 @@ from mpi4py import MPI
 import numpy as np
 import networkx as nx
 import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
@@ -84,6 +85,8 @@ class EvbForceFieldBuilder():
 
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
+
+        self.mute_scf: bool = True
 
         self.optimize_ff: bool = True
 
@@ -141,8 +144,9 @@ class EvbForceFieldBuilder():
                 self.product, 
                 broken_bonds,note='product',
             )
+        
 
-        return self.reactant, self.product, formed_bonds, broken_bonds
+        return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products
 
     @staticmethod
     def _combine_molecule(molecules):
@@ -191,12 +195,13 @@ class EvbForceFieldBuilder():
             forcefield.bonds.pop(bond)
 
         pdb = mmapp.PDBFile(f'{name}.pdb')
+        ff = mmapp.ForceField(f'{name}.xml')
+
         modeller = mmapp.Modeller(pdb.topology,pdb.positions)
             
         top = modeller.getTopology()
         pos = modeller.getPositions()
 
-        ff = mmapp.ForceField(f'{name}.xml')
 
         mmsys = ff.createSystem(
             top,
@@ -223,6 +228,9 @@ class EvbForceFieldBuilder():
                         nbforce.addException(i, j,0,1,0)
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
+        os.unlink(f'{name}.xml')
+        os.unlink(f'{name}.pdb')
+        os.unlink(f'{name}_sys.xml')
         integrator = mm.VerletIntegrator(0.001)
         sim = mmapp.Simulation(top, mmsys, integrator)
         sim.context.setPositions(pos)
@@ -259,15 +267,20 @@ class EvbForceFieldBuilder():
             forcefield.molecule = molecule
         else:
             if input["optimize"] and optimize:
-                self.ostream.print_info("Optimising the geometry with xtb.")
-                scf_drv = XtbDriver()
+                scf_drv = XtbDriver(ostream=self.ostream)
                 opt_drv = OptimizationDriver(scf_drv)
                 opt_drv.hessian = "last"
+                if self.mute_scf:
+                    self.ostream.print_info("Optimising the geometry with xtb.")
+                    self.ostream.mute()
                 opt_results = opt_drv.compute(molecule)
+                self.ostream.unmute()
                 molecule = Molecule.from_xyz_string(
                     opt_results["final_geometry"])
 
-            forcefield = MMForceFieldGenerator()
+
+            forcefield = MMForceFieldGenerator(ostream=self.ostream)
+            
             forcefield.eq_param = False
             #Load or calculate the charges
 
@@ -296,22 +309,29 @@ class EvbForceFieldBuilder():
                                                 "6-31G*",
                                                 ostream=None)
                 if molecule.get_multiplicity() == 1:
-                    scf_drv = ScfRestrictedDriver()
+                    scf_drv = ScfRestrictedDriver(ostream=self.ostream)
                 else:
-                    scf_drv = ScfUnrestrictedDriver()
-                self.ostream.flush()
+                    scf_drv = ScfUnrestrictedDriver(ostream=self.ostream)
+                
+                if self.mute_scf:
+                    self.ostream.print_info("Calculating SCF for RESP charges")
+                    self.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
                     scf_drv.conv_thresh = 1.0e-4
                     scf_drv.max_iter = 200
                     scf_results = scf_drv.compute(molecule, basis)
+                self.ostream.unmute()
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
-
-                resp_drv = RespChargesDriver()
-                self.ostream.print_info("Calculating RESP charges")
+                resp_drv = RespChargesDriver(ostream=self.ostream)
                 self.ostream.flush()
+                if self.mute_scf:
+                    self.ostream.print_info("Calculating RESP charges")
+                    self.ostream.mute()
                 forcefield.partial_charges = resp_drv.compute(
                     molecule, basis, scf_results, 'resp')
+                
+                self.ostream.unmute()
                 self.ostream.flush()
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule,
@@ -389,7 +409,7 @@ class EvbForceFieldBuilder():
         for i, elem in enumerate(pro_elems):
             pro_graph.nodes[i]['elem'] = elem
 
-        rm = ReactionMatcher()
+        rm = ReactionMatcher(ostream=self.ostream)
         total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
@@ -413,6 +433,8 @@ class EvbForceFieldBuilder():
         forcefield.dihedrals = {}
         forcefield.impropers = {}
         atom_count = 0
+        forcefield.unique_atom_types = []
+        forcefield.pairs = {}
         
         for i, ff in enumerate(forcefields):
             # Shift all atom keys by the current atom count so that every atom has a unique ID
@@ -431,6 +453,9 @@ class EvbForceFieldBuilder():
             forcefield.angles.update(ff.angles)
             forcefield.dihedrals.update(ff.dihedrals)
             forcefield.impropers.update(ff.impropers)
+
+            forcefield.unique_atom_types += ff.unique_atom_types
+            forcefield.pairs.update(ff.pairs)
 
         return forcefield
 

@@ -55,97 +55,6 @@ except ImportError:
     pass
 
 
-# The EVB procedure uses two different potentials, one for the integration of the EOMs to explore phase space, and another one for the calculation of the PES
-# The integration potential is optimised to explore all relevant areas of phase space in an efficient manner. This includes constraints and distance restraints.
-# The PES potential is optimised to calculate the potential energy surface accurate. Constraints and restraints are ommitted for this.
-# Soft core long range potentials provide faster convergence for averages and are thus included in the PES potential. They cause unstable integration though.
-class EvbForceGroup(Enum):
-    DEFAULT = auto(
-    )  # Default force group, included for both integration and energy calculations
-    # THERMOSTAT = auto()  # Thermostat
-    INTLJ = auto()  # Integration lennard-jones potential
-    INTCOUL = auto()  # Integration coulombic potential
-    PESLJ = auto()  # Lennard-jones potential
-    PESCOUL = auto()  # Coulombic potential
-    CONSTRAINT = auto()
-
-    CMM_REMOVER = auto()  # Center of mass motion remover
-    NB_FORCE = auto()  # Solvent-solvent and solvent-solute nb force
-    BAROSTAT = auto()  # Barostat
-    E_FIELD = auto()  # Electric field force
-    REACTION_BONDED = auto()  # Bonded forces for the reaction atoms
-
-    # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
-    PES_CONSTRAINT = auto()
-    RESTRAINT = auto()
-    SOLVENT = auto(
-    )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
-    CARBON = auto()  # Graphene and CNTs
-    INTEGRATION = auto(
-    )  # All leftover forces that should only be used for integration
-    PES = auto(
-    )  # All leftover forces that should only be used for the calculation of the PES
-    NONE = auto(
-    )  # Forces that should not be included in the integration or PES calculations
-    DEBUG1PES = auto()  # Debugging force group 1
-    DEBUG2PES = auto()  # Debugging force group 2
-    DEBUG1INT = auto()  # Debugging force group 1
-    DEBUG2INT = auto()  # Debugging force group 2
-    DEBUG1 = auto()  # Debugging force group 1
-    DEBUG2 = auto()  # Debugging force group 2
-
-    # Both methods return classes because integrator.setIntegrationForceGroups() takes a set as argument
-    @classmethod
-    def integration_force_groups(cls):
-        return set([
-            cls.DEFAULT.value,
-            cls.CMM_REMOVER.value,
-            cls.NB_FORCE.value,
-            cls.BAROSTAT.value,
-            cls.E_FIELD.value,
-            cls.REACTION_BONDED.value,
-            cls.INTLJ.value,
-            cls.INTCOUL.value,
-            cls.CONSTRAINT.value,
-            cls.PES_CONSTRAINT.value,
-            cls.RESTRAINT.value,
-            cls.SOLVENT.value,
-            cls.CARBON.value,
-            cls.INTEGRATION.value,
-            # cls.DEBUG1INT.value,
-            # cls.DEBUG2INT.value,
-            # cls.DEBUG1.value,
-            # cls.DEBUG2.value,
-        ])
-
-    @classmethod
-    def NVT_integration_force_groups(cls):
-        int_fg = cls.integration_force_groups()
-        int_fg.remove(cls.BAROSTAT.value)
-        return int_fg
-
-    @classmethod
-    def pes_force_groups(cls):
-        return set([
-            cls.DEFAULT.value,
-            cls.CMM_REMOVER.value,
-            cls.NB_FORCE.value,
-            cls.BAROSTAT.value,
-            cls.E_FIELD.value,
-            cls.REACTION_BONDED.value,
-            cls.PES_CONSTRAINT.value,
-            cls.PESLJ.value,
-            cls.PESCOUL.value,
-            cls.SOLVENT.value,
-            cls.CARBON.value,
-            cls.PES.value,
-            # cls.DEBUG1PES.value,
-            # cls.DEBUG2PES.value,
-            # cls.DEBUG1.value,
-            # cls.DEBUG2.value,
-        ])
-
-
 class EvbSystemBuilder():
 
     def __init__(self, comm=None, ostream=None):
@@ -186,16 +95,29 @@ class EvbSystemBuilder():
         self.lj14_scale: float = 0.5
         self.minimal_nb_cutoff: float = 1  # nm, minimal cutoff for the nonbonded force
 
+        self.pressure: float = -1.
+        self.solvent: str = None  #type: ignore
+        self.padding: float = 1.
+        self.no_reactant: bool = False
+        self.E_field: list[float] = [0, 0, 0]
+        self.neutralize: bool = False
+
         self.soft_core_coulomb_pes = True
         self.soft_core_lj_pes = True
 
         self.soft_core_coulomb_int = False
-        self.soft_core_lj_int = False
+        self.soft_core_lj_int = True
+
+        self.no_int_coul = False
+        self.no_int_lj = False
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
+        self.bonded_integration_bond_fac: float = 0.1  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
+
+        self.int_nb_const_exceptions = False  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
         self.verbose = False
-        # self.write_xml = True
 
         self.constraints: list[dict] = []
 
@@ -206,6 +128,84 @@ class EvbSystemBuilder():
 
         self.data_folder: str | None = None
         self.run_folder: str | None = None
+
+        self.keywords = {
+            "temperature": {
+                "type": float
+            },
+            "minimal_nb_cutoff": {
+                "type": float
+            },
+            "bonded_integration": {
+                "type": bool
+            },
+            "bonded_integration_bond_fac": {
+                "type": float
+            },
+            "bonded_integration_angle_fac": {
+                "type": float
+            },
+            "soft_core_coulomb_pes": {
+                "type": bool
+            },
+            "soft_core_lj_pes": {
+                "type": bool
+            },
+            "soft_core_coulomb_int": {
+                "type": bool
+            },
+            "soft_core_lj_int": {
+                "type": bool
+            },
+            "no_int_coul": {
+                "type": bool
+            },
+            "no_int_lj": {
+                "type": bool
+            },
+            "int_nb_const_exceptions": {
+                "type": bool
+            },
+            "pressure": {
+                "type": float
+            },
+            "solvent": {
+                "type": str
+            },
+            "padding": {
+                "type": float
+            },
+            "no_reactant": {
+                "type": bool
+            },
+            "E_field": {
+                "type": list
+            },
+            "neutralize": {
+                "type": bool
+            },
+            "morse_D_default": {
+                "type": float
+            },
+            "morse_couple": {
+                "type": float
+            },
+            "restraint_k": {
+                "type": float
+            },
+            "restraint_r_default": {
+                "type": float
+            },
+            "restraint_r_offset": {
+                "type": float
+            },
+            "coul14_scale": {
+                "type": float
+            },
+            "lj14_scale": {
+                "type": float
+            },
+        }
 
     def build_systems(
         self,
@@ -219,49 +219,29 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        self.temperature = configuration.get(
-            "temperature",
-            self.temperature,
-        )
-        self.minimal_nb_cutoff = configuration.get(
-            "minimal_nb_cutoff",
-            self.minimal_nb_cutoff,
-        )
-        self.bonded_integration = configuration.get(
-            "bonded_integration",
-            self.bonded_integration,
-        )
-        self.soft_core_coulomb_pes = configuration.get(
-            "soft_core_coulomb_pes",
-            self.soft_core_coulomb_pes,
-        )
-        self.soft_core_coulomb_int = configuration.get(
-            "soft_core_coulomb_int",
-            self.soft_core_coulomb_int,
-        )
-        self.soft_core_lj_pes = configuration.get(
-            "soft_core_lj_pes",
-            self.soft_core_lj_pes,
-        )
-        self.soft_core_lj_int = configuration.get(
-            "soft_core_lj_int",
-            self.soft_core_lj_int,
-        )
+        for keyword, value in self.keywords.items():
+            if keyword in configuration:
+                if (not isinstance(configuration[keyword], value["type"])
+                        and not (isinstance(configuration[keyword], int)
+                                 and value["type"] == float)):
+                    raise ValueError(
+                        f"Configuration option {keyword} should be of type {value['type']}"
+                    )
+                else:
+                    setattr(self, keyword, configuration[keyword])
+                    self.ostream.print_info(
+                        f"{keyword}: {getattr(self, keyword)}")
 
-        NPT = configuration.get("NPT", False)
-        pressure = configuration.get("pressure", 1)
-        solvent = configuration.get("solvent", None)
-        padding = configuration.get("padding", 1)
-        CNT = configuration.get("CNT", False)
-        CNT = False  # todo fix the exploding CNT
-        Graphene = configuration.get("graphene", False)
-        graphene_size = configuration.get("graphene_size", 2)
-        CNT_radius = configuration.get("CNT_radius", 0.5)
-        ion_count = configuration.get("ion_count", 0)
-        no_reactant = configuration.get("no_reactant", False)
-        E_field = configuration.get("E_field", [0, 0, 0])
-        neutralize = configuration.get("neutralize", False)
-        pdb = configuration.get("pdb", None)
+            else:
+                self.ostream.print_info(
+                    f"{keyword}: {getattr(self, keyword)} (default)")
+
+        # CNT = configuration.get("CNT", False)
+        # CNT = False  # todo fix the exploding CNT
+        # Graphene = configuration.get("graphene", False)
+        # graphene_size = configuration.get("graphene_size", 2)
+        # CNT_radius = configuration.get("CNT_radius", 0.5)
+        # ion_count = configuration.get("ion_count", 0)
 
         self.constraints = constraints
 
@@ -317,7 +297,7 @@ class EvbSystemBuilder():
         cmm_remover.setName("CMM remover")
         cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
 
-        if not no_reactant:
+        if not self.no_reactant:
             # add atoms of the solute to the topology and the system
             elements = reactant.molecule.get_labels()
 
@@ -341,7 +321,7 @@ class EvbSystemBuilder():
                 )
 
         #todo come up with a more structured way of building systems
-        if not no_reactant:
+        if not self.no_reactant:
             if pdb is None:
                 system_mol = Molecule(reactant.molecule)
                 positions = system_mol.get_coordinates_in_angstrom()
@@ -355,10 +335,11 @@ class EvbSystemBuilder():
             y_size = 0.1 * (max(positions[:, 1]) - min(positions[:, 1]))
             z_size = 0.1 * (max(positions[:, 2]) - min(positions[:, 2]))
             box = [
-                2 * padding + x_size, 2 * padding + y_size, 2 * padding + z_size
+                2 * self.padding + x_size, 2 * self.padding + y_size,
+                2 * self.padding + z_size
             ]
             self.ostream.print_info(
-                f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f}, padding: {padding:.3f} nm."
+                f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f}, padding: {self.padding:.3f} nm."
             )
 
         else:
@@ -373,10 +354,10 @@ class EvbSystemBuilder():
 
         # self.ostream.print_info(f"Building system in box with dimensions {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm")
 
-        if solvent:
-            assert pdb is None, "Solvent cannot be used with a PDB file yet"
-            box = self._add_solvent(system, system_mol, solvent, topology,
-                                    nb_force, neutralize, padding)
+        if self.solvent:
+            box = self._add_solvent(system, system_mol, self.solvent, topology,
+                                    nb_force, self.neutralize, self.padding)
+
         else:
             self.positions = np.array(positions) * 0.1
 
@@ -389,21 +370,21 @@ class EvbSystemBuilder():
         self.ostream.print_info(f"Setting nonbonded cutoff to {cutoff:.3f} nm")
         nb_force.setSwitchingDistance(0.9 * cutoff)
 
-        if NPT:
+        if self.pressure > 0:
             barostat = mm.MonteCarloBarostat(
-                pressure * mmunit.bar,  # type: ignore
+                self.pressure * mmunit.bar,  # type: ignore
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
             barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
             system.addForce(barostat)
 
-        if np.any(np.array(E_field) > 0.001):
-            E_field_force = self._create_E_field(system, E_field)
+        if np.any(np.array(self.E_field) > 0.001):
+            E_field_force = self._create_E_field(system, self.E_field)
             E_field_force.setForceGroup(EvbForceGroup.E_FIELD.value)
             system.addForce(E_field_force)
 
         #Add the reactant to the nonbonded force
-        if not no_reactant:
+        if not self.no_reactant:
             for i, atom in enumerate(reactant.atoms.values()):
                 #Make sure the solute does not interact with itself through, as there will be another nonbonded force to take care of this
                 for j in range(len(reactant.atoms.values())):
@@ -450,7 +431,7 @@ class EvbSystemBuilder():
 
             for i in range(system.getNumParticles()):
                 charge = nb_force.getParticleParameters(i)[0]
-                if np.any(np.array(E_field) > 0.001):
+                if np.any(np.array(self.E_field) > 0.001):
                     E_field_force.setParticleParameters(i, i, [charge])
 
             if not round(total_charge, 5).is_integer():
@@ -466,7 +447,7 @@ class EvbSystemBuilder():
         self.topology: mmapp.Topology = topology
         # self.system_mol = system_mol
 
-        if not no_reactant:
+        if not self.no_reactant:
             for lam in Lambda:
                 self._add_reaction_forces(self.systems[lam], lam)
 
@@ -1006,39 +987,49 @@ class EvbSystemBuilder():
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
-        harmonic_static_force, harmonic_dynamic_force, morse_force, max_distance, = self._create_bond_forces(
+        bonded_harmonic, bonded_integration, morse_force, max_distance, = self._create_bond_forces(
             lam)
-        angle_static, angle_dynamic = self._create_angle_forces(lam)
+        angle, angle_integration = self._create_angle_forces(lam)
         torsion = self._create_proper_torsion_forces(lam)
         improper = self._create_improper_torsion_forces(lam)
 
-        # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude the nonbonded interactions over the entire lambda vector.
-        # This is compensated through the extra (dynamic) bonded interactions
+        # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude these nonbonded interactions over the entire lambda vector.
+        # This is compensated through the extra bonded interactions (labeled with integration)
         # This only affects the integration potential as the hard core interactions are used for integration
+
         intlj, intcoul = self._create_nonbonded_forces(
             lam,
-            bonded=self.bonded_integration,
+            constant_exceptions=self.int_nb_const_exceptions,
             lj_soft_core=self.soft_core_lj_int,
             coul_soft_core=self.soft_core_coulomb_int,
         )
+        intljname = intlj.getName() + "(int)"
+        intlj.setName(intljname)
+        intcoulname = intcoul.getName() + "(int)"
+        intcoul.setName(intcoulname)
+
         # The soft core forces are used for the PES calculations, and thus always have the 'correct' exceptions
         peslj, pescoul = self._create_nonbonded_forces(
             lam,
-            bonded=False,
+            constant_exceptions=False,
             lj_soft_core=self.soft_core_lj_pes,
             coul_soft_core=self.soft_core_coulomb_pes,
         )
-        # The hard
+        pesljname = peslj.getName() + "(pes)"
+        peslj.setName(pesljname)
+
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
 
-        harmonic_static_force.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
-        angle_static.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
+        bonded_harmonic.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
+        angle.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
 
-        intlj.setForceGroup(EvbForceGroup.INTLJ.value)
-        intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
+        if not self.no_int_lj:
+            intlj.setForceGroup(EvbForceGroup.INTLJ.value)
+        if not self.no_int_coul:
+            intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
         peslj.setForceGroup(EvbForceGroup.PESLJ.value)
         pescoul.setForceGroup(EvbForceGroup.PESCOUL.value)
         bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
@@ -1046,8 +1037,8 @@ class EvbSystemBuilder():
         angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
         torsion_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
 
-        system.addForce(harmonic_static_force)
-        system.addForce(angle_static)
+        system.addForce(bonded_harmonic)
+        system.addForce(angle)
         system.addForce(torsion)
         system.addForce(improper)
         system.addForce(intlj)
@@ -1060,12 +1051,11 @@ class EvbSystemBuilder():
         system.addForce(torsion_constraint)
 
         if self.bonded_integration:
-            harmonic_dynamic_force.setForceGroup(
-                EvbForceGroup.INTEGRATION.value)
-            angle_dynamic.setForceGroup(EvbForceGroup.INTEGRATION.value)
+            bonded_integration.setForceGroup(EvbForceGroup.INTEGRATION.value)
+            angle_integration.setForceGroup(EvbForceGroup.INTEGRATION.value)
             morse_force.setForceGroup(EvbForceGroup.PES.value)
-            system.addForce(harmonic_dynamic_force)
-            system.addForce(angle_dynamic)
+            system.addForce(bonded_integration)
+            system.addForce(angle_integration)
             system.addForce(morse_force)
         else:
             morse_force.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
@@ -1163,12 +1153,15 @@ class EvbSystemBuilder():
                 self._add_distance_restraint(max_distance, atom_ids,
                                              broken_length, 1 - scale)
 
-                # self._add_bond(
-                #     integration_force,
-                #     atom_ids,
-                #     bond['equilibrium'] * scale + broken_length * (1 - scale),
-                #     bond['force_constant'],
-                # )
+                # This the force constant is not scaled down (fully) with lambda, because if bonded_integration is turned on, the morse force is not included in the integration potential
+                # The bonded integration factor is scaled up based on lambda, to make sure that there is a full bonded interaction when the bond is present
+                self._add_bond(
+                    integration_force,
+                    atom_ids,
+                    bond['equilibrium'] * scale + broken_length * (1 - scale),
+                    bond['force_constant'] *
+                    (1 - scale * self.bonded_integration_bond_fac),
+                )
         return harmonic_force, integration_force, morse_force, max_distance
 
     def _create_angle_forces(self, lam: float):
@@ -1209,9 +1202,8 @@ class EvbSystemBuilder():
 
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
-                # self._add_angle(integration_force,
-                #                 atom_ids, broken_equil,
-                #                 angle['force_constant'] * (1 - scale))
+                self._add_angle(integration_force, atom_ids, broken_equil,
+                                angle['force_constant'] * (1 - scale))
 
         return harmonic_force, integration_force
 
@@ -1443,7 +1435,7 @@ class EvbSystemBuilder():
 
     def _create_nonbonded_forces(self,
                                  lam,
-                                 bonded=False,
+                                 constant_exceptions=False,
                                  lj_soft_core=False,
                                  coul_soft_core=False):
 
@@ -1472,13 +1464,14 @@ class EvbSystemBuilder():
         lj_force.addPerBondParameter("epsilonB")
         lj_force.addGlobalParameter("l", lam)
 
-        if not bonded:
-            reactant_bonds = self.reactant.bonds
-            product_bonds = self.product.bonds
-        else:
+        # The bonded parameter forces the same exceptions across the entire reaction
+        if constant_exceptions:
             bonds = list(set(self.reactant.bonds) | set(self.product.bonds))
             reactant_bonds = bonds
             product_bonds = bonds
+        else:
+            reactant_bonds = self.reactant.bonds
+            product_bonds = self.product.bonds
         reactant_exceptions = self._create_exceptions_from_bonds(
             self.reactant.atoms, reactant_bonds)
         product_exceptions = self._create_exceptions_from_bonds(
@@ -1694,3 +1687,112 @@ class EvbSystemBuilder():
         angle = angle * 180 / np.pi  # Convert to degrees
 
         return angle
+
+
+# The EVB procedure uses two different potentials, one for the integration of the EOMs to explore phase space, and another one for the calculation of the PES
+# The integration potential is optimized to explore all relevant areas of phase space in an efficient manner. This includes constraints and distance restraints.
+# The PES potential is optimized to calculate the potential energy surface accurate. Constraints and restraints are ommitted for this.
+# Soft core long range potentials provide faster convergence for averages and are thus included in the PES potential. They cause unstable integration though.
+class EvbForceGroup(Enum):
+    DEFAULT = auto(
+    )  # Default force group, included for both integration and energy calculations
+    # THERMOSTAT = auto()  # Thermostat
+    INTLJ = auto()  # Integration lennard-jones potential
+    INTCOUL = auto()  # Integration coulombic potential
+    PESLJ = auto()  # Lennard-jones potential
+    PESCOUL = auto()  # Coulombic potential
+    CONSTRAINT = auto()
+
+    CMM_REMOVER = auto()  # Center of mass motion remover
+    NB_FORCE = auto()  # Solvent-solvent and solvent-solute nb force
+    BAROSTAT = auto()  # Barostat
+    E_FIELD = auto()  # Electric field force
+    REACTION_BONDED = auto()  # Bonded forces for the reaction atoms
+
+    # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
+    PES_CONSTRAINT = auto()
+    RESTRAINT = auto()
+    SOLVENT = auto(
+    )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
+    CARBON = auto()  # Graphene and CNTs
+    INTEGRATION = auto(
+    )  # All leftover forces that should only be used for integration
+    PES = auto(
+    )  # All leftover forces that should only be used for the calculation of the PES
+    NONE = auto(
+    )  # Forces that should not be included in the integration or PES calculations
+    DEBUG1PES = auto()  # Debugging force group 1
+    DEBUG2PES = auto()  # Debugging force group 2
+    DEBUG1INT = auto()  # Debugging force group 1
+    DEBUG2INT = auto()  # Debugging force group 2
+    DEBUG1 = auto()  # Debugging force group 1
+    DEBUG2 = auto()  # Debugging force group 2
+
+    # Both methods return classes because integrator.setIntegrationForceGroups() takes a set as argument
+    @classmethod
+    def integration_force_groups(cls):
+        return set([
+            cls.DEFAULT.value,
+            cls.CMM_REMOVER.value,
+            cls.NB_FORCE.value,
+            cls.BAROSTAT.value,
+            cls.E_FIELD.value,
+            cls.REACTION_BONDED.value,
+            cls.INTLJ.value,
+            cls.INTCOUL.value,
+            cls.CONSTRAINT.value,
+            cls.PES_CONSTRAINT.value,
+            cls.RESTRAINT.value,
+            cls.SOLVENT.value,
+            cls.CARBON.value,
+            cls.INTEGRATION.value,
+            # cls.DEBUG1INT.value,
+            # cls.DEBUG2INT.value,
+            # cls.DEBUG1.value,
+            # cls.DEBUG2.value,
+        ])
+
+    @classmethod
+    def NVT_integration_force_groups(cls):
+        int_fg = cls.integration_force_groups()
+        int_fg.remove(cls.BAROSTAT.value)
+        return int_fg
+
+    @classmethod
+    def pes_force_groups(cls):
+        return set([
+            cls.DEFAULT.value,
+            cls.CMM_REMOVER.value,
+            cls.NB_FORCE.value,
+            cls.BAROSTAT.value,
+            cls.E_FIELD.value,
+            cls.REACTION_BONDED.value,
+            cls.PES_CONSTRAINT.value,
+            cls.PESLJ.value,
+            cls.PESCOUL.value,
+            cls.SOLVENT.value,
+            cls.CARBON.value,
+            cls.PES.value,
+            # cls.DEBUG1PES.value,
+            # cls.DEBUG2PES.value,
+            # cls.DEBUG1.value,
+            # cls.DEBUG2.value,
+        ])
+
+    @classmethod
+    #Simple method for printing a descrpitive header to be used in force group logging files
+    def get_header(cls):
+        header = ""
+        integration_forcegroups = cls.integration_force_groups()
+        pes_forcegroups = cls.pes_force_groups()
+        for fg in cls:
+            in_int = fg.value in integration_forcegroups
+            in_pes = fg.value in pes_forcegroups
+            fg_cat = 'b'  # For both
+            if in_int and not in_pes:
+                fg_cat = 'i'
+            if not in_int and in_pes:
+                fg_cat = 'p'
+            header += f"{fg.name}({fg.value}-{fg_cat}), "
+        header = header[:-2] + '\n'
+        return header
