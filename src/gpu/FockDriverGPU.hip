@@ -63,6 +63,50 @@
 
 namespace gpu {  // gpu namespace
 
+template <uint32_t numCalls> struct unrollCalls {
+	static void call(
+				dim3 num_blocks, 
+				dim3 flat_threads_per_block, 
+				double* d_mat_K, 
+				const DeviceStore<9>* data,
+                const double*   mat_D_full_AO,
+                const uint32_t  pair_inds_count_for_K_dd,
+                const uint32_t  naos) {
+		hipLaunchKernelGGL(gpu::computeExchangeFockDDDD<numCalls>, num_blocks, flat_threads_per_block, 0, 0,
+                    d_mat_K,
+                    data,
+                    mat_D_full_AO,
+                    pair_inds_count_for_K_dd,
+                    naos);
+				unrollCalls<numCalls-1>::call(
+					num_blocks,
+					flat_threads_per_block,
+					d_mat_K, data,
+					mat_D_full_AO,
+		    		pair_inds_count_for_K_dd,
+					naos);
+	}
+};
+
+template <> struct unrollCalls<0> {
+	static void call(
+				dim3 num_blocks, 
+				dim3 flat_threads_per_block, 
+				double* d_mat_K, 
+				const DeviceStore<9>* data,
+                const double*   mat_D_full_AO,
+                const uint32_t  pair_inds_count_for_K_dd,
+                const uint32_t  naos) {
+		hipLaunchKernelGGL(gpu::computeExchangeFockDDDD<0>, num_blocks, flat_threads_per_block, 0, 0,
+                    d_mat_K,
+                    data,
+                    mat_D_full_AO,
+                    pair_inds_count_for_K_dd,
+                    naos);
+	}
+};
+
+
 __global__ void
 zeroData(double* d_data, const uint32_t n)
 {
@@ -7809,111 +7853,15 @@ computeFockOnGPU(const              CMolecule& molecule,
         hipSafe(hipDeviceSynchronize());
     
         dim3 flat_threads_per_block = dim3(TILE_SIZE_K);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, flat_threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_deviceBlockData,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           static_cast<uint32_t>(cart_naos));
+		
+		unrollCalls<95>::call(
+			num_blocks,
+			flat_threads_per_block,
+			d_mat_K, 
+			d_deviceBlockData,
+            d_mat_D_full_AO,
+            static_cast<uint32_t>(pair_inds_count_for_K_dd),
+            static_cast<uint32_t>(cart_naos));
 
         hipSafe(hipDeviceSynchronize());
 
