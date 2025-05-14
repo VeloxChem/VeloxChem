@@ -727,7 +727,7 @@ class InterpolationDriver():
 
                 for ww, mask in enumerate(masks):
                     
-
+                    
                     grad = symmetry_data_point.internal_gradient.copy()
                     grad[masks[0]] = grad[mask]
 
@@ -830,9 +830,31 @@ class InterpolationDriver():
                 self.dihedral_rmsd[j] *= Wi
 
             gradient = grad_pes           # this is what the caller expects
-   
+            return pes, gradient, hessian_error
+        
+        else:
+            hessian_error = 0.0
+            energy = symmetry_data_point.energy
+            grad = symmetry_data_point.internal_gradient.copy()
+            hessian = symmetry_data_point.internal_hessian.copy()
+            dist_org = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
+            dist_check = (org_int_coords.copy() - symmetry_data_point.internal_coordinates_values[mask])
 
-        return pes, gradient, hessian_error
+            pes = (energy + np.matmul(dist_check.T, grad) +
+                        0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
+            
+            dist_hessian = np.matmul(dist_check.T, hessian)
+            for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]):
+                
+                grad[i] *= np.cos(dist_org[i])
+                dist_hessian[i] *= np.cos(dist_org[i])
+            
+            pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
+
+            return pes, pes_prime, hessian_error
+
+
+        
 
 
     
