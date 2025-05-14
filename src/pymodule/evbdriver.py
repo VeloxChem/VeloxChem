@@ -545,7 +545,6 @@ class EvbDriver():
         configurations: list[str] | list[dict],  # type: ignore
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
-        debug_Lambda=False,
     ):
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
@@ -561,15 +560,15 @@ class EvbDriver():
                             'openmm is required for EvbDriver.')
 
         if Lambda is None:
-            if not debug_Lambda:
+            if configurations[0] == "debug":
+                Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+            else:
                 Lambda = np.linspace(0, 0.1, 11)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
                 Lambda = np.round(Lambda, 3)
                 self.ostream.print_info(
                     f"Using default lambda vector: {list(Lambda)}")
-            else:
-                Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
         assert (Lambda[0] == 0 and Lambda[-1]
                 == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(
@@ -673,99 +672,6 @@ class EvbDriver():
 
         self.system_confs = configurations
         self.ostream.flush()
-
-    def default_system_configurations(self, name: str) -> dict:
-        """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
-
-        Args:
-            name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
-        """
-        #todo restructure the input system for keywords, build proper class and enum for this, also restructure ensembles with NPT and NVE stuff
-        if name == "vacuum" or name == "vacuum_NVT":
-            conf = {
-                "name": name,
-                "temperature": self.temperature,
-            }
-        elif name == "vacuum_NVE":
-            conf = {
-                "name": "vacuum_NVE",
-            }
-        elif name == "debug":
-            conf = {
-                "name": "debug",
-                "temperature": self.temperature,
-                "pressure": 1,
-                "equil_NVT_steps": 100,
-                "equil_NPT_steps": 100,
-                "sample_steps": 1000,
-                "write_step": 1,
-                "initial_equil_NVT_steps": 0,
-                "initial_equil_NPT_steps": 0,
-            }
-        elif name == "water" or name == "water_NPT":
-            conf = {
-                "name": "water",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-                "neutralize": False
-            }
-        elif name == "water_NVT":
-            conf = {
-                "name": "water",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "padding": 1.5,
-                "ion_count": 0,
-                "neutralize": False
-            }
-        elif name == "E_field":
-            conf = {
-                "name": "water_E_field",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-                "E_field": [0, 0, 10],
-            }
-        elif name == "no_reactant":
-            conf = {
-                "name": "no_reactant",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-                "no_reactant": True,
-            }
-        elif name == "ts_guesser":
-            conf = {
-                "name": "vacuum",
-                "temperature": self.temperature,
-                "bonded_integration": True,
-                "soft_core_coulomb_pes": True,
-                "soft_core_lj_pes": True,
-                "soft_core_coulomb_int": False,
-                "soft_core_lj_int": False,
-            }
-        else:
-            try:
-                solvent = SolvationBuilder()._solvent_properties(name)
-                conf = {
-                    "name": name,
-                    "solvent": name,
-                    "temperature": self.temperature,
-                    "pressure": 1,
-                    "padding": 1.5,
-                    "ion_count": 0,
-                }
-            except:
-                raise ValueError(f"Unknown system configuration {name}")
-
-        return conf
 
     def load_initialisation(self,
                             data_folder: str,
@@ -1177,3 +1083,95 @@ class EvbDriver():
                         group[k] = v
 
             save_group(data, file)
+
+    def default_system_configurations(self, name: str) -> dict:
+        """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
+
+        Args:
+            name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
+        """
+        if name == "vacuum" or name == "vacuum_NVT":
+            conf = {
+                "name": name,
+                "temperature": self.temperature,
+            }
+        elif name == "vacuum_NVE":
+            conf = {
+                "name": "vacuum_NVE",
+            }
+        elif name == "debug":
+            conf = {
+                "name": "debug",
+                "temperature": self.temperature,
+                "pressure": 1,
+                "equil_NVT_steps": 100,
+                "equil_NPT_steps": 100,
+                "sample_steps": 1000,
+                "write_step": 1,
+                "initial_equil_NVT_steps": 0,
+                "initial_equil_NPT_steps": 0,
+            }
+        elif name == "water" or name == "water_NPT":
+            conf = {
+                "name": "water",
+                "solvent": "spce",
+                "temperature": self.temperature,
+                "pressure": 1,
+                "padding": 1.5,
+                "ion_count": 0,
+                "neutralize": False
+            }
+        elif name == "water_NVT":
+            conf = {
+                "name": "water",
+                "solvent": "spce",
+                "temperature": self.temperature,
+                "padding": 1.5,
+                "ion_count": 0,
+                "neutralize": False
+            }
+        elif name == "E_field":
+            conf = {
+                "name": "water_E_field",
+                "solvent": "spce",
+                "temperature": self.temperature,
+                "pressure": 1,
+                "padding": 1.5,
+                "ion_count": 0,
+                "E_field": [0, 0, 10],
+            }
+        elif name == "no_reactant":
+            conf = {
+                "name": "no_reactant",
+                "solvent": "spce",
+                "temperature": self.temperature,
+                "pressure": 1,
+                "padding": 1.5,
+                "ion_count": 0,
+                "no_reactant": True,
+            }
+        elif name == "ts_guesser":
+            conf = {
+                "name": "vacuum",
+                "temperature": self.temperature,
+                "bonded_integration": True,
+                "soft_core_coulomb_pes": True,
+                "soft_core_lj_pes": True,
+                "soft_core_coulomb_int": False,
+                "soft_core_lj_int": False,
+            }
+        else:
+            try:
+                solvent = SolvationBuilder()._solvent_properties(name)
+                conf = {
+                    "name": name,
+                    "solvent": name,
+                    "temperature": self.temperature,
+                    "pressure": 1,
+                    "padding": 1.5,
+                    "ion_count": 0,
+                }
+            except:
+                raise ValueError(f"Unknown system configuration {name}")
+
+        return conf

@@ -447,7 +447,6 @@ class EvbFepDriver():
             velocity_file=v_file,
             force_file=f_file,
             append=append,
-            debug=self.debug,
         )
         run_simulation.reporters.append(evb_reporter)
 
@@ -560,10 +559,16 @@ class EvbFepDriver():
             with open(path / f"{xml_name}.xml", "w") as f:
                 f.write(mm.XmlSerializer.serialize(state))
 
-            minim_positions = state.getPositions()
+            positions = np.array(state.getPositions().value_in_unit(mm.unit.angstrom))
+            # Make sure that openmm PDB writing doesn't crash when encountering too large values
+            positions = np.clip(positions, -9999999 , 99999999)
+            positions[positions==np.inf] = 99999999
+            positions[positions==-np.inf] = -9999999
+            positions[positions==np.nan] = 0
+
             mmapp.PDBFile.writeFile(
                 self.topology,
-                np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
+                positions,
                 open(self.run_folder / f"{pdb_name}.pdb", "w"),
             )
 
