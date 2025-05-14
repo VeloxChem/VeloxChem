@@ -169,6 +169,7 @@ class EvbFepDriver():
             "save_crash_xml": {
                 "type": bool
             },
+        }
 
     def run_FEP(
         self,
