@@ -46,6 +46,7 @@ from .atomtypeidentifier import AtomTypeIdentifier
 from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
+from .waterparameters import get_water_parameters
 
 try:
     import openmm as mm
@@ -128,6 +129,8 @@ class EvbSystemBuilder():
 
         self.data_folder: str | None = None
         self.run_folder: str | None = None
+
+        self.water_model:str
 
         self.keywords = {
             "temperature": {
@@ -822,21 +825,32 @@ class EvbSystemBuilder():
             solvent_ff = MMForceFieldGenerator()
             solvent_ff.create_topology(vlx_solvent_molecule)
 
-            for atom in solvent_ff.atoms.values():
-                if atom['type'] == 'ow':
-                    sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0930 * 4.184
-                    atom['type'] = 'oh'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water oxygen"
-                elif atom['type'] == 'hw':
-                    sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0047 * 4.184
-                    atom['type'] = 'ho'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water hydrogen"
+            atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
+            if 'ow' in atom_types and 'hw' in atom_types and len(atom_types)==3:
+                water_model = get_water_parameters()[self.water_model]
+                for atom_id, atom in solvent_ff.atoms.items():
+                    solvent_ff.atoms[atom_id] = copy.copy(water_model[atom['type']])
+                    solvent_ff.atoms[atom_id]['name'] = solvent_ff.atoms[atom_id]['name'][0] + str(atom_id)
+                for bond_id in solvent_ff.bonds.keys():
+                    solvent_ff.bonds[bond_id] = water_model['bonds']
+                for ang_id in solvent_ff.angles.keys():
+                    solvent_ff.angles[ang_id] = water_model['angles']
+
+            # for atom in solvent_ff.atoms.values():
+            #     if atom['type'] == 'ow':
+            #         sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
+            #         epsilon = 0.0930 * 4.184
+            #         atom['type'] = 'oh'
+            #         atom['sigma'] = sigma
+            #         atom['epsilon'] = epsilon
+            #         atom['comment'] = "Reaction-water oxygen"
+            #     elif atom['type'] == 'hw':
+            #         sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
+            #         epsilon = 0.0047 * 4.184
+            #         atom['type'] = 'ho'
+            #         atom['sigma'] = sigma
+            #         atom['epsilon'] = epsilon
+            #         atom['comment'] = "Reaction-water hydrogen"
 
             for i in range(solvent_count):
 

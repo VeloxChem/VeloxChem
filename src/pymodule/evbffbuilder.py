@@ -35,7 +35,7 @@ import numpy as np
 import networkx as nx
 import sys
 import os
-
+import copy
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -49,6 +49,7 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionmatcher import ReactionMatcher
 from .outputstream import OutputStream
 from .veloxchemlib import Point
+from .waterparameters import get_water_parameters
 
 try:
     import openmm as mm
@@ -89,6 +90,7 @@ class EvbForceFieldBuilder():
         self.mute_scf: bool = True
 
         self.optimize_ff: bool = True
+        self.water_model: str
 
     def build_forcefields(
         self,
@@ -295,7 +297,7 @@ class EvbForceFieldBuilder():
                 forcefield.partial_charges = input["charges"]
                 self.ostream.print_info("Creating topology")
                 self.ostream.flush()
-                forcefield.create_topology(molecule)
+                forcefield.create_topology(molecule,water_model = self.water_model)
             else:
                 if max(molecule.get_masses()) > 84:
                     basis = MolecularBasis.read(molecule,
@@ -336,25 +338,21 @@ class EvbForceFieldBuilder():
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule,
                                            basis,
-                                           scf_results=scf_results)
+                                           scf_results=scf_results,
+                                           water_model = self.water_model,)
 
             # The atomtypeidentifier returns water with no Lennard-Jones on the hydrogens, which leads to unstable simulations
-            for atom in forcefield.atoms.values():
-                if atom['type'] == 'ow':
-                    sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0930 * 4.184
-                    atom['type'] = 'oh'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water oxygen"
-                elif atom['type'] == 'hw':
+            atom_types = [atom['type'] for atom in forcefield.atoms.values()]
+            if 'ow' in atom_types and 'hw' in atom_types and len(atom_types)==3:
+                water_model = get_water_parameters()[self.water_model]
+                for atom_id, atom in forcefield.atoms.items():
+                    forcefield.atoms[atom_id] = copy.copy(water_model[atom['type']])
+                    forcefield.atoms[atom_id]['name'] = forcefield.atoms[atom_id]['name'][0] + str(atom_id)
+                for bond_id in forcefield.bonds.keys():
+                    forcefield.bonds[bond_id] = water_model['bonds']
+                for ang_id in forcefield.angles.keys():
+                    forcefield.angles[ang_id] = water_model['angles']
 
-                    sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0047 * 4.184
-                    atom['type'] = 'ho'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water hydrogen"
 
             #Reparameterize the forcefield if necessary and requested
             unknowns_params = 'Guessed' in [
