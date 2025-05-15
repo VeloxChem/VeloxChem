@@ -46,6 +46,7 @@ from .atomtypeidentifier import AtomTypeIdentifier
 from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
+from .waterparameters import get_water_parameters
 
 try:
     import openmm as mm
@@ -95,11 +96,6 @@ class EvbSystemBuilder():
         self.lj14_scale: float = 0.5
         self.minimal_nb_cutoff: float = 1  # nm, minimal cutoff for the nonbonded force
 
-        self.soft_core_coulomb_pes = True
-        self.soft_core_lj_pes = True
-
-        self.soft_core_coulomb_int = False
-        self.soft_core_lj_int = False
         self.pressure: float = -1.
         self.solvent: str = None  #type: ignore
         self.padding: float = 1.
@@ -107,8 +103,20 @@ class EvbSystemBuilder():
         self.E_field: list[float] = [0, 0, 0]
         self.neutralize: bool = False
 
+        self.soft_core_coulomb_pes = True
+        self.soft_core_lj_pes = True
+
+        self.soft_core_coulomb_int = False
+        self.soft_core_lj_int = True
+
+        self.no_int_coul = False
+        self.no_int_lj = False
+
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
-        self.bonded_integration_fac: float = 0.5  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_bond_fac: float = 0.1  # Scaling factor for the bonded integration forces.
+        self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
+
+        self.int_nb_const_exceptions = False  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
         self.verbose = False
 
@@ -122,6 +130,8 @@ class EvbSystemBuilder():
         self.data_folder: str | None = None
         self.run_folder: str | None = None
 
+        self.water_model:str
+
         self.keywords = {
             "temperature": {
                 "type": float
@@ -131,6 +141,12 @@ class EvbSystemBuilder():
             },
             "bonded_integration": {
                 "type": bool
+            },
+            "bonded_integration_bond_fac": {
+                "type": float
+            },
+            "bonded_integration_angle_fac": {
+                "type": float
             },
             "soft_core_coulomb_pes": {
                 "type": bool
@@ -144,8 +160,14 @@ class EvbSystemBuilder():
             "soft_core_lj_int": {
                 "type": bool
             },
-            "bonded_integration_fac": {
-                "type": float
+            "no_int_coul": {
+                "type": bool
+            },
+            "no_int_lj": {
+                "type": bool
+            },
+            "int_nb_const_exceptions": {
+                "type": bool
             },
             "pressure": {
                 "type": float
@@ -803,21 +825,32 @@ class EvbSystemBuilder():
             solvent_ff = MMForceFieldGenerator()
             solvent_ff.create_topology(vlx_solvent_molecule)
 
-            for atom in solvent_ff.atoms.values():
-                if atom['type'] == 'ow':
-                    sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0930 * 4.184
-                    atom['type'] = 'oh'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water oxygen"
-                elif atom['type'] == 'hw':
-                    sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0047 * 4.184
-                    atom['type'] = 'ho'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water hydrogen"
+            atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
+            if 'ow' in atom_types and 'hw' in atom_types and len(atom_types)==3:
+                water_model = get_water_parameters()[self.water_model]
+                for atom_id, atom in solvent_ff.atoms.items():
+                    solvent_ff.atoms[atom_id] = copy.copy(water_model[atom['type']])
+                    solvent_ff.atoms[atom_id]['name'] = solvent_ff.atoms[atom_id]['name'][0] + str(atom_id)
+                for bond_id in solvent_ff.bonds.keys():
+                    solvent_ff.bonds[bond_id] = water_model['bonds']
+                for ang_id in solvent_ff.angles.keys():
+                    solvent_ff.angles[ang_id] = water_model['angles']
+
+            # for atom in solvent_ff.atoms.values():
+            #     if atom['type'] == 'ow':
+            #         sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
+            #         epsilon = 0.0930 * 4.184
+            #         atom['type'] = 'oh'
+            #         atom['sigma'] = sigma
+            #         atom['epsilon'] = epsilon
+            #         atom['comment'] = "Reaction-water oxygen"
+            #     elif atom['type'] == 'hw':
+            #         sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
+            #         epsilon = 0.0047 * 4.184
+            #         atom['type'] = 'ho'
+            #         atom['sigma'] = sigma
+            #         atom['epsilon'] = epsilon
+            #         atom['comment'] = "Reaction-water hydrogen"
 
             for i in range(solvent_count):
 
@@ -928,20 +961,28 @@ class EvbSystemBuilder():
         # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude these nonbonded interactions over the entire lambda vector.
         # This is compensated through the extra bonded interactions (labeled with integration)
         # This only affects the integration potential as the hard core interactions are used for integration
+
         intlj, intcoul = self._create_nonbonded_forces(
             lam,
-            bonded=self.bonded_integration,
+            constant_exceptions=self.int_nb_const_exceptions,
             lj_soft_core=self.soft_core_lj_int,
             coul_soft_core=self.soft_core_coulomb_int,
         )
+        intljname = intlj.getName() + "(int)"
+        intlj.setName(intljname)
+        intcoulname = intcoul.getName() + "(int)"
+        intcoul.setName(intcoulname)
+
         # The soft core forces are used for the PES calculations, and thus always have the 'correct' exceptions
         peslj, pescoul = self._create_nonbonded_forces(
             lam,
-            bonded=False,
+            constant_exceptions=False,
             lj_soft_core=self.soft_core_lj_pes,
             coul_soft_core=self.soft_core_coulomb_pes,
         )
-        # The hard
+        pesljname = peslj.getName() + "(pes)"
+        peslj.setName(pesljname)
+
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
 
@@ -950,8 +991,10 @@ class EvbSystemBuilder():
         torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
 
-        intlj.setForceGroup(EvbForceGroup.INTLJ.value)
-        intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
+        if not self.no_int_lj:
+            intlj.setForceGroup(EvbForceGroup.INTLJ.value)
+        if not self.no_int_coul:
+            intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
         peslj.setForceGroup(EvbForceGroup.PESLJ.value)
         pescoul.setForceGroup(EvbForceGroup.PESCOUL.value)
         bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
@@ -1082,7 +1125,7 @@ class EvbSystemBuilder():
                     atom_ids,
                     bond['equilibrium'] * scale + broken_length * (1 - scale),
                     bond['force_constant'] *
-                    (1 - scale * self.bonded_integration_fac),
+                    (1 - scale * self.bonded_integration_bond_fac),
                 )
         return harmonic_force, integration_force, morse_force, max_distance
 
@@ -1124,8 +1167,10 @@ class EvbSystemBuilder():
 
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
-                self._add_angle(integration_force, atom_ids, broken_equil,
-                                angle['force_constant'] * (1 - scale)*self.bonded_integration_fac)
+                self._add_angle(
+                    integration_force, atom_ids, broken_equil,
+                    angle['force_constant'] * (1 - scale) *
+                    self.bonded_integration_angle_fac)
 
         return harmonic_force, integration_force
 
@@ -1357,7 +1402,7 @@ class EvbSystemBuilder():
 
     def _create_nonbonded_forces(self,
                                  lam,
-                                 bonded=False,
+                                 constant_exceptions=False,
                                  lj_soft_core=False,
                                  coul_soft_core=False):
 
@@ -1386,13 +1431,14 @@ class EvbSystemBuilder():
         lj_force.addPerBondParameter("epsilonB")
         lj_force.addGlobalParameter("l", lam)
 
-        if not bonded:
-            reactant_bonds = self.reactant.bonds
-            product_bonds = self.product.bonds
-        else:
+        # The bonded parameter forces the same exceptions across the entire reaction
+        if constant_exceptions:
             bonds = list(set(self.reactant.bonds) | set(self.product.bonds))
             reactant_bonds = bonds
             product_bonds = bonds
+        else:
+            reactant_bonds = self.reactant.bonds
+            product_bonds = self.product.bonds
         reactant_exceptions = self._create_exceptions_from_bonds(
             self.reactant.atoms, reactant_bonds)
         product_exceptions = self._create_exceptions_from_bonds(
@@ -1701,6 +1747,7 @@ class EvbForceGroup(Enum):
         ])
 
     @classmethod
+    #Simple method for printing a descrpitive header to be used in force group logging files
     def get_header(cls):
         header = ""
         integration_forcegroups = cls.integration_force_groups()
@@ -1708,7 +1755,7 @@ class EvbForceGroup(Enum):
         for fg in cls:
             in_int = fg.value in integration_forcegroups
             in_pes = fg.value in pes_forcegroups
-            fg_cat = 'b'
+            fg_cat = 'b'  # For both
             if in_int and not in_pes:
                 fg_cat = 'i'
             if not in_int and in_pes:

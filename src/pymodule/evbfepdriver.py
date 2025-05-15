@@ -105,6 +105,8 @@ class EvbFepDriver():
         self.report_forcegroups: bool = True
         self.debug: bool = False
         self.save_frames: int = 1000
+        self.save_crash_pdb: bool = True
+        self.save_crash_xml: bool = False
 
         self.keywords = {
             "friction": {
@@ -161,6 +163,12 @@ class EvbFepDriver():
             "save_frames": {
                 "type": int
             },
+            "save_crash_pdb": {
+                "type": bool
+            },
+            "save_crash_xml": {
+                "type": bool
+            },
         }
 
     def run_FEP(
@@ -170,7 +178,7 @@ class EvbFepDriver():
         platform,
     ):
         #todo add this to the configuration keywords
-
+        
         self.platform = platform
 
         for keyword, value in self.keywords.items():
@@ -447,7 +455,6 @@ class EvbFepDriver():
             velocity_file=v_file,
             force_file=f_file,
             append=append,
-            debug=self.debug,
         )
         run_simulation.reporters.append(evb_reporter)
 
@@ -556,16 +563,25 @@ class EvbFepDriver():
         for j, state in enumerate(states):
             step_num = step - len(states) + j
             xml_name = f"state_step_{j}_{step_num}"
-            pdb_name = f"{step_num}"
-            with open(path / f"{xml_name}.xml", "w") as f:
-                f.write(mm.XmlSerializer.serialize(state))
+            pdb_name = f"state_step_{step_num}"
+            if self.save_crash_xml:
+                with open(path / f"{xml_name}.xml", "w") as f:
+                    f.write(mm.XmlSerializer.serialize(state))
 
-            minim_positions = state.getPositions()
-            mmapp.PDBFile.writeFile(
-                self.topology,
-                np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
-                open(self.run_folder / f"{pdb_name}.pdb", "w"),
-            )
+            if self.save_crash_pdb:
+                positions = np.array(state.getPositions().value_in_unit(mm.unit.angstrom))
+
+                # Make sure that openmm PDB writing doesn't crash when encountering too large values
+                positions = np.clip(positions, -9999998 , 99999998)
+                positions[positions==np.inf] = 99999998
+                positions[positions==-np.inf] = -9999998
+                positions[positions==np.nan] = 0
+
+                mmapp.PDBFile.writeFile(
+                    self.topology,
+                    positions,
+                    open(self.run_folder / f"{pdb_name}.pdb", "w"),
+                )
 
             kin = state.getKineticEnergy()
             kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
@@ -590,32 +606,26 @@ class EvbFepDriver():
                 energies[j, k + 4] = energy
 
         # Combine all saved PDB files into one and remove the sigle ones
-        input_folder = self.run_folder  # replace this
-        output_file = "combined_crash.pdb"
-        pdb_pattern = "state_step_*.pdb"
-        pdb_files = sorted(glob.glob(os.path.join(input_folder, pdb_pattern)))
-
-        self.ostream.print_info(str(pdb_files))
-
-        with open(self.run_folder / output_file, 'w') as outfile:
-            for model_number, pdb_file in enumerate(pdb_files, start=1):
-                with open(pdb_file, 'r') as infile:
-                    lines = infile.readlines()
-
-                outfile.write(f"MODEL     {model_number}\n")
-                for line in lines:
-                    if (model_number == 1
-                            and line.startswith("CRYST1")) or line.startswith(
-                                ('ATOM', 'HETATM', 'TER')):
-                        outfile.write(line)
-                    # Skip 'END' lines and anything else
-                outfile.write("ENDMDL\n")
-                os.remove(pdb_file)
+        if self.save_crash_pdb:
+            
+            output_file = "combined_crash.pdb"
+            pdb_pattern = "state_step_*.pdb"
+            pdb_files = sorted(glob.glob(os.path.join(self.run_folder, pdb_pattern)))
+            with open(self.data_folder / output_file, 'w') as outfile:
+                for model_number, pdb_file in enumerate(pdb_files, start=1):
+                    outfile.write(f"MODEL     {model_number}\n")
+                    with open(pdb_file, 'r') as infile:
+                        for line in infile:
+                            if line.startswith(('ATOM', 'HETATM', 'TER',
+                                                'END')) or (model_number == 1 and line.startswith("CRYST1")):  # Skip headers/footers
+                                outfile.write(line)
+                    outfile.write("ENDMDL\n")
+                    os.remove(pdb_file)
 
         header = "step, kinetic, potential, volume,"
         header += EvbForceGroup.get_header()
         np.savetxt(
-            path / f"crash_energies.csv",
+            self.data_folder / f"crash_energies.csv",
             energies,
             delimiter=",",
             header=header,
