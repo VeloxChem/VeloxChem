@@ -560,7 +560,7 @@ class EvbDriver():
                             'openmm is required for EvbDriver.')
 
         if Lambda is None:
-            if configurations[0] == "debug":
+            if configurations[0]["debug"] == True:
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
             else:
                 Lambda = np.linspace(0, 0.1, 11)
@@ -648,8 +648,7 @@ class EvbDriver():
 
             mmapp.PDBFile.writeFile(
                 topology,
-                initial_positions *
-                10,  # positions are handled in nanometers, but pdb's should be in angstroms
+                initial_positions,  # positions are handled in nanometers, but pdb's should be in angstroms
                 open(top_path, "w"),
             )
 
@@ -1104,6 +1103,7 @@ class EvbDriver():
         elif name == "debug":
             conf = {
                 "name": "debug",
+                "debug": True,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "equil_NVT_steps": 100,
