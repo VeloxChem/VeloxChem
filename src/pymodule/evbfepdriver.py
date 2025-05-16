@@ -243,7 +243,7 @@ class EvbFepDriver():
             self.write_step,
         )
         timer.start()
-        positions = initial_positions
+        positions = initial_positions * 0.1
 
         for i, l in enumerate(self.Lambda):
             if l > 0:

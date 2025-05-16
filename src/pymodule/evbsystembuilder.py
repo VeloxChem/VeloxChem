@@ -128,7 +128,7 @@ class EvbSystemBuilder():
 
         self.data_folder: str | None = None
         self.run_folder: str | None = None
-        self.pdb:str|None = None
+        self.pdb: str | None = None
 
         self.no_force_groups: bool = False
         self.nb_switching_function: bool = True
@@ -209,13 +209,13 @@ class EvbSystemBuilder():
             "lj14_scale": {
                 "type": float
             },
-            "pdb":{
+            "pdb": {
                 "type": str
             },
-            "no_force_groups":{
+            "no_force_groups": {
                 "type": bool
             },
-            "nb_switching_function":{
+            "nb_switching_function": {
                 "type": bool
             }
         }
@@ -303,14 +303,26 @@ class EvbSystemBuilder():
                 if isinstance(force, mm.CMMotionRemover)
             ][0]
 
+            forces = [
+                force for force in system.getForces()
+                if not (isinstance(force, mm.CMMotionRemover) or isinstance(force, mm.NonbondedForce))
+            ]
+            if not self.no_force_groups:
+                for force in system.getForces():
+                    if not (isinstance(force, mm.CMMotionRemover) or
+                        isinstance(force, mm.NonbondedForce)):
+                        force.setForceGroup(EvbForceGroup.PDB.value)
+                        force.setName(force.getName()+"PDB")
+
         if not self.no_reactant:
             reaction_chain = topology.addChain()
-            reaction_residue = topology.addResidue(name="REA", chain=reaction_chain)
+            reaction_residue = topology.addResidue(name="REA",
+                                                   chain=reaction_chain)
         reaction_atoms = []
 
-        nb_force.setName("General nonbonded force")
+        nb_force.setName("NonbondedForce")
         nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
-        cmm_remover.setName("CMM remover")
+        cmm_remover.setName("CMMotionRemover")
         if not self.no_force_groups:
             nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
             cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
@@ -344,12 +356,15 @@ class EvbSystemBuilder():
             else:
                 #solvating a pdb is not yet a prio, so don't need system_mol
                 system_mol = Molecule()
-                self.positions = pdb_file.getPositions(asNumpy=True).value_in_unit(
-                    mmunit.angstrom)
+                self.positions = pdb_file.getPositions(
+                    asNumpy=True).value_in_unit(mmunit.angstrom)
 
-            x_size = 0.1 * (max(self.positions[:, 0]) - min(self.positions[:, 0]))
-            y_size = 0.1 * (max(self.positions[:, 1]) - min(self.positions[:, 1]))
-            z_size = 0.1 * (max(self.positions[:, 2]) - min(self.positions[:, 2]))
+            x_size = 0.1 * (max(self.positions[:, 0]) -
+                            min(self.positions[:, 0]))
+            y_size = 0.1 * (max(self.positions[:, 1]) -
+                            min(self.positions[:, 1]))
+            z_size = 0.1 * (max(self.positions[:, 2]) -
+                            min(self.positions[:, 2]))
             box = [
                 2 * self.padding + x_size, 2 * self.padding + y_size,
                 2 * self.padding + z_size
@@ -381,15 +396,16 @@ class EvbSystemBuilder():
             else:
                 #solvating a pdb is not yet a prio, so don't need system_mol
                 system_mol = Molecule()
-                self.positions = pdb_file.getPositions(asNumpy=True).value_in_unit(
-                    mmunit.angstrom)
-                boxvec = topology.getPeriodicBoxVectors().value_in_unit(mmunit.nanometer)
+                self.positions = pdb_file.getPositions(
+                    asNumpy=True).value_in_unit(mmunit.angstrom)
+                boxvec = topology.getPeriodicBoxVectors().value_in_unit(
+                    mmunit.nanometer)
                 box = [boxvec[0][0], boxvec[1][1], boxvec[2][2]]
-                assert ((boxvec[0][1] == 0 and boxvec[0][2] == 0) and
-                     (boxvec[1][0] == 0 and boxvec[1][2] == 0) and 
-                     (boxvec[2][0] == 0 and boxvec[2][1] == 0)), "PDB has non-orthogonal box vectors"
+                assert ((boxvec[0][1] == 0 and boxvec[0][2] == 0)
+                        and (boxvec[1][0] == 0 and boxvec[1][2] == 0)
+                        and (boxvec[2][0] == 0 and boxvec[2][1]
+                             == 0)), "PDB has non-orthogonal box vectors"
 
-                
         # if CNT or Graphene:
         #     assert False, "Rethink CNT/graphene input"
         #     box = self._add_CNT_graphene(system, CNT, Graphene, nb_force, topology, system_mol, positions, box,
@@ -403,15 +419,18 @@ class EvbSystemBuilder():
         # #todo how do I get the positions back from _add_solvent again?
         # self.positions = np.array(positions) * 0.1
 
-
         cutoff = min(
             self.minimal_nb_cutoff,
             min(min(box[0], box[1]), box[2]) * 0.4
         )  # nm, 0.4 factor to accomodate for shrinkage of the box in NPT simulations
         nb_force.setCutoffDistance(cutoff)
-        nb_force.setUseSwitchingFunction(self.nb_switching_function)
         self.ostream.print_info(f"Setting nonbonded cutoff to {cutoff:.3f} nm")
-        nb_force.setSwitchingDistance(0.9 * cutoff)
+        if self.nb_switching_function:
+            nb_force.setUseSwitchingFunction(True)
+            nb_force.setSwitchingDistance(0.9 * cutoff)
+        else:
+            nb_force.setUseSwitchingFunction(False)
+            nb_force.setSwitchingDistance(-1)
 
         if self.pressure > 0:
             barostat = mm.MonteCarloBarostat(
@@ -443,7 +462,7 @@ class EvbSystemBuilder():
                         )
 
         self.systems: typing.Dict = {}
-        
+
         for lam in Lambda:
             total_charge = 0
             if not self.no_reactant:
@@ -452,9 +471,8 @@ class EvbSystemBuilder():
                     charge = (1 - lam) * reactant_atom[
                         "charge"] + lam * product_atom["charge"]
                     total_charge += charge
-                    sigma = (
-                        1 -
-                        lam) * reactant_atom["sigma"] + lam * product_atom["sigma"]
+                    sigma = (1 - lam) * reactant_atom[
+                        "sigma"] + lam * product_atom["sigma"]
                     epsilon = (1 - lam) * reactant_atom[
                         "epsilon"] + lam * product_atom["epsilon"]
                     if sigma == 0:
@@ -464,8 +482,8 @@ class EvbSystemBuilder():
                             raise ValueError(
                                 "Sigma is 0 while epsilon is not, which will cause division by 0"
                             )
-                    nb_force.setParticleParameters(reaction_atoms[i].index, charge,
-                                                sigma, epsilon)
+                    nb_force.setParticleParameters(reaction_atoms[i].index,
+                                                   charge, sigma, epsilon)
 
             for i in range(system.getNumParticles()):
                 charge = nb_force.getParticleParameters(i)[0]
@@ -845,8 +863,10 @@ class EvbSystemBuilder():
                                           carbon_atoms[j].index, 0, 1, 0)
         if not self.no_force_groups:
             carbon_harmonic_bond_force.setForceGroup(EvbForceGroup.CARBON.value)
-            carbon_harmonic_angle_force.setForceGroup(EvbForceGroup.CARBON.value)
-            carbon_fourier_dihedral_force.setForceGroup(EvbForceGroup.CARBON.value)
+            carbon_harmonic_angle_force.setForceGroup(
+                EvbForceGroup.CARBON.value)
+            carbon_fourier_dihedral_force.setForceGroup(
+                EvbForceGroup.CARBON.value)
         system.addForce(carbon_harmonic_bond_force)
         system.addForce(carbon_harmonic_angle_force)
         system.addForce(carbon_fourier_dihedral_force)
@@ -1006,11 +1026,13 @@ class EvbSystemBuilder():
 
             if harmonic_bond_force.getNumBonds() > 0:
                 if not self.no_force_groups:
-                    harmonic_bond_force.setForceGroup(EvbForceGroup.SOLVENT.value)
+                    harmonic_bond_force.setForceGroup(
+                        EvbForceGroup.SOLVENT.value)
                 system.addForce(harmonic_bond_force)
             if harmonic_angle_force.getNumAngles() > 0:
                 if not self.no_force_groups:
-                    harmonic_angle_force.setForceGroup(EvbForceGroup.SOLVENT.value)
+                    harmonic_angle_force.setForceGroup(
+                        EvbForceGroup.SOLVENT.value)
                 system.addForce(harmonic_angle_force)
             if fourier_force.getNumTorsions() > 0:
                 if not self.no_force_groups:
@@ -1095,7 +1117,8 @@ class EvbSystemBuilder():
 
         if self.bonded_integration:
             if not self.no_force_groups:
-                bonded_integration.setForceGroup(EvbForceGroup.INTEGRATION.value)
+                bonded_integration.setForceGroup(
+                    EvbForceGroup.INTEGRATION.value)
                 angle_integration.setForceGroup(EvbForceGroup.INTEGRATION.value)
                 morse_force.setForceGroup(EvbForceGroup.PES.value)
             system.addForce(bonded_integration)
@@ -1760,6 +1783,7 @@ class EvbForceGroup(Enum):
     SOLVENT = auto(
     )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
     CARBON = auto()  # Graphene and CNTs
+    PDB = auto() # Bonded forces added from the PDB
     INTEGRATION = auto(
     )  # All leftover forces that should only be used for integration
     PES = auto(
@@ -1790,6 +1814,7 @@ class EvbForceGroup(Enum):
             cls.RESTRAINT.value,
             cls.SOLVENT.value,
             cls.CARBON.value,
+            cls.PDB.value,
             cls.INTEGRATION.value,
             # cls.DEBUG1INT.value,
             # cls.DEBUG2INT.value,
@@ -1817,6 +1842,7 @@ class EvbForceGroup(Enum):
             cls.PESCOUL.value,
             cls.SOLVENT.value,
             cls.CARBON.value,
+            cls.PDB.value,
             cls.PES.value,
             # cls.DEBUG1PES.value,
             # cls.DEBUG2PES.value,
