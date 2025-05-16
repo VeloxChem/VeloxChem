@@ -51,6 +51,13 @@ class TddftHessianDriver(HessianDriver):
     def __init__(self, scf_drv, rsp_drv, tddft_grad_drv):
         """
         Initializes the TDDFT Hessian driver.
+
+        :param scf_drv:
+            The SCF driver.
+        :param rsp_drv:
+            The linear response driver.
+        :param tddft_grad_drv:
+            The TDDFT gradient driver.
         """
         super().__init__(scf_drv.comm, scf_drv.ostream)
         if scf_drv._dft:
@@ -61,6 +68,7 @@ class TddftHessianDriver(HessianDriver):
         self.rsp_drv = rsp_drv
         self.tddft_grad_drv = tddft_grad_drv
         self.do_print_hessian = False
+        self.tamm_dancoff = tddft_grad_drv.tamm_dancoff
 
     def update_settings(self, method_dict, hessian_dict=None, cphf_dict=None):
         """
@@ -315,11 +323,15 @@ class TddftHessianDriver(HessianDriver):
         assert_msg_critical(rsp_drv.is_converged,
                             'TddftHessianDriver: response did not converge')
 
-        # reset tddft_grad_drv instance variable to the results
-        # for the current molecular geometry - required by how compute_analytical works.
+        # set tddft_grad_drv scf_drv and rsp_results instance variable to the results
+        # for the current molecular geometry.
         tddft_grad_drv._scf_drv = scf_drv
         tddft_grad_drv._rsp_results = None
         tddft_grad_drv.compute_analytical(molecule, basis, rsp_results)
+
+        self.scf_drv = scf_drv
+        self.rsp_drv = rsp_drv
+        self.tddft_grad_drv = tddft_grad_drv
 
         if self.rank == mpi_master():
             # Multiple excited states can be computed simultaneously.
