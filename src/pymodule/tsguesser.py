@@ -35,12 +35,15 @@ import sys
 import numpy as np
 import os
 import math
+import copy
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .sanitychecks import molecule_sanity_check
+from .mmforcefieldgenerator import MMForceFieldGenerator
+from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
@@ -84,7 +87,8 @@ class TransitionStateGuesser():
         self.mm_step_size = 0.001 * mmunit.picoseconds
         self.save_mm_traj = False
         self.scf_drv = None
-        self.evb_drv = None
+        self.evb_drv: None | EvbDriver = None
+        self.molecule = None
 
     def find_TS(
         self,
@@ -126,10 +130,12 @@ class TransitionStateGuesser():
         )
 
         self.evb_drv.temperature = self.mm_temperature
-        self.evb_drv.build_systems(['ts_guesser'],
-                               self.lambda_vec,
-                               save_output=False,
-                               constraints=constraints)
+        self.evb_drv.build_systems(
+            ['ts_guesser'],
+            self.lambda_vec,
+            save_output=False,
+            constraints=constraints,
+        )
         self.ostream.print_blank()
         self.ostream.print_header("Starting MM scan")
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
@@ -137,7 +143,8 @@ class TransitionStateGuesser():
         mm_energies, mm_geometries, ff_exception = self._scan_ff(self.evb_drv)
         xyz_geometries = []
         for mm_geom in mm_geometries:
-            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.evb_drv.reactant.molecule)
+            xyz_geom = self._mm_to_xyz_geom(mm_geom,
+                                            self.evb_drv.reactant.molecule)
             xyz_geometries.append(xyz_geom)
         self.results = {
             'mm_energies': mm_energies,
@@ -190,6 +197,142 @@ class TransitionStateGuesser():
 
         self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
         return self.molecule, self.results
+
+    #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
+    #todo add option for recalculating charges from ts_mol
+    def get_ts_ffgen(self, reaffgen=None, proffgen=None, l=0.5, ts_mol=None, recalculate = True):
+        if reaffgen is None:
+            reaffgen = self.evb_drv.reactant
+        if proffgen is None:
+            proffgen = self.evb_drv.product
+        if ts_mol is None:
+            ts_mol = self.molecule
+            
+        if recalculate:
+            assert ts_mol is not None, "Please provide a molecule, or turn of recalculation"
+        ts_ffgen = MMForceFieldGenerator()
+
+        ts_ffgen.bonds = self._average_params(
+            reaffgen.bonds,
+            proffgen.bonds,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.angles = self._average_params(
+            reaffgen.angles,
+            proffgen.angles,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.dihedrals = self._mix_dihedrals(
+            reaffgen.dihedrals,
+            proffgen.dihedrals,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.impropers = self._mix_dihedrals(
+            reaffgen.impropers,
+            proffgen.impropers,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.atoms = self._merge_atoms(
+            reaffgen.atoms,
+            proffgen.atoms,
+            l,
+            ts_mol,
+        )
+        return ts_ffgen
+
+    @staticmethod
+    def _average_params(reaparams, proparams, l, mol):
+        ts_params = {}
+        for id in reaparams.keys() | proparams.keys():
+            param = {}
+            if id in reaparams.keys() and id in proparams.keys():
+                reaparam = reaparams[id]
+                proparam = proparams[id]
+                #todo change this to measurement from molecule
+                eq = (1 -
+                      l) * reaparam['equilibrium'] + l * proparam['equilibrium']
+                fc = (1 - l) * reaparam['force_constant'] + l * proparam[
+                    'force_constant']
+                comment = f"averaged {reaparam['comment']} {proparam['comment']}"
+                param = {
+                    'force_constant': fc,
+                    'equilibrium': eq,
+                    'comment': comment,
+                }
+            elif id in reaparams.keys():
+                param = reaparams[id]
+                param['force_constant'] *= (1 - l)
+            elif id in proparams.keys():
+                param = proparams[id]
+                param['force_constant'] *= l
+            else:
+                continue
+            ts_params.update({id: copy.copy(param)})
+        if ts_params is {}:
+            return None
+        return ts_params
+
+    @staticmethod
+    def _mix_dihedrals(rea_dihedrals, pro_dihedrals, l,mol):
+        ts_params = {}
+        for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
+            for id, param in dict.items():
+                #todo reassign value of phase?
+                new_param = copy.copy(param)
+                if new_param.get('multiple'):
+                    new_param['barrier'] = [
+                        bar * scaling for bar in new_param['barrier']
+                    ]
+                else:
+                    new_param['barrier'] *= scaling
+                ts_params.update({id: new_param})
+        return ts_params
+
+    @staticmethod
+    def _merge_atoms(rea_atoms, pro_atoms, l,mol):
+        atoms = {}
+        for i, (rea_atom, pro_atom) in enumerate(
+                zip(rea_atoms.values(), pro_atoms.values())):
+            assert rea_atom["mass"] == pro_atom[
+                "mass"], "Atoms in reactont and product are not the same"
+
+            name = ''.join(x for x in rea_atom['name'] if x.isalpha())
+
+            if rea_atom['type'] == pro_atom['type']:
+                typ = rea_atom['type']
+            else:
+                typ = name.lower() + "rx"
+
+            if rea_atom.get('comment') == pro_atom.get(
+                    'comment') and rea_atom.get('comment') is not None:
+                comment = rea_atom['comment']
+            else:
+                comment = "Merged TS atom"
+
+            charge = (1 - l) * rea_atom['charge'] + l * pro_atom['charge']
+            eps = (1 - l) * rea_atom['epsilon'] + l * pro_atom['epsilon']
+            sigma = (1 - l) * rea_atom['sigma'] + l * pro_atom['sigma']
+
+            atom = {
+                'name': f"{name}{i}",
+                'sigma': sigma,
+                'epsilon': eps,
+                'charge': charge,
+                'mass': rea_atom["mass"],
+                'type': typ,
+                'comment': comment
+            }
+
+            if rea_atom.get('equivalent_atom') == pro_atom.get(
+                    'equivalent_atom'):
+                equi_atom = rea_atom['equivalent_atom']
+                atom.update({'equivalent_atom': equi_atom})
+            atoms.update({i: atom})
+        return atoms
 
     def _scan_ff(self, EVB):
         energies = []
@@ -320,19 +463,23 @@ class TransitionStateGuesser():
             scf_energies=ipywidgets.fixed(scf_energies),
             geometries=ipywidgets.fixed(geometries),
             lambda_vec=ipywidgets.fixed(lambda_vec),
-            step=ipywidgets.SelectionSlider(options=lambda_vec,
-                                            description='Lambda',
-                                            value=final_lambda),
+            step=ipywidgets.SelectionSlider(
+                options=lambda_vec,
+                description='Lambda',
+                value=final_lambda,
+            ),
             atom_indices=ipywidgets.fixed(atom_indices),
         )
 
-    def _show_iteration(self,
-                        mm_energies,
-                        geometries,
-                        lambda_vec,
-                        step,
-                        scf_energies=None,
-                        atom_indices=False):
+    def _show_iteration(
+        self,
+        mm_energies,
+        geometries,
+        lambda_vec,
+        step,
+        scf_energies=None,
+        atom_indices=False,
+    ):
         """
         Show the geometry at a specific iteration.
         """
