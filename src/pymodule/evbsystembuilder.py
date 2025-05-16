@@ -97,7 +97,7 @@ class EvbSystemBuilder():
 
         self.pressure: float = -1.
         self.solvent: str = None  #type: ignore
-        self.padding: float = 1.
+        self.padding: float = 1.5
         self.no_reactant: bool = False
         self.E_field: list[float] = [0, 0, 0]
         self.neutralize: bool = False
@@ -352,12 +352,9 @@ class EvbSystemBuilder():
 
             if self.pdb is None:
                 system_mol = Molecule(reactant.molecule)
-                self.positions = system_mol.get_coordinates_in_angstrom()
             else:
-                #solvating a pdb is not yet a prio, so don't need system_mol
-                system_mol = Molecule()
-                self.positions = pdb_file.getPositions(
-                    asNumpy=True).value_in_unit(mmunit.angstrom)
+                system_mol = Molecule.read_pdb_file(self.pdb)
+            self.positions = system_mol.get_coordinates_in_angstrom()
 
             x_size = 0.1 * (max(self.positions[:, 0]) -
                             min(self.positions[:, 0]))
@@ -395,9 +392,8 @@ class EvbSystemBuilder():
                 topology.setPeriodicBoxVectors(expanded_box)
             else:
                 #solvating a pdb is not yet a prio, so don't need system_mol
-                system_mol = Molecule()
-                self.positions = pdb_file.getPositions(
-                    asNumpy=True).value_in_unit(mmunit.angstrom)
+                system_mol = Molecule.read_pdb_file(self.pdb)
+                self.positions = system_mol.get_coordinates_in_angstrom()
                 boxvec = topology.getPeriodicBoxVectors().value_in_unit(
                     mmunit.nanometer)
                 box = [boxvec[0][0], boxvec[1][1], boxvec[2][2]]
@@ -891,7 +887,7 @@ class EvbSystemBuilder():
         )
 
         self.positions = vlxsysbuilder.system_molecule.get_coordinates_in_angstrom(
-        ) * 0.1
+        )
         box = [side * 0.1 for side in vlxsysbuilder.box]
 
         solvents = vlxsysbuilder.solvents
