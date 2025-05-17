@@ -83,7 +83,7 @@ max_angular_momentum(const int id) -> int
 
     if ((id > 20) && (id < 57)) return 2;
 
-    if ((id > 56) && (id < 87)) return 3;
+    if ((id > 56) && (id < 103)) return 3;
 
     return -1;
 }
