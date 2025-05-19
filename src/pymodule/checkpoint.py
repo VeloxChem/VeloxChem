@@ -604,7 +604,12 @@ def read_results(fname, label):
     res_dict = {}
     h5f = h5py.File(fname, "r")
 
-    assert_msg_critical(label in h5f, label + " section not found in the checkpoint file.")
+    label_found = (label in h5f)
+
+    if not label_found:
+        h5f.close()
+
+    assert_msg_critical(label_found, label + " section not found in the checkpoint file.")
 
     # Always read general information about the molecule, basis, and settings
     for key in h5f:
