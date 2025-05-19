@@ -235,7 +235,7 @@ class InterpolationDriver():
             if remove_from_label in key:
 
                 label = key.replace(remove_from_label, "")
-                if label not in labels:
+                if label not in labels and '_symmetry' not in label:
                     labels.append(label)
                 
                 if counter == 0:
@@ -560,11 +560,15 @@ class InterpolationDriver():
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
         # ∇U = Σ Wᵢ ∇Uᵢ  +  Σ Uᵢ ∇Wᵢ
-        self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
-        # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
-        # Add contributions only to the selected rows
-        
-        self.impes_coordinate.gradient[self.symmetry_information[3]] += np.tensordot(potentials, grad_W_i, axes=1)
+
+        if len(self.symmetry_information[3]) != 0:
+            self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
+            # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
+            # Add contributions only to the selected rows
+            
+            self.impes_coordinate.gradient[self.symmetry_information[3]] += np.tensordot(potentials, grad_W_i, axes=1)
+        else:
+            self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
 
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
@@ -776,9 +780,6 @@ class InterpolationDriver():
                             dist_check[i] = np.sin(dist_org[i])  
                             dist_correlation[i] = np.sin(dist_org[i])
 
-                        # print('sum sym dihedral', sum_sym_dihedral)
-                    
-                    # print('\n\n')
                     self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
                     self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
                     self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_information[-1][1]:]**2))))
@@ -870,10 +871,6 @@ class InterpolationDriver():
             pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
 
             return pes, pes_prime, hessian_error
-
-
-        
-
 
     
     def te_weight_gradient(self, theta, b_matrix_col):

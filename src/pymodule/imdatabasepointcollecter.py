@@ -811,10 +811,12 @@ class IMDatabasePointCollecter:
         last_added = 0
         if self.reference_struc_energies_file is not None:
             self.sampled_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
+            self.allowed_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
             last_added += len(self.sampled_molecules[self.roots_to_follow[0]]['molecules'])
         else:
              self.reference_struc_energies_file = 'ref_struc_energy.xyz'
 
+        print('allowed molecules', self.allowed_molecules)
 
         for root in self.roots_to_follow:
             # Dynamically create an attribute name
@@ -1636,7 +1638,7 @@ class IMDatabasePointCollecter:
                 break
 
 
-    def cartesian_just_distance(self, coordinate_1, coordinate_2):
+    def cartesian_just_distance(self, coordinate_1, coordinate_2, non_core_atoms):
         """Calculates and returns the cartesian distance between
            self.coordinates and data_point coordinates.
            Besides the distance, it also returns the weight gradient,
@@ -1644,10 +1646,12 @@ class IMDatabasePointCollecter:
            :param data_point:
                 InterpolationDatapoint object
         """
+        target_coordinates_core = np.delete(coordinate_1, non_core_atoms, axis=0)
+        reference_coordinates_core = np.delete(coordinate_2, non_core_atoms, axis=0)
         # First, translate the cartesian coordinates to zero
-        target_coordinates = self.calculate_translation_coordinates(coordinate_1)
+        target_coordinates = self.calculate_translation_coordinates(target_coordinates_core)
         reference_coordinates = (
-            self.calculate_translation_coordinates(coordinate_2))
+            self.calculate_translation_coordinates(reference_coordinates_core))
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
         # to self.impes_coordinate (reference_coordinates)
@@ -1919,13 +1923,48 @@ class IMDatabasePointCollecter:
                     mean_dihedral_rmsd = np.mean(np.array(self.impes_drivers[0].dihedral_rmsd))
 
                     if mean_bond_rmsd > 0.1 or mean_angle_rmsd > 0.1 or mean_dihedral_rmsd > 1.0:
+                        
+                        K = 5  # Number of closest previous matches to cache
+                        threshold = self.distance_thrsh - 0.05
+                        new_coords = new_molecule.get_coordinates_in_bohr()
+                        n_atoms = len(new_molecule.get_labels())
+                        sym_group = self.non_core_symmetry_groups['gs' if self.current_state == 0 else 'es'][4]
+                        molecule_list = self.allowed_molecules[self.current_state]['molecules']
+
+                        if not hasattr(self, "previous_candidate_indices"):
+                            self.previous_candidate_indices = []
 
                         scanned = False
-                        for checked_molecule in self.allowed_molecules[self.current_state]['molecules']:
-                            checked_distance = self.cartesian_just_distance(checked_molecule.get_coordinates_in_bohr(), new_molecule.get_coordinates_in_bohr())
-                            if (np.linalg.norm(checked_distance) / np.sqrt(len(new_molecule.get_labels()))) * bohr_in_angstrom() <= self.distance_thrsh - 0.05:
-                                scanned = True 
+                        closest_indices = []
+
+                        # --- 1. Try cached candidates first
+                        for idx in self.previous_candidate_indices:
+                            if idx >= len(molecule_list):
+                                continue
+                            checked_molecule = molecule_list[idx]
+                            checked_coords = checked_molecule.get_coordinates_in_bohr()
+                            checked_distance = self.cartesian_just_distance(checked_coords, new_coords, sym_group)
+                            normed_dist = (np.linalg.norm(checked_distance) / np.sqrt(n_atoms)) * bohr_in_angstrom()
+                            print("cached candidate idx", idx, "→", normed_dist)
+                            closest_indices.append((idx, normed_dist))
+                            if normed_dist <= threshold:
+                                scanned = True
                                 break
+
+                        # --- 2. Fallback: full scan only if no match
+                        if not scanned:
+                            for idx, checked_molecule in enumerate(molecule_list):
+                                checked_coords = checked_molecule.get_coordinates_in_bohr()
+                                checked_distance = self.cartesian_just_distance(checked_coords, new_coords, sym_group)
+                                normed_dist = (np.linalg.norm(checked_distance) / np.sqrt(n_atoms)) * bohr_in_angstrom()
+                                closest_indices.append((idx, normed_dist))
+                                if normed_dist <= threshold:
+                                    scanned = True
+                                    break
+
+                        # --- 3. Update cached candidate indices for the next step
+                        closest_indices.sort(key=lambda x: x[1])  # Sort by distance
+                        self.previous_candidate_indices = [i for i, _ in closest_indices[:K]]
                         if not scanned:
                             for i, qm_data_point in enumerate(self.qm_data_point_dict[self.current_state], start=1):
 
@@ -2156,7 +2195,7 @@ class IMDatabasePointCollecter:
                 self.sampled_molecules[self.current_state]['qm_energies'].append(qm_energy[0])
                 
                 self.add_a_point = False
-            if self.add_a_point and self.expansion :
+            if self.add_a_point and self.expansion:
                 print('✨ A point is added! ✨', self.point_checker)
                 print(molecule.get_xyz_string())
 

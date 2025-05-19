@@ -740,15 +740,13 @@ class IMForceFieldGenerator:
                 for i, mol in enumerate(molecules):
                     
                     # mol = dp_mol[0]
-                    mol.set_dihedral([6,1,2,3], -180.0, 'degree')
+                    # mol.set_dihedral([5,6,7,11], 90.0, 'degree')
                     # mol.set_dihedral([12, 13, 14, 25], 60.0, 'degree')
-                    # mol.set_dihedral([17, 15, 16, 27], 60.0, 'degree')
-
-                    
+                    # mol.set_dihedral([17, 15, 16, 27], 60.0, 'degree')                   
 
                     current_dihedral_angle = list(self.allowed_deviation[key].keys())[i]
 
-                    density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, imforcefieldfile)
+                    density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density[self.roots_to_follow[0]], imforcefieldfile)
 
                     forcefield_generator = MMForceFieldGenerator()
                     self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}_{i}.pdb'
@@ -866,7 +864,7 @@ class IMForceFieldGenerator:
                                                         for i in range(len(rotation_values))}
                 point_densities[specific_dihedral] = {rotation_values[i]: 0 for i in range(len(rotation_values))}
                 for theta in rotation_values:
-                    molecule.set_dihedral_in_degrees([specific_dihedral[0] + 1, specific_dihedral[1] + 1, specific_dihedral[2] + 1, specific_dihedral[3] + 1], theta)
+                    molecule.set_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]], theta)
                     new_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
                     sampled_molecules[specific_dihedral].append(new_molecule)
         
@@ -876,7 +874,7 @@ class IMForceFieldGenerator:
             point_densities[None] = {360: 0}
             
             allowed_deviation[None] = {360: (0.0, 360.0)}
-
+        
         return point_densities, sampled_molecules, allowed_deviation
     
     def determine_conformal_structures(self, molecule, specific_dihedrals=None):
@@ -976,7 +974,7 @@ class IMForceFieldGenerator:
                     qm_data_point = InterpolationDatapoint(self.z_matrix)
                     qm_data_point.read_hdf5(imforcefieldfile, label)
                     qm_datapoints.append(qm_data_point)
-
+        
         reseted_point_densities_dict = {outer_key: {key: 0 for key in point_densities_dict[outer_key].keys()} for outer_key in point_densities_dict.keys()}
         
         for specific_dihedral in point_densities_dict.keys():
@@ -988,8 +986,7 @@ class IMForceFieldGenerator:
                     key = None
                     for dihedral in point_densities_dict[specific_dihedral].keys():
                         datapoint_molecule = Molecule(self.molecule.get_labels(), point.cartesian_coordinates, 'bohr')
-                        dihedrals_of_dp = [datapoint_molecule.get_dihedral_in_degrees([specific_dihedral[0] + 1, specific_dihedral[1] + 1, specific_dihedral[2] + 1, specific_dihedral[3] + 1])]
-                        print(dihedrals_of_dp, dihedral)
+                        dihedrals_of_dp = [datapoint_molecule.get_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]])]
                         distance_vectorized = dihedral_distance_vectorized([dihedral], dihedrals_of_dp)
                         if abs(distance_vectorized) < min_distance:
                             min_distance = abs(distance_vectorized)
@@ -1669,6 +1666,7 @@ class IMForceFieldGenerator:
                         if label_counter == 0:
                             label = f'point_{len(sorted_labels) + 1}'
                             old_label = f'point_{len(sorted_labels) + 1}'
+                            current_label = f'point_{len(sorted_labels) + 1}'
                         else:
                             label = f'{old_label}_symmetry_{label_counter}'
                         impes_coordinate = InterpolationDatapoint(z_matrix)
