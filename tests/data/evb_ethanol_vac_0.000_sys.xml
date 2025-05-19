@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <System openmmVersion="8.2" type="System" version="1">
 	<PeriodicBoxVectors>
-		<A x="2.377477578577477" y="0" z="0"/>
-		<B x="0" y="2.2746160562745406" z="0"/>
-		<C x="0" y="0" z="2.1993144900691353"/>
+		<A x="3.377477578577477" y="0" z="0"/>
+		<B x="0" y="3.2746160562745406" z="0"/>
+		<C x="0" y="0" z="3.1993144900691353"/>
 	</PeriodicBoxVectors>
 	<Particles>
 		<Particle mass="12.01078"/>
@@ -18,8 +18,7 @@
 	</Particles>
 	<Constraints/>
 	<Forces>
-		<Force forceGroup="7" frequency="1" name="CMM remover" type="CMMotionRemover" version="1"/>
-		<Force alpha="0" cutoff=".8797257960276541" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="8" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="4" name="General nonbonded force" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance=".7917532164248887" type="NonbondedForce" useSwitchingFunction="1" version="4">
+		<Force alpha="0" cutoff="1" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="8" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="4" name="NonbondedForce" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance=".9" type="NonbondedForce" useSwitchingFunction="1" version="4">
 			<GlobalParameters/>
 			<ParticleOffsets/>
 			<ExceptionOffsets/>
@@ -73,6 +72,7 @@
 				<Exception eps="0" p1="7" p2="8" q="0" sig="1"/>
 			</Exceptions>
 		</Force>
+		<Force forceGroup="7" frequency="1" name="CMMotionRemover" type="CMMotionRemover" version="1"/>
 		<Force forceGroup="11" name="Reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
 				<Bond d=".15380000000000002" k="194555.99999999997" p1="0" p2="1"/>
@@ -292,19 +292,19 @@
 			<EnergyParameterDerivatives/>
 			<Torsions/>
 		</Force>
-		<Force forceGroup="16" name="Integration reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
+		<Force forceGroup="17" name="Integration reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
 				<Bond d=".1097" k="283097.80799999996" p1="0" p2="7"/>
 				<Bond d=".29203126492311143" k="345000" p1="6" p2="7"/>
 				<Bond d=".1423" k="220965.40799999994" p1="1" p2="6"/>
 			</Bonds>
 		</Force>
-		<Force forceGroup="16" name="Integration reaction angle" type="HarmonicAngleForce" usesPeriodic="0" version="2">
+		<Force forceGroup="17" name="Integration reaction angle" type="HarmonicAngleForce" usesPeriodic="0" version="2">
 			<Angles>
-				<Angle a="2.532073380332324" k="38.300000000000004" p1="7" p2="6" p3="8"/>
+				<Angle a="2.532073380332324" k="383" p1="7" p2="6" p3="8"/>
 			</Angles>
 		</Force>
-		<Force energy="D*(1-exp(-a*(r-re)))^2;" forceGroup="17" name="Reaction morse bond" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy="D*(1-exp(-a*(r-re)))^2;" forceGroup="18" name="Reaction morse bond" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="D"/>
 				<Parameter name="a"/>

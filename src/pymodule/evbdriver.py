@@ -561,8 +561,25 @@ class EvbDriver():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
+        if all(isinstance(conf, str) for conf in configurations):
+            configurations = [
+                self.default_system_configurations(conf)
+                for conf in configurations
+            ]
+
+        assert all(
+            isinstance(conf, dict) for conf in configurations
+        ), "Configurations must be a list of strings or a list of dictionaries"
+        self.configurations: list[dict] = configurations  # type: ignore
+        if constraints is None:
+            constraints = []
+        if isinstance(constraints, dict):
+            constraints = [constraints]
+
+
+        
         if Lambda is None:
-            if configurations[0]["debug"] == True:
+            if configurations[0].get("debug",False):
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
             else:
                 Lambda = np.linspace(0, 0.1, 11)
@@ -579,20 +596,6 @@ class EvbDriver():
         Lambda = [round(lam, 3) for lam in Lambda]
         self.Lambda = Lambda
 
-        if all(isinstance(conf, str) for conf in configurations):
-            configurations = [
-                self.default_system_configurations(conf)
-                for conf in configurations
-            ]
-
-        assert all(
-            isinstance(conf, dict) for conf in configurations
-        ), "Configurations must be a list of strings or a list of dictionaries"
-        self.configurations: list[dict] = configurations  # type: ignore
-        if constraints is None:
-            constraints = []
-        if isinstance(constraints, dict):
-            constraints = [constraints]
 
         #Per configuration
         for conf in self.configurations:
