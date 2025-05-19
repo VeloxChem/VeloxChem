@@ -81,11 +81,11 @@ class EvbSystemBuilder():
 
         self.temperature: float = 300
         self.Lambda: list[float]
-
+        
         self.sc_alpha_lj: float = 0.7
         self.sc_alpha_q: float = 0.3
         self.sc_sigma_q: float = 1.0
-        self.sc_power: float = 1 / 6
+        self.sc_power: float = 1 / 6 # The exponential power in the soft core expression
         self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
         self.restraint_k: float = 1000  # kj/mol nm^2, force constant for the position restraints
