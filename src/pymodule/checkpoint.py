@@ -37,7 +37,7 @@ import h5py
 
 from .veloxchemlib import mpi_master
 from .distributedarray import DistributedArray
-
+from .errorhandler import assert_msg_critical
 
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
@@ -582,3 +582,41 @@ def read_cpcm_charges(fname):
     hf.close()
 
     return cpcm_q
+
+def read_results(fname, label):
+    """ Read the results dictionary from a checkpoint file.
+
+        :param fname:
+            Name of the checkpoint file.
+        :param label:
+            The response dictionary label (scf, rsp, vib, opt, etc.).
+
+        :return:
+            the dictionary of results.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    assert_msg_critical(valid_checkpoint, fname + " is not a valid checkpoint file.") 
+
+    res_dict = {}
+    h5f = h5py.File(fname, "r")
+
+    assert_msg_critical(label in h5f, label + " section not found in the checkpoint file.")
+
+    h5f_dict = h5f[label]
+
+    for key in h5f_dict:
+        if "normal_modes" in key:
+            modes_dict = dict(h5f_dict[key])
+            modes = []
+            for mode in modes_dict:
+                modes.append(np.array(modes_dict[mode]))
+                res_dict[key] = modes
+        else:
+            data = np.array(h5f_dict[key])
+            res_dict[key] = data
+    h5f.close()
+    
+    return res_dict
