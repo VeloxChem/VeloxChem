@@ -1039,7 +1039,7 @@ class VibrationalAnalysis:
 
         natm = molecule.number_of_atoms()
 
-        normal_mode_grp = hf.create_group('normal_modes')
+        normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
         for n, Q in enumerate(self.normal_modes, 1):
             normal_mode_grp.create_dataset(str(n),
                                            data=np.array([Q]).reshape(natm, 3))
