@@ -644,11 +644,21 @@ def read_results(fname, label):
             xyz_geometries.append(molecule.get_xyz_string())
         res_dict["opt_geometries"] = xyz_geometries
     
+    # Create molecule xyz
+    nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+    coords = res_dict["atom_coordinates"]
+    molecule = Molecule(nuclear_charges, coords, units="au")
+
+    xyz_lines = molecule.get_xyz_string().splitlines()
+
+    xyz = []
+    for line in xyz_lines[2:]:
+        xyz.append(line)
+
+    res_dict["xyz"] = xyz
+
     if "vib" in label:
-        # Create the molecule xyz string
-        nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
-        coords = res_dict["atom_coordinates"]
-        molecule = Molecule(nuclear_charges, coords, units="au")
+        # needed to animate the molecular vibrations
         res_dict["molecule_xyz_string"] = molecule.get_xyz_string()
 
     h5f.close()
