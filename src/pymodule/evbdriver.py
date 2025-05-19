@@ -993,9 +993,15 @@ class EvbDriver():
             Lambda = np.append(Lambda, 1)
 
         E_data = np.loadtxt(E_file, skiprows=1, delimiter=',').T
-        fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
-        rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
-        pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
+        fg_data = []
+        rea_fg_data = []
+        pro_fg_data = []
+        if Path(fg_file).exists():
+            fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
+        if Path(fg_rea_file).exists():
+            rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
+        if Path(fg_pro_file).exists():
+            pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
 
         sub_indices = l_sub_indices[::time_sub_sample]
