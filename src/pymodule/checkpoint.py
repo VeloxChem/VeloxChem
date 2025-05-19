@@ -610,13 +610,18 @@ def read_results(fname, label):
     for key in h5f:
         if key not in ["vib", "rsp", "scf", "opt"]:
             data = np.array(h5f.get(key))
-            res_dict[key] = data
+            # Check if data is a number or an array
+            if len(data.shape) == 1 and data.shape[0] == 1:
+                res_dict[key] = data[0]
+            else:
+                res_dict[key] = data
 
     h5f_dict = h5f[label]
 
     for key in h5f_dict:
-        # For known lists of arrays, read the sub-group accordingly
-        if "normal_modes" in key or "resonance_raman_activity" in key:
+        # For known lists of arrays (normal modes, raman and resonance raman),
+        # read the sub-group accordingly
+        if "normal_modes" in key or "raman_activities" in key:
             sub_dict = dict(h5f_dict[key])
             sub_dict_results = {}
             for sub_key in sub_dict:
@@ -638,6 +643,13 @@ def read_results(fname, label):
             molecule = Molecule(nuclear_charges, coords, units="au")
             xyz_geometries.append(molecule.get_xyz_string())
         res_dict["opt_geometries"] = xyz_geometries
+    
+    if "vib" in label:
+        # Create the molecule xyz string
+        nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+        coords = res_dict["atom_coordinates"]
+        molecule = Molecule(nuclear_charges, coords, units="au")
+        res_dict["molecule_xyz_string"] = molecule.get_xyz_string()
 
     h5f.close()
     
