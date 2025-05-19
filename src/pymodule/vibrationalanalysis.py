@@ -1038,6 +1038,10 @@ class VibrationalAnalysis:
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         natm = molecule.number_of_atoms()
+        nmodes = len(self.vib_frequencies)
+
+        hf.create_dataset(vib_group + "number_of_modes",
+                        data=np.array([nmodes]))
 
         normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
         for n, Q in enumerate(self.normal_modes, 1):

@@ -38,6 +38,7 @@ import h5py
 from .veloxchemlib import mpi_master
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
+from .molecule import Molecule
 
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
@@ -605,18 +606,39 @@ def read_results(fname, label):
 
     assert_msg_critical(label in h5f, label + " section not found in the checkpoint file.")
 
+    # Always read general information about the molecule, basis, and settings
+    for key in h5f:
+        if key not in ["vib", "rsp", "scf", "opt"]:
+            data = np.array(h5f.get(key))
+            res_dict[key] = data
+
     h5f_dict = h5f[label]
 
     for key in h5f_dict:
-        if "normal_modes" in key:
-            modes_dict = dict(h5f_dict[key])
-            modes = []
-            for mode in modes_dict:
-                modes.append(np.array(modes_dict[mode]))
-                res_dict[key] = modes
+        # For known lists of arrays, read the sub-group accordingly
+        if "normal_modes" in key or "resonance_raman_activity" in key:
+            sub_dict = dict(h5f_dict[key])
+            sub_dict_results = {}
+            for sub_key in sub_dict:
+                sub_dict_results[sub_key] = np.array(sub_dict[sub_key])
+            res_dict[key] = sub_dict_results
         else:
             data = np.array(h5f_dict[key])
-            res_dict[key] = data
+            # Check if data is a number or an array
+            if len(data.shape) == 1 and data.shape[0] == 1:
+                res_dict[key] = data[0]
+            else:
+                res_dict[key] = data
+
+    if "opt" in label:
+        # Create the list of xyz geometries
+        nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+        xyz_geometries = []
+        for coords in res_dict["opt_coordinates_au"]:
+            molecule = Molecule(nuclear_charges, coords, units="au")
+            xyz_geometries.append(molecule.get_xyz_string())
+        res_dict["opt_geometries"] = xyz_geometries
+
     h5f.close()
     
     return res_dict
