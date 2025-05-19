@@ -83,7 +83,9 @@ class TestEvb:
             "charges": None,
         }]
 
-        reactant, product, formed_bonds, broken_bonds = ffbuilder.build_forcefields(
+        ffbuilder.water_model = 'spce'
+
+        reactant, product, formed_bonds, broken_bonds, reactants, products = ffbuilder.build_forcefields(
             [reactant_input],
             product_input,
         )
@@ -165,6 +167,7 @@ class TestEvb:
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
         system_builder = EvbSystemBuilder()
+        system_builder.water_model = 'spce'
         vac_systems, vac_topology, vac_positions = system_builder.build_systems(
             reactant,
             product,
@@ -256,15 +259,29 @@ class TestEvb:
         E_file = folder / 'evb_Sn2_vacuum_Energies.csv'
         data_file = folder / 'evb_Sn2_vacuum_Data_combined.csv'
         options_file = folder / 'evb_options.json'
-        specific, common = EVB._load_output_files(E_file, data_file,
-                                                  options_file)
+        specific, common = EVB._load_output_files(
+            E_file,
+            #todo add forcegroup files
+            "nothing",
+            "nada",
+            "noppes",
+            data_file,
+            options_file,
+        )
         specific_results.update({'vacuum': specific})
 
         E_file = folder / 'evb_Sn2_water_Energies.csv'
         data_file = folder / 'evb_Sn2_water_Data_combined.csv'
         options_file = folder / 'evb_options.json'
-        specific, common = EVB._load_output_files(E_file, data_file,
-                                                  options_file)
+        specific, common = EVB._load_output_files(
+            E_file,
+            #todo add forcegroup files
+            "nothing",
+            "nada",
+            "noppes",
+            data_file,
+            options_file,
+        )
         specific_results.update({'water': specific})
 
         input_results.update(common)

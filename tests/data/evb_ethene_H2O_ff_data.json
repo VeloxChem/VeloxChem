@@ -55,34 +55,31 @@
             "equivalent_atom": "ha_00"
         },
         "6": {
-            "type": "oh",
-            "name": "O2",
+            "type": "ow",
+            "name": "O22",
             "mass": 15.994915,
-            "charge": -0.813698,
-            "sigma": 0.3242871334030835,
-            "epsilon": 0.389112,
-            "equivalent_atom": "ow_00",
-            "comment": "Reaction-water oxygen"
+            "charge": -0.8476,
+            "sigma": 0.31658,
+            "epsilon": 0.649775,
+            "equivalent_atom": "SPC/E water"
         },
         "7": {
-            "type": "ho",
-            "name": "H22",
-            "mass": 1.007825,
-            "charge": 0.406024,
-            "sigma": 0.053792464601313685,
-            "epsilon": 0.019664800000000003,
-            "equivalent_atom": "hw_00",
-            "comment": "Reaction-water hydrogen"
-        },
-        "8": {
-            "type": "ho",
+            "type": "hw",
             "name": "H12",
             "mass": 1.007825,
-            "charge": 0.407674,
-            "sigma": 0.053792464601313685,
-            "epsilon": 0.019664800000000003,
-            "equivalent_atom": "hw_00",
-            "comment": "Reaction-water hydrogen"
+            "charge": 0.4238,
+            "sigma": 0.11658,
+            "epsilon": 0.064978,
+            "equivalent_atom": "SPC/E water"
+        },
+        "8": {
+            "type": "hw",
+            "name": "H02",
+            "mass": 1.007825,
+            "charge": 0.4238,
+            "sigma": 0.11658,
+            "epsilon": 0.064978,
+            "equivalent_atom": "SPC/E water"
         }
     },
     "bonds": {
@@ -118,15 +115,15 @@
         },
         "(6, 8)": {
             "type": "harmonic",
-            "force_constant": 462750.3999999999,
-            "equilibrium": 0.09572000000000001,
-            "comment": "ow-hw"
+            "force_constant": 345000,
+            "equilibrium": 0.1,
+            "comment": "SPC/E water"
         },
         "(6, 7)": {
             "type": "harmonic",
-            "force_constant": 462750.3999999999,
-            "equilibrium": 0.09572000000000001,
-            "comment": "ow-hw"
+            "force_constant": 345000,
+            "equilibrium": 0.1,
+            "comment": "SPC/E water"
         }
     },
     "angles": {
@@ -168,9 +165,9 @@
         },
         "(7, 6, 8)": {
             "type": "harmonic",
-            "force_constant": 836.8000000000001,
-            "equilibrium": 104.52,
-            "comment": "hw-ow-hw"
+            "force_constant": 383,
+            "equilibrium": 109.47,
+            "comment": "SPC/E water"
         }
     },
     "dihedrals": {

@@ -98,6 +98,7 @@ class EvbDriver():
         self.fast_run = False
 
         self.t_label = int(time.time())
+        self.water_model = 'spce'
 
     def build_and_run_default_water_EVB(
         self,
@@ -185,13 +186,14 @@ class EvbDriver():
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
         ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
+        ffbuilder.water_model = self.water_model
         ffbuilder.reparameterize = reparameterize
         ffbuilder.optimize = optimize
 
         if isinstance(breaking_bonds, tuple):
             breaking_bonds = [breaking_bonds]
 
-        self.reactant, self.product, self.formed_bonds, self.broken_bonds,self.reactants,self.products = ffbuilder.build_forcefields(
+        self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
             rea_input,
             pro_input,
             ordered_input,
@@ -270,8 +272,7 @@ class EvbDriver():
         if (combined_rea_input['forcefield'] is not None
                 and combined_rea_input['molecule'] is not None
                 and combined_pro_input['forcefield'] is not None
-                and mapped_product_path.exists()
-                and not force_recalculation):
+                and mapped_product_path.exists() and not force_recalculation):
             mapped_product_molecule = Molecule.read_xyz_file(
                 str(mapped_product_path))
             combined_pro_input['forcefield'].molecule = mapped_product_molecule
@@ -296,6 +297,7 @@ class EvbDriver():
             )
 
             ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
+            ffbuilder.water_model = self.water_model
             ffbuilder.reparameterize = reparameterize
             ffbuilder.optimize = optimize
 
@@ -625,6 +627,7 @@ class EvbDriver():
                 conf.pop("pressure")
             # build the system
             system_builder = EvbSystemBuilder(ostream=self.ostream)
+            system_builder.water_model = self.water_model
             self.ostream.print_blank()
             self.ostream.print_header(f"Building systems for {conf['name']}")
             self.ostream.flush()
@@ -896,9 +899,12 @@ class EvbDriver():
         dp.plot_results(self.results, **kwargs)
         self.ostream.flush()
 
-    def _load_output_from_folders(self, lambda_sub_sample,
-                                  lambda_sub_sample_ends,
-                                  time_sub_sample) -> dict:
+    def _load_output_from_folders(
+        self,
+        lambda_sub_sample,
+        lambda_sub_sample_ends,
+        time_sub_sample,
+    ) -> dict:
         reference_folder = self.system_confs[0]["data_folder"]
         target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
 
@@ -916,14 +922,14 @@ class EvbDriver():
             data_file = str(cwd / folder / "Data_combined.csv")
             options_file = str(cwd / folder / "options.json")
             fg_file = str(cwd / folder / "ForceGroups.csv")
-            rea_fg_file = str(cwd/folder/"ForceGroups_rea.csv")
-            pro_fg_file = str(cwd/folder/"ForceGroups_pro.csv")
+            rea_fg_file = str(cwd / folder / "ForceGroups_rea.csv")
+            pro_fg_file = str(cwd / folder / "ForceGroups_pro.csv")
             specific, common = self._load_output_files(
                 E_file,
                 fg_file,
                 rea_fg_file,
                 pro_fg_file,
-                data_file, 
+                data_file,
                 options_file,
                 lambda_sub_sample,
                 lambda_sub_sample_ends,
@@ -948,16 +954,18 @@ class EvbDriver():
             results.update({key: val})
         return results
 
-    def _load_output_files(self,
-                            E_file,
-                            fg_file,
-                            fg_rea_file,
-                            fg_pro_file,    
-                            data_file,
-                            options_file,
-                            lambda_sub_sample=1,
-                            lambda_sub_sample_ends=False,
-                            time_sub_sample=1):
+    def _load_output_files(
+        self,
+        E_file,
+        fg_file,
+        fg_rea_file,
+        fg_pro_file,
+        data_file,
+        options_file,
+        lambda_sub_sample=1,
+        lambda_sub_sample_ends=False,
+        time_sub_sample=1,
+    ):
         with open(options_file, "r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
@@ -984,9 +992,15 @@ class EvbDriver():
             Lambda = np.append(Lambda, 1)
 
         E_data = np.loadtxt(E_file, skiprows=1, delimiter=',').T
-        fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
-        rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
-        pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
+        fg_data = []
+        rea_fg_data = []
+        pro_fg_data = []
+        if Path(fg_file).exists():
+            fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
+        if Path(fg_rea_file).exists():
+            rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
+        if Path(fg_pro_file).exists():
+            pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
 
         sub_indices = l_sub_indices[::time_sub_sample]
@@ -1115,8 +1129,8 @@ class EvbDriver():
             }
         elif name == "water" or name == "water_NPT":
             conf = {
-                "name": "water",
-                "solvent": "spce",
+                "name": f"water_{self.water_model}_NPT",
+                "solvent": self.water_model,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "padding": 1.5,
@@ -1125,8 +1139,8 @@ class EvbDriver():
             }
         elif name == "water_NVT":
             conf = {
-                "name": "water",
-                "solvent": "spce",
+                "name": f"water_{self.water_model}_NVT",
+                "solvent": self.water_model,
                 "temperature": self.temperature,
                 "padding": 1.5,
                 "ion_count": 0,
@@ -1134,8 +1148,8 @@ class EvbDriver():
             }
         elif name == "E_field":
             conf = {
-                "name": "water_E_field",
-                "solvent": "spce",
+                "name": f"water_E_field_{self.water_model}",
+                "solvent": self.water_model,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "padding": 1.5,
@@ -1145,7 +1159,7 @@ class EvbDriver():
         elif name == "no_reactant":
             conf = {
                 "name": "no_reactant",
-                "solvent": "spce",
+                "solvent": self.water_model,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "padding": 1.5,
