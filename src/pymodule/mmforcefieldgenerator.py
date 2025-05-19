@@ -823,7 +823,7 @@ class MMForceFieldGenerator:
         return {
             'dihedral_angles': np.array(fitted_dihedral_results['dihedral_angles']),
             'qm_scan_kJpermol': np.array(fitted_dihedral_results['qm_scan_kJpermol']),
-            'mm_scan_kJ_permol': np.array(fitted_dihedral_results['mm_scan_kJpermol']),
+            'mm_scan_kJpermol': np.array(fitted_dihedral_results['mm_scan_kJpermol']),
             'maximum_difference': self.fitting_summary['maximum_difference'],
             'standard_deviation': self.fitting_summary['standard_deviation'],
         }
