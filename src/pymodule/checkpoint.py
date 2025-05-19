@@ -143,7 +143,7 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         hf.close()
 
 
-def write_rsp_solution(fname, key, vec):
+def write_rsp_solution(fname, key, vec, group_label='rsp'):
     """
     Writes a response solution vector to HDF5 file.
 
@@ -153,18 +153,20 @@ def write_rsp_solution(fname, key, vec):
         The key for the solution vector.
     :param vec:
         The solution vector.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
-        label = 'rsp/' + key
+        label = group_label + '/' + key
         if label in hf:
             del hf[label]
         hf.create_dataset(label, data=vec)
         hf.close()
 
 
-def write_rsp_solution_with_multiple_keys(fname, keys, vec):
+def write_rsp_solution_with_multiple_keys(fname, keys, vec, group_label='rsp'):
     """
     Writes a response solution vector with multiple keys to HDF5 file.
 
@@ -174,18 +176,20 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         The list of keys for the solution vector.
     :param vec:
         The solution vector.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
 
-        label = 'rsp/' + keys[0]
+        label = group_label + '/' + keys[0]
         if label in hf:
             del hf[label]
         dset = hf.create_dataset(label, data=vec)
 
         for key in keys[1:]:
-            label = 'rsp/' + key
+            label = group_label + '/' + key
             if label in hf:
                 del hf[label]
             hf[label] = dset
@@ -193,7 +197,7 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         hf.close()
 
 
-def write_lr_rsp_results_to_hdf5(fname, rsp_results):
+def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
     """
     Writes the results of a linear response calculation to HDF5 file.
 
@@ -201,6 +205,8 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
         Name of the HDF5 file.
     :param rsp_results:
         The dictionary containing the linear response results.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
@@ -212,7 +218,7 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
             if "vector" in key or "cube" in key or "file" in key or "details" in key:
                 continue
 
-            label = 'rsp/' + key
+            label = group_label + '/' + key
             if label in hf:
                 del hf[label]
             hf.create_dataset(label, data=rsp_results[key])
@@ -269,7 +275,7 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     return True
 
 
-def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
+def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, group_label='rsp'):
     """
     Writes the detachment and attachment density matrices for a specific
     excited state to the checkpoint file.
@@ -282,6 +288,8 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
         The detachment density matrix.
     :param dens_attach:
         The attachment density matrix.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
@@ -290,12 +298,12 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
 
         # add detachment/attachment densities to the rsp group
 
-        detach_label = "rsp/detach_" + state_label
+        detach_label = group_label + "/detach_" + state_label
         if detach_label in hf:
             del hf[detach_label]
         hf.create_dataset(detach_label, data=dens_detach)
 
-        attach_label = "rsp/attach_" + state_label
+        attach_label = group_label + "/attach_" + state_label
         if attach_label in hf:
             del hf[attach_label]
         hf.create_dataset(attach_label, data=dens_attach)

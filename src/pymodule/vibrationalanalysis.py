@@ -660,12 +660,16 @@ class VibrationalAnalysis:
             lr_drv = ComplexResponse(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
+            # save response results in the vib sub-folder of the checkpoint file
+            lr_drv.group_label = 'vib/rsp'
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = polgrad_drv.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
+            # save response results in the vib subfolder of the cehckpoint file
+            lr_drv.group_label = 'vib/rsp'
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = self.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
