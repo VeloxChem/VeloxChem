@@ -222,6 +222,13 @@ class CGradientScreeningData
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_dd;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_dd;
 
+    std::vector<std::vector<double>> _local_D_ik_for_K_ss;
+    std::vector<std::vector<double>> _local_D_ik_for_K_sp;
+    std::vector<std::vector<double>> _local_D_ik_for_K_sd;
+    std::vector<std::vector<double>> _local_D_ik_for_K_pp;
+    std::vector<std::vector<double>> _local_D_ik_for_K_pd;
+    std::vector<std::vector<double>> _local_D_ik_for_K_dd;
+
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
     auto _sortQ(const int64_t                s_prim_count,
@@ -444,6 +451,13 @@ class CGradientScreeningData
     auto get_local_pair_inds_i_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
     auto get_local_pair_inds_k_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
 
+    auto get_local_D_ik_for_K_ss(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_local_D_ik_for_K_sp(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_local_D_ik_for_K_sd(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_local_D_ik_for_K_pp(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_local_D_ik_for_K_pd(const int64_t gpu_id) const -> const std::vector<double>&;
+    auto get_local_D_ik_for_K_dd(const int64_t gpu_id) const -> const std::vector<double>&;
+
     auto get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) const -> CDenseMatrix;
     auto get_mat_D_abs_full(const int64_t s_prim_count,
                             const int64_t p_prim_count,
@@ -464,7 +478,16 @@ class CGradientScreeningData
                                  const std::vector<double>&   p_prim_info,
                                  const std::vector<double>&   d_prim_info) -> void;
 
-    auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
+    auto form_pair_inds_for_K(const int64_t s_prim_count,
+                              const int64_t p_prim_count,
+                              const int64_t d_prim_count,
+                              const std::vector<uint32_t>& s_prim_aoinds,
+                              const std::vector<uint32_t>& p_prim_aoinds,
+                              const std::vector<uint32_t>& d_prim_aoinds,
+                              const CDenseMatrix& Q_prime,
+                              const double Q_prime_thresh,
+                              const int64_t naos,
+                              const double* dens_ptr) -> void;
 };
 
 #endif /* GradientScreeningData_hpp */
