@@ -1701,6 +1701,7 @@ class ScfDriver:
 
                 fock_prep_dt = eri_t1 - eri_t0
                 fock_prep_dt -= (max_coulomb_timing + max_coulomb_timing)
+                fock_prep_dt = max(0.0, fock_prep_dt)
                 profiler.add_timing_info('FockPrep', fock_prep_dt)
                 profiler.add_timing_info('FockJ', max_coulomb_timing)
                 profiler.add_timing_info('FockK', max_exchange_timing)
