@@ -107,6 +107,7 @@ class EvbFepDriver():
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = False
+        self.xml_save_interval: int = 10
 
         self.keywords = {
             "friction": {
@@ -169,6 +170,9 @@ class EvbFepDriver():
             "save_crash_xml": {
                 "type": bool
             },
+            "xml_save_interval":{
+                "type": int
+            }
         }
 
     def run_FEP(
@@ -568,7 +572,7 @@ class EvbFepDriver():
             step_num = step - len(states) + j
             xml_name = f"state_step_{j}_{step_num}"
             pdb_name = f"state_step_{step_num}"
-            if self.save_crash_xml:
+            if self.save_crash_xml and j%self.xml_save_interval == 0:
                 with open(path / f"{xml_name}.xml", "w") as f:
                     f.write(mm.XmlSerializer.serialize(state))
 
