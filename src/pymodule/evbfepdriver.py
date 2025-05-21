@@ -104,10 +104,10 @@ class EvbFepDriver():
         self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
-        self.save_frames: int = 1000
+        self.save_frames: int = 2000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
-        self.xml_save_interval: int = 10
+        self.xml_save_interval: int = 50
 
         self.keywords = {
             "friction": {
