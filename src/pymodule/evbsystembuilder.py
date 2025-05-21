@@ -109,14 +109,11 @@ class EvbSystemBuilder():
         self.soft_core_coulomb_int = False
         self.soft_core_lj_int = True
 
-        self.no_int_coul = False
-        self.no_int_lj = False
-
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.1  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
 
-        self.int_nb_const_exceptions = False  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
+        self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
         self.verbose = False
 
@@ -162,12 +159,6 @@ class EvbSystemBuilder():
                 "type": bool
             },
             "soft_core_lj_int": {
-                "type": bool
-            },
-            "no_int_coul": {
-                "type": bool
-            },
-            "no_int_lj": {
                 "type": bool
             },
             "int_nb_const_exceptions": {
@@ -347,19 +338,11 @@ class EvbSystemBuilder():
             rea_topology = rea_modeller.getTopology()
             rea_pdb_pos = rea_modeller.getPositions()
             # pass
-            assert len(reactant.atoms) == rea_topology.getNumAtoms(
+            assert len(self.reactant.atoms) == rea_topology.getNumAtoms(
             ), "Number of atoms in the reactant and the topology do not match"
 
-        topology = env_topology
-
-        if not self.no_force_groups:
-            for force in system.getForces():
-                if not (isinstance(force, mm.CMMotionRemover)
-                        or isinstance(force, mm.NonbondedForce)):
-                    force.setForceGroup(EvbForceGroup.PDB.value)
-                    force.setName(force.getName() + "PDB")
-
-        return system_mol, topology, system_mol
+            topology = env_topology
+        return system, topology, system_mol
 
     def _configure_box(self, system, topology, nb_force):
         x_size = 0.1 * (max(self.positions[:, 0]) - min(self.positions[:, 0]))
@@ -385,7 +368,8 @@ class EvbSystemBuilder():
         topology.setPeriodicBoxVectors(list_box)
 
         nb_force.setCutoffDistance(self.nb_cutoff)
-        self.ostream.print_info(f"Setting nonbonded cutoff to {self.nb_cutoff:.3f} nm")
+        self.ostream.print_info(
+            f"Setting nonbonded cutoff to {self.nb_cutoff:.3f} nm")
         if self.nb_switching_function:
             nb_force.setUseSwitchingFunction(True)
             nb_force.setSwitchingDistance(0.9 * self.nb_cutoff)
@@ -1022,42 +1006,41 @@ class EvbSystemBuilder():
             if not self.no_reactant:
                 self._add_reaction_forces(new_system, lam)
             systems[lam] = new_system
+
+            if lam == 0:
+                new_system = copy.deepcopy(system)
+                self._add_reaction_forces(new_system, lam, pes=True)
+                systems['reactant'] = new_system
+            if lam == 1:
+                new_system = copy.deepcopy(system)
+                self._add_reaction_forces(new_system, lam, pes=True)
+                systems['product'] = new_system
         return systems
 
-    def _add_reaction_forces(self, system, lam):
+    def _add_reaction_forces(self, system, lam, pes=False):
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
-        bonded_harmonic, bonded_integration, morse_force, max_distance, = self._create_bond_forces(
-            lam)
-        angle, angle_integration = self._create_angle_forces(lam)
+        bonded_harmonic = self._create_harmonic_bond_forces(lam, not pes)
+        angle = self._create_harmonic_angle_forces(lam, not pes)
+        # angle, angle_integration = self._create_angle_forces(lam)
         torsion = self._create_proper_torsion_forces(lam)
         improper = self._create_improper_torsion_forces(lam)
 
-        # The bonded_integration flag causes the nonbonded exceptions to be created as if the bonds of the reactant and product are all present all the time, and thus to exclude these nonbonded interactions over the entire lambda vector.
-        # This is compensated through the extra bonded interactions (labeled with integration)
-        # This only affects the integration potential as the hard core interactions are used for integration
+        morse = self._create_morse_force()
 
-        intlj, intcoul = self._create_nonbonded_forces(
+        if pes:
+            sclj = self.soft_core_lj_pes
+            sccoul = self.soft_core_coulomb_pes
+        else:
+            sclj = self.soft_core_lj_int
+            sccoul = self.soft_core_coulomb_int
+        syslj, syscoul = self._create_nonbonded_forces(
             lam,
-            constant_exceptions=self.int_nb_const_exceptions,
-            lj_soft_core=self.soft_core_lj_int,
-            coul_soft_core=self.soft_core_coulomb_int,
+            constant_exceptions=not pes,
+            lj_soft_core=sclj,
+            coul_soft_core=sccoul,
         )
-        intljname = intlj.getName() + "(int)"
-        intlj.setName(intljname)
-        intcoulname = intcoul.getName() + "(int)"
-        intcoul.setName(intcoulname)
-
-        # The soft core forces are used for the PES calculations, and thus always have the 'correct' exceptions
-        peslj, pescoul = self._create_nonbonded_forces(
-            lam,
-            constant_exceptions=False,
-            lj_soft_core=self.soft_core_lj_pes,
-            coul_soft_core=self.soft_core_coulomb_pes,
-        )
-        pesljname = peslj.getName() + "(pes)"
-        peslj.setName(pesljname)
 
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
@@ -1068,45 +1051,28 @@ class EvbSystemBuilder():
             torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
             improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
 
-            if not self.no_int_lj:
-                intlj.setForceGroup(EvbForceGroup.INTLJ.value)
-            if not self.no_int_coul:
-                intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
-            peslj.setForceGroup(EvbForceGroup.PESLJ.value)
-            pescoul.setForceGroup(EvbForceGroup.PESCOUL.value)
             bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
             constant_force.setForceGroup(EvbForceGroup.CONSTRAINT.value)
             angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
             torsion_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
 
+            syslj.setForceGroup(EvbForceGroup.INTLJ.value)
+
+            syscoul.setForceGroup(EvbForceGroup.INTCOUL.value)
+            morse.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
+
         system.addForce(bonded_harmonic)
         system.addForce(angle)
         system.addForce(torsion)
         system.addForce(improper)
-        system.addForce(intlj)
-        system.addForce(intcoul)
-        system.addForce(peslj)
-        system.addForce(pescoul)
+        system.addForce(syslj)
+        system.addForce(syscoul)
         system.addForce(bond_constraint)
         system.addForce(constant_force)
         system.addForce(angle_constraint)
         system.addForce(torsion_constraint)
-
-        if self.bonded_integration:
-            if not self.no_force_groups:
-                bonded_integration.setForceGroup(
-                    EvbForceGroup.INTEGRATION.value)
-                angle_integration.setForceGroup(EvbForceGroup.INTEGRATION.value)
-                morse_force.setForceGroup(EvbForceGroup.PES.value)
-            system.addForce(bonded_integration)
-            system.addForce(angle_integration)
-            system.addForce(morse_force)
-        else:
-            if not self.no_force_groups:
-                morse_force.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
-                max_distance.setForceGroup(EvbForceGroup.RESTRAINT.value)
-            system.addForce(morse_force)
-            system.addForce(max_distance)
+        if pes:
+            system.addForce(morse)
         return system
 
     def _add_E_field(self, system, E_field):
@@ -1129,7 +1095,7 @@ class EvbSystemBuilder():
             E_field_force.setForceGroup(EvbForceGroup.E_FIELD.value)
         return E_field_force
 
-    def _create_bond_forces(self, lam):
+    def _create_harmonic_bond_forces(self, lam, model_broken):
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
@@ -1137,9 +1103,45 @@ class EvbSystemBuilder():
         harmonic_force = mm.HarmonicBondForce()
         harmonic_force.setName("Reaction harmonic bond")
 
-        integration_force = mm.HarmonicBondForce()
-        integration_force.setName("Integration reaction harmonic bond")
+        bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
+        for key in bond_keys:
+            atom_ids = self._key_to_id(key, self.reaction_atoms)
+            if key in self.reactant.bonds and key in self.product.bonds:
+                bondA = self.reactant.bonds[key]
+                fcA = bondA['force_constant']
+                eqA = bondA['equilibrium']
+                bondB = self.product.bonds[key]
+                fcB = bondB['force_constant']
+                eqB = bondB['equilibrium']
+            elif key in self.reactant.bonds:
+                bondA = self.reactant.bonds[key]
+                fcA = bondA['force_constant']
+                eqA = bondA['equilibrium']
 
+                coords = self.product.molecule.get_coordinates_in_angstrom()
+                eqB = self.measure_length(coords[key[0]], coords[key[1]])
+                if model_broken:
+                    fcB = fcA
+                else:
+                    fcB = 0
+            else:
+                bondB = self.product.bonds[key]
+                fcB = bondB['force_constant']
+                eqB = bondB['equilibrium']
+
+                coords = self.reactant.molecule.get_coordinates_in_angstrom()
+                eqA = self.measure_length(coords[key[0]], coords[key[1]])
+                if model_broken:
+                    fcA = fcB
+                else:
+                    fcA = 0
+            eq = eqA * (1 - lam) + eqB * lam
+            fc = fcA * (1 - lam) + fcB * lam
+            self._add_bond(harmonic_force, atom_ids, eq, fc)
+
+        return harmonic_force
+
+    def _create_morse_force(self):
         morse_expr = "D*(1-exp(-a*(r-re)))^2;"
         morse_force = mm.CustomBondForce(morse_expr)
         morse_force.setName("Reaction morse bond")
@@ -1147,113 +1149,69 @@ class EvbSystemBuilder():
         morse_force.addPerBondParameter("a")
         morse_force.addPerBondParameter("re")
 
-        max_dist_expr = "k*step(r-rmax)*(r-rmax)^2"
-        max_distance = mm.CustomBondForce(max_dist_expr)
-        max_distance.setName("Reaction distance restraint")
-        max_distance.addPerBondParameter("rmax")
-        max_distance.addPerBondParameter("k")
-
         bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
-        static_bond_keys = list(
-            set(self.reactant.bonds) & set(self.product.bonds))
-        broken_bond_keys = list(
-            set(self.reactant.bonds) - set(self.product.bonds))
-        formed_bond_keys = list(
-            set(self.product.bonds) - set(self.reactant.bonds))
 
         for key in bond_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
-            if key in static_bond_keys:
-                bondA = self.reactant.bonds[key]
-                bondB = self.product.bonds[key]
-                self._add_bond(
-                    harmonic_force,
-                    atom_ids,
-                    bondA['equilibrium'],
-                    bondA['force_constant'] * (1 - lam),
-                )
-                self._add_bond(
-                    harmonic_force,
-                    atom_ids,
-                    bondB['equilibrium'],
-                    bondB['force_constant'] * lam,
-                )
-            else:
-                if key in broken_bond_keys:
-                    scale = 1 - lam
-                    bond = self.reactant.bonds[key]
-                    broken_coords = self.product.molecule.get_coordinates_in_angstrom(
-                    )
-                elif key in formed_bond_keys:
-                    scale = lam
-                    bond = self.product.bonds[key]
-                    broken_coords = self.reactant.molecule.get_coordinates_in_angstrom(
-                    )
-                else:
-                    assert (
-                        False
-                    ), "A bond can either be static, or dynamic, in  which case it can be broken or formed"
-                broken_length = (self.measure_length(
-                    broken_coords[key[0]], broken_coords[key[1]]) * 0.1)
+            if key in self.reactant.bonds and not key in self.product.bonds:
+                bond = self.reactant.bonds[key]
+                self._add_morse_bond(morse_force, bond, atom_ids)
+            elif not key in self.reactant.bonds and key in self.product.bonds:
+                bond = self.product.bonds[key]
+                self._add_morse_bond(morse_force, bond, atom_ids)
+        return morse_force
 
-                # self._add_harm_bond(harmonic_dynamic_force, bond, atom_ids, scale)
-                self._add_morse_bond(morse_force, bond, atom_ids, scale)
-                self._add_distance_restraint(max_distance, atom_ids,
-                                             broken_length, 1 - scale)
-
-                # This the force constant is not scaled down (fully) with lambda, because if bonded_integration is turned on, the morse force is not included in the integration potential
-                # The bonded integration factor is scaled up based on lambda, to make sure that there is a full bonded interaction when the bond is present
-                self._add_bond(
-                    integration_force,
-                    atom_ids,
-                    bond['equilibrium'] * scale + broken_length * (1 - scale),
-                    bond['force_constant'] *
-                    (1 - scale * self.bonded_integration_bond_fac),
-                )
-        return harmonic_force, integration_force, morse_force, max_distance
-
-    def _create_angle_forces(self, lam: float):
+    def _create_harmonic_angle_forces(self, lam: float, model_broken):
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
         harmonic_force = mm.HarmonicAngleForce()
         harmonic_force.setName("Reaction angle")
-        integration_force = mm.HarmonicAngleForce()
-        integration_force.setName("Integration reaction angle")
 
         angle_keys = list(set(self.reactant.angles) | set(self.product.angles))
         for key in angle_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
-            if key in self.reactant.angles.keys(
-            ) and key in self.product.angles.keys():
+            if (key in self.reactant.angles.keys()
+                    and key in self.product.angles.keys()):
                 angleA = self.reactant.angles[key]
                 angleB = self.product.angles[key]
-                self._add_angle(harmonic_force, atom_ids, angleA['equilibrium'],
-                                angleA['force_constant'] * (1 - lam))
-                self._add_angle(harmonic_force, atom_ids, angleB['equilibrium'],
-                                angleB['force_constant'] * (lam))
-            else:
-                if key in self.reactant.angles.keys():
-                    scale = 1 - lam
-                    angle = self.reactant.angles[key]
-                    broken_coords = self.product.molecule.get_coordinates_in_angstrom(
-                    )
+
+                fcA = angleA['force_constant']
+                eqA = angleA['equilibrium']
+
+                fcB = angleB['force_constant']
+                eqB = angleB['equilibrium']
+            elif key in self.reactant.angles.keys():
+                # take angle from reactant, and from product structure
+                angleA = self.reactant.angles[key]
+                fcA = angleA['force_constant']
+                eqA = angleA['equilibrium']
+
+                coords = self.product.molecule.get_coordinates_in_angstrom()
+                eqB = self.measure_angle(coords[key[0]], coords[key[1]],
+                                         coords[key[2]])
+                if model_broken:
+                    fcB = fcA
                 else:
-                    scale = lam
-                    angle = self.product.angles[key]
-                    broken_coords = self.reactant.molecule.get_coordinates_in_angstrom(
-                    )
-                broken_equil = self.measure_angle(broken_coords[key[0]],
-                                                  broken_coords[key[1]],
-                                                  broken_coords[key[2]])
+                    fcB = 0
+            else:
+                coords = self.reactant.molecule.get_coordinates_in_angstrom()
+                eqA = self.measure_angle(coords[key[0]], coords[key[1]],
+                                         coords[key[2]])
 
-                self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
-                                angle['force_constant'] * scale)
-                self._add_angle(integration_force, atom_ids, broken_equil,
-                                angle['force_constant'] * (1 - scale))
-
-        return harmonic_force, integration_force
+                angleB = self.product.angles[key]
+                eqB = angleB['equilibrium']
+                fcB = angleB['force_constant']
+                fcA = fcB
+                if model_broken:
+                    fcA = fcB
+                else:
+                    fcA = 0
+            eq = eqA * (1 - lam) + eqB * lam
+            fc = fcA * (1 - lam) + fcB * lam
+            self._add_angle(harmonic_force, atom_ids, eq, fc)
+        return harmonic_force
 
     def _create_proper_torsion_forces(self, lam):
 
@@ -1803,12 +1761,7 @@ class EvbForceGroup(Enum):
         ])
 
     @classmethod
-    def NVT_integration_force_groups(cls):
-        int_fg = cls.integration_force_groups()
-        int_fg.remove(cls.BAROSTAT.value)
-        return int_fg
-
-    @classmethod
+    #todo deprecate this
     def pes_force_groups(cls):
         return set([
             cls.DEFAULT.value,

@@ -52,8 +52,10 @@ class EvbReporter():
         self,
         energy_file,
         report_interval,
-        reactant_ff,
-        product_ff,
+        reactant_int_sys,
+        product_int_sys,
+        reactant_pes_sys,
+        product_pes_sys,
         topology,
         Lambda,
         outputstream,
@@ -85,25 +87,25 @@ class EvbReporter():
         self.simulation_dicts.update({
             'reactant_pes': {
                 "simulation":
-                mmapp.Simulation(topology, reactant_ff, mm.VerletIntegrator(1)),
+                mmapp.Simulation(topology, reactant_pes_sys, mm.VerletIntegrator(1)),
                 "forcegroups":
                 EvbForceGroup.pes_force_groups(),
             },
             'product_pes': {
                 "simulation":
-                mmapp.Simulation(topology, product_ff, mm.VerletIntegrator(1)),
+                mmapp.Simulation(topology, product_pes_sys, mm.VerletIntegrator(1)),
                 "forcegroups":
                 EvbForceGroup.pes_force_groups(),
             },
             'reactant_integration': {
                 "simulation":
-                mmapp.Simulation(topology, reactant_ff, mm.VerletIntegrator(1)),
+                mmapp.Simulation(topology, reactant_int_sys, mm.VerletIntegrator(1)),
                 "forcegroups":
                 EvbForceGroup.integration_force_groups(),
             },
             'product_integration': {
                 "simulation":
-                mmapp.Simulation(topology, product_ff, mm.VerletIntegrator(1)),
+                mmapp.Simulation(topology, product_int_sys, mm.VerletIntegrator(1)),
                 "forcegroups":
                 EvbForceGroup.integration_force_groups(),
             },

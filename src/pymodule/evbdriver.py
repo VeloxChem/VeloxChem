@@ -669,8 +669,8 @@ class EvbDriver():
                     Lambda,
                     "integration forcegroups":
                     list(EvbForceGroup.integration_force_groups()),
-                    "pes forcegroups":
-                    list(EvbForceGroup.pes_force_groups()),
+                    # "pes forcegroups":
+                    # list(EvbForceGroup.pes_force_groups()),
                 },
                 conf,
             )
@@ -752,6 +752,14 @@ class EvbDriver():
             file_path = str(path / f"{lam:.3f}_sys.xml")
             with open(file_path, mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(systems[lam]))
+
+        file_path = str(path / f"reactant_sys.xml")
+        with open(file_path, mode="w", encoding="utf-8") as output:
+            output.write(mm.XmlSerializer.serialize(systems['reactant']))
+
+        file_path = str(path / f"product_sys.xml")
+        with open(file_path, mode="w", encoding="utf-8") as output:
+            output.write(mm.XmlSerializer.serialize(systems['product']))
 
     def load_systems_from_xml(self, folder: str):
         """Load the systems from xml files in the given folder.
