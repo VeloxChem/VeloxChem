@@ -106,7 +106,7 @@ class EvbFepDriver():
         self.debug: bool = False
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
-        self.save_crash_xml: bool = False
+        self.save_crash_xml: bool = True
         self.xml_save_interval: int = 10
 
         self.keywords = {
@@ -170,7 +170,7 @@ class EvbFepDriver():
             "save_crash_xml": {
                 "type": bool
             },
-            "xml_save_interval":{
+            "xml_save_interval": {
                 "type": int
             }
         }
@@ -343,7 +343,7 @@ class EvbFepDriver():
         if self.isobaric:
             barostat = [
                 force for force in equil_simulation.system.getForces()
-                if isinstance(force, mm.MonteCarloBarostat)
+                if isinstance(force, mm.MonteCarloBarostat) or isinstance(force, mm.MonteCarloFlexibleBarostat)
             ][0]
         if l == 0:
             if self.isobaric:
@@ -572,7 +572,7 @@ class EvbFepDriver():
             step_num = step - len(states) + j
             xml_name = f"state_step_{j}_{step_num}"
             pdb_name = f"state_step_{step_num}"
-            if self.save_crash_xml and j%self.xml_save_interval == 0:
+            if self.save_crash_xml and j % self.xml_save_interval == 0:
                 with open(path / f"{xml_name}.xml", "w") as f:
                     f.write(mm.XmlSerializer.serialize(state))
 
