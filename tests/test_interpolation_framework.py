@@ -232,7 +232,7 @@ class TestInterpolationSetup:
 
             interpolation_driver = InterpolationDriver()
             interpolation_driver.update_settings(interpolation_settings)
-            interpolation_driver.imforcefield_file = interpolationdatafile
+            interpolation_driver.imforcefieldfile = interpolationdatafile
             labels, z_matrix = interpolation_driver.read_labels()
             interpolation_driver.impes_coordinate.z_matrix = z_matrix
             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
@@ -268,7 +268,7 @@ class TestInterpolationSetup:
 
             interpolation_driver_simple = InterpolationDriver()
             interpolation_driver_simple.update_settings(interpolation_settings)
-            interpolation_driver_simple.imforcefield_file = interpolationdatafile
+            interpolation_driver_simple.imforcefieldfile = interpolationdatafile
             interpolation_driver_simple.impes_coordinate.z_matrix = z_matrix
 
             interpolation_driver_simple.compute(molecule, im_datapoints)

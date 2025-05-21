@@ -68,7 +68,7 @@ class InterpolationDriver():
         - exponent_q: exponent required in the Shepard interpolation procedure.
         - confidence_radius: confidence radius required by the Shepard
           interpolation procedure.
-        - imforcefield_file: File containing the necessary information to construct the interpolation forcefield
+        - imforcefieldfile: File containing the necessary information to construct the interpolation forcefield
     """
 
     def __init__(self, z_matrix=None, comm=None, ostream=None):
@@ -110,7 +110,7 @@ class InterpolationDriver():
         self.old_gradient = None
 
         # kpoint file with QM data
-        self.imforcefield_file = None
+        self.imforcefieldfile = None
         self.qm_data_points = None
         # Name lables for the QM data points
         self.labels = None
@@ -122,7 +122,7 @@ class InterpolationDriver():
                 'exponent_p': ('int', 'the main exponent'),
                 'exponent_q': ('int', 'the additional exponent (Shepard IM)'),
                 'confidence_radius': ('float', 'the confidence radius'),
-                'imforcefield_file':
+                'imforcefieldfile':
                     ('str', 'the name of the chk file with QM data'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
@@ -168,6 +168,8 @@ class InterpolationDriver():
         if self.interpolation_type == 'shepard' and self.exponent_q is None:
             self.exponent_q = self.exponent_p / 2.0
 
+        
+
     def read_labels(self):
         """
         Read data point labels from checkpoint file.
@@ -177,10 +179,10 @@ class InterpolationDriver():
         """
 
         assert_msg_critical(
-            self.imforcefield_file is not None,
+            self.imforcefieldfile is not None,
             'ImpesDriver: Please provide a chekpoint file name.')
 
-        h5f = h5py.File(self.imforcefield_file, 'r')
+        h5f = h5py.File(self.imforcefieldfile, 'r')
 
         keys = h5f.keys()
 
@@ -254,7 +256,7 @@ class InterpolationDriver():
         if labels:
             self.labels = labels
         if chk_file:
-            self.imforcefield_file = chk_file
+            self.imforcefieldfile = chk_file
 
         if self.qm_data_points is None:
             self.qm_data_points = self.read_qm_data_points()
@@ -377,9 +379,7 @@ class InterpolationDriver():
         self.impes_coordinate.gradient = np.zeros((natms, 3))
         self.impes_coordinate.NAC = np.zeros((natms, 3))
         weights = np.array(weights) / sum_weights
-        
-        # for i, w in enumerate(weights):
-        #     print(f'Label: {self.labels[i]} with weight: {w} with distance: {distances_from_points[i]}')
+
 
         for i in range(n_points):
 
@@ -401,7 +401,7 @@ class InterpolationDriver():
         qm_data_points = []
 
         assert_msg_critical(
-            self.imforcefield_file is not None,
+            self.imforcefieldfile is not None,
             'ImpesDriver: Please provide a chekpoint file name.')
        
         if not self.labels:
@@ -413,7 +413,7 @@ class InterpolationDriver():
         for label in self.labels:
             data_point = InterpolationDatapoint(z_matrix)#, self.comm, self.ostream)
             data_point.update_settings(self.impes_dict)
-            data_point.read_hdf5(self.imforcefield_file, label)
+            data_point.read_hdf5(self.imforcefieldfile, label)
             qm_data_points.append(data_point)
 
         self.qm_data_points = qm_data_points
@@ -436,13 +436,9 @@ class InterpolationDriver():
         hessian = data_point.internal_hessian
         dist_check = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
 
-        # implement sin for keeping the structure
-        # change the code so it can take on any function that is being used for the dihedral
-        # TODO: check if the bond angle can be described by a function as well?
         for i, element in enumerate(self.impes_coordinate.z_matrix): 
             if len(element) == 4:
                     dist_check[i] = np.sin(dist_check[i])
-                    # dist_check[i] = abs(self.principal_angle(dist_check[i]))
 
         pes = (energy + np.matmul(dist_check.T, grad) +
                0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))

@@ -99,6 +99,19 @@ def scf_results_sanity_check(obj, scf_results):
             if obj.potfile is None:
                 updated_scf_info['potfile'] = scf_results['potfile']
 
+        if scf_results.get('solvation_model', None) is not None:
+            # do not overwrite solvation_model if it is already specified
+            if hasattr(obj, 'solvation_model') and obj.solvation_model is None:
+                for key in [
+                        'solvation_model',
+                        'cpcm_epsilon',
+                        'cpcm_grid_per_sphere',
+                        'cpcm_cg_thresh',
+                        'cpcm_x',
+                        'cpcm_custom_vdw_radii',
+                ]:
+                    updated_scf_info[key] = scf_results[key]
+
     updated_scf_info = obj.comm.bcast(updated_scf_info, root=mpi_master())
 
     for key, val in updated_scf_info.items():

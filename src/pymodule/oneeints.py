@@ -39,6 +39,7 @@ from .veloxchemlib import NuclearPotentialGeom100Driver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
+from .veloxchemlib import compute_quadrupole_integrals
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
 from .veloxchemlib import compute_electric_field_integrals
