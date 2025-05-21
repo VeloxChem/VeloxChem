@@ -131,6 +131,11 @@ class EvbSystemBuilder():
         self.no_force_groups: bool = False
         self.nb_switching_function: bool = True
 
+        self.graphene = False
+        self.graphene_size_nm = 4
+        self.CNT = False
+        self.CNT_radius_nm = 0.5
+
         self.water_model: str
 
         self.keywords = {
@@ -211,7 +216,20 @@ class EvbSystemBuilder():
             },
             "nb_switching_function": {
                 "type": bool
+            },
+            'graphene':{
+                "type": bool
+            },
+            'graphene_size_nm':{
+                'type':float
+            },
+            "CNT":{
+                "type": bool
+            },
+            "CNT_radius_nm":{
+                "type":float
             }
+            
         }
 
     def build_systems(
@@ -244,13 +262,6 @@ class EvbSystemBuilder():
                     f"{keyword}: {getattr(self, keyword)} (default)")
         self.reactant = reactant
         self.product = product
-        # CNT = configuration.get("CNT", False)
-        # CNT = False  # todo fix the exploding CNT
-        # Graphene = configuration.get("graphene", False)
-        # graphene_size = configuration.get("graphene_size", 2)
-        # CNT_radius = configuration.get("CNT_radius", 0.5)
-        # ion_count = configuration.get("ion_count", 0)
-
         self.constraints = constraints
 
         if self.pdb is None:
@@ -284,17 +295,17 @@ class EvbSystemBuilder():
 
         # Set the positions and make a box for it
         self.positions = system_mol.get_coordinates_in_angstrom()
-        box = self._configure_box(system, topology, nb_force)
+        box = None
+        if self.CNT or self.graphene:
+            box = self._add_CNT_graphene(system, nb_force, topology, system_mol)
+        box = self._configure_pbc(system, topology, nb_force, box) # A
 
-        # if CNT or Graphene:
-        #     assert False, "Rethink CNT/graphene input"
-        #     box = self._add_CNT_graphene(system, CNT, Graphene, nb_force, topology, system_mol, positions, box,
-        #                                  graphene_size, CNT_radius)
+            # assert False, "Rethink CNT/graphene input"
 
         if self.solvent:
             #todo what about the box, and especially giving it to the solvator
             box = self._add_solvent(system, system_mol, self.solvent, topology,
-                                    nb_force, self.neutralize, self.padding)
+                                    nb_force, self.neutralize, self.padding, box)
 
         if self.pressure > 0:
             barostat = self._add_barostat(system)
@@ -344,16 +355,24 @@ class EvbSystemBuilder():
             topology = env_topology
         return system, topology, system_mol
 
-    def _configure_box(self, system, topology, nb_force):
-        x_size = 0.1 * (max(self.positions[:, 0]) - min(self.positions[:, 0]))
-        y_size = 0.1 * (max(self.positions[:, 1]) - min(self.positions[:, 1]))
-        z_size = 0.1 * (max(self.positions[:, 2]) - min(self.positions[:, 2]))
-        box = [
-            2 * self.padding + x_size, 2 * self.padding + y_size,
-            2 * self.padding + z_size
+    def _configure_pbc(self, system, topology, nb_force, box = None):
+        if box is None:
+            box = [-1.,-1.,-1.]
+        minim = [
+            2 * self.padding+ 0.1 * (max(self.positions[:, 0]) - min(self.positions[:, 0])),
+            2 * self.padding+ 0.1 * (max(self.positions[:, 1]) - min(self.positions[:, 1])),
+            2 * self.padding+ 0.1 * (max(self.positions[:, 2]) - min(self.positions[:, 2]))
         ]
+        dims = ['x','y','z']
+        for i in range(3):
+            if box[i] == -1:
+                box[i] = minim[i]
+            else:
+                self.ostream.print_info(f"Box size calculation for {dims[i]}-component is being overridden by graphene or CNT with value of {box[i]}")
+                # if box[i]<minim[i]:
+                #     self.ostream.print_warning(f"Provided {dims[i]}-component of box size {box[i]} is smaller then {minim[i]}. Consider increasing the box size (or the size of the graphene or CNT)")
         self.ostream.print_info(
-            f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f}, padding: {self.padding:.3f} nm."
+            f"Size of the system: {minim[0]:.3f} x {minim[1]:.3f} x {minim[2]:.3f}, padding: {self.padding:.3f} nm."
         )
         self.ostream.print_info(
             f"Building system in box with dimensions {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm"
@@ -376,6 +395,10 @@ class EvbSystemBuilder():
         else:
             nb_force.setUseSwitchingFunction(False)
             nb_force.setSwitchingDistance(-1)
+        box[0]*=10
+        box[1]*=10
+        box[2]*=10
+        self.ostream.flush()
         return box
 
     def _add_reactant(self, system, topology, nb_force):
@@ -418,14 +441,12 @@ class EvbSystemBuilder():
 
         return reaction_atoms
 
-    def _add_CNT_graphene(self, system, CNT: bool, Graphene: bool, nb_force,
-                          topology, system_mol, positions, box, graphene_size,
-                          CNT_radius):
+    def _add_CNT_graphene(self, system, nb_force,topology, system_mol):
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        if CNT and Graphene:
+        if self.CNT and self.graphene:
             raise ValueError(
                 "CNT and Graphene cannot be used simultaneously, pick one please"
             )
@@ -436,35 +457,39 @@ class EvbSystemBuilder():
         y_disp = math.sqrt(
             3
         ) * cc_eq * 10  # A, size of the graphene unit cell in the y direction
-        if Graphene:
-            x_minim = max(graphene_size, box[0]) * 10
-            y_minim = max(graphene_size, box[1]) * 10
+        box = [-1.,-1.,-1.]
+        if self.graphene:
+            x_minim = self.graphene_size_nm * 10 # A
+            y_minim = self.graphene_size_nm * 10 # A 
             M = math.ceil(x_minim / x_disp)
             N = math.ceil(y_minim / y_disp)
             X = M * x_disp  # A
             Y = N * y_disp  # A
             self.ostream.print_info(
-                f"Box size x: {box[0]:.3f} y: {box[1]:.3f} nm, minimum graphene size: {graphene_size:.3f} nm. Using largest to determine the size of the graphene sheet and size of the box"
+                f"Box size x: {box[0]:.3f} y: {box[1]:.3f} nm, minimum graphene size: {self.graphene_size_nm:.3f} nm. Using largest to determine the size of the graphene sheet and size of the box"
             )
             self.ostream.print_info(
                 f"Building graphene sheet with X: {X/10:.3f} nm, Y: {Y/10:.3f} nm"
             )
-            box[0] = X / 10
-            box[1] = Y / 10
+            box[0] = X / 10 # nm
+            box[1] = Y / 10 # nm
+            
         else:
-            x_minim = box[0] * 10
-            y_minim = CNT_radius * 2 * np.pi * 10
+            x_minim = 2*self.padding*10+ (max(self.positions[:, 0]) - min(self.positions[:, 0])) # A
+            y_minim = self.CNT_radius_nm * 2 * np.pi * 10 # A
             M = math.ceil(x_minim / x_disp)
             N = math.ceil(y_minim / y_disp)
             X = M * x_disp  # A
             Y = N * y_disp  # A
             R = Y / (2 * np.pi)  # A
+
+            box[0] = X/10
             self.ostream.print_info(
-                f"Box size x: {box[0]:.3f}, minimum CNT radius: {CNT_radius:.3f} nm."
+                f"Box size x: {box[0]:.3f}, minimum CNT radius: {self.CNT_radius_nm:.3f} nm."
             )
             self.ostream.print_info(
                 f"Building CNT with X: {X/10:.3f} nm, R: {R/10.:3f} nm")
-
+            self.ostream.flush()
         graphene_xyz = """4
 
         C        0.00000        1.21944        0.00000
@@ -518,10 +543,10 @@ class EvbSystemBuilder():
         middle_y = (max(mol_positions[:, 1]) + min(mol_positions[:, 1])) / 2
         min_z = min(mol_positions[:, 2])
         min_y = min(mol_positions[:, 1])
-        if Graphene:
+        if self.graphene:
             x_offset = middle_x - X / 2
             y_offset = middle_y - Y / 2
-            z_offset = min_z - 2
+            z_offset = min_z - 5
         else:
             x_offset = middle_x - X / 2
             y_offset = min_y - 0.7 * (R + 1)
@@ -535,7 +560,7 @@ class EvbSystemBuilder():
 
                     coord[0] += m * x_disp
                     coord[1] += n * y_disp
-                    if CNT:
+                    if self.CNT:
                         phi = 2 * np.pi * coord[1] / Y
                         coord = np.array(
                             [coord[0], R * math.sin(phi), R * math.cos(phi)]
@@ -549,9 +574,8 @@ class EvbSystemBuilder():
                     carbon_atoms.append(atom)
                     CC_atoms.append(atom)
 
-                    system_mol.add_atom(int(atomic_number), Point(coord),
-                                        'angstrom')  # Bohr
-                    positions = np.vstack([positions, coord])
+                    system_mol.add_atom(int(atomic_number), Point(coord),'angstrom')
+                    self.positions = np.vstack([self.positions, coord])
                     system.addParticle(mm_element.mass)
                     nb_force.addParticle(0, sigma, epsilon)
 
@@ -782,7 +806,7 @@ class EvbSystemBuilder():
         return box
 
     def _add_solvent(self, system, system_mol, solvent, topology, nb_force,
-                     neutralize, padding):
+                     neutralize, padding,box):
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
@@ -793,10 +817,11 @@ class EvbSystemBuilder():
             solvent)
         vlxsysbuilder.solvate(
             solute=system_mol,
-            solvent=solvent,
+            # solvent=solvent,
             padding=padding,
             neutralize=neutralize,
-            target_density=density * 0.95,
+            target_density=density,
+            box=box # A
         )
 
         self.positions = vlxsysbuilder.system_molecule.get_coordinates_in_angstrom(
@@ -955,10 +980,16 @@ class EvbSystemBuilder():
         return box
 
     def _add_barostat(self, system):
-        barostat = mm.MonteCarloBarostat(
-            self.pressure * mmunit.bar,  # type: ignore
-            self.temperature * mmunit.kelvin,  # type: ignore
-        )
+        if not (self.CNT or self.graphene):
+            barostat = mm.MonteCarloBarostat(
+                self.pressure * mmunit.bar,  # type: ignore
+                self.temperature * mmunit.kelvin,  # type: ignore
+            )
+        else:
+            barostat = mm.MonteCarloFlexibleBarostat(
+                self.pressure * mmunit.bar,  # type: ignore
+                self.temperature * mmunit.kelvin,  # type: ignore
+            )
         if not self.no_force_groups:
             barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
         system.addForce(barostat)
@@ -1027,7 +1058,7 @@ class EvbSystemBuilder():
         torsion = self._create_proper_torsion_forces(lam)
         improper = self._create_improper_torsion_forces(lam)
 
-        morse = self._create_morse_force()
+        morse = self._create_morse_force(lam)
 
         if pes:
             sclj = self.soft_core_lj_pes
@@ -1119,7 +1150,7 @@ class EvbSystemBuilder():
                 eqA = bondA['equilibrium']
 
                 coords = self.product.molecule.get_coordinates_in_angstrom()
-                eqB = self.measure_length(coords[key[0]], coords[key[1]])
+                eqB = self.measure_length(coords[key[0]], coords[key[1]])*0.1
                 if model_broken:
                     fcB = fcA
                 else:
@@ -1130,7 +1161,7 @@ class EvbSystemBuilder():
                 eqB = bondB['equilibrium']
 
                 coords = self.reactant.molecule.get_coordinates_in_angstrom()
-                eqA = self.measure_length(coords[key[0]], coords[key[1]])
+                eqA = self.measure_length(coords[key[0]], coords[key[1]])*0.1
                 if model_broken:
                     fcA = fcB
                 else:
@@ -1141,7 +1172,7 @@ class EvbSystemBuilder():
 
         return harmonic_force
 
-    def _create_morse_force(self):
+    def _create_morse_force(self,lam):
         morse_expr = "D*(1-exp(-a*(r-re)))^2;"
         morse_force = mm.CustomBondForce(morse_expr)
         morse_force.setName("Reaction morse bond")
@@ -1155,10 +1186,10 @@ class EvbSystemBuilder():
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if key in self.reactant.bonds and not key in self.product.bonds:
                 bond = self.reactant.bonds[key]
-                self._add_morse_bond(morse_force, bond, atom_ids)
+                self._add_morse_bond(morse_force, bond, atom_ids,1-lam)
             elif not key in self.reactant.bonds and key in self.product.bonds:
                 bond = self.product.bonds[key]
-                self._add_morse_bond(morse_force, bond, atom_ids)
+                self._add_morse_bond(morse_force, bond, atom_ids,lam)
         return morse_force
 
     def _create_harmonic_angle_forces(self, lam: float, model_broken):

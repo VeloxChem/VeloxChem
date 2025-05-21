@@ -467,9 +467,10 @@ class EvbForceFieldBuilder():
             forcefield.angles.update(ff.angles)
             forcefield.dihedrals.update(ff.dihedrals)
             forcefield.impropers.update(ff.impropers)
-
-            forcefield.unique_atom_types += ff.unique_atom_types
-            forcefield.pairs.update(ff.pairs)
+            if hasattr(ff,'unique_atom_types'):
+                forcefield.unique_atom_types += ff.unique_atom_types
+            if hasattr(ff,'pairs'):
+                forcefield.pairs.update(ff.pairs)
 
         return forcefield
 
