@@ -137,7 +137,8 @@ class EvbSystemBuilder():
         self.CNT_radius_nm = 0.5
 
         self.water_model: str
-
+        self.decompose_bonded = None
+        self.decompose_nb: list|None = None
         self.keywords = {
             "temperature": {
                 "type": float
@@ -228,7 +229,13 @@ class EvbSystemBuilder():
             },
             "CNT_radius_nm": {
                 "type": float
-            }
+            },
+            "decompose_nb":{
+                "type": list
+            },
+            "decompose_bonded":{
+                "type": list
+            },
         }
 
     def build_systems(
@@ -1040,19 +1047,26 @@ class EvbSystemBuilder():
                 )
 
             new_system = copy.deepcopy(system)
+            if lam == 0:
+                rea_system = copy.deepcopy(system)
+            if lam ==1:
+                pro_system = copy.deepcopy(system)
             # Add the bonded forces for the reaction system
             if not self.no_reactant:
                 self._add_reaction_forces(new_system, lam)
             systems[lam] = new_system
 
-            if lam == 0:
-                new_system = copy.deepcopy(system)
-                self._add_reaction_forces(new_system, lam, pes=True)
-                systems['reactant'] = new_system
-            if lam == 1:
-                new_system = copy.deepcopy(system)
-                self._add_reaction_forces(new_system, lam, pes=True)
-                systems['product'] = new_system
+        
+        self._add_reaction_forces(rea_system,0, pes=True)
+        self._add_reaction_forces(pro_system, 1, pes=True)
+        if self.decompose_bonded is not None:
+            self._add_bonded_decompositions(rea_system,0)
+            self._add_bonded_decompositions(pro_system,1)
+        if self.decompose_nb is not None:
+            self._add_nb_decompositions(rea_system)
+            self._add_nb_decompositions(pro_system)
+        systems['reactant'] = rea_system
+        systems['product'] = pro_system
         return systems
 
     def _add_reaction_forces(self, system, lam, pes=False):
@@ -1111,6 +1125,41 @@ class EvbSystemBuilder():
         system.addForce(torsion_constraint)
         if pes:
             system.addForce(morse)
+        return system
+
+    def _add_bonded_decompositions(self, system, lam):
+        
+        return system
+    
+    def _add_nb_decompositions(self, system):
+        nbforce = [force for force in system.getForces() if isinstance(force, mm.NonbondedForce)][0]
+        fg_ind = EvbForceGroup.LJDECOMP1.value
+        
+        assert len(self.decompose_nb) <4, "Can only decompose the nonbonded interactions in 3 groups"
+
+        for to_decompose in self.decompose_nb:
+            
+            lj_dec = copy.deepcopy(nbforce)
+            coul_dec = copy.deepcopy(nbforce)
+            
+            for i, _ in enumerate(self.reactant.atoms.values()):
+                atom_id = self.reaction_atoms[i].index
+                charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
+                
+                if i in to_decompose:
+                    lj_dec.setParticleParameters(atom_id, 0, sigma, epsilon)
+                    coul_dec.setParticleParameters(atom_id, charge, 1, 0)
+                else:
+                #If particle isn't listed in the decompositions, just set all the parameters to 0
+                    lj_dec.setParticleParameters(atom_id, 0, 0, 0)
+                    coul_dec.setParticleParameters(atom_id, 0, 0, 0)
+            lj_dec.setForceGroup(fg_ind)
+            fg_ind+=1
+            coul_dec.setForceGroup(fg_ind)
+            fg_ind+=1
+            system.addForce(lj_dec)
+            system.addForce(coul_dec)
+
         return system
 
     def _add_E_field(self, system, E_field):
@@ -1743,8 +1792,6 @@ class EvbForceGroup(Enum):
     # THERMOSTAT = auto()  # Thermostat
     SYSLJ = auto()  # Integration lennard-jones potential
     SYSCOUL = auto()  # Integration coulombic potential
-    PESLJ = auto()  # Lennard-jones potential
-    PESCOUL = auto()  # Coulombic potential
     CONSTRAINT = auto()
 
     CMM_REMOVER = auto()  # Center of mass motion remover
@@ -1770,33 +1817,16 @@ class EvbForceGroup(Enum):
     )  # All leftover forces that should only be used for the calculation of the PES
     NONE = auto(
     )  # Forces that should not be included in the integration or PES calculations
+
+    #Forcegroups to hold decomposed forces in
+    LJDECOMP1 = auto()
+    COULDECOMP1 = auto()
+    LJDECOMP2 = auto()
+    COULDECOMP2 = auto()
+    LJDECOMP3 = auto()
+    COULDECOMP3 = auto()
     DEBUG1 = auto()  # Debugging force group 1
     DEBUG2 = auto()  # Debugging force group 2
-
-    # Both methods return classes because integrator.setIntegrationForceGroups() takes a set as argument
-    # @classmethod
-    # def integration_force_groups(cls):
-    #     return set([
-    #         cls.DEFAULT.value,
-    #         cls.CMM_REMOVER.value,
-    #         cls.NB_FORCE.value,
-    #         cls.BAROSTAT.value,
-    #         cls.E_FIELD.value,
-    #         cls.REA_HARM_BOND.value,
-    #         cls.REA_ANGLE.value,
-    #         cls.REA_TORSION.value,
-    #         cls.REA_IMP.value,
-    #         cls.SYSLJ.value,
-    #         cls.SYSCOUL.value,
-    #         cls.CONSTRAINT.value,
-    #         cls.RESTRAINT.value,
-    #         cls.SOLVENT.value,
-    #         cls.CARBON.value,
-    #         cls.PDB.value,
-    #         cls.INTEGRATION.value,
-    #         # cls.DEBUG1.value,
-    #         # cls.DEBUG2.value,
-    #     ])
 
     @classmethod
     #Simple method for printing a descrpitive header to be used in force group logging files
