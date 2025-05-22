@@ -382,31 +382,44 @@ def embedding_sanity_check(options):
         )
 
 def gostshyp_sanity_check(obj, method_dict=None):
-        """
-        Checks the GOSTSHYP settings and updates relevant attributes.
+    """
+    Checks the GOSTSHYP settings and updates relevant attributes.
 
-        :param method_dict:
-            The dictionary of method settings.
-        """
+    :param method_dict:
+        The dictionary of method settings.
+    """
 
-        obj._gostshyp = (obj.pressure != 0.0)
+    obj._gostshyp = (obj.pressure != 0.0)
 
-        if obj._gostshyp:
-            assert_msg_critical(obj.pressure > 0.0,
-                'GOSTSHYP: Unphysical negative pressures invalid')
+    if obj._gostshyp:
+        assert_msg_critical(obj.pressure > 0.0,
+            'GOSTSHYP: Unphysical negative pressures invalid')
 
-            from .gostshyp import parse_pressure_units
-            from .tessellation import TessellationDriver
+        from .gostshyp import parse_pressure_units
+        from .tessellation import TessellationDriver
 
-            # check wether the requested number of points is valid
-            tessellation_drv = TessellationDriver(obj.comm, obj.ostream)
-            tessellation_drv.update_settings(method_dict)
-            obj.num_leb_points = tessellation_drv.update_num_points()
+        # check wether the requested number of points is valid
+        tessellation_drv = TessellationDriver(obj.comm, obj.ostream)
 
-            # TODO
-            # keep self.pressure_units for user-tailored output
-            obj.pressure = parse_pressure_units(obj.pressure,
-                                                 obj.pressure_units)
+        # should this be here?
+        if method_dict == None:
+            method_dict = {
+            'num_leb_points': 110,
+            'tssf': 1.2,
+            'discretization': 'fixed',
+            'filename': None,
+            'homemade': False, #TODO: remove (added for testing of gradient with fixed cavity)
+            'tess_file': None #TODO: remove (added for testing of gradient with fixed cavity)
+        }
+
+        tessellation_drv.update_settings(method_dict)
+        obj.num_leb_points = tessellation_drv.update_num_points()
+
+        # TODO
+        # keep self.pressure_units for user-tailored output
+        obj._pressure_in_input_units = obj.pressure
+        obj.pressure = parse_pressure_units(obj.pressure,
+                                                obj.pressure_units)
 
 
 def solvation_model_sanity_check(obj):

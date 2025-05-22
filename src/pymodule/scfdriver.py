@@ -121,6 +121,8 @@ class ScfDriver:
         - num_leb_points: The number of Lebedev points per van der Waals sphere.
         - tssf: The tessellation sphere scaling factor.
         - discretization: The surface discretization method.
+        - homemade: The flag for running with a homemade cavity for gostshyp pressure calculation
+        - tess_file: The data file containing tessellation data for homemade cavity
         - dispersion: The flag for calculating D4 dispersion correction.
         - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
@@ -238,13 +240,13 @@ class ScfDriver:
         # gostshyp setup
         self._gostshyp = False
         self.pressure = 0.0
+        self._pressure_in_input_units = 0.0
         self.pressure_units = 'MPa'
         self.num_leb_points = 110
         self.tssf = 1.2
         self.discretization = 'fixed'
-        # TODO remove the two variables below added for testing purposes
-        self.homemade = False
-        self.tess_file = None
+        self.homemade = False #TODO: remove (added for testing of gradient with fixed cavity)
+        self.tess_file = None #TODO: remove (added for testing of gradient with fixed cavity)
 
         # solvation model
         self.solvation_model = None
@@ -336,8 +338,8 @@ class ScfDriver:
                 'num_leb_points': ('int', 'number of grid points per sphere'),
                 'tssf': ('float', 'tessellation sphere scaling factor'),
                 'discretization': ('str', 'surface discretization method'),
-                'homemade': ('bool', 'read tessellation data from file'), # TODO: remove (added for testing purposes)
-                'tess_file': ('str', 'tessellation data file name'), # TODO: remove (added for testing purposes)
+                'homemade': ('bool', 'read tessellation data from file'), #TODO: remove (added for testing of gradient with fixed cavity)
+                'tess_file': ('str', 'tessellation data file name'),#TODO: remove (added for testing of gradient with fixed cavity)
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('int', 'number of grid points per sphere (C-PCM)'),
@@ -875,7 +877,7 @@ class ScfDriver:
 
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
-# set up gostshyp method by creating a surface tessellation
+        # set up gostshyp method by creating a surface tessellation
         if self._gostshyp:
             from .gostshyp import GostshypDriver
             self._gostshyp_drv = GostshypDriver(molecule, ao_basis,
@@ -886,8 +888,8 @@ class ScfDriver:
                 'tssf': self.tssf,
                 'discretization': self.discretization,
                 'filename': self.filename,
-                'homemade': self.homemade, #TODO: remove (added for testing purposes)
-                'tess_file': self.tess_file #TODO: remove (added for testing purposes)
+                'homemade': self.homemade, #TODO: remove (added for testing of gradient with fixed cavity)
+                'tess_file': self.tess_file #TODO: remove (added for testing of gradient with fixed cavity)
             }
 
             tess_t0 = tm.time()
@@ -1542,6 +1544,8 @@ class ScfDriver:
 
             fock_mat, vxc_mat, vkx_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
+            
+            self._e_gost = e_pr
 
             profiler.start_timer('ErrVec')
 
@@ -2346,7 +2350,7 @@ class ScfDriver:
             else:
                 density_matrix = den_mat[0] + den_mat[1]
             e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
-            print('Energy contribution from  GOSTSHYP: ', e_pr)
+            #print('Energy contribution from  GOSTSHYP: ', e_pr) #should be printed in ostream?
         else:
             e_pr, V_pr = 0.0, None
 
@@ -2846,6 +2850,25 @@ class ScfDriver:
             cur_str += f'{self.cpcm_drv.grid_per_sphere}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self._gostshyp:
+            cur_str = 'Pressure Model                  : '
+            cur_str += 'GOSTSHYP'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Input Pressure                  : '
+            cur_str += f'{self._pressure_in_input_units} '
+            cur_str += self.pressure_units
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Discretization Choice for Cavity: '
+            cur_str += self.discretization
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Tessellation Sphere Scaling     : '
+            cur_str += f'{self.tssf}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Grid Points per Atomic Sphere   : '
+            cur_str += f'{self.num_leb_points}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+
         if self.electric_field is not None:
             cur_str = 'Static Electric Field           : '
             cur_str += str(self.electric_field)
@@ -3099,6 +3122,9 @@ class ScfDriver:
         if self._cpcm:
             e_el -= self.cpcm_epol
 
+        if self._gostshyp:
+            e_el -= self._e_gost
+
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
@@ -3108,6 +3134,11 @@ class ScfDriver:
         if self._cpcm:
             valstr = 'Electrostatic Solvation Energy     :'
             valstr += f'{self.cpcm_epol:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+
+        if self._gostshyp:
+            valstr = 'GOSTSHYP Pressure Energy           :'
+            valstr += f'{self._e_gost:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
