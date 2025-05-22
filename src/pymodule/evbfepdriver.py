@@ -85,7 +85,10 @@ class EvbFepDriver():
 
         self.isothermal: bool = False
         self.isobaric: bool = False
-        self.friction = 1.0
+        self.langevin_friction = 1.0 # 1/ps
+
+        # a default of tau = 1000*dt is on the safe side, See discussion on Tdam: https://docs.lammps.org/fix_nh.html
+        self.nh_frequency = 1.0 #1/ps,
         self.temperature = -1
         self.pressure = -1
 
@@ -95,8 +98,8 @@ class EvbFepDriver():
         self.write_step = 1000
         self.initial_equil_NVT_steps = 10000
         self.initial_equil_NPT_steps = 10000
-        self.step_size = 0.001
-        self.equil_step_size = 0.001
+        self.step_size = 0.001 #ps
+        self.equil_step_size = 0.001 #ps
 
         self.crash_reporting_interval: int = 1
         self.constrain_H: bool = False
@@ -108,10 +111,14 @@ class EvbFepDriver():
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
         self.xml_save_interval: int = 50
+        self.NVT_integrator = "nose-hoover"
 
         self.keywords = {
-            "friction": {
+            "langevin_friction": {
                 "type": float
+            },
+            "nh_frequency":{
+                "type":float
             },
             "temperature": {
                 "type": float
@@ -172,6 +179,9 @@ class EvbFepDriver():
             },
             "xml_save_interval": {
                 "type": int
+            },
+            "NVT_integrator":{
+                "type":str
             }
         }
 
@@ -475,11 +485,20 @@ class EvbFepDriver():
 
     def _get_simulation(self, system, step_size):
         if self.isothermal:
-            integrator = mm.LangevinMiddleIntegrator(
-                self.temperature * mmunit.kelvin,  #type: ignore
-                self.friction / mmunit.picosecond,  #type: ignore
-                step_size * mmunit.picoseconds,
-            )
+            if self.NVT_integrator =="langevin":
+                integrator = mm.LangevinMiddleIntegrator(
+                    self.temperature * mmunit.kelvin,  #type: ignore
+                    self.langevin_friction / mmunit.picosecond,  #type: ignore
+                    step_size * mmunit.picoseconds,
+                )
+            elif self.NVT_integrator =="nose-hoover":
+                integrator = mm.NoseHooverIntegrator(
+                    self.temperature *mmunit.kelvin,
+                    self.nh_frequency /mmunit.picosecond, 
+                    step_size *mmunit.picoseconds,
+                )
+            else:
+                assert False, "NVT-integrator should be either 'langevin' or 'nose-hoover'"
         else:
             integrator = mm.VerletIntegrator(step_size)
         # integrator.setIntegrationForceGroups(
