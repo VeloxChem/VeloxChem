@@ -173,6 +173,7 @@ class ScfGradientDriver(GradientDriver):
             'PE_grad': 0.0,
             'CPCM_grad': 0.0,
             'D4_grad': 0.0,
+            'GOSTSHYP_grad': 0.0,
             'Classical': 0.0,
         }
 
@@ -448,6 +449,29 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += self.scf_driver.cpcm_drv.compute_gradient(
                 molecule, basis, 2.0 * D)
             grad_timing['CPCM_grad'] += time.time() - t0
+
+        t0 = time.time()
+
+        if self.scf_driver._gostshyp:
+            from .gostshyp import GostshypDriver
+
+            self._gostshyp_drv = GostshypDriver(molecule = molecule, basis = basis,
+                    pressure = self.scf_driver.pressure, pressure_units = self.scf_driver.pressure_units, comm = self.comm, ostream = self.ostream)
+
+            tessellation_settings = {
+                'num_leb_points': self.scf_driver.num_leb_points,
+                'tssf': self.scf_driver.tssf,
+                'discretization': self.scf_driver.discretization,
+                'filename': self.scf_driver.filename,
+                'homemade': self.scf_driver.homemade, #TODO: remove (added for testing of gradient with fixed cavity)
+                'tess_file': self.scf_driver.tess_file #TODO: remove (added for testing of gradient with fixed cavity)
+            }
+
+            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad(2 * D, tessellation_settings)
+
+            self.gradient += gostshyp_grad
+
+        grad_timing['GOSTSHYP_grad'] += time.time() - t0
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -820,6 +844,25 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += self.scf_driver.cpcm_drv.compute_gradient(
                 molecule, basis, Da + Db)
 
+        if self.scf_driver._gostshyp:
+            from .gostshyp import GostshypDriver
+
+            self._gostshyp_drv = GostshypDriver(molecule = molecule, basis = basis,
+                    pressure = self.scf_driver.pressure, pressure_units = self.scf_driver.pressure_units, comm = self.comm, ostream = self.ostream)
+
+            tessellation_settings = {
+                'num_leb_points': self.scf_driver.num_leb_points,
+                'tssf': self.scf_driver.tssf,
+                'discretization': self.scf_driver.discretization,
+                'filename': self.scf_driver.filename,
+                'homemade': self.scf_driver.homemade, #TODO: remove (added for testing purposes)
+                'tess_file': self.scf_driver.tess_file #TODO: remove (added for testing purposes)
+            }
+
+            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad(Da + Db, tessellation_settings)
+
+            self.gradient += gostshyp_grad
+        
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
         # (only added on master rank)

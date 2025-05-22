@@ -35,11 +35,12 @@ from .veloxchemlib import bohr_in_angstrom
 from .outputstream import OutputStream
 from .inputparser import (parse_input, print_keywords,
                           get_random_string_parallel)
+from .errorhandler import assert_msg_critical
 
 class TessellationDriver:
     """
     Implements the discretization of the van der Waals surface
-    into a grid with octahedral symmetry.
+    into a grid with octahedral symmetry including grid point areas geometric derivatives 
 
     :param comm:
         The MPI communicator.
@@ -51,6 +52,7 @@ class TessellationDriver:
         - tssf: The tessellation sphere scaling factor.
         - discretization: The surface discretization method.
         - switching_thresh: The (I)SWIG switching function threshold.
+        - atom: The atom index of which the grid point areas geometric derivatives are computed wrt
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
         - nodes: The number of MPI processes.
@@ -76,6 +78,10 @@ class TessellationDriver:
         self.tssf = 1.2
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
+        self.homemade = False #TODO: remove (added for testing of gradient with fixed cavity)
+        
+        # cavity derivative setup
+        self.atom = None
 
         # mpi information
         self.comm = comm
@@ -158,8 +164,10 @@ class TessellationDriver:
         neighbors = self.find_neighbors(molecule, vdw_radii, unscaled_w.max())
 
         # initialize the van der Waals surface object containing the following
-        # information for every grid point: x, y, z, A, n_x, n_y, n_z, atom_num, F
-        vdw_surface = np.empty((9,0))
+        # information for every grid point: x, y, z, A, n_x, n_y, n_z, atom_num, unscaled w, vdw_rad of atom, F
+        # unscaled w and vdw_rad to be used in area gradient
+
+        vdw_surface = np.empty((11,0))
 
         for i, rad in enumerate(vdw_radii):
 
@@ -167,7 +175,7 @@ class TessellationDriver:
             # vector components  and mark it with the current atom number
             sphere = vdw_spheres[rad].copy()
             sphere = np.vstack((sphere, norm_vecs.copy(),
-                                np.full(sphere.shape[1], i)))
+                                np.full(sphere.shape[1], i), unscaled_w, np.full(sphere.shape[1], rad)))
 
             # translate sphere to the center of the respective atom
             sphere[:3, :] += np.array(molecule.get_atom_coordinates(i))[:, None]
@@ -180,23 +188,113 @@ class TessellationDriver:
                                       sw_functions[contribution_mask]))
 
             vdw_surface = np.hstack((vdw_surface, contribution))
-
+        
         # correct the surface areas
         vdw_surface[3, :] *= vdw_surface[-1, :]
 
         # write surface to file for testing purposes:
-        self.write_grid_to_file(vdw_surface)
+        #self.write_grid_to_file(vdw_surface)
 
         # output for testing
         ######################################################
-        tot_surf_str = 'The total area of the van der Waals surface is '
-        tot_surf_str += str(np.sum(vdw_surface[3, :]) * bohr_in_angstrom()**2)
-        tot_surf_str += ' angstrom^2'
-        print(tot_surf_str)
-        print('with {} tessellation points'.format(vdw_surface.shape[1]))
+        # tot_surf_str = 'The total area of the van der Waals surface is '
+        # tot_surf_str += str(np.sum(vdw_surface[3, :]) * bohr_in_angstrom()**2)
+        # tot_surf_str += ' angstrom^2'
+        # print(tot_surf_str)
+        # print('with {} tessellation points'.format(vdw_surface.shape[1]))
         ######################################################
 
         return vdw_surface
+
+    def comp_area_grad(self, molecule, tessellation, M):
+        
+        """Calculate the cavity (area/switching function) gradient wrt atom
+        
+        Herbert, Lange, J. Chem. Phys. 133, 244111 (2010), Appendix C
+
+        :param molecule             : the VeloxChem Molecule object,
+        :param tessellation         : the tessellation data,
+        :param discretization       : the chosen discretization scheme,
+        :param tssf                 : the tessellation scaling factor,
+        :param M                    : the current atom index
+
+        :return                     : the area gradient for all grid points wrt atom
+        """    
+
+        # to ease comparison with the paper atom index is renamed M
+        
+        # move these to tessellation array
+        vdw_radii = molecule.vdw_radii_to_numpy() * self.tssf
+        
+        areas = tessellation[3, :] # current areas
+        sw_funcs = tessellation[-1, :] # current switching functions
+        weights = areas / sw_funcs # original weights for scaled spheres
+        
+        num_tes_points = tessellation.shape[1]
+        
+        # initialize array to store the area gradient per tessellation point wrt xyz coords of nuclei M
+        area_grad = np.zeros((3, num_tes_points))
+
+        # define parameters used to compute zetas in the iswig scheme
+        iswig_input = tessellation[8:10, :]
+        
+        # define parameters used in the swig scheme
+        gamma = np.sqrt(14.0 / self.num_leb_points)
+        alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
+            
+        rad_M = vdw_radii[M]
+        
+        # array stating if the tessellation point belongs to a given atom or not (delta_iM)    
+        delta_iM = 1.0 * (tessellation[7] == np.full((num_tes_points), M))
+
+        for J, rad_J in enumerate(vdw_radii): # gradient contains summation over all atoms
+            
+            # distance vector between tessellation point and nuclei positions
+            diff = tessellation[:3] - np.array(molecule.get_atom_coordinates(J))[:, None]  
+            # length of distance vector
+            distances = np.linalg.norm(diff, axis=0)
+
+            # assert value of delta_JM
+            if (M == J):
+                delta_JM = 1.0
+            else:
+                delta_JM = 0.0
+
+            # fixed case
+            assert_msg_critical(self.discretization.lower() != 'fixed',
+                     'GOSTSHYP: Geometric gradient not available with the fixed discretization scheme. Use SWIG or ISWIG.')                 
+
+            # swig case    
+            if self.discretization.lower() == 'swig':
+
+                # arguments for elementary switching functions
+                sw_radius = rad_J * gamma
+                inner_J = rad_J - alpha * sw_radius
+
+                # compute elementary switching functions and derivatives of these for all tessellation points
+                elem_sw_funcs = [self.swig_elem_sw_func((d - inner_J) / sw_radius) for d in distances]
+                deriv_elem_sw_funcs = [self.swig_elem_sw_func_derivative((d - inner_J) / sw_radius) for d in distances]
+                diJ_grads = (diff / distances) * (delta_iM - delta_JM) / sw_radius #compute gradient of diJ measures
+
+                contrib = deriv_elem_sw_funcs * diJ_grads / elem_sw_funcs
+                area_grad += contrib
+
+            # iswig case    
+            elif self.discretization.lower() == 'iswig':
+
+                zeta = self.get_zeta(self.num_leb_points)                
+                zetas = zeta / (iswig_input[1] * np.sqrt(iswig_input[0])) # weights for unscaled spheres to be used
+
+                elem_sw_funcs = [self.iswig_elem_sw_func(x, z, rad_J) for x, z in zip(distances, zetas)]
+                deriv_elem_sw_funcs = [self.iswig_elem_sw_func_derivative(x, z, rad_J) for x, z in zip(distances, zetas)]
+                riJ_grads = diff / distances * (delta_iM - delta_JM)
+
+                contrib = deriv_elem_sw_funcs * riJ_grads / elem_sw_funcs
+                area_grad += contrib
+
+        area_grad *= areas
+        
+        return area_grad
 
     def generate_lebedev_grid(self):
         """
@@ -340,6 +438,42 @@ class TessellationDriver:
 
         return (1.0 - 0.5 * (math.erf(zeta * (r_j - x)) +
                              math.erf(zeta * (r_j + x))))
+
+    def swig_elem_sw_func_derivative(self, x):
+        """
+        Returns the value for the SWIG elementary switching function derivative wrt. x.
+
+        :param x:
+            The function argument.
+
+        :return:
+            The function value.
+        """
+
+        if x < 0.0:
+            return 0.0
+        elif x > 1.0:
+            return 0.0
+        else:
+            return (30 * x**4 - 60 * x**3 + 30 * x**2)
+
+    def iswig_elem_sw_func_derivative(self, x, zeta, r_j):
+
+        """
+        Returns the value for the ISWIG elementary switching function derivative wrt. x.
+
+        :param x:
+            The function argument.
+        :param zeta:
+            The zeta value.
+        :param r_j:
+            The radius of atom j.
+            
+        :return:
+            The function value.
+        """    
+
+        return zeta / np.sqrt(np.pi) * (np.exp(-zeta**2 * (r_j - x)**2) + np.exp(-zeta**2 * (r_j + x)**2 ))
 
     def scale_sphere(self, grid, radius):
         """
@@ -499,6 +633,31 @@ class TessellationDriver:
 
             self.num_leb_points = num_points_avail[np.abs(
                               num_points_avail - self.num_leb_points).argmin()]
+
+            warn_text = '***' + ' ' * 10
+            warn_text += 'A number of '
+            warn_text += str(self.num_leb_points)
+            warn_text += ' points is used instead as the closest valid number.'
+
+            self.ostream.print_header(warn_text.ljust(97))
+            self.ostream.print_blank()
+
+            self.ostream.flush()
+
+        if (self.num_leb_points == 2030 and self.discretization.lower() == 'iswig'):
+            warn_text = '*** Warning: Requested number of '
+            warn_text += str(self.num_leb_points)
+            warn_text += ' points for the Lebedev grid is invalid with the iswig discretization scheme.'
+
+            self.ostream.print_header(warn_text.ljust(97))
+
+            warn_text = '***' + ' ' * 10
+            warn_text += 'Valid numbers of grid points are: '
+            warn_text += '6, 50, 110, 194, 302, 434, 590, 770 and 974.'
+
+            self.ostream.print_header(warn_text.ljust(97))
+
+            self.num_leb_points = 974
 
             warn_text = '***' + ' ' * 10
             warn_text += 'A number of '
