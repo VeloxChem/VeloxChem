@@ -37,6 +37,9 @@ from xml.dom import minidom
 import xml.etree.ElementTree as ET
 import numpy as np
 import sys
+import math
+import random
+from copy import deepcopy
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_kjpermol, bohr_in_angstrom
@@ -45,14 +48,19 @@ from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
-from .xtbdriver import XtbDriver
-from .scfrestdriver import ScfRestrictedDriver
-from .scfrestopendriver import ScfRestrictedOpenDriver
-from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
+from .interpolationdatapoint import InterpolationDatapoint
+from .scfrestdriver import ScfRestrictedDriver
+from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 from .interpolationdriver import InterpolationDriver
+from .atommapper import AtomMapper
 from .errorhandler import assert_msg_critical
 from .mofutils import svd_superimpose
+from contextlib import redirect_stderr
+from io import StringIO
+
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 try:
     import openmm as mm
@@ -62,7 +70,7 @@ except ImportError:
     pass
 
 
-class OpenMMDynamics:
+class OpenMMIMDynamics:
     """
     Implements the OpenMMDynamics.
     Performs classical MD and QM/MM simulations.
@@ -97,7 +105,7 @@ class OpenMMDynamics:
         - molecule: The VeloxChem molecule object.
         - unique_residues: The list of unique residues in the system.
         - unique_molecules: The list of unique molecules in the system.
-        - qm_driver: The VeloxChem driver object. Options are XtbDriver or an ScfDriver.
+        - im_driver: The VeloxChem driver object. Options are XtbDriver or an ScfDriver.
         - basis: The basis set for the QM region if an SCF driver is used.
         - grad_driver: The VeloxChem gradient driver object.
         - qm_atoms: The list of atom indices for the QM region.
@@ -171,7 +179,21 @@ class OpenMMDynamics:
         self.energy_threshold = 1.5 # kj/mol
 
         # QM Region parameters
-        self.qm_driver = None
+        self.im_drivers = {}
+        self.use_symmetry = True
+        self.symmetry_information = None
+        self.excitation_pulse = (-1, 0)
+        self.current_state = None
+        self.current_molecule = None
+
+        self.roots_to_follow = None
+        self.qm_symmetry_datapoint_dict = None
+        self.qm_data_point_dict = None
+        self.sorted_state_spec_im_labels = None
+        self.root_spec_molecules = None
+        self.interpolation_settings_dict = None
+
+        self.step = None
         self.basis = None
         self.grad_driver = None
         self.qm_atoms = None
@@ -361,7 +383,8 @@ class OpenMMDynamics:
             
     # Method to generate OpenMM system from VeloxChem objects
     def create_system_from_molecule(self, 
-                             molecule, 
+                             molecule,
+                             z_matrix, 
                              ff_gen, 
                              solvent='gas', 
                              qm_atoms=None, 
@@ -390,6 +413,10 @@ class OpenMMDynamics:
         self.molecule = molecule
         self.positions = molecule.get_coordinates_in_angstrom()
         self.labels = molecule.get_labels()
+        self.z_matrix = z_matrix
+
+        if self.use_symmetry:
+            self.set_up_the_system(molecule, z_matrix)
 
         # Options for the QM region if it's required.
         # TODO: Take this if else tree to a separate method.
@@ -732,7 +759,7 @@ class OpenMMDynamics:
                                 nsteps=10000, 
                                 snapshots=10,
                                 unique_conformers=True,
-                                qm_driver=None,
+                                im_driver=None,
                                 basis=None,
                                 constraints=None):
 
@@ -754,7 +781,7 @@ class OpenMMDynamics:
         :param qm_minimization:
             QM driver object for energy minimization. Default is None.
         :param basis:
-            Basis set for the SCF driver if qm_driver is not None.
+            Basis set for the SCF driver if im_driver is not None.
         :param constraints:
             Constraints for the system. Default is None.
         :param minimize:
@@ -881,16 +908,16 @@ class OpenMMDynamics:
             self.ostream.print_info(msg)
             self.ostream.flush()
 
-        if qm_driver:
+        if im_driver:
             # Use qm_miniization to minimize the energy of the conformations
             # Name flag based on if is instance of the XtbDriver or ScfDriver
-            if isinstance(qm_driver, XtbDriver):
+            if isinstance(im_driver, XtbDriver):
                 drv_name = 'XTB Driver'
-            elif isinstance(qm_driver, ScfRestrictedDriver):
+            elif isinstance(im_driver, ScfRestrictedDriver):
                 drv_name = 'RSCF Driver'
-            elif isinstance(qm_driver, ScfUnrestrictedDriver):
+            elif isinstance(im_driver, ScfUnrestrictedDriver):
                 drv_name = 'USCF Driver'
-            elif isinstance(qm_driver, ScfRestrictedOpenDriver):
+            elif isinstance(im_driver, ScfRestrictedOpenDriver):
                 drv_name = 'ROSCF Driver'
 
             if drv_name != 'XTB Driver' and basis is None:
@@ -905,7 +932,7 @@ class OpenMMDynamics:
                 self.ostream.print_info(f'Conformation {conf}')
                 self.ostream.flush()
                 molecule = Molecule.from_xyz_string(coords)
-                qm_energy, qm_coords = self.qm_minimization(molecule, basis, qm_driver, constraints)
+                qm_energy, qm_coords = self.qm_minimization(molecule, basis, im_driver, constraints)
                 qm_energies.append(qm_energy)
                 qm_opt_coordinates.append(qm_coords)
                 msg = f'Energy of the conformation: {qm_energy}'
@@ -1156,10 +1183,10 @@ class OpenMMDynamics:
         self.ostream.print_info(f'Simulation output saved as {output_file}')
         self.ostream.flush()
 
-    def run_qmmm(self, 
-                 qm_driver,
-                 grad_driver,
-                 basis = None,
+    def run_immm(self, 
+                 im_driver,
+                 interpolation_settings,
+                 roots_to_follow=[0],
                  restart_file = None, 
                  ensemble='NVE', 
                  temperature=298.15, 
@@ -1174,7 +1201,7 @@ class OpenMMDynamics:
         """
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
-        :param qm_driver:
+        :param im_driver:
             QM driver object from VeloxChem.
         :param grad_driver:
             Gradient driver object from VeloxChem.
@@ -1203,9 +1230,6 @@ class OpenMMDynamics:
         """
         if self.system is None:
             raise RuntimeError('System has not been created!')
-        
-        if basis is not None:
-            self.basis = basis
 
         self.ensemble = ensemble
         self.temperature = temperature * unit.kelvin
@@ -1213,26 +1237,67 @@ class OpenMMDynamics:
         self.timestep = timestep * unit.femtoseconds
         self.nsteps = nsteps
 
-        self.qm_driver = qm_driver
-        self.grad_driver = grad_driver
+        self.im_driver = im_driver
 
-        # Driver flag 
-        if isinstance(self.qm_driver, XtbDriver):
-            self.driver_flag = 'XTb Driver'
-        elif isinstance(self.qm_driver, ScfRestrictedDriver):
-            self.driver_flag = 'RSCF Driver'
-            self.qm_driver.ostream.mute()
-        elif isinstance(self.qm_driver, ScfUnrestrictedDriver):
-            self.driver_flag = 'USCF Driver'
-            self.qm_driver.ostream.mute()
-        elif isinstance(self.qm_driver, ScfRestrictedOpenDriver):
-            self.driver_flag = 'ROSCF Driver'
-            self.qm_driver.ostream.mute()
-        elif isinstance(self.qm_driver, InterpolationDriver):
-            self.driver_flag = 'IM Driver'
-            _ = self.qm_driver.read_qm_data_points()
+        if isinstance(self.im_driver, InterpolationDriver):
+            interpolation_settings_dict = {}
+            if len(interpolation_settings) != len(roots_to_follow):
+                for i, root in enumerate(roots_to_follow):
+                    interpolation_settings_dict[root] = interpolation_settings[i]
+            else:
+                for i, root in enumerate(roots_to_follow):
+                    interpolation_settings_dict[root] = interpolation_settings[i]
+            self.roots_to_follow = roots_to_follow
+            self.qm_symmetry_datapoint_dict = {root: {} for root in self.roots_to_follow}
+            self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
+            self.sorted_state_spec_im_labels = {root: [] for root in self.roots_to_follow}
+            self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
+            self.interpolation_settings_dict = interpolation_settings_dict
+            for root in self.roots_to_follow:
+                # Dynamically create an attribute name
+                attribute_name = f'impes_driver_{root}'
+                # Initialize the object
+                driver_object = InterpolationDriver(self.z_matrix)
+                driver_object.update_settings(interpolation_settings_dict[root])
+                if root == 0:
+                    driver_object.symmetry_information = self.symmetry_information['gs']
+                else:
+                    driver_object.symmetry_information = self.symmetry_information['es']
+                driver_object.use_symmetry = self.use_symmetry
 
-        
+                im_labels, _ = driver_object.read_labels()
+                print('beginning labels', im_labels)
+                self.qm_data_points = []
+                self.qm_energies = []
+                old_label = None
+
+                for label in im_labels:
+                    if '_symmetry' not in label:
+                        qm_data_point = InterpolationDatapoint(self.z_matrix)
+                        qm_data_point.read_hdf5(interpolation_settings_dict[root]['imforcefield_file'], label)
+
+                        self.qm_data_point_dict[root].append(qm_data_point)
+                        
+                        self.sorted_state_spec_im_labels[root].append(label)
+                        
+                        old_label = qm_data_point.point_label
+                        driver_object.qm_symmetry_data_points[old_label] = [qm_data_point]
+                        self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
+
+                    else:
+                        symmetry_data_point = InterpolationDatapoint(self.z_matrix)
+                        symmetry_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
+                        
+                        driver_object.qm_symmetry_data_points[old_label].append(symmetry_data_point)
+                        self.qm_symmetry_datapoint_dict[root][old_label].append(symmetry_data_point)
+                        
+                        # driver_object.qm_symmetry_data_points_1 = {old_label: [self.qm_data_point_dict[root][2], self.qm_data_point_dict[root][4]]}
+                        # driver_object.qm_symmetry_data_points_2 = {old_label: [self.qm_data_point_dict[root][3], self.qm_data_point_dict[root][5]]}         
+                # Set the object as an attribute of the instance
+                setattr(self, attribute_name, driver_object)
+                # Append the object to the list
+                self.im_drivers[root] = driver_object
+            self.current_state = self.roots_to_follow[0]
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
 
@@ -1269,8 +1334,8 @@ class OpenMMDynamics:
             # Set initial velocities if the ensemble is NVT or NPT
             if self.ensemble in ['NVT', 'NPT']:
                 self.simulation.context.setVelocitiesToTemperature(self.temperature)
-            else:
-                self.simulation.context.setVelocitiesToTemperature(10 * unit.kelvin)
+            # else:
+            #     self.simulation.context.setVelocitiesToTemperature(10 * unit.kelvin)
 
         # There is no minimization step for QM/MM simulations
         # It causes instabilities in the MM region!
@@ -1295,7 +1360,7 @@ class OpenMMDynamics:
         print('=' * 60)
 
         start_time = time()
-
+        self.step = 0
         for step in range(nsteps):
 
             self.update_forces(self.simulation.context)
@@ -1346,9 +1411,12 @@ class OpenMMDynamics:
                 print('Kinetic Energy:', kinetic)
                 print('Temperature:', temp, 'K')
                 print('Total Energy:', total)
+                print('Current State (PES):', self.current_state)  
                 print('-' * 60)   
+                
 
             self.simulation.step(1)
+            self.step += 1
 
         end_time = time()
         elapsed_time = end_time - start_time
@@ -2169,6 +2237,7 @@ class OpenMMDynamics:
             The gradient and potential energy of the QM region.
         """
 
+        new_molecule = None
         positions_ang = (new_positions) * 10 
         # Check if there is a QM/MM partition in the system
         if self.mm_subregion is not None:
@@ -2208,20 +2277,51 @@ class OpenMMDynamics:
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
             self.dynamic_molecules.append(new_molecule)
 
-        if self.basis is not None:
-            basis = MolecularBasis.read(new_molecule, self.basis)
-            scf_results = self.qm_driver.compute(new_molecule, basis)
-            gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
-            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
-            gradient = self.grad_driver.get_gradient()
-        else:
-            self.qm_driver.compute(new_molecule)
-            if self.driver_flag != 'IM Driver':
-                self.grad_driver.compute(new_molecule)
-            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kjpermol()
-            gradient = self.grad_driver.get_gradient()
+        for root in self.roots_to_follow:
+            self.im_drivers[root].qm_data_points = self.qm_data_point_dict[root]
+            self.im_drivers[root].compute(new_molecule)
+        
+        transitions = []
+        if len(self.roots_to_follow) > 1:
+            for root_1 in range(0, len(self.roots_to_follow)):
+                for root_2 in range(root_1 + 1, len(self.roots_to_follow)):
 
-        return gradient, potential_kjmol
+                    potential_kjmol = self.im_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy * hartree_in_kjpermol()
+                    potential_kjmol_2 = self.im_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy * hartree_in_kjpermol()
+                    transitions.append((self.roots_to_follow[root_1], self.roots_to_follow[root_2], potential_kjmol - potential_kjmol_2))
+                    print(f'compare the energies between roots: {self.roots_to_follow[root_1]} -> {self.roots_to_follow[root_2]}', potential_kjmol_2 - potential_kjmol)
+
+                    if 1==2 and np.linalg.norm(self.velocities_np[-1]) > 0.0:
+                        current_NAC = self.im_drivers[self.roots_to_follow[root_1]].impes_coordinate.NAC.flatten()
+                        current_velocitites = self.velocities_np[-1].flatten() * 4.566180e-4
+
+                        hopping_potential = np.exp(-abs((np.pi/(4)) * (( self.impes_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy - self.impes_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy ) / np.linalg.multi_dot([current_NAC, current_velocitites]))))
+                        print('#######################', '\n\n', hopping_potential, potential_kjmol_2 - potential_kjmol, '\n\n', '#######################')
+
+                    if abs(potential_kjmol_2 - potential_kjmol) < 20:
+                        # Choose a random integer between 0 and 1
+                        random_integer = random.randint(0, 1)
+                        if random_integer == 1 and self.current_state == self.roots_to_follow[root_1]:
+                            self.current_state = self.roots_to_follow[root_2]
+                        elif random_integer == 1 and self.current_state == self.roots_to_follow[root_2]:
+                            self.current_state = self.roots_to_follow[root_1]
+                        break
+        
+        else:
+            self.current_state = self.roots_to_follow[0]
+
+        if len(self.roots_to_follow) > 1 and self.step == self.excitation_pulse[0]:
+            self.current_state = self.excitation_pulse[1]
+    
+        self.root_spec_molecules[self.current_state].append(new_molecule)
+
+        potential_kjmol = self.im_drivers[self.current_state].impes_coordinate.energy * hartree_in_kjpermol()
+        self.current_gradient = self.im_drivers[self.current_state].impes_coordinate.gradient
+
+        self.current_energy = potential_kjmol
+
+
+        return self.current_gradient, potential_kjmol
 
     def update_gradient(self, new_positions):
         """
@@ -2262,19 +2362,18 @@ class OpenMMDynamics:
 
         # Update the forces of the QM region
         qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
+        
 
         gradient = self.update_gradient(qm_positions)
         force = -np.array(gradient) * conversion_factor
-
-        custom_force = self.system.getForce(self.qm_force_index)
-
+        
         # Construct a set from the list of tuples self.broken_bonds
         #broken_bond_atoms = set([atom for bond in self.broken_bonds for atom in bond])
 
         for i, atom_idx in enumerate(self.qm_atoms):
-            custom_force.setParticleParameters(i, atom_idx, force[i])
-            
-        custom_force.updateParametersInContext(context)
+
+            self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
+        self.system.getForce(self.qm_force_index).updateParametersInContext(context)
     
     def get_qm_potential_energy(self):
         """
@@ -2283,10 +2382,8 @@ class OpenMMDynamics:
         Returns:
             The potential energy of the QM region.
         """
-        if self.basis is not None:
-            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
-        else:
-            potential_energy = self.qm_driver.get_energy() * hartree_in_kjpermol()
+
+        potential_energy = self.im_drivers[self.current_state].get_energy() * hartree_in_kjpermol()
 
         return potential_energy
     
@@ -2355,8 +2452,412 @@ class OpenMMDynamics:
 
         return rmsd_value
 
+    def database_extracter(self, datafile, mol_labels):
+        """Extracts molecular structures from a given database file.
+
+        :param datafile:
+            Database file containing interpolation data.
+        
+        :param mol_labels:
+            List of molecular labels.
+
+        :returns:
+            A list of VeloxChem Molecule objects extracted from the database.
+        
+        """
+        
+        im_driver = InterpolationDriver() # -> implemented Class in VeloxChem that is capable to perform interpolation calculations for a given molecule and provided z_matrix and database
+        im_driver.imforcefield_file = datafile
+        labels, z_matrix = im_driver.read_labels()
+        sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
+
+        impes_coordinate = InterpolationDatapoint(z_matrix) # -> implemented Class in VeloxChem that handles all transformations and database changes concerning the interpolation
+        data_point_molecules = []
+        datapoints = []
+
+        for label in sorted_labels:
+            impes_coordinate = InterpolationDatapoint(z_matrix)
+            impes_coordinate.read_hdf5(datafile, label) # -> read in function from the ImpesDriver object
+            coordinates_in_angstrom = impes_coordinate.cartesian_coordinates * bohr_in_angstrom()
+            current_molecule = Molecule(mol_labels, coordinates_in_angstrom, 'angstrom') # -> creates a VeloxChem Molecule object
+            
+            datapoints.append(impes_coordinate)
+            data_point_molecules.append(current_molecule)
+
+        return data_point_molecules, datapoints
     
+    def calculate_translation_coordinates(self, given_coordinates):
+        """Center the molecule by translating its geometric center to (0, 0, 0)."""
+        center = np.mean(given_coordinates, axis=0)
+        translated_coordinates = given_coordinates - center
+
+        return translated_coordinates
+
+    def calculate_distance_to_ref(self, current_coordinates, datapoint_coordinate):
+        """Calculates and returns the cartesian distance between
+           self.coordinates and data_point coordinates.
+           Besides the distance, it also returns the weight gradient,
+           which requires the distance vector to be computed.
+
+           :param current_coordinates:
+                current molecular coordinates.
+           
+           :param data_point:
+                InterpolationDatapoint object.
+
+           :returns:
+              Norm of the distance between 2 structures.
+        """
+
+        # First, translate the cartesian coordinates to zero
+        target_coordinates = self.calculate_translation_coordinates(datapoint_coordinate)
+        reference_coordinates = self.calculate_translation_coordinates(current_coordinates)
+
+        # Then, determine the rotation matrix which
+        # aligns data_point (target_coordinates)
+        # to self.impes_coordinate (reference_coordinates)     
+        rotation_matrix_core = geometric.rotate.get_rot(target_coordinates,
+                                                reference_coordinates)
+        
+
+        # Rotate the data point
+        rotated_coordinates_core = np.dot(rotation_matrix_core, target_coordinates.T).T
+        # Calculate the Cartesian distance
+        ref_structure_check = reference_coordinates.copy()
+        distance_core = (np.linalg.norm(rotated_coordinates_core - ref_structure_check))
+
+        return distance_core
+
+    def confirm_database_quality(self, molecule, interpolation_settings, basis_set_label, given_molecular_strucutres, symmetry_information):
+        """Validates the quality of an interpolation database for a given molecule.
+
+       This function assesses the quality of the provided interpolation database 
+       comparing the interpolated energy with a QM-reference energy.
+
+       :param molecule:
+           A VeloxChem molecule object representing the reference molecular system.
+
+       :param im_database_file:
+           Interpolation database file.
+
+       :param given_molecular_strucutres:
+           An optional list of additional molecular structures that will be used for the validation.
+
+       :returns:
+           List of QM-energies, IM-energies.
+        """
+
+        # For all Methods a ForceField of the molecule is requiered
+        forcefield_generator = MMForceFieldGenerator()
+        forcefield_generator.create_topology(molecule)
+    
+        for root in given_molecular_strucutres.keys():
+
+            drivers = None
+            symmetry_inf = None
+            if root == 0:
+                symmetry_inf = symmetry_information['gs']
+                drivers = ScfRestrictedDriver()
+                drivers.xcfun = 'b3lyp'
+                # drivers.ri_coulomb = True
+            else:
+                symmetry_inf = symmetry_information['es']
+                drivers = ExternalExcitedStatesScfDriver('ORCA', self.roots_to_follow, 0, 1)
+            all_structures = given_molecular_strucutres[root]
+            datapoint_molecules, _ = self.database_extracter(interpolation_settings[root]['imforcefield_file'], molecule.get_labels())
+            current_datafile = interpolation_settings[root]['imforcefield_file']
+                
+            rmsd = -np.inf
+            random_structure_choices = None
+            counter = 0
+            # if given_molecular_strucutres is not None:
+            #     random_structure_choices = given_molecular_strucutres
+            while rmsd < 0.3 and counter <= 20:
+                # if self.dihedrals is not None:
+                #     desired_angles = np.linspace(0, 360, 36)
+                #     angles_mols = {int(angle):[] for angle in desired_angles}
+                #     keys = list(angles_mols.keys())
+                #     for mol in all_structures:  
+                #         mol_angle = (mol.get_dihedral_in_degrees(self.dihedrals[0]) + 360) % 360
+                        
+                        
+                #         for i in range(len(desired_angles) - 1):
+                            
+                #             if keys[i] <= mol_angle < keys[i + 1]:
+                #                 angles_mols[keys[i]].append(mol)
+                #                 break
+                    
+                #     # List to hold selected molecules
+                #     selected_molecules = []
+                #     total_molecules = sum(len(mols) for mols in angles_mols.values())
+                #     # Adaptive selection based on bin sizes
+        
+                #     for angle_bin, molecules_in_bin in angles_mols.items():
+                #         num_mols_in_bin = len(molecules_in_bin)
+                #         if num_mols_in_bin == 0:
+                #             continue  # Skip empty bins
+                #         # If 2 or fewer molecules, take all
+                #         elif num_mols_in_bin <= 2:
+                #             selected_molecules.extend(molecules_in_bin)
+                #         else:
+                #             # Calculate proportional number of molecules to select
+                #             proportion = num_mols_in_bin / total_molecules
+                #             num_to_select = max(1, math.ceil(proportion * 15))
+                #             # Randomly select the proportional number
+                #             selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
+                #             selected_molecules.extend(selected_mols)
+                # else:
+                selected_molecules = random.sample(all_structures, min(100, len(all_structures)))
+                
+                            
+                individual_distances = []
+                random_structure_choices = selected_molecules
+                for datapoint_molecule in datapoint_molecules:
+                    for random_struc in random_structure_choices:
+                        
+                        distance_norm = self.calculate_distance_to_ref(random_struc.get_coordinates_in_bohr(), datapoint_molecule.get_coordinates_in_bohr())
+                        individual_distances.append(distance_norm / np.sqrt(len(molecule.get_labels())) * bohr_in_angstrom())
+                
+                rmsd = min(individual_distances)
+                counter += 1
+                if rmsd >= 0.3:
+                    print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
+                else:
+                    print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
+            
+            # if self.dihedrals is not None:
+            #     for random_mol in random_structure_choices:
+            #         print('angle', random_mol.get_dihedral_in_degrees(self.dihedrals[0]))
+            
+            atom_mapper = AtomMapper(molecule, molecule)
+            qm_energies = []
+            im_energies = []
+            impes_driver = InterpolationDriver()
+            impes_driver.update_settings(interpolation_settings[root])
+            labels, z_matrix = impes_driver.read_labels()
+ 
+            impes_driver.impes_coordinate.z_matrix = z_matrix
+            impes_driver.symmetry_information = symmetry_inf
+            impes_driver.use_symmetry = True
+            sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
+            for i, mol in enumerate(random_structure_choices):
+                
+                current_basis = MolecularBasis.read(mol, basis_set_label)
+                impes_driver.compute(mol, labels=sorted_labels)
+                drivers.ostream.mute()
+                scf_tensors = drivers.compute(mol, current_basis)
+                qm_energy = drivers.scf_energy
+                
+                qm_energies.append(qm_energy)
+                im_energies.append(impes_driver.impes_coordinate.energy)
+
+                print(f'\n\n ########## Step {i} ######### \n')
+                print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol()} kJ/mol \n')
+        
+            # self.plot_final_energies(qm_energies, im_energies)
+            self.structures_to_xyz_file(all_structures, f'full_xyz_traj_root_{root}.xyz')
+            self.structures_to_xyz_file(random_structure_choices, f'random_xyz_structures_root_{root}.xyz', im_energies, qm_energies)
+    
+    def structures_to_xyz_file(self, molecules_for_xyz, structure_filename, im_energies=None, qm_energies=None):
+        """Writes molecular structures to an XYZ file.
+
+        :param molecules_for_xyz:
+            A list of VeloxChem molecular objects.
+
+        :param structure_filename:
+            The name of the output file where XYZ structures will be stored.
+
+        :param im_energies:
+            An optional list of interpolation energies corresponding to each molecule.
+
+        :param qm_energies:
+            An optional list of quantum mechanical energies corresponding to each molecule.
+
+        """
+
+        with open(structure_filename, 'w') as file:
+            pass
+
+        for i, dyn_mol in enumerate(molecules_for_xyz):
+
+            current_xyz_string = dyn_mol.get_xyz_string()
+
+            xyz_lines = current_xyz_string.splitlines()
+
+            if len(xyz_lines) >= 2 and im_energies is not None:
+
+                xyz_lines[1] += f'Energies  QM: {qm_energies[i]}  IM: {im_energies[i]}  delta_E: {abs(qm_energies[i] - im_energies[i])}'
+
+
+            updated_xyz_string = "\n".join(xyz_lines)
+
+            with open(structure_filename, 'a') as file:
+                file.write(f"{updated_xyz_string}\n\n")
+
+    def set_up_the_system(self, molecule, z_matrix):
+
+        """
+        Assign the neccessary variables with respected values. 
+
+        :param molecule: original molecule
+
+        :param target_dihedrals: is a list of dihedrals that should be scanned during the dynamics
+
+        :param sampling_structures: devides the searchspace around given rotatbale dihedrals
+            
+        """
+
+        def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
+            new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
+            rot_groups = {'gs': [], 'es': []}
+            labels = molecule.get_labels()
+
+            def determine_state(a1, a2):
+                neighbors_a1 = sum(conn[a1])
+                neighbors_a2 = sum(conn[a2])
+                element_a1 = labels[a1][0]
+                element_a2 = labels[a2][0]
+
+                # NH2 rule
+                if (element_a1 == 'N' and neighbors_a1 == 2) or (element_a2 == 'N' and neighbors_a2 == 2):
+                    return 'gs'
+
+                # Oxygen + sp2 carbon → es
+                if (element_a1 == 'O' and element_a2 == 'C' and neighbors_a2 == 3) or \
+                (element_a2 == 'O' and element_a1 == 'C' and neighbors_a1 == 3):
+                    return 'es'
+
+                # sp2-sp2 → es
+                if neighbors_a1 == 3 and neighbors_a2 == 3:
+                    return 'es'
+
+                # default → gs
+                return 'gs'
+
+            for group in groups:
+                connected_subgroups = {}  # key: (state, atom in bond), value: atoms in group connected to it
+
+                for atom in group:
+                    for a1, a2 in rotatable_bonds:
+                        state = determine_state(a1, a2)
+
+                        if conn[atom, a1]:
+                            connected_subgroups.setdefault((state, a1), []).append(atom)
+                        if conn[atom, a2]:
+                            connected_subgroups.setdefault((state, a2), []).append(atom)
+
+                if not connected_subgroups:
+                    new_groups['non_rotatable'].append(group)
+                else:
+                    for (state, _), subgroup in connected_subgroups.items():
+                        subgroup = list(set(subgroup))
+                        if len(subgroup) > 1 and subgroup not in rot_groups[state]:
+                            for atom in subgroup:
+                                print(molecule.get_labels()[atom], sum(conn[atom]))
+                            rot_groups[state].append(sorted(subgroup))
+                            new_groups[state].append(sorted(subgroup))
+
+            return new_groups, rot_groups
+
+        angle_index = next(i for i, x in enumerate(z_matrix) if len(x) == 3)
+        dihedral_index = next(i for i, x in enumerate(z_matrix) if len(x) == 4)
+
+        self.qm_data_points = None
+        self.molecule = molecule
+
+        atom_mapper = AtomMapper(molecule, molecule)
+        symmetry_groups = atom_mapper.determine_symmetry_group()
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.create_topology(molecule)
+
+        rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+
+        rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
+        all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
+
+        symmetry_groups_ref = [groups for groups in symmetry_groups[1] if not any(item in all_exclision for item in groups)]
+
+        regrouped, rot_groups = regroup_by_rotatable_connection(molecule, symmetry_groups_ref, rotatable_bonds_zero_based, molecule.get_connectivity_matrix())
+
+        
+        self.symmetry_information = {}
+        for root in range(2):
+            if root == 0:
+        
+                non_core_atoms = [element for group in regrouped['gs'] for element in group]
+                _, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(z_matrix, rot_groups['gs'], rotatable_bonds_zero_based)
+        
+                indices_list = []
+                for key, dihedral_list in self.symmetry_dihedral_lists.items():
+                
+                    for i, element in enumerate(z_matrix[dihedral_index:], start=dihedral_index):
+
+                        if tuple(sorted(element)) in dihedral_list:
+                            indices_list.append(i)
+
+                self.symmetry_information['gs'] = (symmetry_groups[0], rot_groups['gs'], regrouped['gs'], non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [angle_index, dihedral_index])
+
+
+            if root == 1:
+                non_core_atoms = [element for group in regrouped['es'] for element in group]
+                _, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(z_matrix, rot_groups['es'], rotatable_bonds_zero_based)
+        
+                indices_list = []
+                for key, dihedral_list in self.symmetry_dihedral_lists.items():
+                
+                    for i, element in enumerate(z_matrix[dihedral_index:], start=dihedral_index):
+
+                        if tuple(sorted(element)) in dihedral_list:
+                            indices_list.append(i)
+
+                self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [angle_index, dihedral_index])
 
 
 
 
+    def adjust_symmetry_dihedrals(self, z_matrix, symmetry_groups, rot_bonds):
+        
+        def symmetry_group_dihedral(reference_set, dihedrals, rot_bonds):
+            rot_bond_set = {frozenset(bond) for bond in rot_bonds}
+
+            filtered_dihedrals = []
+            for d in dihedrals:
+                middle_bond = frozenset([d[1], d[2]])
+
+                if middle_bond in rot_bond_set:
+                    common_elements = [x for x in [d[0], d[3]] if x in reference_set]
+                    if len(common_elements) == 1:
+                        filtered_dihedrals.append(d)
+            return filtered_dihedrals
+        
+
+        all_dihedrals = [element for element in z_matrix if len(element) == 4]
+
+        symmetry_group_dihedral_dict = {} 
+        angles_to_set = {}
+        periodicities = {}
+        dihedral_groups = {2: [], 3: []}
+
+        for symmetry_group in symmetry_groups:
+             
+            symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
+            symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
+
+            if len(symmetry_group) == 3:
+
+                # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+
+                periodicities[symmetry_group_dihedral_list[0]] = 3
+                dihedral_groups[3].extend([tuple(sorted(element)) for element in symmetry_group_dihedral_list])
+
+            elif len(symmetry_group) == 2:
+
+                # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/2.0])
+
+                periodicities[symmetry_group_dihedral_list[0]] = 2
+                dihedral_groups[2].extend([tuple(sorted(element)) for element in symmetry_group_dihedral_list])
+
+        return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups

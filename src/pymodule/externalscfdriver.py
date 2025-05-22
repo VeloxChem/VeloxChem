@@ -73,13 +73,14 @@ class ExternalScfDriver:
 
         self.xc_func = 'b3lyp'
         self.basis_set_label = 'def2-svp'
+        self.method = 'RKS'
 
         self.tracked_roots = None
         self.energies = None
-        self.method = None
         self.spin_flip = False
         self.NAC = False
         self.cluster = False
+        self.add_ghost_atom = False
         self.path_on_cluster = path_on_cluster
         
         self.xyz_filename = None
@@ -160,10 +161,25 @@ conda activate vlxenv_simd_master
         os.chmod(script_path, 0o755)
      
     
-    def compute_energy(self, molecule, basis, method='TDDFT'):
+    def compute_energy(self, molecule, basis):
         
         self.basis_set_label = basis
         molecule.write_xyz_file('current_geometry.xyz')
+        
+        if self.add_ghost_atom:
+            with open('current_geometry.xyz', 'r') as f:
+                
+                insert_line = "Ne: 0.0 0.0 0.0\n"
+                lines = f.readlines()
+
+                # Insert the line at the 3rd index (line 4)
+                lines.insert(2, insert_line)  # Index 3 = after line 3 (0-based indexing)
+
+                # Write back the modified content
+                with open('current_geometry.xyz', 'w') as f:
+                    f.writelines(lines)
+
+        
         lines = None
         with open('current_geometry.xyz', 'r') as f1:
             lines = f1.readlines()
@@ -171,7 +187,6 @@ conda activate vlxenv_simd_master
             f2.writelines(lines)
 
         self.xyz_filename = 'current_geometry.xyz'
-        self.method = method
 
         """
         Run the pymolcas command with the input file and redirect output to the output file.
@@ -362,12 +377,18 @@ conda activate vlxenv_simd_master
                 if self.path_on_cluster is not None:
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
                 with open(input_file, 'w') as file:
-                    file.write(f'!{self.xc_func} {self.basis_set_label}\n')
+                    file.write(f'!{self.method} {self.xc_func} {self.basis_set_label}\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')
                     file.write('END\n')
-                    file.write(f'* xyzfile {self.charge} {self.spin} {full_path}\n')
+                    file.write(f'* xyz {self.charge} {self.spin}\n')
+                    with open(full_path, 'r') as geometry_lines:
+                        for i, line in enumerate(geometry_lines):
+                            if i < 2:
+                                continue
+                            file.write(line)
+                    file.write('*\n')
 
             elif self.program == 'QCHEM':
                 functional = 'b3lyp'

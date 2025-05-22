@@ -197,6 +197,7 @@ from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .openmmimdynamics import OpenMMIMDynamics
 from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
 from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver

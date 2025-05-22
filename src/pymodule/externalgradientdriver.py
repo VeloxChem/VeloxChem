@@ -433,14 +433,20 @@ conda activate vlxenv_new_compile
             
             elif self.program == 'ORCA':
 
-                full_path = os.path.abspath(self.xyz_filename)
+                full_path = os.path.abspath(self.qm_driver.xyz_filename)
                 with open(input_file, 'w') as file:
-                    file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.basis_set_label} ENGRAD\n')
+                    file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.basis_set_label} ENGRAD\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.qm_driver.nprocs * 2}\n')
                     file.write('END\n')
-                    file.write(f'* xyzfile {self.qm_driver.charge} {self.qm_driver.spin} {full_path}\n')
+                    file.write(f'* xyz {self.qm_driver.charge} {self.qm_driver.spin}\n')
+                    with open(full_path, 'r') as geometry_lines:
+                        for i, line in enumerate(geometry_lines):
+                            if i < 2:
+                                continue
+                            file.write(line)
+                    file.write('*\n')
 
                 
             elif self.program == 'QCHEM':

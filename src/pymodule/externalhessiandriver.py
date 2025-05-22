@@ -86,7 +86,6 @@ class ExternalHessianDriver:
         self.output_files.append(self.output_filename)
         self.hessian_files.append(self.hessian_file)
 
-        self.analytical = False
         self.qm_driver = qm_driver
         self.cluster_manager = qm_driver.cluster_manager
         self.program = qm_driver.program
@@ -326,8 +325,6 @@ conda activate vlxenv_new_compile
         Run the pymolcas command with the input file and redirect output to the output file.
         """
 
-        current_molecule.write_xyz_file('current_geometry.xyz')
-        self.xyz_filename = 'current_geometry.xyz'
         current_job_id = None
 
         if molecule_geometry:
@@ -658,17 +655,22 @@ conda activate vlxenv_new_compile
             
             elif self.program == 'ORCA':
 
-                full_path = os.path.abspath(self.xyz_filename)
+                full_path = os.path.abspath(self.qm_driver.xyz_filename)
                 with open(input_file, 'w') as file:
-                    file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.basis_set_label} freq\n')
+                    file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.basis_set_label} freq\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.qm_driver.nprocs * 4}\n')
                     file.write('END\n')
-                    file.write(f'* xyzfile {self.qm_driver.charge} {self.qm_driver.spin} {full_path}\n')
+                    file.write(f'* xyz {self.qm_driver.charge} {self.qm_driver.spin} \n')
+                    with open(full_path, 'r') as geometry_lines:
+                        for i, line in enumerate(geometry_lines):
+                            if i < 2:
+                                continue
+                            file.write(line)
+                    file.write('*\n')
 
             elif self.program == 'QCHEM':
-
     
                 full_path = os.path.abspath(self.xyz_filename)
                 with open(input_file, 'w') as file:
