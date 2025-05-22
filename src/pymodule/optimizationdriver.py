@@ -517,7 +517,10 @@ class OptimizationDriver:
         """
 
         if extfile.is_file():
-            extfile.unlink()
+            try:
+                extfile.unlink()
+            except PermissionError:
+                pass
 
     @staticmethod
     def get_ic_rmsd(opt_mol, ref_mol):
