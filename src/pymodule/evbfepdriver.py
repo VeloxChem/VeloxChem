@@ -88,7 +88,9 @@ class EvbFepDriver():
         self.langevin_friction = 1.0 # 1/ps
 
         # a default of tau = 1000*dt is on the safe side, See discussion on Tdam: https://docs.lammps.org/fix_nh.html
-        self.nh_frequency = 1.0 #1/ps,
+        self.nhc_frequency = 1.0 #1/ps,
+        self.nhc_small_length = 3
+        self.nhc_bulk_length = 1
         self.temperature = -1
         self.pressure = -1
 
@@ -117,8 +119,14 @@ class EvbFepDriver():
             "langevin_friction": {
                 "type": float
             },
-            "nh_frequency":{
+            "nhc_frequency":{
                 "type":float
+            },
+            "nhc_small_length":{
+                "type":int
+            },
+            "nhc_bulk_length":{
+                "type":int
             },
             "temperature": {
                 "type": float
@@ -490,12 +498,19 @@ class EvbFepDriver():
                     self.temperature * mmunit.kelvin,  #type: ignore
                     self.langevin_friction / mmunit.picosecond,  #type: ignore
                     step_size * mmunit.picoseconds,
+                    
                 )
             elif self.NVT_integrator =="nose-hoover":
+                if system.getNumParticles >100:
+                    chain_length = self.nhc_bulk_length
+                else:
+                    chain_length = self.nhc_small_length
+
                 integrator = mm.NoseHooverIntegrator(
                     self.temperature *mmunit.kelvin,
-                    self.nh_frequency /mmunit.picosecond, 
+                    self.nhc_frequency /mmunit.picosecond, 
                     step_size *mmunit.picoseconds,
+                    chain_length,
                 )
             else:
                 assert False, "NVT-integrator should be either 'langevin' or 'nose-hoover'"
@@ -589,13 +604,14 @@ class EvbFepDriver():
 
         for j, state in enumerate(states):
             step_num = step - len(states) + j
-            xml_name = f"state_step_{j}_{step_num}"
-            pdb_name = f"state_step_{step_num}"
+            
             if self.save_crash_xml and j % self.xml_save_interval == 0:
+                xml_name = f"state_step_{j}_{step_num}"
                 with open(path / f"{xml_name}.xml", "w") as f:
                     f.write(mm.XmlSerializer.serialize(state))
 
             if self.save_crash_pdb:
+                pdb_name = f"state_step_{step_num}"
                 positions = np.array(state.getPositions().value_in_unit(
                     mm.unit.angstrom))
 
