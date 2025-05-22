@@ -113,6 +113,110 @@ class GostshypDriver:
             }
         }
 
+
+    def get_vectorized_gostshyp_contribution(self, den_mat, tessellation_settings=None):
+
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+
+        timing_info = np.zeros((2))
+
+        t0_step_1 = tm.time()
+    
+        energy_contrib = np.sum(  np.apply_along_axis(func1d = self.get_single_point_gostshyp_energy_contribution, 
+                                    axis = 0, 
+                                    arr = self.tessellation,
+                                    den_mat = den_mat), 
+                                axis = 0)
+        
+        timing_info[0] = (tm.time() - t0_step_1)
+
+        t0_step_2 = tm.time()
+        
+        fock_contrib = np.sum(   np.apply_along_axis(func1d = self.get_single_point_gostshyp_fock_contribution, 
+                                    axis = 0, 
+                                    arr = self.tessellation,
+                                    den_mat = den_mat), 
+                                axis = 2)
+
+        timing_info[1] = (tm.time() - t0_step_2)
+                            
+        print()
+        print('Accumulated time of energy contribution \n', timing_info[0], '\n\n Accumulated time of Fock matrix contribution \n', timing_info[1])
+        print()
+
+        return energy_contrib, fock_contrib
+
+    def get_single_point_gostshyp_energy_contribution(self, gaussian_information, den_mat):
+    
+        #num_tess_points = tessellation.shape[1]
+        #pressure = parse_pressure_units(p, p_unit)
+            
+        #gaussian_information = tessellation[:, j]
+        a = gaussian_information[3]
+
+        f_tilde = self.comp_f_tilde(gaussian_information, den_mat)
+        g_tilde = self.comp_g_tilde(gaussian_information, den_mat)
+
+        # compute Gaussian amplitude
+        p_amp = self.pressure * a / f_tilde
+
+        # compute energy contribution
+        e_contrib = p_amp * g_tilde
+
+        # TODO: raise the detection of negative amplitudes properly
+        #       (counter and proper output)
+        if (p_amp >= 0.0):
+            return e_contrib
+        else:
+            print('NEGATIVE AMPLITUDE DETECTED')
+            return 0
+    
+    def get_single_point_gostshyp_fock_contribution(self, gaussian_information, den_mat):
+    
+        #num_tess_points = tessellation.shape[1]
+        #pressure = parse_pressure_units(p, p_unit)
+            
+        #gaussian_information = tessellation[:, j]
+        a = gaussian_information[3]
+        width_params = np.pi * np.log(2.0) / gaussian_information[3]
+        exp = [width_params]
+        center = [gaussian_information[:3].tolist()]
+        norm_vec = gaussian_information[4:7]
+        pre_fac = [1]
+        
+        tco_drv = ThreeCenterOverlapDriver()
+        tcog_drv = ThreeCenterOverlapGradientDriver()
+
+        # compute the three center overlap matrix and three center overlap gradient matrices
+        tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+
+        x_mat_grad = tcog_mats.matrix_to_numpy('X')
+        y_mat_grad = tcog_mats.matrix_to_numpy('Y')
+        z_mat_grad = tcog_mats.matrix_to_numpy('Z')
+
+        # compute dot product between normal vector and 
+        # three center overlap gradient matrices
+        f_mat = ( norm_vec[0] * x_mat_grad
+                + norm_vec[1] * y_mat_grad
+                + norm_vec[2] * z_mat_grad  ) * (-1)
+        
+        f_tilde = np.einsum('pq,pq->', den_mat, f_mat)
+        
+        p_amp = self.pressure * a / f_tilde
+
+        if (p_amp >= 0.0):
+            tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+            g_tilde = np.einsum('pq,pq->', den_mat, tco_mat.to_numpy())
+            
+            V_pr = ( p_amp * tco_mat.to_numpy() 
+                    - g_tilde * p_amp / f_tilde * f_mat )
+            
+            return V_pr
+        else:
+            print('NEGATIVE AMPLITUDE DETECTED')
+            return np.zeros(den_mat.shape)
+
     def get_gostshyp_contribution(self, den_mat, tessellation_settings=None):
 
         """
