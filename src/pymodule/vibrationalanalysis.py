@@ -660,12 +660,16 @@ class VibrationalAnalysis:
             lr_drv = ComplexResponse(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
+            # save response results in the vib sub-folder of the checkpoint file
+            lr_drv.group_label = 'vib/rsp'
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = polgrad_drv.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
+            # save response results in the vib subfolder of the cehckpoint file
+            lr_drv.group_label = 'vib/rsp'
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = self.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
@@ -1038,36 +1042,40 @@ class VibrationalAnalysis:
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         natm = molecule.number_of_atoms()
+        nmodes = len(self.vib_frequencies)
 
-        normal_mode_grp = hf.create_group('normal_modes')
+        hf.create_dataset(vib_group + "number_of_modes",
+                        data=np.array([nmodes]))
+
+        normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
         for n, Q in enumerate(self.normal_modes, 1):
             normal_mode_grp.create_dataset(str(n),
-                                           data=np.array([Q]).reshape(natm, 3))
+                                           data=np.array(Q).reshape(natm, 3))
 
         hf.create_dataset(vib_group + 'hessian', data=self.hessian)
         hf.create_dataset(vib_group + 'vib_frequencies',
-                          data=np.array([self.vib_frequencies]))
+                          data=np.array(self.vib_frequencies))
         hf.create_dataset(vib_group + 'force_constants',
-                          data=np.array([self.force_constants]))
+                          data=np.array(self.force_constants))
         hf.create_dataset(vib_group + 'reduced_masses',
-                          data=np.array([self.reduced_masses]))
+                          data=np.array(self.reduced_masses))
         if self.do_ir:
             hf.create_dataset(vib_group + 'ir_intensities',
-                              data=np.array([self.ir_intensities]))
+                              data=np.array(self.ir_intensities))
         if self.do_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group(vib_group + 'raman_activity')
+            raman_grp = hf.create_group(vib_group + 'raman_activities')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
-                                             [self.raman_activities[freqs[i]]]))
+                                             self.raman_activities[freqs[i]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group(vib_group + 'resonance_raman_activity')
+            raman_grp = hf.create_group(vib_group + 'resonance_raman_activities')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
-                                             [self.raman_activities[freqs[i]]]))
+                                             self.raman_activities[freqs[i]]))
         hf.close()
 
     def print_header(self):
@@ -1230,7 +1238,11 @@ class VibrationalAnalysis:
         ax2 = ax.twinx()
 
         freqs = vib_results['vib_frequencies']
-        raman_act = vib_results['raman_activities'][0]
+        raman_results = vib_results['raman_activities']
+        if isinstance(raman_results, dict):
+            raman_act = raman_results["0"]
+        else:
+            raman_act = raman_results[0]
         if broadening_type.lower() == 'lorentzian':
             x, y = self.lorentzian_broadening(freqs, raman_act, 0, 4000, 1,
                                               broadening_value)
@@ -1278,7 +1290,7 @@ class VibrationalAnalysis:
                     scaling_factor * vib_results['vib_frequencies'][i],
                     scaling_factor * vib_results['vib_frequencies'][i]
                 ],
-                [0.0, vib_results['raman_activities'][0][i]],
+                [0.0, raman_act[i]],
                 alpha=0.7,
                 linewidth=2,
                 color="darkcyan",
@@ -1463,7 +1475,11 @@ class VibrationalAnalysis:
             str(len(vib_results['normal_modes'])) + " normal modes.")
 
         xyz = vib_results['molecule_xyz_string']
-        nm = vib_results['normal_modes'][mode - 1]
+        normal_modes = vib_results['normal_modes']
+        if isinstance(normal_modes, dict):
+            nm = normal_modes[str(mode)]
+        else:
+            nm = normal_modes[mode - 1]
 
         xyz_lines = xyz.strip().splitlines()
         nm_reshaped = nm.reshape(-1, 3)

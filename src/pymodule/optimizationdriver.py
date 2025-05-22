@@ -285,6 +285,7 @@ class OptimizationDriver:
 
         if self.filename is not None:
             base_fname = self.filename
+            self.keep_files = True
         else:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
