@@ -667,8 +667,8 @@ class EvbDriver():
                 {
                     "Lambda":
                     Lambda,
-                    "integration forcegroups":
-                    list(EvbForceGroup.integration_force_groups()),
+                    # "integration forcegroups":
+                    # list(EvbForceGroup.integration_force_groups()),
                     # "pes forcegroups":
                     # list(EvbForceGroup.pes_force_groups()),
                 },
@@ -1022,7 +1022,7 @@ class EvbDriver():
         E1_int = E_data[3, sub_indices]
         E2_int = E_data[4, sub_indices]
         E_m_pes = E_data[5, sub_indices]
-        E_m_int = E_data[6, sub_indices]
+        # E_m_int = E_data[6, sub_indices]
 
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(
             data_file,
@@ -1036,7 +1036,7 @@ class EvbDriver():
             "E1_int": E1_int,
             "E2_int": E2_int,
             "E_m_pes": E_m_pes,
-            "E_m_int": E_m_int,
+            # "E_m_int": E_m_int,
             "E1_fg": rea_fg_data,
             "E2_fg": pro_fg_data,
             "E_m_fg": fg_data,

@@ -365,8 +365,8 @@ class EvbFepDriver():
                     f"Running initial equilibration for {self.initial_equil_NVT_steps+self.initial_equil_NPT_steps} steps"
                 )
                 self.ostream.flush()
-                equil_simulation.integrator.setIntegrationForceGroups(
-                    EvbForceGroup.integration_force_groups())
+                # equil_simulation.integrator.setIntegrationForceGroups(
+                #     EvbForceGroup.integration_force_groups())
                 self._safe_step(
                     equil_simulation,
                     self.initial_equil_NVT_steps + self.initial_equil_NPT_steps)
@@ -482,8 +482,8 @@ class EvbFepDriver():
             )
         else:
             integrator = mm.VerletIntegrator(step_size)
-        integrator.setIntegrationForceGroups(
-            EvbForceGroup.integration_force_groups())
+        # integrator.setIntegrationForceGroups(
+        #     EvbForceGroup.integration_force_groups())
 
         if self.platform is not None:
             simulation = mmapp.Simulation(

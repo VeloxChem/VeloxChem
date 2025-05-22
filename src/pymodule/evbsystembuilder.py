@@ -1084,20 +1084,20 @@ class EvbSystemBuilder():
             lam)
 
         if not self.no_force_groups:
-            bonded_harmonic.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
-            angle.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
-            torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
-            improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
+            bonded_harmonic.setForceGroup(EvbForceGroup.REA_HARM_BOND.value)
+            angle.setForceGroup(EvbForceGroup.REA_ANGLE.value)
+            torsion.setForceGroup(EvbForceGroup.REA_TORSION.value)
+            improper.setForceGroup(EvbForceGroup.REA_IMP.value)
 
             bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
             constant_force.setForceGroup(EvbForceGroup.CONSTRAINT.value)
             angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
             torsion_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
 
-            syslj.setForceGroup(EvbForceGroup.INTLJ.value)
+            syslj.setForceGroup(EvbForceGroup.SYSLJ.value)
+            syscoul.setForceGroup(EvbForceGroup.SYSCOUL.value)
 
-            syscoul.setForceGroup(EvbForceGroup.INTCOUL.value)
-            morse.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
+            morse.setForceGroup(EvbForceGroup.REA_MORSE_BOND.value)
 
         system.addForce(bonded_harmonic)
         system.addForce(angle)
@@ -1741,8 +1741,8 @@ class EvbForceGroup(Enum):
     DEFAULT = auto(
     )  # Default force group, included for both integration and energy calculations
     # THERMOSTAT = auto()  # Thermostat
-    INTLJ = auto()  # Integration lennard-jones potential
-    INTCOUL = auto()  # Integration coulombic potential
+    SYSLJ = auto()  # Integration lennard-jones potential
+    SYSCOUL = auto()  # Integration coulombic potential
     PESLJ = auto()  # Lennard-jones potential
     PESCOUL = auto()  # Coulombic potential
     CONSTRAINT = auto()
@@ -1751,7 +1751,11 @@ class EvbForceGroup(Enum):
     NB_FORCE = auto()  # Solvent-solvent and solvent-solute nb force
     BAROSTAT = auto()  # Barostat
     E_FIELD = auto()  # Electric field force
-    REACTION_BONDED = auto()  # Bonded forces for the reaction atoms
+    REA_HARM_BOND = auto()  # Bonded forces for the reaction atoms
+    REA_MORSE_BOND = auto()
+    REA_ANGLE = auto()
+    REA_TORSION = auto()
+    REA_IMP = auto()
 
     # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
     PES_CONSTRAINT = auto()
@@ -1766,75 +1770,40 @@ class EvbForceGroup(Enum):
     )  # All leftover forces that should only be used for the calculation of the PES
     NONE = auto(
     )  # Forces that should not be included in the integration or PES calculations
-    DEBUG1PES = auto()  # Debugging force group 1
-    DEBUG2PES = auto()  # Debugging force group 2
-    DEBUG1INT = auto()  # Debugging force group 1
-    DEBUG2INT = auto()  # Debugging force group 2
     DEBUG1 = auto()  # Debugging force group 1
     DEBUG2 = auto()  # Debugging force group 2
 
     # Both methods return classes because integrator.setIntegrationForceGroups() takes a set as argument
-    @classmethod
-    def integration_force_groups(cls):
-        return set([
-            cls.DEFAULT.value,
-            cls.CMM_REMOVER.value,
-            cls.NB_FORCE.value,
-            cls.BAROSTAT.value,
-            cls.E_FIELD.value,
-            cls.REACTION_BONDED.value,
-            cls.INTLJ.value,
-            cls.INTCOUL.value,
-            cls.CONSTRAINT.value,
-            cls.PES_CONSTRAINT.value,
-            cls.RESTRAINT.value,
-            cls.SOLVENT.value,
-            cls.CARBON.value,
-            cls.PDB.value,
-            cls.INTEGRATION.value,
-            # cls.DEBUG1INT.value,
-            # cls.DEBUG2INT.value,
-            # cls.DEBUG1.value,
-            # cls.DEBUG2.value,
-        ])
-
-    @classmethod
-    #todo deprecate this
-    def pes_force_groups(cls):
-        return set([
-            cls.DEFAULT.value,
-            cls.CMM_REMOVER.value,
-            cls.NB_FORCE.value,
-            cls.BAROSTAT.value,
-            cls.E_FIELD.value,
-            cls.REACTION_BONDED.value,
-            cls.PES_CONSTRAINT.value,
-            cls.PESLJ.value,
-            cls.PESCOUL.value,
-            cls.SOLVENT.value,
-            cls.CARBON.value,
-            cls.PDB.value,
-            cls.PES.value,
-            # cls.DEBUG1PES.value,
-            # cls.DEBUG2PES.value,
-            # cls.DEBUG1.value,
-            # cls.DEBUG2.value,
-        ])
+    # @classmethod
+    # def integration_force_groups(cls):
+    #     return set([
+    #         cls.DEFAULT.value,
+    #         cls.CMM_REMOVER.value,
+    #         cls.NB_FORCE.value,
+    #         cls.BAROSTAT.value,
+    #         cls.E_FIELD.value,
+    #         cls.REA_HARM_BOND.value,
+    #         cls.REA_ANGLE.value,
+    #         cls.REA_TORSION.value,
+    #         cls.REA_IMP.value,
+    #         cls.SYSLJ.value,
+    #         cls.SYSCOUL.value,
+    #         cls.CONSTRAINT.value,
+    #         cls.RESTRAINT.value,
+    #         cls.SOLVENT.value,
+    #         cls.CARBON.value,
+    #         cls.PDB.value,
+    #         cls.INTEGRATION.value,
+    #         # cls.DEBUG1.value,
+    #         # cls.DEBUG2.value,
+    #     ])
 
     @classmethod
     #Simple method for printing a descrpitive header to be used in force group logging files
     def get_header(cls):
         header = ""
-        integration_forcegroups = cls.integration_force_groups()
-        pes_forcegroups = cls.pes_force_groups()
+        # pes_forcegroups = cls.pes_force_groups()
         for fg in cls:
-            in_int = fg.value in integration_forcegroups
-            in_pes = fg.value in pes_forcegroups
-            fg_cat = 'b'  # For both
-            if in_int and not in_pes:
-                fg_cat = 'i'
-            if not in_int and in_pes:
-                fg_cat = 'p'
-            header += f"{fg.name}({fg.value}-{fg_cat}), "
+            header += f"{fg.name}({fg.value}), "
         header = header[:-2] + '\n'
         return header
