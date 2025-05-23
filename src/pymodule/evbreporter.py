@@ -341,12 +341,7 @@ class EvbReporter():
             #             f"Unknown force group: {forcegroups}. Use 'pes' or 'int'."
             #         )
             if isinstance(forcegroups, EvbForceGroup):
-                forcegroups = [forcegroups.value]
-            else:
-                raise ValueError("Unknown forcegroup argument")
-
-            if not isinstance(forcegroups, set):
-                forcegroups = set(forcegroups)
+                forcegroups = set([forcegroups.value] )
 
             return simulation.context.getState(
                 getEnergy=True,
