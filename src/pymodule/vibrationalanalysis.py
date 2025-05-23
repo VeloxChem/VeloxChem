@@ -119,7 +119,6 @@ class VibrationalAnalysis:
 
         # filenames
         self.filename = None
-        self.results_h5_file = None
         self.vib_results_txt_file = None
 
         # option dictionaries from input
@@ -255,7 +254,6 @@ class VibrationalAnalysis:
 
         if 'filename' in vib_dict:
             self.filename = vib_dict['filename']
-            self.results_h5_file = f'{self.filename}.h5'
             self.vib_results_txt_file = f'{self.filename}-vib-results.out'
 
         # settings for property modules
@@ -1018,8 +1016,9 @@ class VibrationalAnalysis:
             The molecule.
         """
 
-        if self.results_h5_file is not None:
-            self.write_vib_results_to_hdf5(molecule, self.results_h5_file)
+        if self.filename is not None:
+            results_h5_file = f"{self.filename}.h5"
+            self.write_vib_results_to_hdf5(molecule, results_h5_file)
 
     def write_vib_results_to_hdf5(self, molecule, fname):
         """
