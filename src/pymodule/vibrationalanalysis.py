@@ -1239,6 +1239,7 @@ class VibrationalAnalysis:
 
         freqs = vib_results['vib_frequencies']
         raman_results = vib_results['raman_activities']
+        # TODO: make the read of raman results consistent
         if isinstance(raman_results, dict):
             raman_act = raman_results["0"]
         else:
@@ -1476,6 +1477,7 @@ class VibrationalAnalysis:
 
         xyz = vib_results['molecule_xyz_string']
         normal_modes = vib_results['normal_modes']
+        # TODO: make the read of normal modes consistent
         if isinstance(normal_modes, dict):
             nm = normal_modes[str(mode)]
         else:
