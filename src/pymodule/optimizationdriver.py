@@ -269,11 +269,20 @@ class OptimizationDriver:
 
         # inherit filename from scf results
 
-        # check that the args are molecular basis and scf results
-        if ((len(args) >= 2) and isinstance(args[0], MolecularBasis) and
-                isinstance(args[1], dict)):
-            if ('filename' in args[1]) and (args[1]['filename'] is not None):
-                self.filename = args[1]['filename']
+        # check that the args contain molecular basis and scf_results
+        # note that scf_results is a dictionary on the master rank and None on
+        # other ranks so we do not check its type
+        if (len(args) >= 2) and isinstance(args[0], MolecularBasis):
+            # read filename on master rank and broadcast
+            args_filename = None
+            if self.rank == mpi_master():
+                if ('filename' in args[1]) and (args[1]['filename']
+                                                is not None):
+                    args_filename = args[1]['filename']
+            args_filename = self.comm.bcast(args_filename, root=mpi_master())
+            # update filename
+            if args_filename is not None:
+                self.filename = args_filename
 
         # run within temp_dir since geomeTRIC will generate intermediate files
 
