@@ -94,12 +94,12 @@ class EvbFepDriver():
         self.temperature = -1
         self.pressure = -1
 
-        self.equil_NVT_steps = 5000
-        self.equil_NPT_steps = 5000
-        self.sample_steps = 100000
+        self.equil_NVT_steps = 20000
+        self.equil_NPT_steps = 20000
+        self.sample_steps = 250000
         self.write_step = 1000
-        self.initial_equil_NVT_steps = 10000
-        self.initial_equil_NPT_steps = 10000
+        self.initial_equil_NVT_steps = 50000
+        self.initial_equil_NPT_steps = 50000
         self.step_size = 0.001 #ps
         self.equil_step_size = 0.001 #ps
 
@@ -112,6 +112,7 @@ class EvbFepDriver():
         self.save_frames: int = 2000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
+        self.minimize_every_lambda: bool = False
         self.xml_save_interval: int = 50
         self.NVT_integrator = "nose-hoover"
 
@@ -303,6 +304,7 @@ class EvbFepDriver():
             self.ostream.print_info(
                 f"Running FEP on platform: {platformname.getName()}")
             self.ostream.flush()
+
         self.ostream.print_info("Minimizing energy")
         self.ostream.flush()
         equil_simulation.minimizeEnergy()

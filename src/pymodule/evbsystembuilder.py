@@ -1453,7 +1453,7 @@ class EvbSystemBuilder():
                      improper=False):
         assert torsion_dict["type"] == "Fourier", "Unknown dihedral type"
         if improper:
-            atom_id = [atom_id[1], atom_id[0], atom_id[2], atom_id[3]]
+            atom_id = [atom_id[3], atom_id[2], atom_id[0], atom_id[1]]
         if barrier_scaling > 0:
             if torsion_dict.get("multiple", False):
                 for periodicity, phase, barrier in zip(

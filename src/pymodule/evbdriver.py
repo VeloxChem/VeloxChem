@@ -582,9 +582,9 @@ class EvbDriver():
             if configurations[0].get("debug",False):
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
             else:
-                Lambda = np.linspace(0, 0.1, 11)
-                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
-                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
+                Lambda = np.linspace(0, 0.1, 6)
+                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
+                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
                 Lambda = np.round(Lambda, 3)
                 self.ostream.print_info(
                     f"Using default lambda vector: {list(Lambda)}")
