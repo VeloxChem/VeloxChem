@@ -620,6 +620,7 @@ class EvbFepDriver():
                 positions[positions == np.inf] = 99999998
                 positions[positions == -np.inf] = -9999998
                 positions[positions == np.nan] = 0
+                positions = np.nan_to_num(positions, posinf = 99999998, neginf = -9999998)
 
                 mmapp.PDBFile.writeFile(
                     self.topology,
