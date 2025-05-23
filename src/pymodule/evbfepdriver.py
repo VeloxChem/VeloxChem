@@ -94,12 +94,12 @@ class EvbFepDriver():
         self.temperature = -1
         self.pressure = -1
 
-        self.equil_NVT_steps = 50000
-        self.equil_NPT_steps = 50000
+        self.equil_NVT_steps = 5000
+        self.equil_NPT_steps = 5000
         self.sample_steps = 100000
         self.write_step = 1000
-        self.initial_equil_NVT_steps = 100000
-        self.initial_equil_NPT_steps = 100000
+        self.initial_equil_NVT_steps = 10000
+        self.initial_equil_NPT_steps = 10000
         self.step_size = 0.001 #ps
         self.equil_step_size = 0.001 #ps
 
