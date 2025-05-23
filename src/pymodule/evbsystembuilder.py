@@ -1453,7 +1453,7 @@ class EvbSystemBuilder():
                      improper=False):
         assert torsion_dict["type"] == "Fourier", "Unknown dihedral type"
         if improper:
-            atom_id = [atom_id[3], atom_id[2], atom_id[0], atom_id[1]]
+            atom_id = [atom_id[1], atom_id[0], atom_id[2], atom_id[3]]
         if barrier_scaling > 0:
             if torsion_dict.get("multiple", False):
                 for periodicity, phase, barrier in zip(
@@ -1836,12 +1836,6 @@ class EvbForceGroup(Enum):
     )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
     CARBON = auto()  # Graphene and CNTs
     PDB = auto()  # Bonded forces added from the PDB
-    INTEGRATION = auto(
-    )  # All leftover forces that should only be used for integration
-    PES = auto(
-    )  # All leftover forces that should only be used for the calculation of the PES
-    NONE = auto(
-    )  # Forces that should not be included in the integration or PES calculations
 
     #Forcegroups to hold decomposed forces in
     LJDECOMP1 = auto()
@@ -1852,6 +1846,11 @@ class EvbForceGroup(Enum):
     COULDECOMP3 = auto()
     DEBUG1 = auto()  # Debugging force group 1
     DEBUG2 = auto()  # Debugging force group 2
+
+    @classmethod
+    def pes_forcegroups(cls):
+        max_ind = cls.LJDECOMP1.value
+        return set(range(1,max_ind))
 
     @classmethod
     #Simple method for printing a descrpitive header to be used in force group logging files

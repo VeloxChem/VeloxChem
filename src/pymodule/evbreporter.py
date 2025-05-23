@@ -89,29 +89,27 @@ class EvbReporter():
                 "simulation":
                 mmapp.Simulation(topology, reactant_pes_sys,
                                  mm.VerletIntegrator(1)),
-                # "forcegroups":
-                # EvbForceGroup.pes_force_groups(),
+                "forcegroups":
+                EvbForceGroup.pes_forcegroups(),
             },
             'product_pes': {
                 "simulation":
                 mmapp.Simulation(topology, product_pes_sys,
                                  mm.VerletIntegrator(1)),
-                # "forcegroups":
-                # EvbForceGroup.pes_force_groups(),
+                "forcegroups":
+                EvbForceGroup.pes_forcegroups(),
             },
             'reactant_integration': {
                 "simulation":
                 mmapp.Simulation(topology, reactant_int_sys,
                                  mm.VerletIntegrator(1)),
-                # "forcegroups":
-                # EvbForceGroup.integration_force_groups(),
+                "forcegroups":-1,
             },
             'product_integration': {
                 "simulation":
                 mmapp.Simulation(topology, product_int_sys,
                                  mm.VerletIntegrator(1)),
-                # "forcegroups":
-                # EvbForceGroup.integration_force_groups(),
+                "forcegroups":-1,
             },
         })
 
@@ -185,8 +183,9 @@ class EvbReporter():
         for simulation_dict in self.simulation_dicts.values():
             e = self._get_potential_energy(
                 simulation_dict['simulation'],
-                #    simulation_dict['forcegroups'],
-                state=state)
+                simulation_dict['forcegroups'],
+                state=state,
+            )
             E.append(e)
         E1_pes = E[0]
         E2_pes = E[1]
