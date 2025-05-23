@@ -138,7 +138,7 @@ class EvbSystemBuilder():
 
         self.water_model: str
         self.decompose_bonded = None
-        self.decompose_nb: list|None = None
+        self.decompose_nb: list | None = None
         self.keywords = {
             "temperature": {
                 "type": float
@@ -230,10 +230,10 @@ class EvbSystemBuilder():
             "CNT_radius_nm": {
                 "type": float
             },
-            "decompose_nb":{
+            "decompose_nb": {
                 "type": list
             },
-            "decompose_bonded":{
+            "decompose_bonded": {
                 "type": list
             },
         }
@@ -748,19 +748,19 @@ class EvbSystemBuilder():
                 })
 
                 impropers.update({
-                    (left + 3, center + 0, center + 1, up + 2):
+                    (center + 0, left + 3, center + 1, up + 2):
                     graphene_dihedral
                 })
                 impropers.update({
-                    (center + 0, center + 1, down + 0, center + 2):
+                    (center + 1, center + 0, down + 0, center + 2):
                     graphene_dihedral
                 })
                 impropers.update({
-                    (center + 1, center + 2, down + 3, center + 3):
+                    (center + 2, center + 1, down + 3, center + 3):
                     graphene_dihedral
                 })
                 impropers.update({
-                    (center + 2, center + 3, right + 0, up + 2):
+                    (center + 3, center + 2, right + 0, up + 2):
                     graphene_dihedral
                 })
 
@@ -800,7 +800,10 @@ class EvbSystemBuilder():
 
         for key, improper in impropers.items():
             atom_ids = self._key_to_id(key, CC_atoms)
-            self._add_torsion(carbon_fourier_dihedral_force, improper, atom_ids)
+            self._add_torsion(carbon_fourier_dihedral_force,
+                              improper,
+                              atom_ids,
+                              improper=True)
 
         for i in range(len(carbon_atoms)):
             for j in range(len(carbon_atoms)):
@@ -934,7 +937,10 @@ class EvbSystemBuilder():
                     self._add_torsion(fourier_force, dihedral, atom_ids)
                 for key, dihedral in solvent_ff.impropers.items():
                     atom_ids = self._key_to_id(key, solvent_atoms)
-                    self._add_torsion(fourier_imp_force, dihedral, atom_ids)
+                    self._add_torsion(fourier_imp_force,
+                                      dihedral,
+                                      atom_ids,
+                                      improper=True)
 
                 exceptions = self._create_exceptions_from_bonds(
                     solvent_ff.atoms, solvent_ff.bonds)
@@ -1049,19 +1055,18 @@ class EvbSystemBuilder():
             new_system = copy.deepcopy(system)
             if lam == 0:
                 rea_system = copy.deepcopy(system)
-            if lam ==1:
+            if lam == 1:
                 pro_system = copy.deepcopy(system)
             # Add the bonded forces for the reaction system
             if not self.no_reactant:
                 self._add_reaction_forces(new_system, lam)
             systems[lam] = new_system
 
-        
-        self._add_reaction_forces(rea_system,0, pes=True)
+        self._add_reaction_forces(rea_system, 0, pes=True)
         self._add_reaction_forces(pro_system, 1, pes=True)
         if self.decompose_bonded is not None:
-            self._add_bonded_decompositions(rea_system,0)
-            self._add_bonded_decompositions(pro_system,1)
+            self._add_bonded_decompositions(rea_system, 0)
+            self._add_bonded_decompositions(pro_system, 1)
         if self.decompose_nb is not None:
             self._add_nb_decompositions(rea_system)
             self._add_nb_decompositions(pro_system)
@@ -1128,35 +1133,40 @@ class EvbSystemBuilder():
         return system
 
     def _add_bonded_decompositions(self, system, lam):
-        
+
         return system
-    
+
     def _add_nb_decompositions(self, system):
-        nbforce = [force for force in system.getForces() if isinstance(force, mm.NonbondedForce)][0]
+        nbforce = [
+            force for force in system.getForces()
+            if isinstance(force, mm.NonbondedForce)
+        ][0]
         fg_ind = EvbForceGroup.LJDECOMP1.value
-        
-        assert len(self.decompose_nb) <4, "Can only decompose the nonbonded interactions in 3 groups"
+
+        assert len(
+            self.decompose_nb
+        ) < 4, "Can only decompose the nonbonded interactions in 3 groups"
 
         for to_decompose in self.decompose_nb:
-            
+
             lj_dec = copy.deepcopy(nbforce)
             coul_dec = copy.deepcopy(nbforce)
-            
+
             for i, _ in enumerate(self.reactant.atoms.values()):
                 atom_id = self.reaction_atoms[i].index
                 charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
-                
+
                 if i in to_decompose:
                     lj_dec.setParticleParameters(atom_id, 0, sigma, epsilon)
                     coul_dec.setParticleParameters(atom_id, charge, 1, 0)
                 else:
-                #If particle isn't listed in the decompositions, just set all the parameters to 0
+                    #If particle isn't listed in the decompositions, just set all the parameters to 0
                     lj_dec.setParticleParameters(atom_id, 0, 0, 0)
                     coul_dec.setParticleParameters(atom_id, 0, 0, 0)
             lj_dec.setForceGroup(fg_ind)
-            fg_ind+=1
+            fg_ind += 1
             coul_dec.setForceGroup(fg_ind)
-            fg_ind+=1
+            fg_ind += 1
             system.addForce(lj_dec)
             system.addForce(coul_dec)
 
@@ -1344,9 +1354,17 @@ class EvbSystemBuilder():
             if (key in self.reactant.impropers.keys()
                     and key in self.product.impropers.keys()):
                 dihedA = self.reactant.impropers[key]
-                self._add_torsion(fourier_force, dihedA, atom_ids, 1 - lam)
+                self._add_torsion(fourier_force,
+                                  dihedA,
+                                  atom_ids,
+                                  1 - lam,
+                                  improper=True)
                 dihedB = self.product.impropers[key]
-                self._add_torsion(fourier_force, dihedB, atom_ids, lam)
+                self._add_torsion(fourier_force,
+                                  dihedB,
+                                  atom_ids,
+                                  lam,
+                                  improper=True)
             else:
                 if key in self.reactant.impropers.keys():
                     scale = 1 - lam
@@ -1355,7 +1373,11 @@ class EvbSystemBuilder():
                     scale = lam
                     dihed = self.product.impropers[key]
                 if scale > 0:
-                    self._add_torsion(fourier_force, dihed, atom_ids, scale)
+                    self._add_torsion(fourier_force,
+                                      dihed,
+                                      atom_ids,
+                                      scale,
+                                      improper=True)
         return fourier_force
 
     def _add_bond(self, bond_force, atom_id, equil, fc):
@@ -1427,8 +1449,11 @@ class EvbSystemBuilder():
                      fourier_force,
                      torsion_dict,
                      atom_id,
-                     barrier_scaling=1.):
+                     barrier_scaling=1.,
+                     improper=False):
         assert torsion_dict["type"] == "Fourier", "Unknown dihedral type"
+        if improper:
+            atom_id = [atom_id[1], atom_id[0], atom_id[2], atom_id[3]]
         if barrier_scaling > 0:
             if torsion_dict.get("multiple", False):
                 for periodicity, phase, barrier in zip(
