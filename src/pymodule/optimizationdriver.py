@@ -285,7 +285,6 @@ class OptimizationDriver:
 
         if self.filename is not None:
             base_fname = self.filename
-            self.keep_files = True
         else:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
@@ -467,7 +466,9 @@ class OptimizationDriver:
                 self.ostream.flush()
 
                 # Write opt results to final hdf5 file
-                final_h5_fname = filename + ".h5"
+                # Note: use base_fname so that the final h5 file is kept even
+                # when keep_files is False
+                final_h5_fname = base_fname + ".h5"
                 self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
