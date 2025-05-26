@@ -270,14 +270,13 @@ class OptimizationDriver:
         # inherit filename from scf results
 
         # check that the args contain molecular basis and scf_results
-        # note that scf_results is a dictionary on the master rank and None on
-        # other ranks so we do not check its type
+        # note that we only check the type of scf_results on the master rank
         if (len(args) >= 2) and isinstance(args[0], MolecularBasis):
-            # read filename on master rank and broadcast
             args_filename = None
             if self.rank == mpi_master():
-                if ('filename' in args[1]) and (args[1]['filename']
-                                                is not None):
+                # read filename from scf_results
+                if isinstance(args[1], dict) and ('filename' in args[1]) and (
+                        args[1]['filename'] is not None):
                     args_filename = args[1]['filename']
             args_filename = self.comm.bcast(args_filename, root=mpi_master())
             # update filename
