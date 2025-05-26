@@ -455,8 +455,9 @@ class ConformerGenerator:
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
-        #default partial charges are RESP charges: self.resp_charges is True as default
-        if self.resp_charges is True:
+        #default partial charges are RESP charges: self.resp_charges is True and partial_charges is None as default 
+        #if the user provides partial charges, then skip RESP charges calculation
+        if self.resp_charges and (self.partial_charges is None):
             basis = MolecularBasis.read(molecule, "6-31g*")
             self.partial_charges = RespChargesDriver().compute(
                 molecule, basis, 'resp')
