@@ -2274,6 +2274,11 @@ class MMForceFieldGenerator:
             if bond in non_rotatable_bonds:
                 bonds_to_delete.append((i, j))
                 continue
+            
+            # Check if any side atom of the bond is involved in a triple bond
+            if (bond[0] in ['c1','n1','cg','ch']) or (bond[1] in ['c1', 'n1','cg','ch']):
+                bonds_to_delete.append((i, j))
+                continue
 
             # Check if the bond is part of a ring
             if self.is_bond_in_ring(i, j):
