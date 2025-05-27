@@ -70,6 +70,16 @@ auto integrateFxcFock(CDenseMatrix&           aoFockMatrix,
                       const int64_t           rank,
                       const int64_t           nnodes) -> void;
 
+auto integrateVxcGradient(const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& rwDensityMatrix,
+                          const CAODensityMatrix& gsDensityMatrix,
+                          const CMolecularGrid&   molecularGrid,
+                          const std::string&      xcFuncLabel,
+                          const int64_t           numGpusPerNode,
+                          const int64_t           rank,
+                          const int64_t           nnodes) -> CDenseMatrix;
+
 }  // namespace gpu
 
 #endif
