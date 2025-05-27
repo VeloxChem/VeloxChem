@@ -49,8 +49,9 @@
 #include "GpuDevices.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
-#include "GtoValuesGgaGPU.hpp"
 #include "GtoValuesLdaGPU.hpp"
+#include "GtoValuesGgaGPU.hpp"
+#include "GtoValuesMggaGPU.hpp"
 #include "MathFunc.hpp"
 #include "MatrixFunc.hpp"
 #include "MultiTimer.hpp"
@@ -227,17 +228,17 @@ getDensitySigmaOnGrids(double*        d_rho,
 }
 
 __global__ void
-getDensityGradientOnGrids(double* d_dengrad_x,
-                          double* d_dengrad_y,
-                          double* d_dengrad_z,
-                          const double* d_mat_F,
-                          const double* d_gto_values_x,
-                          const double* d_gto_values_y,
-                          const double* d_gto_values_z,
-                          const uint32_t aocount,
-                          const uint32_t* d_ao_to_atom_ids,
-                          const uint32_t natoms,
-                          const uint32_t npoints)
+getLdaDensityGradientOnGrids(double* d_dengrad_x,
+                             double* d_dengrad_y,
+                             double* d_dengrad_z,
+                             const double* d_mat_F,
+                             const double* d_gto_values_x,
+                             const double* d_gto_values_y,
+                             const double* d_gto_values_z,
+                             const uint32_t aocount,
+                             const uint32_t* d_ao_to_atom_ids,
+                             const uint32_t natoms,
+                             const uint32_t npoints)
 {
     const uint32_t a = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
@@ -259,6 +260,90 @@ getDensityGradientOnGrids(double* d_dengrad_x,
         d_dengrad_x[a * npoints + g] = dgx;
         d_dengrad_y[a * npoints + g] = dgy;
         d_dengrad_z[a * npoints + g] = dgz;
+    }
+}
+
+__global__ void
+getGgaDensityGradientOnGrids(double* d_dengrad_x,
+                             double* d_dengrad_y,
+                             double* d_dengrad_z,
+                             double* d_dengrad_xx,
+                             double* d_dengrad_xy,
+                             double* d_dengrad_xz,
+                             double* d_dengrad_yx,
+                             double* d_dengrad_yy,
+                             double* d_dengrad_yz,
+                             double* d_dengrad_zx,
+                             double* d_dengrad_zy,
+                             double* d_dengrad_zz,
+                             const double* d_mat_F,
+                             const double* d_mat_F_x,
+                             const double* d_mat_F_y,
+                             const double* d_mat_F_z,
+                             const double* d_gto_values_x,
+                             const double* d_gto_values_y,
+                             const double* d_gto_values_z,
+                             const double* d_gto_values_xx,
+                             const double* d_gto_values_xy,
+                             const double* d_gto_values_xz,
+                             const double* d_gto_values_yy,
+                             const double* d_gto_values_yz,
+                             const double* d_gto_values_zz,
+                             const uint32_t aocount,
+                             const uint32_t* d_ao_to_atom_ids,
+                             const uint32_t natoms,
+                             const uint32_t npoints)
+{
+    const uint32_t a = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if ((a < natoms) && (g < npoints))
+    {
+        double dgx = 0.0, dgy = 0.0, dgz = 0.0;
+
+        double dgxx = 0.0, dgxy = 0.0, dgxz = 0.0;
+        double dgyx = 0.0, dgyy = 0.0, dgyz = 0.0;
+        double dgzx = 0.0, dgzy = 0.0, dgzz = 0.0;
+
+        for (uint32_t i = 0; i < aocount; i++)
+        {
+            if (a == d_ao_to_atom_ids[i])
+            {
+                const uint32_t ig = i * npoints + g;
+
+                dgx -= 2.0 * d_mat_F[ig] * d_gto_values_x[ig];
+                dgy -= 2.0 * d_mat_F[ig] * d_gto_values_y[ig];
+                dgz -= 2.0 * d_mat_F[ig] * d_gto_values_z[ig];
+
+                dgxx -= 2.0 * (d_mat_F_x[ig] * d_gto_values_x[ig] + d_mat_F[ig] * d_gto_values_xx[ig]);
+                dgxy -= 2.0 * (d_mat_F_x[ig] * d_gto_values_y[ig] + d_mat_F[ig] * d_gto_values_xy[ig]);
+                dgxz -= 2.0 * (d_mat_F_x[ig] * d_gto_values_z[ig] + d_mat_F[ig] * d_gto_values_xz[ig]);
+
+                dgyx -= 2.0 * (d_mat_F_y[ig] * d_gto_values_x[ig] + d_mat_F[ig] * d_gto_values_xy[ig]);
+                dgyy -= 2.0 * (d_mat_F_y[ig] * d_gto_values_y[ig] + d_mat_F[ig] * d_gto_values_yy[ig]);
+                dgyz -= 2.0 * (d_mat_F_y[ig] * d_gto_values_z[ig] + d_mat_F[ig] * d_gto_values_yz[ig]);
+
+                dgzx -= 2.0 * (d_mat_F_z[ig] * d_gto_values_x[ig] + d_mat_F[ig] * d_gto_values_xz[ig]);
+                dgzy -= 2.0 * (d_mat_F_z[ig] * d_gto_values_y[ig] + d_mat_F[ig] * d_gto_values_yz[ig]);
+                dgzz -= 2.0 * (d_mat_F_z[ig] * d_gto_values_z[ig] + d_mat_F[ig] * d_gto_values_zz[ig]);
+            }
+        }
+
+        d_dengrad_x[a * npoints + g] = dgx;
+        d_dengrad_y[a * npoints + g] = dgy;
+        d_dengrad_z[a * npoints + g] = dgz;
+
+        d_dengrad_xx[a * npoints + g] = dgxx;
+        d_dengrad_xy[a * npoints + g] = dgxy;
+        d_dengrad_xz[a * npoints + g] = dgxz;
+
+        d_dengrad_yx[a * npoints + g] = dgyx;
+        d_dengrad_yy[a * npoints + g] = dgyy;
+        d_dengrad_yz[a * npoints + g] = dgyz;
+
+        d_dengrad_zx[a * npoints + g] = dgzx;
+        d_dengrad_zy[a * npoints + g] = dgzy;
+        d_dengrad_zz[a * npoints + g] = dgzz;
     }
 }
 
@@ -513,6 +598,214 @@ getGgaFxcMatrixG(double*        d_mat_G,
         d_mat_G_gga[g + i * npoints] = w * (xcomp * d_gto_values_x[g + i * npoints] +
                                             ycomp * d_gto_values_y[g + i * npoints] +
                                             zcomp * d_gto_values_z[g + i * npoints]);
+    }
+}
+
+__global__ void
+getGgaVxcGradient(double*        d_mol_grad,
+                  const double*  d_grid_w,
+                  const uint32_t grid_offset,
+                  const uint32_t npoints,
+                  const double*  d_dengrad_x,
+                  const double*  d_dengrad_y,
+                  const double*  d_dengrad_z,
+                  const double*  d_dengrad_xx,
+                  const double*  d_dengrad_xy,
+                  const double*  d_dengrad_xz,
+                  const double*  d_dengrad_yx,
+                  const double*  d_dengrad_yy,
+                  const double*  d_dengrad_yz,
+                  const double*  d_dengrad_zx,
+                  const double*  d_dengrad_zy,
+                  const double*  d_dengrad_zz,
+                  const uint32_t natoms,
+                  const double*  d_vrho,
+                  const double*  d_vsigma,
+                  const double*  d_rhograd)
+{
+    __shared__ double As_x[TILE_DIM][TILE_DIM + 1];
+    __shared__ double As_y[TILE_DIM][TILE_DIM + 1];
+    __shared__ double As_z[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM + 1];
+
+    const uint32_t a = blockDim.x * blockIdx.x + threadIdx.x;
+
+    double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
+
+    for (uint32_t k = 0; k < (npoints + TILE_DIM - 1) / TILE_DIM; k++)
+    {
+        const uint32_t g = k * TILE_DIM + threadIdx.y;
+
+        // vrho contrib.
+
+        if ((g < npoints) && (a < natoms))
+        {
+            As_x[threadIdx.y][threadIdx.x] = d_dengrad_x[a * npoints + g];
+            As_y[threadIdx.y][threadIdx.x] = d_dengrad_y[a * npoints + g];
+            As_z[threadIdx.y][threadIdx.x] = d_dengrad_z[a * npoints + g];
+
+            if (threadIdx.x == 0)
+            {
+                Bs[threadIdx.y] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0];
+            }
+        }
+        else
+        {
+            As_x[threadIdx.y][threadIdx.x] = 0.0;
+            As_y[threadIdx.y][threadIdx.x] = 0.0;
+            As_z[threadIdx.y][threadIdx.x] = 0.0;
+
+            if (threadIdx.x == 0)
+            {
+                Bs[threadIdx.y] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+        if ((threadIdx.y == 0) && (g < npoints))
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                gatmx += As_x[m][threadIdx.x] * Bs[m];
+                gatmy += As_y[m][threadIdx.x] * Bs[m];
+                gatmz += As_z[m][threadIdx.x] * Bs[m];
+            }
+        }
+
+        __syncthreads();
+
+        // vx contrib.
+
+        if ((g < npoints) && (a < natoms))
+        {
+            As_x[threadIdx.y][threadIdx.x] = d_dengrad_xx[a * npoints + g];
+            As_y[threadIdx.y][threadIdx.x] = d_dengrad_xy[a * npoints + g];
+            As_z[threadIdx.y][threadIdx.x] = d_dengrad_xz[a * npoints + g];
+
+            if (threadIdx.x == 0)
+            {
+                const double vx = 2.0 * d_vsigma[3 * g + 0] * d_rhograd[6 * g + 0] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 3];
+
+                Bs[threadIdx.y] = d_grid_w[g + grid_offset] * vx;
+            }
+        }
+        else
+        {
+            As_x[threadIdx.y][threadIdx.x] = 0.0;
+            As_y[threadIdx.y][threadIdx.x] = 0.0;
+            As_z[threadIdx.y][threadIdx.x] = 0.0;
+
+            if (threadIdx.x == 0)
+            {
+                Bs[threadIdx.y] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                gatmx += As_x[m][threadIdx.x] * Bs[m];
+                gatmy += As_y[m][threadIdx.x] * Bs[m];
+                gatmz += As_z[m][threadIdx.x] * Bs[m];
+            }
+        }
+
+        __syncthreads();
+
+        // vy contrib.
+
+        if ((g < npoints) && (a < natoms))
+        {
+            As_x[threadIdx.y][threadIdx.x] = d_dengrad_yx[a * npoints + g];
+            As_y[threadIdx.y][threadIdx.x] = d_dengrad_yy[a * npoints + g];
+            As_z[threadIdx.y][threadIdx.x] = d_dengrad_yz[a * npoints + g];
+
+            if (threadIdx.x == 0)
+            {
+                const double vy = 2.0 * d_vsigma[3 * g + 0] * d_rhograd[6 * g + 1] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 4];
+
+                Bs[threadIdx.y] = d_grid_w[g + grid_offset] * vy;
+            }
+        }
+        else
+        {
+            As_x[threadIdx.y][threadIdx.x] = 0.0;
+            As_y[threadIdx.y][threadIdx.x] = 0.0;
+            As_z[threadIdx.y][threadIdx.x] = 0.0;
+
+            if (threadIdx.x == 0)
+            {
+                Bs[threadIdx.y] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+        if ((threadIdx.y == 0) && (g < npoints))
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                gatmx += As_x[m][threadIdx.x] * Bs[m];
+                gatmy += As_y[m][threadIdx.x] * Bs[m];
+                gatmz += As_z[m][threadIdx.x] * Bs[m];
+            }
+        }
+
+        __syncthreads();
+
+        // vz contrib.
+
+        if ((g < npoints) && (a < natoms))
+        {
+            As_x[threadIdx.y][threadIdx.x] = d_dengrad_zx[a * npoints + g];
+            As_y[threadIdx.y][threadIdx.x] = d_dengrad_zy[a * npoints + g];
+            As_z[threadIdx.y][threadIdx.x] = d_dengrad_zz[a * npoints + g];
+
+            if (threadIdx.x == 0)
+            {
+                const double vz = 2.0 * d_vsigma[3 * g + 0] * d_rhograd[6 * g + 2] + d_vsigma[3 * g + 1] * d_rhograd[6 * g + 5];
+
+                Bs[threadIdx.y] = d_grid_w[g + grid_offset] * vz;
+            }
+        }
+        else
+        {
+            As_x[threadIdx.y][threadIdx.x] = 0.0;
+            As_y[threadIdx.y][threadIdx.x] = 0.0;
+            As_z[threadIdx.y][threadIdx.x] = 0.0;
+
+            if (threadIdx.x == 0)
+            {
+                Bs[threadIdx.y] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+        if ((threadIdx.y == 0) && (g < npoints))
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                gatmx += As_x[m][threadIdx.x] * Bs[m];
+                gatmy += As_y[m][threadIdx.x] * Bs[m];
+                gatmz += As_z[m][threadIdx.x] * Bs[m];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    // accumulate gradient
+
+    if ((threadIdx.y == 0) && (a < natoms))
+    {
+        d_mol_grad[a * 3 + 0] += 2.0 * gatmx;
+        d_mol_grad[a * 3 + 1] += 2.0 * gatmy;
+        d_mol_grad[a * 3 + 2] += 2.0 * gatmz;
     }
 }
 
@@ -869,6 +1162,133 @@ getGtoValuesForGga(double*                     d_gto_values_0,
     else
     {
         std::string err_ang("gpu::getGtoValuesForGga: Only implemented for s, p and d-orbitals");
+
+        errors::assertMsgCritical(false, err_ang);
+    }
+}
+
+static auto
+getGtoValuesForMgga(double*                     d_gto_values_0,
+                    double*                     d_gto_values_x,
+                    double*                     d_gto_values_y,
+                    double*                     d_gto_values_z,
+                    double*                     d_gto_values_xx,
+                    double*                     d_gto_values_xy,
+                    double*                     d_gto_values_xz,
+                    double*                     d_gto_values_yy,
+                    double*                     d_gto_values_yz,
+                    double*                     d_gto_values_zz,
+                    const int64_t               row_offset,
+                    double*                     d_gto_info,
+                    const CGtoBlock&            gto_block,
+                    const double*               d_grid_x,
+                    const double*               d_grid_y,
+                    const double*               d_grid_z,
+                    const int64_t               grid_offset,
+                    const int64_t               n_grid_points,
+                    const std::vector<int64_t>& gtos_mask) -> void
+{
+    // number of useful CGTOs
+
+    const auto nrows = mathfunc::countSignificantElements(gtos_mask);
+
+    // number of primitives per CGTO
+
+    const auto npgtos = gto_block.getNumberOfPrimitives();
+
+    // number of grid points
+
+    const auto ncols = n_grid_points;
+
+    // prepare GTO information
+
+    auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
+
+    hipSafe(hipMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // evaluate GTO values on grid points
+
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+    dim3 num_blocks((ncols + threads_per_block.x - 1) / threads_per_block.x, (nrows + threads_per_block.y - 1) / threads_per_block.y);
+
+    auto gto_ang = gto_block.getAngularMomentum();
+
+    if (gto_ang == 0)
+    {
+        hipLaunchKernelGGL(gpu::gtoValuesMggaRecS, num_blocks, threads_per_block, 0, 0,
+                                                                 d_gto_values_0,
+                                                                 d_gto_values_x,
+                                                                 d_gto_values_y,
+                                                                 d_gto_values_z,
+                                                                 d_gto_values_xx,
+                                                                 d_gto_values_xy,
+                                                                 d_gto_values_xz,
+                                                                 d_gto_values_yy,
+                                                                 d_gto_values_yz,
+                                                                 d_gto_values_zz,
+                                                                 static_cast<uint32_t>(row_offset),
+                                                                 d_gto_info,
+                                                                 d_grid_x,
+                                                                 d_grid_y,
+                                                                 d_grid_z,
+                                                                 static_cast<uint32_t>(grid_offset),
+                                                                 static_cast<uint32_t>(nrows),
+                                                                 static_cast<uint32_t>(npgtos),
+                                                                 static_cast<uint32_t>(ncols));
+    }
+    else if (gto_ang == 1)
+    {
+        hipLaunchKernelGGL(gpu::gtoValuesMggaRecP, num_blocks, threads_per_block, 0, 0,
+                                                                 d_gto_values_0,
+                                                                 d_gto_values_x,
+                                                                 d_gto_values_y,
+                                                                 d_gto_values_z,
+                                                                 d_gto_values_xx,
+                                                                 d_gto_values_xy,
+                                                                 d_gto_values_xz,
+                                                                 d_gto_values_yy,
+                                                                 d_gto_values_yz,
+                                                                 d_gto_values_zz,
+                                                                 static_cast<uint32_t>(row_offset),
+                                                                 d_gto_info,
+                                                                 d_grid_x,
+                                                                 d_grid_y,
+                                                                 d_grid_z,
+                                                                 static_cast<uint32_t>(grid_offset),
+                                                                 static_cast<uint32_t>(nrows),
+                                                                 static_cast<uint32_t>(npgtos),
+                                                                 static_cast<uint32_t>(ncols));
+    }
+    else if (gto_ang == 2)
+    {
+        const double f2_3 = 2.0 * std::sqrt(3.0);
+
+        hipLaunchKernelGGL(gpu::gtoValuesMggaRecD, num_blocks, threads_per_block, 0, 0,
+                                                                 d_gto_values_0,
+                                                                 d_gto_values_x,
+                                                                 d_gto_values_y,
+                                                                 d_gto_values_z,
+                                                                 d_gto_values_xx,
+                                                                 d_gto_values_xy,
+                                                                 d_gto_values_xz,
+                                                                 d_gto_values_yy,
+                                                                 d_gto_values_yz,
+                                                                 d_gto_values_zz,
+                                                                 static_cast<uint32_t>(row_offset),
+                                                                 f2_3,
+                                                                 d_gto_info,
+                                                                 d_grid_x,
+                                                                 d_grid_y,
+                                                                 d_grid_z,
+                                                                 static_cast<uint32_t>(grid_offset),
+                                                                 static_cast<uint32_t>(nrows),
+                                                                 static_cast<uint32_t>(npgtos),
+                                                                 static_cast<uint32_t>(ncols));
+    }
+    else
+    {
+        std::string err_ang("gpu::getGtoValuesForMgga: Only implemented for s, p and d-orbitals");
 
         errors::assertMsgCritical(false, err_ang);
     }
@@ -3239,7 +3659,7 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (natoms + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::getDensityGradientOnGrids, num_blocks, threads_per_block, 0, 0, 
+        hipLaunchKernelGGL(gpu::getLdaDensityGradientOnGrids, num_blocks, threads_per_block, 0, 0, 
                            d_dengrad_x,
                            d_dengrad_y,
                            d_dengrad_z,
@@ -3333,6 +3753,531 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     return molgrad;
 }
 
+static auto
+integrateVxcGradientForGGA(const CMolecule&        molecule,
+                           const CMolecularBasis&  basis,
+                           const CAODensityMatrix& rwDensityMatrix,
+                           const CAODensityMatrix& gsDensityMatrix,
+                           const CMolecularGrid&   molecularGrid,
+                           const CXCFunctional&    xcFunctional,
+                           const int64_t           numGpusPerNode,
+                           const int64_t           rank,
+                           const int64_t           nnodes) -> CDenseMatrix
+{
+    CGpuDevices gpu_devices;
+
+    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
+
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = numGpusPerNode;
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    std::string errnaos("gpu::integrateVxcFockForGGA: Inconsistent number of AOs");
+
+    errors::assertMsgCritical((naos == rwDensityMatrix.getNumberOfRows(0)) &&
+                              (naos == rwDensityMatrix.getNumberOfColumns(0)) &&
+                              (naos == gsDensityMatrix.getNumberOfRows(0)) &&
+                              (naos == gsDensityMatrix.getNumberOfColumns(0)),
+                              errnaos);
+
+    int64_t max_ncgtos = 0, max_npgtos = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        max_ncgtos = std::max(ncgtos, max_ncgtos);
+        max_npgtos = std::max(npgtos, max_npgtos);
+    }
+
+    // AO-to-atom mapping
+
+    std::vector<int64_t> ao_to_atom_ids(naos);
+
+    aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+
+    // molecular gradient
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    CDenseMatrix molgrad_omp(num_gpus_per_node, natoms * 3);
+
+    molgrad_omp.zero();
+
+    // grid points
+
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id < num_gpus_per_node)
+    {
+    auto gpu_id = thread_id;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    double* d_gto_info;
+
+    hipSafe(hipMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+
+    uint32_t* d_ao_inds;
+
+    hipSafe(hipMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+
+    uint32_t* d_ao_to_atom_ids;
+
+    hipSafe(hipMalloc(&d_ao_to_atom_ids, naos * sizeof(uint32_t)));
+
+    // GTOs on grid points
+
+    double *d_mol_grad, *d_rw_den_mat_full, *d_gs_den_mat_full, *d_den_mat;
+    double *d_mat_F, *d_mat_F_x, *d_mat_F_y, *d_mat_F_z;
+    double *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z;
+    double *d_gto_values_xx, *d_gto_values_xy, *d_gto_values_xz, *d_gto_values_yy, *d_gto_values_yz, *d_gto_values_zz;
+
+    double *d_dengrad_x, *d_dengrad_y, *d_dengrad_z;
+    double *d_dengrad_xx, *d_dengrad_xy, *d_dengrad_xz;
+    double *d_dengrad_yx, *d_dengrad_yy, *d_dengrad_yz;
+    double *d_dengrad_zx, *d_dengrad_zy, *d_dengrad_zz;
+
+    hipSafe(hipMalloc(&d_mol_grad, natoms * 3 * sizeof(double)));
+    hipSafe(hipMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_den_mat, naos * naos * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_F_x, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_F_y, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_F_z, naos * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_gto_values_xx, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_xy, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_xz, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_yy, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_yz, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values_zz, naos * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_dengrad_x, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_y, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_z, natoms * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_dengrad_xx, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_xy, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_xz, natoms * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_dengrad_yx, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_yy, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_yz, natoms * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_dengrad_zx, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_zy, natoms * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_dengrad_zz, natoms * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), hipMemcpyHostToDevice));
+
+    dim3 threads_per_block(1, TILE_DIM);
+
+    dim3 num_blocks(1, (natoms * 3 + threads_per_block.y - 1) / threads_per_block.y);
+
+    hipLaunchKernelGGL(gpu::zeroMatrix, num_blocks, threads_per_block, 0, 0,
+                       d_mol_grad, static_cast<uint32_t>(natoms * 3), 1);
+
+    // density and functional derivatives
+
+    auto xcfun_copy = vxcfuncs::getExchangeCorrelationFunctional(xcFunctional.getFunctionalLabel());
+
+    auto       ggafunc = xcfun_copy.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
+
+    std::vector<double> rho_data(dim->rho * max_npoints_per_box);
+    std::vector<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    std::vector<double> sigma_data(dim->sigma * max_npoints_per_box);
+
+    std::vector<double> vrho_data(dim->vrho * max_npoints_per_box);
+    std::vector<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+
+    auto rho     = rho_data.data();
+    auto rhograd = rhograd_data.data();
+    auto sigma   = sigma_data.data();
+
+    auto vrho   = vrho_data.data();
+    auto vsigma = vsigma_data.data();
+
+    double *d_rho, *d_rhograd, *d_sigma, *d_vrho, *d_vsigma;
+
+    hipSafe(hipMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    auto weights = molecularGrid.getWeights();
+
+    auto n_total_grid_points = molecularGrid.getNumberOfGridPoints();
+
+    double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
+
+    hipSafe(hipMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipDeviceSynchronize());
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (size_t box_id = gpu_id; box_id < counts.size(); box_id += num_gpus_per_node)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // prescreening
+
+        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
+
+        std::vector<int64_t> aoinds;
+
+        for (const auto& gto_block : gto_blocks)
+        {
+            // 2nd order GTO derivative
+            auto pre_scr_info = prescr::preScreenGtoBlock(gto_block, 2, 1.0e-12, boxdim);
+
+            auto cgto_mask   = std::get<0>(pre_scr_info);
+            auto pre_ao_inds = std::get<1>(pre_scr_info);
+
+            cgto_mask_blocks.push_back(cgto_mask);
+
+            pre_ao_inds_blocks.push_back(pre_ao_inds);
+
+            for (const auto nu : pre_ao_inds)
+            {
+                aoinds.push_back(nu);
+            }
+        }
+
+        const auto aocount = static_cast<int64_t>(aoinds.size());
+
+        if (aocount == 0) continue;
+
+        // GTO values on grid points
+
+        int64_t row_offset = 0;
+
+        for (size_t i_block = 0; i_block < gto_blocks.size(); i_block++)
+        {
+            const auto& gto_block = gto_blocks[i_block];
+
+            const auto& cgto_mask = cgto_mask_blocks[i_block];
+
+            const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
+
+            gpu::getGtoValuesForMgga(d_gto_values,
+                                     d_gto_values_x,
+                                     d_gto_values_y,
+                                     d_gto_values_z,
+                                     d_gto_values_xx,
+                                     d_gto_values_xy,
+                                     d_gto_values_xz,
+                                     d_gto_values_yy,
+                                     d_gto_values_yz,
+                                     d_gto_values_zz,
+                                     row_offset,
+                                     d_gto_info,
+                                     gto_block,
+                                     d_grid_x,
+                                     d_grid_y,
+                                     d_grid_z,
+                                     gridblockpos,
+                                     npoints,
+                                     cgto_mask);
+
+            row_offset += static_cast<int64_t>(pre_ao_inds.size());
+        }
+
+        // AO indices
+
+        std::vector<uint32_t> ao_inds_int32(aocount);
+
+        std::vector<uint32_t> ao_to_atom_ids_int32(aocount);
+
+        for (int64_t ind = 0; ind < aocount; ind++)
+        {
+            ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
+
+            ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
+        }
+
+        hipSafe(hipMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        hipSafe(hipMemcpy(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+        // sub density matrix for groud-state rho
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        hipLaunchKernelGGL(gpu::getSubDensityMatrix, num_blocks, threads_per_block, 0, 0, 
+                           d_den_mat,
+                           d_gs_den_mat_full,
+                           static_cast<uint32_t>(naos),
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
+
+        // GGA density for groud-state rho
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
+                           d_mat_F,
+                           d_den_mat,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        // Note: one block in y dimension
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        hipLaunchKernelGGL(gpu::getDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0,
+                           d_rho,
+                           d_rhograd,
+                           d_sigma,
+                           d_mat_F,
+                           d_gto_values,
+                           d_gto_values_x,
+                           d_gto_values_y,
+                           d_gto_values_z,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        // density gradient on grid points
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        hipLaunchKernelGGL(gpu::getSubDensityMatrix, num_blocks, threads_per_block, 0, 0, 
+                           d_den_mat,
+                           d_rw_den_mat_full,
+                           static_cast<uint32_t>(naos),
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
+                           d_mat_F,
+                           d_den_mat,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
+                           d_mat_F_x,
+                           d_den_mat,
+                           d_gto_values_x,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
+                           d_mat_F_y,
+                           d_den_mat,
+                           d_gto_values_y,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, 
+                           d_mat_F_z,
+                           d_den_mat,
+                           d_gto_values_z,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (natoms + threads_per_block.y - 1) / threads_per_block.y);
+
+        hipLaunchKernelGGL(gpu::getGgaDensityGradientOnGrids, num_blocks, threads_per_block, 0, 0, 
+                           d_dengrad_x,
+                           d_dengrad_y,
+                           d_dengrad_z,
+                           d_dengrad_xx,
+                           d_dengrad_xy,
+                           d_dengrad_xz,
+                           d_dengrad_yx,
+                           d_dengrad_yy,
+                           d_dengrad_yz,
+                           d_dengrad_zx,
+                           d_dengrad_zy,
+                           d_dengrad_zz,
+                           d_mat_F,
+                           d_mat_F_x,
+                           d_mat_F_y,
+                           d_mat_F_z,
+                           d_gto_values_x,
+                           d_gto_values_y,
+                           d_gto_values_z,
+                           d_gto_values_xx,
+                           d_gto_values_xy,
+                           d_gto_values_xz,
+                           d_gto_values_yy,
+                           d_gto_values_yz,
+                           d_gto_values_zz,
+                           static_cast<uint32_t>(aocount),
+                           d_ao_to_atom_ids,
+                           static_cast<uint32_t>(natoms),
+                           static_cast<uint32_t>(npoints));
+
+        // funtional evaluation
+
+        hipSafe(hipMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), hipMemcpyDeviceToHost));
+
+        xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
+
+        hipSafe(hipMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), hipMemcpyHostToDevice));
+        hipSafe(hipMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), hipMemcpyHostToDevice));
+
+        // accumulate partial contribution to Vxc gradient
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((natoms + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        hipLaunchKernelGGL(gpu::getGgaVxcGradient, num_blocks, threads_per_block, 0, 0,
+                           d_mol_grad,
+                           d_grid_w,
+                           static_cast<uint32_t>(gridblockpos),
+                           static_cast<uint32_t>(npoints),
+                           d_dengrad_x,
+                           d_dengrad_y,
+                           d_dengrad_z,
+                           d_dengrad_xx,
+                           d_dengrad_xy,
+                           d_dengrad_xz,
+                           d_dengrad_yx,
+                           d_dengrad_yy,
+                           d_dengrad_yz,
+                           d_dengrad_zx,
+                           d_dengrad_zy,
+                           d_dengrad_zz,
+                           static_cast<uint32_t>(natoms),
+                           d_vrho,
+                           d_vsigma,
+                           d_rhograd);
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    // copy final gradient back
+    hipSafe(hipMemcpy(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_gto_info));
+    hipSafe(hipFree(d_ao_inds));
+    hipSafe(hipFree(d_ao_to_atom_ids));
+
+    hipSafe(hipFree(d_gto_values));
+    hipSafe(hipFree(d_gto_values_x));
+    hipSafe(hipFree(d_gto_values_y));
+    hipSafe(hipFree(d_gto_values_z));
+
+    hipSafe(hipFree(d_gto_values_xx));
+    hipSafe(hipFree(d_gto_values_xy));
+    hipSafe(hipFree(d_gto_values_xz));
+    hipSafe(hipFree(d_gto_values_yy));
+    hipSafe(hipFree(d_gto_values_yz));
+    hipSafe(hipFree(d_gto_values_zz));
+
+    hipSafe(hipFree(d_mat_F));
+    hipSafe(hipFree(d_mat_F_x));
+    hipSafe(hipFree(d_mat_F_y));
+    hipSafe(hipFree(d_mat_F_z));
+
+    hipSafe(hipFree(d_den_mat));
+    hipSafe(hipFree(d_rw_den_mat_full));
+    hipSafe(hipFree(d_gs_den_mat_full));
+
+    hipSafe(hipFree(d_rho));
+    hipSafe(hipFree(d_rhograd));
+    hipSafe(hipFree(d_sigma));
+    hipSafe(hipFree(d_vrho));
+    hipSafe(hipFree(d_vsigma));
+
+    hipSafe(hipFree(d_grid_x));
+    hipSafe(hipFree(d_grid_y));
+    hipSafe(hipFree(d_grid_z));
+    hipSafe(hipFree(d_grid_w));
+
+    }
+    }
+
+    CDenseMatrix molgrad(natoms, 3);
+
+    molgrad.zero();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        for (int64_t a = 0; a < natoms; a++)
+        {
+            for (int64_t d = 0; d < 3; d++)
+            {
+                molgrad.row(a)[d] += molgrad_omp.row(gpu_id)[a * 3 + d];
+            }
+        }
+    }
+
+    return molgrad;
+}
+
 auto
 integrateVxcGradient(const CMolecule&        molecule,
                      const CMolecularBasis&  basis,
@@ -3354,13 +4299,13 @@ integrateVxcGradient(const CMolecule&        molecule,
 
     if (xcfuntype == xcfun::lda) return gpu::integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
 
-    /*
     if (xcfuntype == xcfun::gga) return gpu::integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
 
+    /*
     if (xcfuntype == xcfun::mgga) return gpu::integrateVxcGradientForMGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
     */
 
-    std::string errxcfuntype("gpu::integrateVxcGradient: Only implemented for LDA");
+    std::string errxcfuntype("gpu::integrateVxcGradient: Only implemented for LDA/GGA");
 
     errors::assertMsgCritical(false, errxcfuntype);
 
