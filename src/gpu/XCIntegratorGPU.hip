@@ -234,20 +234,31 @@ getDensityGradientOnGrids(double* d_dengrad_x,
                           const double* d_gto_values_x,
                           const double* d_gto_values_y,
                           const double* d_gto_values_z,
-                          const uint32_t* d_ao_to_atom_ids,
                           const uint32_t aocount,
+                          const uint32_t* d_ao_to_atom_ids,
+                          const uint32_t natoms,
                           const uint32_t npoints)
 {
-    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t a = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if ((i < aocount) && (g < npoints))
+    if ((a < natoms) && (g < npoints))
     {
-        const auto atomidx = d_ao_to_atom_ids[i];
+        double dgx = 0.0, dgy = 0.0, dgz = 0.0;
 
-        atomicAdd(d_dengrad_x + atomidx * npoints + g, -2.0 * d_mat_F[i * npoints + g] * d_gto_values_x[i * npoints + g]);
-        atomicAdd(d_dengrad_y + atomidx * npoints + g, -2.0 * d_mat_F[i * npoints + g] * d_gto_values_y[i * npoints + g]);
-        atomicAdd(d_dengrad_z + atomidx * npoints + g, -2.0 * d_mat_F[i * npoints + g] * d_gto_values_z[i * npoints + g]);
+        for (uint32_t i = 0; i < aocount; i++)
+        {
+            if (a == d_ao_to_atom_ids[i])
+            {
+                dgx -= 2.0 * d_mat_F[i * npoints + g] * d_gto_values_x[i * npoints + g];
+                dgy -= 2.0 * d_mat_F[i * npoints + g] * d_gto_values_y[i * npoints + g];
+                dgz -= 2.0 * d_mat_F[i * npoints + g] * d_gto_values_z[i * npoints + g];
+            }
+        }
+
+        d_dengrad_x[a * npoints + g] = dgx;
+        d_dengrad_y[a * npoints + g] = dgy;
+        d_dengrad_z[a * npoints + g] = dgz;
     }
 }
 
@@ -311,27 +322,64 @@ getLdaVxcGradient(double*        d_mol_grad,
                   const uint32_t natoms,
                   const double*  d_vrho)
 {
-    // TODO: use square thread block and shared memory to accumulate mol_grad
+    __shared__ double As_x[TILE_DIM][TILE_DIM + 1];
+    __shared__ double As_y[TILE_DIM][TILE_DIM + 1];
+    __shared__ double As_z[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM + 1];
 
-    const uint32_t a = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t a = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (a < natoms)
+    double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
+
+    for (uint32_t k = 0; k < (npoints + TILE_DIM - 1) / TILE_DIM; k++)
     {
-        double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
+        const uint32_t g = k * TILE_DIM + threadIdx.y;
 
-        for (uint32_t g = 0; g < npoints; g++)
+        if ((g < npoints) && (a < natoms))
         {
-            gatmx += d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_dengrad_x[g + a * npoints];
-            gatmy += d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_dengrad_y[g + a * npoints];
-            gatmz += d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_dengrad_z[g + a * npoints];
+            As_x[threadIdx.y][threadIdx.x] = d_dengrad_x[a * npoints + g];
+            As_y[threadIdx.y][threadIdx.x] = d_dengrad_y[a * npoints + g];
+            As_z[threadIdx.y][threadIdx.x] = d_dengrad_z[a * npoints + g];
+
+            if (threadIdx.x == 0)
+            {
+                Bs[threadIdx.y] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0];
+            }
+        }
+        else
+        {
+            As_x[threadIdx.y][threadIdx.x] = 0.0;
+            As_y[threadIdx.y][threadIdx.x] = 0.0;
+            As_z[threadIdx.y][threadIdx.x] = 0.0;
+
+            if (threadIdx.x == 0)
+            {
+                Bs[threadIdx.y] = 0.0;
+            }
         }
 
+        __syncthreads();
+
+        if ((threadIdx.y == 0) && (g < npoints))
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                gatmx += As_x[m][threadIdx.x] * Bs[m];
+                gatmy += As_y[m][threadIdx.x] * Bs[m];
+                gatmz += As_z[m][threadIdx.x] * Bs[m];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (a < natoms))
+    {
         d_mol_grad[a * 3 + 0] += 2.0 * gatmx;
         d_mol_grad[a * 3 + 1] += 2.0 * gatmy;
         d_mol_grad[a * 3 + 2] += 2.0 * gatmz;
     }
 }
-
 
 __global__ void
 getGgaVxcMatrixG(double*        d_mat_G,
@@ -3187,76 +3235,9 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
                            static_cast<uint32_t>(aocount),
                            static_cast<uint32_t>(npoints));
 
-        // for now, compute density gradient on CPU
-        CDenseMatrix mat_F(aocount, npoints);
-        CDenseMatrix mat_chi_x(aocount, npoints);
-        CDenseMatrix mat_chi_y(aocount, npoints);
-        CDenseMatrix mat_chi_z(aocount, npoints);
-
-        hipSafe(hipMemcpy(mat_F.values(), d_mat_F, aocount * npoints * sizeof(double), hipMemcpyDeviceToHost));
-
-        hipSafe(hipMemcpy(mat_chi_x.values(), d_gto_values_x, aocount * npoints * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_chi_y.values(), d_gto_values_y, aocount * npoints * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_chi_z.values(), d_gto_values_z, aocount * npoints * sizeof(double), hipMemcpyDeviceToHost));
-
-        CDenseMatrix dengradx(natoms, npoints);
-        CDenseMatrix dengrady(natoms, npoints);
-        CDenseMatrix dengradz(natoms, npoints);
-
-        dengradx.zero();
-        dengrady.zero();
-        dengradz.zero();
-
-        auto F_val = mat_F.values();
-
-        auto chi_x_val = mat_chi_x.values();
-        auto chi_y_val = mat_chi_y.values();
-        auto chi_z_val = mat_chi_z.values();
-
-        auto gdenx = dengradx.values();
-        auto gdeny = dengrady.values();
-        auto gdenz = dengradz.values();
-
-        for (int nu = 0; nu < aocount; nu++)
-        {
-            auto atomidx = ao_to_atom_ids[aoinds[nu]];
-
-            auto atom_offset = atomidx * npoints;
-
-            auto nu_offset = nu * npoints;
-
-            for (int g = 0; g < npoints; g++)
-            {
-                auto atom_g = atom_offset + g;
-
-                auto nu_g = nu_offset + g;
-
-                gdenx[atom_g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
-                gdeny[atom_g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
-                gdenz[atom_g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
-            }
-        }
-
-        hipSafe(hipMemcpy(d_dengrad_x, gdenx, natoms * npoints * sizeof(double), hipMemcpyHostToDevice));
-        hipSafe(hipMemcpy(d_dengrad_y, gdeny, natoms * npoints * sizeof(double), hipMemcpyHostToDevice));
-        hipSafe(hipMemcpy(d_dengrad_z, gdenz, natoms * npoints * sizeof(double), hipMemcpyHostToDevice));
-
-        // TODO: compute density gradient on GPU
-        /*
-        dim3 threads_per_block(1, TILE_DIM);
-
-        dim3 num_blocks(1, (natoms * max_npoints_per_box + threads_per_block.y - 1) / threads_per_block.y);
-
-        hipLaunchKernelGGL(gpu::zeroMatrix, num_blocks, threads_per_block, 0, 0,
-                           d_dengrad_x, static_cast<uint32_t>(natoms * max_npoints_per_box), 1);
-        hipLaunchKernelGGL(gpu::zeroMatrix, num_blocks, threads_per_block, 0, 0,
-                           d_dengrad_y, static_cast<uint32_t>(natoms * max_npoints_per_box), 1);
-        hipLaunchKernelGGL(gpu::zeroMatrix, num_blocks, threads_per_block, 0, 0,
-                           d_dengrad_z, static_cast<uint32_t>(natoms * max_npoints_per_box), 1);
-
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (natoms + threads_per_block.y - 1) / threads_per_block.y);
 
         hipLaunchKernelGGL(gpu::getDensityGradientOnGrids, num_blocks, threads_per_block, 0, 0, 
                            d_dengrad_x,
@@ -3266,10 +3247,10 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
                            d_gto_values_x,
                            d_gto_values_y,
                            d_gto_values_z,
-                           d_ao_to_atom_ids,
                            static_cast<uint32_t>(aocount),
+                           d_ao_to_atom_ids,
+                           static_cast<uint32_t>(natoms),
                            static_cast<uint32_t>(npoints));
-        */
 
         // functional evaluation
 
@@ -3282,9 +3263,9 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
         // accumulate partial contribution to Vxc gradient
 
-        threads_per_block = dim3(1, TILE_DIM);
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3(1, (natoms + threads_per_block.y - 1) / threads_per_block.y);
+        num_blocks = dim3((natoms + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(gpu::getLdaVxcGradient, num_blocks, threads_per_block, 0, 0,
                            d_mol_grad,
