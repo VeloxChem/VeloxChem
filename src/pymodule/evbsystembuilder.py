@@ -280,7 +280,7 @@ class EvbSystemBuilder():
             system.addForce(cmm_remover)
             system_mol = Molecule(reactant.molecule)
         else:
-            system, topology, system_mol = self._system_from_pdb()
+            system, topology, system_mol, pdb_center_coords = self._system_from_pdb()
             nb_force = [
                 force for force in system.getForces()
                 if isinstance(force, mm.NonbondedForce)
@@ -342,6 +342,9 @@ class EvbSystemBuilder():
         if not self.no_reactant:
             env_modeller.delete([chains[1]])
         env_topology = env_modeller.getTopology()
+        # env_positions = env_modeller.getPositions()
+        env_positions = np.array(env_modeller.getPositions().value_in_unit(mmunit.angstrom))
+        env_center = np.average(env_positions,axis=0)
         forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
 
         system = forcefield.createSystem(
@@ -354,13 +357,12 @@ class EvbSystemBuilder():
             rea_modeller = mmapp.Modeller(topology, pdb_file.positions)
             rea_modeller.delete([chains[0]])
             rea_topology = rea_modeller.getTopology()
-            rea_pdb_pos = rea_modeller.getPositions()
             # pass
             assert len(self.reactant.atoms) == rea_topology.getNumAtoms(
             ), "Number of atoms in the reactant and the topology do not match"
 
             topology = env_topology
-        return system, topology, system_mol
+        return system, topology, system_mol, env_center
 
     def _configure_pbc(self, system, topology, nb_force, box=None):
         if box is None:

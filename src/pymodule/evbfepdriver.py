@@ -111,10 +111,11 @@ class EvbFepDriver():
         self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
-        self.save_frames: int = 2000
+        self.save_frames: int = 5000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
-        self.xml_save_interval: int = 50
+        self.xml_crash_save_interval: int = 50
+        self.pdb_crash_save_interval: int = 10
         self.NVT_integrator = "nose-hoover"
 
         self.keywords = {
@@ -190,7 +191,10 @@ class EvbFepDriver():
             "save_crash_xml": {
                 "type": bool
             },
-            "xml_save_interval": {
+            "xml_crash_save_interval": {
+                "type": int
+            },
+            "pdb_crash_save_interval": {
                 "type": int
             },
             "NVT_integrator":{
@@ -586,12 +590,12 @@ class EvbFepDriver():
         for j, state in enumerate(states):
             step_num = step - len(states) + j
             
-            if self.save_crash_xml and j % self.xml_save_interval == 0:
+            if self.save_crash_xml and j % self.xml_crash_save_interval == 0:
                 xml_name = f"state_step_{j}_{step_num}"
                 with open(path / f"{xml_name}.xml", "w") as f:
                     f.write(mm.XmlSerializer.serialize(state))
 
-            if self.save_crash_pdb:
+            if self.save_crash_pdb and j % self.pdb_crash_save_interval == 0:
                 pdb_name = f"state_step_{step_num}"
                 positions = np.array(state.getPositions().value_in_unit(
                     mm.unit.angstrom))
