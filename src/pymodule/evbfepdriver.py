@@ -309,7 +309,7 @@ class EvbFepDriver():
                 f"Running FEP on platform: {platformname.getName()}")
             self.ostream.flush()
 
-        if l ==0 or self.minimize_every_lambda
+        if l ==0 or self.minimize_every_lambda:
             self.ostream.print_info("Minimizing energy")
             self.ostream.flush()
             equil_simulation.minimizeEnergy()
