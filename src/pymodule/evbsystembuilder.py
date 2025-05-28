@@ -1220,7 +1220,7 @@ class EvbSystemBuilder():
                 coords = self.product.molecule.get_coordinates_in_angstrom()
                 eqB = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
                 if model_broken:
-                    fcB = fcA
+                    fcB = fcA * self.bonded_integration_bond_fac
                 else:
                     fcB = 0
             else:
@@ -1231,7 +1231,7 @@ class EvbSystemBuilder():
                 coords = self.reactant.molecule.get_coordinates_in_angstrom()
                 eqA = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
                 if model_broken:
-                    fcA = fcB
+                    fcA = fcB * self.bonded_integration_bond_fac
                 else:
                     fcA = 0
             eq = eqA * (1 - lam) + eqB * lam
@@ -1291,7 +1291,7 @@ class EvbSystemBuilder():
                 eqB = self.measure_angle(coords[key[0]], coords[key[1]],
                                          coords[key[2]])
                 if model_broken:
-                    fcB = fcA
+                    fcB = fcA * self.bonded_integration_angle_fac
                 else:
                     fcB = 0
             else:
@@ -1304,7 +1304,7 @@ class EvbSystemBuilder():
                 fcB = angleB['force_constant']
                 fcA = fcB
                 if model_broken:
-                    fcA = fcB
+                    fcA = fcB * self.bonded_integration_angle_fac
                 else:
                     fcA = 0
             eq = eqA * (1 - lam) + eqB * lam
