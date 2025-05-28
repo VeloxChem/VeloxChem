@@ -118,6 +118,10 @@ class EvbFepDriver():
         self.pdb_crash_save_interval: int = 10
         self.NVT_integrator = "nose-hoover"
 
+        self.pdb = None
+        self.pdb_equil_start_temp = 10 #kelvin
+        self.pdb_equil_temp_step = 50 # kelvin
+
         self.keywords = {
             "langevin_friction": {
                 "type": float
@@ -199,7 +203,16 @@ class EvbFepDriver():
             },
             "NVT_integrator":{
                 "type":str
-            }
+            },
+            "pdb":{
+                "type":str
+            },
+            "pdb_equil_temp_step":{
+                "type":int
+            },
+            "pdb_equil_start_temp":{
+                "type": int
+            },
         }
 
     def run_FEP(
@@ -312,14 +325,14 @@ class EvbFepDriver():
             self.ostream.print_info(
                 f"Running FEP on platform: {platformname.getName()}")
             self.ostream.flush()
-
-        if l ==0 or self.minimize_every_lambda:
+        
+        if (l ==0 or self.minimize_every_lambda):
             self.ostream.print_info("Minimizing energy")
             self.ostream.flush()
             equil_simulation.minimizeEnergy()
             positions = equil_simulation.context.getState(
                 getPositions=True, enforcePeriodicBox=True).getPositions()
-
+        
         mmapp.PDBFile.writeFile(
             self.topology,
             np.array(positions.value_in_unit(mm.unit.angstrom)),
@@ -369,27 +382,66 @@ class EvbFepDriver():
             append=False,
         )
         equil_simulation.reporters.append(equil_reporter)
-        if self.isobaric:
-            barostat = [
-                force for force in equil_simulation.system.getForces()
-                if isinstance(force, mm.MonteCarloBarostat) or isinstance(force, mm.MonteCarloFlexibleBarostat)
-            ][0]
-        if l == 0:
+        if self.pdb is None:
+            if self.isobaric:
+                barostat = [
+                    force for force in equil_simulation.system.getForces()
+                    if isinstance(force, mm.MonteCarloBarostat) or isinstance(force, mm.MonteCarloAnisotropicBarostat)
+                ][0]
+            if l == 0:
+                if self.isobaric:
+                    barostat.setFrequency(0)
+                    self._safe_step(equil_simulation, self.initial_equil_NVT_steps, "initial NVT equilibration")
+                    barostat.setFrequency(25)
+                    self._safe_step(equil_simulation,self.initial_equil_NPT_steps, "initial NPT equilibration")
+                else:
+                    self._safe_step(equil_simulation,self.initial_equil_NVT_steps, "initial equilibration")
+
             if self.isobaric:
                 barostat.setFrequency(0)
-                self._safe_step(equil_simulation, self.initial_equil_NVT_steps, "initial NVT equilibration")
+                self._safe_step(equil_simulation, self.equil_NVT_steps, "NVT equilibration")
                 barostat.setFrequency(25)
-                self._safe_step(equil_simulation,self.initial_equil_NPT_steps, "initial NPT equilibration")
+                self._safe_step(equil_simulation, self.equil_NPT_steps, "NPT equilibration")
             else:
-                self._safe_step(equil_simulation,self.initial_equil_NVT_steps, "initial equilibration")
-
-        if self.isobaric:
-            barostat.setFrequency(0)
-            self._safe_step(equil_simulation, self.equil_NVT_steps, "NVT equilibration")
-            barostat.setFrequency(25)
-            self._safe_step(equil_simulation, self.equil_NPT_steps, "NPT equilibration")
+                self._safe_step(equil_simulation,self.equil_NVT_steps, "equilibration")
         else:
-            self._safe_step(equil_simulation,self.equil_NVT_steps, "equilibration")
+            if self.isobaric:
+                barostat = [
+                    force for force in equil_simulation.system.getForces()
+                    if isinstance(force, mm.MonteCarloBarostat) or isinstance(force, mm.MonteCarloAnisotropicBarostat)
+                ][0]
+            if l ==0:
+                temperatures = list(np.arange(self.pdb_equil_start_temp, self.temperature,self.pdb_equil_temp_step))
+                temperatures.append(self.temperature)
+                self.ostream.print_info(f"Perfoming PDB warmup with T-vector {temperatures}")
+                self.ostream.flush()
+                for T in temperatures:
+                    equil_simulation.integrator.setTemperature(T)
+                    if self.isobaric:
+                        barostat.setFrequency(0)
+                    self._safe_step(equil_simulation, self.initial_equil_NVT_steps, f"PDB warmup NVT equilibration T = {T}")
+                
+                if self.isobaric:
+                    barostat.setFrequency(25)
+                    for T in temperatures:
+                        equil_simulation.integrator.setTemperature(T)
+                        self._safe_step(equil_simulation, self.initial_equil_NPT_steps, f"PDB warmup NPT equilibration T = {T}")
+                
+            
+            self.ostream.print_info(f"Turning off centroid force")
+            self.ostream.flush()
+            centroid_force = [force for force in equil_simulation.system.getForces()if isinstance(force, mm.CustomCentroidBondForce)][0]
+            dist = centroid_force.getBondParameters(0)[1][0]
+            centroid_force.setBondParameters(0, [0,1],[dist,0])
+
+            if self.isobaric:
+                barostat.setFrequency(0)
+                self._safe_step(equil_simulation, self.equil_NVT_steps, "NVT equilibration")
+                barostat.setFrequency(25)
+                self._safe_step(equil_simulation, self.equil_NPT_steps, "NPT equilibration")
+            else:
+                self._safe_step(equil_simulation,self.equil_NVT_steps, "equilibration")
+
 
         equil_state = equil_simulation.context.getState(
             getPositions=True,
@@ -469,8 +521,6 @@ class EvbFepDriver():
         self.ostream.flush()
         states = self._safe_step(run_simulation, self.sample_steps, "sampling")
         return states[-1]
-
-    
 
     def _get_simulation(self, system, step_size):
         if self.isothermal:

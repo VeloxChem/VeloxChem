@@ -89,9 +89,9 @@ class EvbSystemBuilder():
         self.sc_power: float = 1 / 6  # The exponential power in the soft core expression
         self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
-        self.restraint_k: float = 1000  # kj/mol nm^2, force constant for the position restraints
-        self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
-        self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
+        self.centroid_k: float = 1000  # kj/mol nm^2, force constant for the position restraints
+        # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
+        # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
         self.coul14_scale: float = 0.833
         self.lj14_scale: float = 0.5
         self.nb_cutoff: float = 1.  # nm, minimal cutoff for the nonbonded force
@@ -194,13 +194,7 @@ class EvbSystemBuilder():
             "morse_couple": {
                 "type": float
             },
-            "restraint_k": {
-                "type": float
-            },
-            "restraint_r_default": {
-                "type": float
-            },
-            "restraint_r_offset": {
+            "centroid_k": {
                 "type": float
             },
             "coul14_scale": {
@@ -270,6 +264,7 @@ class EvbSystemBuilder():
         self.product = product
         self.constraints = constraints
 
+
         if self.pdb is None:
             system = mm.System()
             topology = mmapp.Topology()
@@ -280,7 +275,7 @@ class EvbSystemBuilder():
             system.addForce(cmm_remover)
             system_mol = Molecule(reactant.molecule)
         else:
-            system, topology, system_mol, pdb_center_coords = self._system_from_pdb()
+            system, topology, system_mol, pdb_atoms, env_rea_dist = self._system_from_pdb()
             nb_force = [
                 force for force in system.getForces()
                 if isinstance(force, mm.NonbondedForce)
@@ -299,6 +294,24 @@ class EvbSystemBuilder():
 
         self.reaction_atoms = self._add_reactant(system, topology, nb_force)
 
+        if self.pdb:
+            reactant_indices = [rea_atom.index for rea_atom in self.reaction_atoms]
+            pdb_indices =  [pdb_atom.index for pdb_atom in pdb_atoms]
+            max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
+
+            centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
+            centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
+            centroid_force.setName("Protein_Ligand_Centroid_force")
+            centroid_force.addPerBondParameter("rmax")
+            centroid_force.addPerBondParameter("k")
+            
+            centroid_force.addGroup(reactant_indices)
+            centroid_force.addGroup(pdb_indices)
+            centroid_force.addBond([0,1],[env_rea_dist*0.1,self.centroid_k])
+
+            system.addForce(centroid_force)
+        
+
         # Set the positions and make a box for it
         self.positions = system_mol.get_coordinates_in_angstrom()
         box = None
@@ -313,6 +326,8 @@ class EvbSystemBuilder():
             box = self._add_solvent(system, system_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
                                     box)
+        
+        
 
         if self.pressure > 0:
             barostat = self._add_barostat(system)
@@ -320,6 +335,7 @@ class EvbSystemBuilder():
         E_field = None
         if np.any(np.array(self.E_field) > 0.001):
             E_field = self._add_E_field(system, self.E_field)
+
 
         self.topology: mmapp.Topology = topology
         self.systems = self._interpolate_system(
@@ -353,16 +369,21 @@ class EvbSystemBuilder():
             nonbondedCutoff=1 * mmunit.nanometer,
             constraints=mmapp.HBonds,
         )
+        pdb_atoms = [atom for atom in env_topology.atoms()]
+        env_rea_dist = -1
         if not self.no_reactant:
             rea_modeller = mmapp.Modeller(topology, pdb_file.positions)
             rea_modeller.delete([chains[0]])
             rea_topology = rea_modeller.getTopology()
+            rea_positions = np.array(rea_modeller.getPositions().value_in_unit(mmunit.angstrom))
+            rea_center = np.average(rea_positions,axis=0)
+            env_rea_dist = np.linalg.norm(env_center-rea_center)
             # pass
             assert len(self.reactant.atoms) == rea_topology.getNumAtoms(
             ), "Number of atoms in the reactant and the topology do not match"
 
             topology = env_topology
-        return system, topology, system_mol, env_center
+        return system, topology, system_mol, pdb_atoms, env_rea_dist
 
     def _configure_pbc(self, system, topology, nb_force, box=None):
         if box is None:
@@ -1008,7 +1029,7 @@ class EvbSystemBuilder():
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
         else:
-            barostat = mm.MonteCarloFlexibleBarostat(
+            barostat = mm.MonteCarloAnisotropicBarostat(
                 self.pressure * mmunit.bar,  # type: ignore
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
@@ -1420,22 +1441,6 @@ class EvbSystemBuilder():
                 [barrier_scaling * D, a, re],
             )
 
-    def _add_distance_restraint(self,
-                                restraint_force,
-                                atom_id,
-                                broken_length,
-                                barrier_scaling=1.):
-        rmax = broken_length
-
-        rmax += self.restraint_r_offset
-        k = self.restraint_k * barrier_scaling
-
-        if k > 0:
-            restraint_force.addBond(
-                atom_id[0],
-                atom_id[1],
-                [rmax, k],
-            )
 
     def _add_angle(self, angle_force, atom_id, equil, fc):
         if fc > 0:
@@ -1838,6 +1843,7 @@ class EvbForceGroup(Enum):
     )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
     CARBON = auto()  # Graphene and CNTs
     PDB = auto()  # Bonded forces added from the PDB
+    CENTROID = auto()
 
     #Forcegroups to hold decomposed forces in
     LJDECOMP1 = auto()
