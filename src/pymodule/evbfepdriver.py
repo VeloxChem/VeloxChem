@@ -98,8 +98,8 @@ class EvbFepDriver():
         self.equil_NPT_steps = 20000
         self.sample_steps = 250000
         self.write_step = 1000
-        self.initial_equil_NVT_steps = 50000
-        self.initial_equil_NPT_steps = 50000
+        self.initial_equil_NVT_steps = 100000
+        self.initial_equil_NPT_steps = 100000
         self.step_size = 0.001 #ps
         self.equil_step_size = 0.001 #ps
         self.minimize_every_lambda: bool = True
@@ -309,15 +309,16 @@ class EvbFepDriver():
                 f"Running FEP on platform: {platformname.getName()}")
             self.ostream.flush()
 
-        self.ostream.print_info("Minimizing energy")
-        self.ostream.flush()
-        equil_simulation.minimizeEnergy()
-        minim_positions = equil_simulation.context.getState(
-            getPositions=True, enforcePeriodicBox=True).getPositions()
+        if l ==0 or self.minimize_every_lambda
+            self.ostream.print_info("Minimizing energy")
+            self.ostream.flush()
+            equil_simulation.minimizeEnergy()
+            positions = equil_simulation.context.getState(
+                getPositions=True, enforcePeriodicBox=True).getPositions()
 
         mmapp.PDBFile.writeFile(
             self.topology,
-            np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
+            np.array(positions.value_in_unit(mm.unit.angstrom)),
             open(self.run_folder / f"minim_{l:.3f}.pdb", "w"),
         )
         if self.debug:
