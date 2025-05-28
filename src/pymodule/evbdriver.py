@@ -862,9 +862,9 @@ class EvbDriver():
 
         self.dataprocessing = dp
         results = dp.compute(results, barrier, free_energy)
-        self._save_dict_as_h5(results, f"results_{self.name}")
         self.results = results
         self.print_results()
+        self._save_dict_as_h5(results, f"results_{self.name}")
         self.ostream.flush()
         return self.results
 

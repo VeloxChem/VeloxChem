@@ -102,6 +102,8 @@ class EvbFepDriver():
         self.initial_equil_NPT_steps = 50000
         self.step_size = 0.001 #ps
         self.equil_step_size = 0.001 #ps
+        self.minimize_every_lambda: bool = True
+
 
         self.crash_reporting_interval: int = 1
         self.constrain_H: bool = False
@@ -112,7 +114,6 @@ class EvbFepDriver():
         self.save_frames: int = 2000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
-        self.minimize_every_lambda: bool = False
         self.xml_save_interval: int = 50
         self.NVT_integrator = "nose-hoover"
 
@@ -158,6 +159,9 @@ class EvbFepDriver():
             },
             "equil_step_size": {
                 "type": float
+            },
+            "minimize_every_lambda":{
+                "type": bool
             },
             "crash_reporting_interval": {
                 "type": int
@@ -368,48 +372,19 @@ class EvbFepDriver():
         if l == 0:
             if self.isobaric:
                 barostat.setFrequency(0)
-                self.ostream.print_info(
-                    f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
-                )
-                self.ostream.flush()
-
-                self._safe_step(equil_simulation, self.initial_equil_NVT_steps)
-                self.ostream.print_info(
-                    f"Running initial NPT equilibration for {self.initial_equil_NPT_steps} steps"
-                )
-                self.ostream.flush()
+                self._safe_step(equil_simulation, self.initial_equil_NVT_steps, "initial NVT equilibration")
                 barostat.setFrequency(25)
-                self._safe_step(equil_simulation, self.initial_equil_NPT_steps)
+                self._safe_step(equil_simulation,self.initial_equil_NPT_steps, "initial NPT equilibration")
             else:
-                self.ostream.print_info(
-                    f"Running initial equilibration for {self.initial_equil_NVT_steps+self.initial_equil_NPT_steps} steps"
-                )
-                self.ostream.flush()
-                # equil_simulation.integrator.setIntegrationForceGroups(
-                #     EvbForceGroup.integration_force_groups())
-                self._safe_step(
-                    equil_simulation,
-                    self.initial_equil_NVT_steps + self.initial_equil_NPT_steps)
+                self._safe_step(equil_simulation,self.initial_equil_NVT_steps, "initial equilibration")
 
         if self.isobaric:
-            self.ostream.print_info(
-                f"Running NVT equilibration for {self.equil_NVT_steps} steps")
-            self.ostream.flush()
             barostat.setFrequency(0)
-            self._safe_step(equil_simulation, self.equil_NVT_steps)
-
-            self.ostream.print_info(
-                f"Running NPT equilibration for {self.equil_NPT_steps} steps")
-            self.ostream.flush()
+            self._safe_step(equil_simulation, self.equil_NVT_steps, "NVT equilibration")
             barostat.setFrequency(25)
-            self._safe_step(equil_simulation, self.equil_NPT_steps)
+            self._safe_step(equil_simulation, self.equil_NPT_steps, "NPT equilibration")
         else:
-            self.ostream.print_info(
-                f"Running equilibration for {self.equil_NVT_steps+self.equil_NPT_steps} steps"
-            )
-            self.ostream.flush()
-            self._safe_step(equil_simulation,
-                            self.equil_NVT_steps + self.equil_NPT_steps)
+            self._safe_step(equil_simulation,self.equil_NVT_steps, "equilibration")
 
         equil_state = equil_simulation.context.getState(
             getPositions=True,
@@ -430,6 +405,7 @@ class EvbFepDriver():
             )
 
         return equil_state
+
 
     def _sample(self, system, l, initial_state):
         run_simulation = self._get_simulation(system, self.equil_step_size)
@@ -485,13 +461,11 @@ class EvbFepDriver():
             append=append,
         )
         run_simulation.reporters.append(evb_reporter)
-
-        self.ostream.print_info(
-            f"Running sampling for {self.sample_steps} steps with step size {run_simulation.integrator.getStepSize()}"
-        )
         self.ostream.flush()
-        states = self._safe_step(run_simulation, self.sample_steps)
+        states = self._safe_step(run_simulation, self.sample_steps, "sampling")
         return states[-1]
+
+    
 
     def _get_simulation(self, system, step_size):
         if self.isothermal:
@@ -566,7 +540,11 @@ class EvbFepDriver():
             xml_file = str(self.run_folder / f"{name}.xml")
             simulation.saveState(xml_file)
 
-    def _safe_step(self, simulation, steps):
+    def _safe_step(self, simulation, steps, name=""):
+        self.ostream.print_info(
+            f"Running {name} for {steps} steps, {steps*self.step_size*0.001} ps"
+        )
+        self.ostream.flush()
         states = []
         potwarning = False
         for i in range(steps):
