@@ -64,6 +64,14 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
                                      const int64_t rank,
                                      const int64_t nnodes) -> CDenseMatrix;
 
+auto computePointChargesGradientOnGPU(const CMolecule& molecule,
+                                      const CMolecularBasis& basis,
+                                      const CGradientScreeningData& screening,
+                                      const double* points_info_ptr,
+                                      const int64_t npoints,
+                                      const int64_t rank,
+                                      const int64_t nnodes) -> CDenseMatrix;
+
 auto computeFockGradientOnGPU(const              CMolecule& molecule,
                               const              CMolecularBasis& basis,
                               const              CAODensityMatrix& densityMatrix,
