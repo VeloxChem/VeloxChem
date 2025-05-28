@@ -102,7 +102,7 @@ class EvbFepDriver():
         self.initial_equil_NPT_steps = 100000
         self.step_size = 0.001 #ps
         self.equil_step_size = 0.001 #ps
-        self.minimize_every_lambda: bool = True
+        self.minimize_every_lambda: bool = False
 
 
         self.crash_reporting_interval: int = 1
