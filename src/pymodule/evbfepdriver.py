@@ -543,7 +543,7 @@ class EvbFepDriver():
 
     def _safe_step(self, simulation, steps, name=""):
         self.ostream.print_info(
-            f"Running {name} for {steps} steps, {steps*self.step_size*0.001} ps"
+            f"Running {name} for {steps} steps, {steps*self.step_size} ps"
         )
         self.ostream.flush()
         states = []
