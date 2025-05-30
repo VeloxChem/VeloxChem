@@ -85,10 +85,10 @@ class EvbFepDriver():
 
         self.isothermal: bool = False
         self.isobaric: bool = False
-        self.langevin_friction = 1.0 # 1/ps
+        self.langevin_friction = 1.0  # 1/ps
 
         # a default of tau = 1000*dt is on the safe side, See discussion on Tdam: https://docs.lammps.org/fix_nh.html
-        self.nhc_frequency = 1.0 #1/ps,
+        self.nhc_frequency = 1.0  #1/ps,
         self.nhc_small_length = 3
         self.nhc_bulk_length = 1
         self.temperature = -1
@@ -100,10 +100,9 @@ class EvbFepDriver():
         self.write_step = 1000
         self.initial_equil_NVT_steps = 100000
         self.initial_equil_NPT_steps = 100000
-        self.step_size = 0.001 #ps
-        self.equil_step_size = 0.001 #ps
+        self.step_size = 0.001  #ps
+        self.equil_step_size = 0.001  #ps
         self.minimize_every_lambda: bool = False
-
 
         self.crash_reporting_interval: int = 1
         self.constrain_H: bool = False
@@ -114,26 +113,27 @@ class EvbFepDriver():
         self.save_frames: int = 5000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
+        self.save_equil_traj: bool = True
         self.xml_crash_save_interval: int = 50
         self.pdb_crash_save_interval: int = 10
         self.NVT_integrator = "nose-hoover"
 
         self.pdb = None
-        self.pdb_equil_start_temp = 10 #kelvin
-        self.pdb_equil_temp_step = 50 # kelvin
+        self.pdb_equil_start_temp = 10  #kelvin
+        self.pdb_equil_temp_step = 50  # kelvin
 
         self.keywords = {
             "langevin_friction": {
                 "type": float
             },
-            "nhc_frequency":{
-                "type":float
+            "nhc_frequency": {
+                "type": float
             },
-            "nhc_small_length":{
-                "type":int
+            "nhc_small_length": {
+                "type": int
             },
-            "nhc_bulk_length":{
-                "type":int
+            "nhc_bulk_length": {
+                "type": int
             },
             "temperature": {
                 "type": float
@@ -165,7 +165,7 @@ class EvbFepDriver():
             "equil_step_size": {
                 "type": float
             },
-            "minimize_every_lambda":{
+            "minimize_every_lambda": {
                 "type": bool
             },
             "crash_reporting_interval": {
@@ -195,22 +195,25 @@ class EvbFepDriver():
             "save_crash_xml": {
                 "type": bool
             },
+            "save_equil_traj": {
+                "type": bool
+            },
             "xml_crash_save_interval": {
                 "type": int
             },
             "pdb_crash_save_interval": {
                 "type": int
             },
-            "NVT_integrator":{
-                "type":str
+            "NVT_integrator": {
+                "type": str
             },
-            "pdb":{
-                "type":str
+            "pdb": {
+                "type": str
             },
-            "pdb_equil_temp_step":{
-                "type":int
+            "pdb_equil_temp_step": {
+                "type": int
             },
-            "pdb_equil_start_temp":{
+            "pdb_equil_start_temp": {
                 "type": int
             },
         }
@@ -288,7 +291,7 @@ class EvbFepDriver():
         )
         timer.start()
         positions = initial_positions * 0.1
-
+        velocities = None
         for i, l in enumerate(self.Lambda):
             if l > 0:
                 estimated_time_remaining = timer.calculate_remaining(i)
@@ -304,7 +307,8 @@ class EvbFepDriver():
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
 
-            equil_state = self._minimize_and_equilibrate(system, l, positions)
+            equil_state = self._minimize_and_equilibrate(
+                system, l, positions, velocities)
 
             if self.constrain_H:
                 info = "Removing constraints involving H atoms"
@@ -314,25 +318,28 @@ class EvbFepDriver():
 
             state = self._sample(system, l, equil_state)
             positions = state.getPositions()
+            velocities = state.getVelocities()
         self.ostream.flush()
 
-    def _minimize_and_equilibrate(self, system, l, positions):
+    def _minimize_and_equilibrate(self, system, l, positions, velocities=None):
         equil_simulation = self._get_simulation(system, self.equil_step_size)
         equil_simulation.context.setPositions(positions)
+        if velocities is not None:
+            equil_simulation.context.setVelocities(velocities)
 
         if l == 0:
             platformname = equil_simulation.context.getPlatform()
             self.ostream.print_info(
                 f"Running FEP on platform: {platformname.getName()}")
             self.ostream.flush()
-        
-        if (l ==0 or self.minimize_every_lambda):
+
+        if (l == 0 or self.minimize_every_lambda):
             self.ostream.print_info("Minimizing energy")
             self.ostream.flush()
             equil_simulation.minimizeEnergy()
             positions = equil_simulation.context.getState(
                 getPositions=True, enforcePeriodicBox=True).getPositions()
-        
+
         mmapp.PDBFile.writeFile(
             self.topology,
             np.array(positions.value_in_unit(mm.unit.angstrom)),
@@ -372,7 +379,7 @@ class EvbFepDriver():
 
         equil_reporter = mmapp.StateDataReporter(
             str(self.run_folder / f"equil_data_{l:.3f}.csv"),
-            1,
+            self.write_step,
             step=True,
             potentialEnergy=True,
             kineticEnergy=True,
@@ -382,66 +389,95 @@ class EvbFepDriver():
             append=False,
         )
         equil_simulation.reporters.append(equil_reporter)
+        if self.save_equil_traj:
+            equil_traj_reporter = mmapp.XTCReporter(
+                str(self.run_folder / f"equil_traj_{l:.3f}.csv"),
+                self.write_step,
+                enforcePeriodicBox=True,
+            )
+            equil_simulation.reporters.append(equil_traj_reporter)
         if self.pdb is None:
             if self.isobaric:
                 barostat = [
                     force for force in equil_simulation.system.getForces()
-                    if isinstance(force, mm.MonteCarloBarostat) or isinstance(force, mm.MonteCarloAnisotropicBarostat)
+                    if isinstance(force, mm.MonteCarloBarostat)
+                    or isinstance(force, mm.MonteCarloAnisotropicBarostat)
                 ][0]
             if l == 0:
                 if self.isobaric:
                     barostat.setFrequency(0)
-                    self._safe_step(equil_simulation, self.initial_equil_NVT_steps, "initial NVT equilibration")
+                    self._safe_step(equil_simulation,
+                                    self.initial_equil_NVT_steps,
+                                    "initial NVT equilibration")
                     barostat.setFrequency(25)
-                    self._safe_step(equil_simulation,self.initial_equil_NPT_steps, "initial NPT equilibration")
+                    self._safe_step(equil_simulation,
+                                    self.initial_equil_NPT_steps,
+                                    "initial NPT equilibration")
                 else:
-                    self._safe_step(equil_simulation,self.initial_equil_NVT_steps, "initial equilibration")
+                    self._safe_step(equil_simulation,
+                                    self.initial_equil_NVT_steps,
+                                    "initial equilibration")
 
             if self.isobaric:
                 barostat.setFrequency(0)
-                self._safe_step(equil_simulation, self.equil_NVT_steps, "NVT equilibration")
+                self._safe_step(equil_simulation, self.equil_NVT_steps,
+                                "NVT equilibration")
                 barostat.setFrequency(25)
-                self._safe_step(equil_simulation, self.equil_NPT_steps, "NPT equilibration")
+                self._safe_step(equil_simulation, self.equil_NPT_steps,
+                                "NPT equilibration")
             else:
-                self._safe_step(equil_simulation,self.equil_NVT_steps, "equilibration")
+                self._safe_step(equil_simulation, self.equil_NVT_steps,
+                                "equilibration")
         else:
             if self.isobaric:
                 barostat = [
                     force for force in equil_simulation.system.getForces()
-                    if isinstance(force, mm.MonteCarloBarostat) or isinstance(force, mm.MonteCarloAnisotropicBarostat)
+                    if isinstance(force, mm.MonteCarloBarostat)
+                    or isinstance(force, mm.MonteCarloAnisotropicBarostat)
                 ][0]
-            if l ==0:
-                temperatures = list(np.arange(self.pdb_equil_start_temp, self.temperature,self.pdb_equil_temp_step))
+            if l == 0:
+                temperatures = list(
+                    np.arange(self.pdb_equil_start_temp, self.temperature,
+                              self.pdb_equil_temp_step))
                 temperatures.append(self.temperature)
-                self.ostream.print_info(f"Perfoming PDB warmup with T-vector {temperatures}")
+                self.ostream.print_info(
+                    f"Perfoming PDB warmup with T-vector {temperatures}")
                 self.ostream.flush()
                 for T in temperatures:
                     equil_simulation.integrator.setTemperature(T)
                     if self.isobaric:
                         barostat.setFrequency(0)
-                    self._safe_step(equil_simulation, self.initial_equil_NVT_steps, f"PDB warmup NVT equilibration T = {T}")
-                
+                    self._safe_step(equil_simulation,
+                                    self.initial_equil_NVT_steps,
+                                    f"PDB warmup NVT equilibration T = {T}")
+
                 if self.isobaric:
                     barostat.setFrequency(25)
                     for T in temperatures:
                         equil_simulation.integrator.setTemperature(T)
-                        self._safe_step(equil_simulation, self.initial_equil_NPT_steps, f"PDB warmup NPT equilibration T = {T}")
-                
-            
+                        self._safe_step(
+                            equil_simulation, self.initial_equil_NPT_steps,
+                            f"PDB warmup NPT equilibration T = {T}")
+
             self.ostream.print_info(f"Turning off centroid force")
             self.ostream.flush()
-            centroid_force = [force for force in equil_simulation.system.getForces()if isinstance(force, mm.CustomCentroidBondForce)][0]
+            centroid_force = [
+                force for force in equil_simulation.system.getForces()
+                if isinstance(force, mm.CustomCentroidBondForce)
+            ][0]
             dist = centroid_force.getBondParameters(0)[1][0]
-            centroid_force.setBondParameters(0, [0,1],[dist,0])
+            centroid_force.setBondParameters(0, [0, 1], [dist, 0])
 
             if self.isobaric:
                 barostat.setFrequency(0)
-                self._safe_step(equil_simulation, self.equil_NVT_steps, "NVT equilibration")
+                self._safe_step(equil_simulation, self.equil_NVT_steps,
+                                "NVT equilibration")
                 barostat.setFrequency(25)
-                self._safe_step(equil_simulation, self.equil_NPT_steps, "NPT equilibration")
+                self._safe_step(equil_simulation, self.equil_NPT_steps,
+                                "NPT equilibration")
             else:
-                self._safe_step(equil_simulation,self.equil_NVT_steps, "equilibration")
-
+                self._safe_step(equil_simulation, self.equil_NVT_steps,
+                                "equilibration")
 
         equil_state = equil_simulation.context.getState(
             getPositions=True,
@@ -462,7 +498,6 @@ class EvbFepDriver():
             )
 
         return equil_state
-
 
     def _sample(self, system, l, initial_state):
         run_simulation = self._get_simulation(system, self.equil_step_size)
@@ -524,23 +559,22 @@ class EvbFepDriver():
 
     def _get_simulation(self, system, step_size):
         if self.isothermal:
-            if self.NVT_integrator =="langevin":
+            if self.NVT_integrator == "langevin":
                 integrator = mm.LangevinMiddleIntegrator(
                     self.temperature * mmunit.kelvin,  #type: ignore
                     self.langevin_friction / mmunit.picosecond,  #type: ignore
                     step_size * mmunit.picoseconds,
-                    
                 )
-            elif self.NVT_integrator =="nose-hoover":
-                if system.getNumParticles() >100:
+            elif self.NVT_integrator == "nose-hoover":
+                if system.getNumParticles() > 100:
                     chain_length = self.nhc_bulk_length
                 else:
                     chain_length = self.nhc_small_length
 
                 integrator = mm.NoseHooverIntegrator(
-                    self.temperature *mmunit.kelvin,
-                    self.nhc_frequency /mmunit.picosecond, 
-                    step_size *mmunit.picoseconds,
+                    self.temperature * mmunit.kelvin,
+                    self.nhc_frequency / mmunit.picosecond,
+                    step_size * mmunit.picoseconds,
                     chain_length,
                 )
             else:
@@ -597,8 +631,7 @@ class EvbFepDriver():
 
     def _safe_step(self, simulation, steps, name=""):
         self.ostream.print_info(
-            f"Running {name} for {steps} steps, {steps*self.step_size} ps"
-        )
+            f"Running {name} for {steps} steps, {steps*self.step_size} ps")
         self.ostream.flush()
         states = []
         potwarning = False
@@ -639,7 +672,7 @@ class EvbFepDriver():
 
         for j, state in enumerate(states):
             step_num = step - len(states) + j
-            
+
             if self.save_crash_xml and j % self.xml_crash_save_interval == 0:
                 xml_name = f"state_step_{j}_{step_num}"
                 with open(path / f"{xml_name}.xml", "w") as f:
@@ -655,7 +688,9 @@ class EvbFepDriver():
                 positions[positions == np.inf] = 99999998
                 positions[positions == -np.inf] = -9999998
                 positions[positions == np.nan] = 0
-                positions = np.nan_to_num(positions, posinf = 99999998, neginf = -9999998)
+                positions = np.nan_to_num(positions,
+                                          posinf=99999998,
+                                          neginf=-9999998)
 
                 mmapp.PDBFile.writeFile(
                     self.topology,

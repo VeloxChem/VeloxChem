@@ -275,7 +275,7 @@ class EvbSystemBuilder():
             system.addForce(cmm_remover)
             system_mol = Molecule(reactant.molecule)
         else:
-            system, topology, system_mol, pdb_atoms, env_rea_dist = self._system_from_pdb()
+            system, topology, system_mol, pdb_atoms, env_center = self._system_from_pdb()
             nb_force = [
                 force for force in system.getForces()
                 if isinstance(force, mm.NonbondedForce)
@@ -293,9 +293,20 @@ class EvbSystemBuilder():
             cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
 
         self.reaction_atoms = self._add_reactant(system, topology, nb_force)
+        self.positions = system_mol.get_coordinates_in_angstrom()
 
         if self.pdb:
-            reactant_indices = [rea_atom.index for rea_atom in self.reaction_atoms]
+            reabonds = set(self.reactant.bonds.keys())
+            probonds = set(self.product.bonds.keys())
+            active_bonds = reabonds ^ probonds # Commutative set difference
+            active_atoms = set()
+            for bond in active_bonds:
+                active_atoms.update(bond)
+            reactant_active_indices = [self.reaction_atoms[i].index for i in active_atoms]
+            reactant_active_positions = np.array([self.positions[i] for i in reactant_active_indices])
+            rea_center = np.average(reactant_active_positions,axis=0)
+            distance = np.linalg.norm(env_center - rea_center)
+            # env_center
             pdb_indices =  [pdb_atom.index for pdb_atom in pdb_atoms]
             max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
 
@@ -305,15 +316,15 @@ class EvbSystemBuilder():
             centroid_force.addPerBondParameter("rmax")
             centroid_force.addPerBondParameter("k")
             
-            centroid_force.addGroup(reactant_indices)
+            centroid_force.addGroup(reactant_active_indices)
             centroid_force.addGroup(pdb_indices)
-            centroid_force.addBond([0,1],[env_rea_dist*0.1,self.centroid_k])
+            centroid_force.addBond([0,1],[distance*0.1,self.centroid_k])
 
             system.addForce(centroid_force)
         
 
         # Set the positions and make a box for it
-        self.positions = system_mol.get_coordinates_in_angstrom()
+        
         box = None
         if self.CNT or self.graphene:
             box = self._add_CNT_graphene(system, nb_force, topology, system_mol)
@@ -370,20 +381,19 @@ class EvbSystemBuilder():
             constraints=mmapp.HBonds,
         )
         pdb_atoms = [atom for atom in env_topology.atoms()]
-        env_rea_dist = -1
         if not self.no_reactant:
             rea_modeller = mmapp.Modeller(topology, pdb_file.positions)
             rea_modeller.delete([chains[0]])
             rea_topology = rea_modeller.getTopology()
-            rea_positions = np.array(rea_modeller.getPositions().value_in_unit(mmunit.angstrom))
-            rea_center = np.average(rea_positions,axis=0)
-            env_rea_dist = np.linalg.norm(env_center-rea_center)
+            # rea_positions = np.array(rea_modeller.getPositions().value_in_unit(mmunit.angstrom))
+            # rea_center = np.average(rea_positions,axis=0)
+            # env_rea_dist = np.linalg.norm(env_center-rea_center)
             # pass
             assert len(self.reactant.atoms) == rea_topology.getNumAtoms(
             ), "Number of atoms in the reactant and the topology do not match"
 
             topology = env_topology
-        return system, topology, system_mol, pdb_atoms, env_rea_dist
+        return system, topology, system_mol, pdb_atoms, env_center
 
     def _configure_pbc(self, system, topology, nb_force, box=None):
         if box is None:
