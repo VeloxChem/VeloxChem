@@ -2406,19 +2406,28 @@ integrateVxcFock(const CMolecule&        molecule,
 
     errors::assertMsgCritical(densityMatrix.isClosedShell(), erropenshell);
 
-    if (xcfuntype == xcfun::lda) return gpu::integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
-
-    if (xcfuntype == xcfun::gga) return gpu::integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
-
+    if (xcfuntype == xcfun::lda)
+    {
+        return gpu::integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    }
+    else if (xcfuntype == xcfun::gga)
+    {
+        return gpu::integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    }
     /*
-    if (xcfuntype == xcfun::mgga) return gpu::integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    else if (xcfuntype == xcfun::mgga)
+    {
+        return gpu::integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    }
     */
+    else
+    {
+        std::string errxcfuntype("gpu::integrateVxcFock: Only implemented for LDA/GGA");
 
-    std::string errxcfuntype("gpu::integrateVxcFock: Only implemented for LDA/GGA");
+        errors::assertMsgCritical(false, errxcfuntype);
 
-    errors::assertMsgCritical(false, errxcfuntype);
-
-    return CAOKohnShamMatrix();
+        return CAOKohnShamMatrix();
+    }
 }
 
 static auto
@@ -3322,17 +3331,26 @@ integrateFxcFock(CDenseMatrix&           aoFockMatrix,
 
     errors::assertMsgCritical((rw_closed_shell && gs_closed_shell), erropenshell);
 
-    if (xcfuntype == xcfun::lda) integrateFxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
-
-    if (xcfuntype == xcfun::gga) integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
-
+    if (xcfuntype == xcfun::lda)
+    {
+        integrateFxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    }
+    else if (xcfuntype == xcfun::gga)
+    {
+        integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    }
     /*
-    if (xcfuntype == xcfun::mgga) integrateFxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    else if (xcfuntype == xcfun::mgga)
+    {
+        integrateFxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    }
     */
+    else
+    {
+        std::string errxcfuntype("gpu::integrateFxcFock: Only implemented for LDA/GGA");
 
-    std::string errxcfuntype("gpu::integrateFxcFock: Only implemented for LDA/GGA");
-
-    errors::assertMsgCritical(false, errxcfuntype);
+        errors::assertMsgCritical(false, errxcfuntype);
+    }
 }
 
 static auto
@@ -4297,19 +4315,28 @@ integrateVxcGradient(const CMolecule&        molecule,
 
     errors::assertMsgCritical(rwDensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell(), erropenshell);
 
-    if (xcfuntype == xcfun::lda) return gpu::integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
-
-    if (xcfuntype == xcfun::gga) return gpu::integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
-
+    if (xcfuntype == xcfun::lda)
+    {
+        return gpu::integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    }
+    else if (xcfuntype == xcfun::gga)
+    {
+        return gpu::integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    }
     /*
-    if (xcfuntype == xcfun::mgga) return gpu::integrateVxcGradientForMGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    else if (xcfuntype == xcfun::mgga)
+    {
+        return gpu::integrateVxcGradientForMGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
+    }
     */
+    else
+    {
+        std::string errxcfuntype("gpu::integrateVxcGradient: Only implemented for LDA/GGA");
 
-    std::string errxcfuntype("gpu::integrateVxcGradient: Only implemented for LDA/GGA");
+        errors::assertMsgCritical(false, errxcfuntype);
 
-    errors::assertMsgCritical(false, errxcfuntype);
-
-    return CDenseMatrix();
+        return CDenseMatrix();
+    }
 }
 
 }  // namespace gpu
