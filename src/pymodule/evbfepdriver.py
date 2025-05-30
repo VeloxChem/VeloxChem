@@ -377,17 +377,16 @@ class EvbFepDriver():
         equil_simulation.integrator.setStepSize(sz)
         self.ostream.print_info(f"Equilibration with step size {sz}")
 
-        equil_reporter = mmapp.StateDataReporter(
-            str(self.run_folder / f"equil_data_{l:.3f}.csv"),
-            self.write_step,
-            step=True,
-            potentialEnergy=True,
-            kineticEnergy=True,
-            temperature=True,
-            volume=True,
-            density=True,
-            append=False,
+        equil_reporter = self._get_data_reporter(
+            self.run_folder,
+            f"equil_data_{l:.3f}.csv",
         )
+        equil_evb_reporter = self._get_evb_reporter(
+            self.run_folder,
+            l,
+            f"_{l:.3f}",
+        )
+        equil_simulation.reporters.append(equil_evb_reporter)
         equil_simulation.reporters.append(equil_reporter)
         if self.save_equil_traj:
             equil_traj_reporter = mmapp.XTCReporter(
@@ -510,48 +509,18 @@ class EvbFepDriver():
             append = False
         else:
             append = True
+        state_reporter = self._get_data_reporter(
+            self.data_folder,
+            "Data_combined.csv",
+            True,
+        )
 
-        state_reporter = mmapp.StateDataReporter(
-            str(self.data_folder / "Data_combined.csv"),
-            self.write_step,
-            step=True,
-            potentialEnergy=True,
-            kineticEnergy=True,
-            temperature=True,
-            volume=True,
-            density=True,
+        evb_reporter = self._get_evb_reporter(
+            self.data_folder,
+            l,
             append=append,
         )
         run_simulation.reporters.append(state_reporter)
-
-        if self.report_forces or self.debug:
-            f_file = str(self.data_folder / f"Forces.csv")
-        else:
-            f_file = None
-        if self.report_velocities or self.debug:
-            v_file = str(self.data_folder / f"Velocities.csv")
-        else:
-            v_file = None
-        if self.report_forcegroups or self.debug:
-            g_file = str(self.data_folder / f"ForceGroups.csv")
-        else:
-            g_file = None
-
-        evb_reporter = EvbReporter(
-            str(self.data_folder / "Energies.csv"),
-            self.write_step,
-            self.systems[0],
-            self.systems[1],
-            self.systems['reactant'],
-            self.systems['product'],
-            self.topology,
-            l,
-            self.ostream,
-            forcegroup_file=g_file,
-            velocity_file=v_file,
-            force_file=f_file,
-            append=append,
-        )
         run_simulation.reporters.append(evb_reporter)
         self.ostream.flush()
         states = self._safe_step(run_simulation, self.sample_steps, "sampling")
@@ -598,6 +567,66 @@ class EvbFepDriver():
                 integrator,
             )
         return simulation
+
+    def _get_data_reporter(
+        self,
+        folder,
+        name,
+        append=False,
+        write_step=-1,
+    ):
+        if write_step == -1:
+            write_step = self.write_step
+        state_reporter = mmapp.StateDataReporter(
+            str(folder / name),
+            self.write_step,
+            step=True,
+            potentialEnergy=True,
+            kineticEnergy=True,
+            temperature=True,
+            volume=True,
+            density=True,
+            append=append,
+        )
+        return state_reporter
+
+    def _get_evb_reporter(
+        self,
+        folder,
+        l,
+        name_suffix="",
+        append=False,
+        write_step=-1,
+    ):
+        if self.report_forces or self.debug:
+            f_file = str(folder / f"Forces{name_suffix}.csv")
+        else:
+            f_file = None
+        if self.report_velocities or self.debug:
+            v_file = str(folder / f"Velocities{name_suffix}.csv")
+        else:
+            v_file = None
+        if self.report_forcegroups or self.debug:
+            g_file = str(folder / f"ForceGroups{name_suffix}.csv")
+        else:
+            g_file = None
+
+        evb_reporter = EvbReporter(
+            str(folder / f"Energies{name_suffix}.csv"),
+            self.write_step,
+            self.systems[0],
+            self.systems[1],
+            self.systems['reactant'],
+            self.systems['product'],
+            self.topology,
+            l,
+            self.ostream,
+            forcegroup_file=g_file,
+            velocity_file=v_file,
+            force_file=f_file,
+            append=append,
+        )
+        return evb_reporter
 
     def _constrain_H_bonds(self, system):
         harm_bond_forces = [

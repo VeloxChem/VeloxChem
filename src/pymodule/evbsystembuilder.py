@@ -321,7 +321,9 @@ class EvbSystemBuilder():
             centroid_force.addBond([0,1],[distance*0.1,self.centroid_k])
 
             system.addForce(centroid_force)
-        
+            self.ostream.print_info(f"Adding harmonic force between c.o.m. of reacting atoms and c.o.m. of the protein with distance {distance*0.1}nm")
+            self.ostream.print_info(f"Reacting atoms: {reactant_active_indices}, c.o.m.: {rea_center}, Enzyme c.o.m.: {env_center}")
+            self.ostream.flush()
 
         # Set the positions and make a box for it
         
