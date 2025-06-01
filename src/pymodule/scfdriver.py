@@ -1674,29 +1674,17 @@ class ScfDriver:
         # TODO: add beta density
 
         if self.timing:
-            # all_coulomb_timing = self.comm.gather(coulomb_timing)
-            # all_exchange_timing = self.comm.gather(exchange_timing)
             all_eri_timing = self.comm.gather(coulomb_timing + exchange_timing)
 
             if self.rank == mpi_master():
-                # all_coulomb_timing = np.array(all_coulomb_timing).reshape(-1)
-                # all_exchange_timing = np.array(all_exchange_timing).reshape(-1)
                 all_eri_timing = np.array(all_eri_timing).reshape(-1)
 
-                # max_coulomb_timing = np.max(all_coulomb_timing)
-                # max_exchange_timing = np.max(all_exchange_timing)
                 max_eri_timing = np.max(all_eri_timing)
 
-                # coulomb_load_imb = 1.0 - np.sum(all_coulomb_timing) / (
-                #     all_coulomb_timing.size * max_coulomb_timing)
-                # exchange_load_imb = 1.0 - np.sum(all_exchange_timing) / (
-                #     all_exchange_timing.size * max_exchange_timing)
                 eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
                     all_eri_timing.size * max_eri_timing)
 
                 profiler.add_timing_info('FockERI', tm.time() - eri_t0)
-                # profiler.add_timing_info('LoadImbJ', coulomb_load_imb)
-                # profiler.add_timing_info('LoadImbK', exchange_load_imb)
                 profiler.add_timing_info('(loadimb)', eri_load_imb)
 
         vxc_t0 = tm.time()
