@@ -119,6 +119,10 @@ class CBaseCorePotential
     /// @brief Gets number of primitive  base core potentials in base core potential.
     /// @return The number of primitive  base core potentials in base core potential.
     auto number_of_primitive_potentials() const -> size_t;
+    
+    /// @brief Checks if radial orders are compatable with analytical ECP integration.
+    /// @return True if radial orders compatable with analytical ECP integration, false otherwise.
+    auto is_valid_radial_orders() const -> bool;
 
    private:
     /// @brief The vector of exponents of primitive local potentials.

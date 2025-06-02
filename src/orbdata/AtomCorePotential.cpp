@@ -198,3 +198,21 @@ CAtomCorePotential::number_of_core_electrons() const -> int
 {
     return _core_electrons;
 }
+
+auto
+CAtomCorePotential::is_valid_radial_orders() const -> bool
+{
+    if (!_local_potential.is_valid_radial_orders())
+    {
+        return false;
+    }
+    else
+    {
+        for (const auto& potential : _projected_potentials)
+        {
+            if (!potential.is_valid_radial_orders()) return false;
+        }
+        
+        return true;
+    }
+}

@@ -122,6 +122,10 @@ class CAtomCorePotential
     /// @brief Gets number of core electrons in atom core potential.
     /// @return The number of core electrons.
     auto number_of_core_electrons() const -> int;
+    
+    /// @brief Checks if radial orders are compatable with analytical ECP integration.
+    /// @return True if radial orders compatable with analytical ECP integration, false otherwise.
+    auto is_valid_radial_orders() const -> bool;
 
    private:
     

@@ -52,6 +52,9 @@
 #include "GtoPairBlock.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "MolecularBasis.hpp"
+#include "BaseCorePotential.hpp"
+#include "AtomCorePotential.hpp"
+#include "MolecularCorePotential.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -303,6 +306,66 @@ export_orbdata(py::module &m)
         .def("__copy__", [](const CMolecularBasis &self) { return CMolecularBasis(self); })
         .def("__deepcopy__", [](const CMolecularBasis &self, py::dict) { return CMolecularBasis(self); });
 
+    // CBaseCorePotential class
+    PyClass<CBaseCorePotential>(m, "BaseCorePotential")
+        .def(py::init<>())
+        .def(py::init<const CBaseCorePotential &>())
+        .def(py::init<const std::vector<double> &, const std::vector<double> &, const std::vector<int> &>())
+        .def(py::pickle(
+            [](const CBaseCorePotential &cp) { return py::make_tuple(cp.get_exponents(), cp.get_factors(), cp.get_radial_orders()); },
+            [](py::tuple t) { return CBaseCorePotential(t[0].cast<std::vector<double>>(), t[1].cast<std::vector<double>>(), t[2].cast<std::vector<int>>()); }))
+        .def("set_exponents", &CBaseCorePotential::set_exponents, "Sets exponents of primitive core potentials.")
+        .def("set_factors", &CBaseCorePotential::set_factors, "Sets factors of primitive core potentials.")
+        .def("set_angular_momentum", &CBaseCorePotential::set_radial_orders, "Sets radial orders of primitive core potentials.")
+        .def("add",
+             &CBaseCorePotential::add,
+             "Add primitive core potential i.e. exponent, factor and radial order to core potential.")
+        .def("get_exponents", &CBaseCorePotential::get_exponents, "Gets vector of exponents in core potential.")
+        .def("get_factors", &CBaseCorePotential::get_factors, "Gets vector of factors in core potential.")
+        .def("get_radial_orders", &CBaseCorePotential::get_radial_orders, "Gets vector of radial orders in core potential.")
+        .def("number_of_primitive_potentials", &CBaseCorePotential::number_of_primitive_potentials, "Gets number of primitives potentials in core potential.")
+        .def("is_valid_radial_orders", &CBaseCorePotential::is_valid_radial_orders, "Check if radial orders suitable for analytical integration without usage hypergeometric functions.")
+        .def("__eq__", [](const CBaseCorePotential &self, const CBaseCorePotential &other) { return self == other; })
+        .def("__copy__", [](const CBaseCorePotential &self) { return CBaseCorePotential(self); })
+        .def("__deepcopy__", [](const CBaseCorePotential &self, py::dict) { return CBaseCorePotential(self); });
+    
+    // CAtomCorePotential class
+    PyClass<CAtomCorePotential>(m, "AtomCorePotential")
+        .def(py::init<>())
+        .def(py::init<const CAtomCorePotential &>())
+        .def(py::init<const CBaseCorePotential &, const std::vector<CBaseCorePotential> &, const std::vector<int> &, const int>())
+        .def(py::pickle(
+                        [](const CAtomCorePotential &acp) { return py::make_tuple(acp.get_local_potential(), acp.get_projected_potentials(), acp.get_angular_momentums(), acp.number_of_core_electrons()); },
+                        [](py::tuple t) { return CAtomCorePotential(t[0].cast<CBaseCorePotential>(), t[1].cast<std::vector<CBaseCorePotential>>(), t[2].cast<std::vector<int>>(), t[3].cast<int>()); }))
+        .def("set_local_potential", &CAtomCorePotential::set_local_potential, "Sets local potential in atom core potential.")
+        .def("set_projected_potentials", &CAtomCorePotential::set_projected_potentials, "Sets projected potentials in atom core potential.")
+        .def("set_angular_momentum", &CAtomCorePotential::set_number_core_electrons, "Sets number of core electron in atom core potential.")
+        .def("get_local_potential", &CAtomCorePotential::get_local_potential, "Gets local core potential in atom core potential.")
+        .def("get_projected_potentials", &CAtomCorePotential::get_projected_potentials, "Gets projected potentials in atom core potential.")
+        .def("get_angular_momentums", &CAtomCorePotential::get_angular_momentums, "Gets vector of angular momentum of projected potentials in atom core potential.")
+        .def("number_of_core_electrons", &CAtomCorePotential::number_of_core_electrons, "Gets number of core electrons in atom core potential.")
+        .def("is_valid_radial_orders", &CAtomCorePotential::is_valid_radial_orders, "Check if radial orders suitable for analytical integration without usage hypergeometric functions.")
+        .def("__eq__", [](const CAtomCorePotential &self, const CAtomCorePotential &other) { return self == other; })
+        .def("__copy__", [](const CAtomCorePotential &self) { return CAtomCorePotential(self); })
+        .def("__deepcopy__", [](const CAtomCorePotential &self, py::dict) { return CAtomCorePotential(self); });
+        
+    // CMolecularCorePotential class
+    PyClass<CMolecularCorePotential>(m, "MolecularCorePotential")
+        .def(py::init<>())
+        .def(py::init<const CMolecularCorePotential &>())
+        .def(py::init<const std::vector<CAtomCorePotential> &, const std::vector<int> &, const std::vector<int> &>())
+        .def(py::pickle(
+                        [](const CMolecularCorePotential &mcp) { return py::make_tuple(mcp.core_potentials(), mcp.indices(), mcp.atomic_indices()); },
+                        [](py::tuple t) { return CMolecularCorePotential(t[0].cast<std::vector<CAtomCorePotential>>(), t[1].cast<std::vector<int>>(), t[2].cast<std::vector<int>>()); }))
+        .def("add", &CMolecularCorePotential::add, "Add atom core potential to molecular core potential.")
+        .def("core_potentials", &CMolecularCorePotential::core_potentials, "Gets vector of atom core potentials in molecular core potential.")
+        .def("core_potential", &CMolecularCorePotential::core_potential, "Gets specific atom core potential in molecular core potential.")
+        .def("indices", &CMolecularCorePotential::indices, "Gets vector of internal atom core potential indices.")
+        .def("atomic_indices", &CMolecularCorePotential::atomic_indices, "Gets vector of atomic indices.")
+        .def("__eq__", [](const CMolecularCorePotential &self, const CMolecularCorePotential &other) { return self == other; })
+        .def("__copy__", [](const CMolecularCorePotential &self) { return CMolecularCorePotential(self); })
+        .def("__deepcopy__", [](const CMolecularCorePotential &self, py::dict) { return CMolecularCorePotential(self); });
+    
     // CGtoBlock class
     PyClass<CGtoBlock>(m, "GtoBlock")
         .def(py::init<>())

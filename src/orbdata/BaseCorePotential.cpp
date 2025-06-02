@@ -184,3 +184,9 @@ CBaseCorePotential::number_of_primitive_potentials() const -> size_t
 {
     return _exponents.size();
 }
+
+auto
+CBaseCorePotential::is_valid_radial_orders() const -> bool
+{
+    return (std::ranges::find_if(_radial_orders, [](int order) {return order != 2;}) == _radial_orders.end());
+}

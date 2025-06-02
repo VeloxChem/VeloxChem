@@ -99,6 +99,11 @@ class CMolecularCorePotential
     /// @brief Gets vector of atomic indices.
     /// @return The vector of atomic indices.
     auto atomic_indices() const -> std::vector<int>;
+    
+    /// @brief Gets specific core potential.
+    /// @param index The index of core potential.
+    /// @return The specific core potential.
+    auto core_potential(const int index) const -> CAtomCorePotential; 
 
    private:
     /// @brief The vector of atom core potentials.

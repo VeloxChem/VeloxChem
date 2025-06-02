@@ -158,3 +158,9 @@ CMolecularCorePotential::atomic_indices() const -> std::vector<int>
 {
     return _atom_indices;
 }
+
+auto
+CMolecularCorePotential::core_potential(const int index) const -> CAtomCorePotential
+{
+    return _core_potentials.at(index);
+}
