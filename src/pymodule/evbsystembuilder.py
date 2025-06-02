@@ -264,7 +264,6 @@ class EvbSystemBuilder():
         self.product = product
         self.constraints = constraints
 
-
         if self.pdb is None:
             system = mm.System()
             topology = mmapp.Topology()
@@ -275,7 +274,8 @@ class EvbSystemBuilder():
             system.addForce(cmm_remover)
             system_mol = Molecule(reactant.molecule)
         else:
-            system, topology, system_mol, pdb_atoms, env_center = self._system_from_pdb()
+            system, topology, system_mol, pdb_atoms, env_center = self._system_from_pdb(
+            )
             nb_force = [
                 force for force in system.getForces()
                 if isinstance(force, mm.NonbondedForce)
@@ -298,35 +298,43 @@ class EvbSystemBuilder():
         if self.pdb:
             reabonds = set(self.reactant.bonds.keys())
             probonds = set(self.product.bonds.keys())
-            active_bonds = reabonds ^ probonds # Commutative set difference
+            active_bonds = reabonds ^ probonds  # Commutative set difference
             active_atoms = set()
             for bond in active_bonds:
                 active_atoms.update(bond)
-            reactant_active_indices = [self.reaction_atoms[i].index for i in active_atoms]
-            reactant_active_positions = np.array([self.positions[i] for i in reactant_active_indices])
-            rea_center = np.average(reactant_active_positions,axis=0)
+            reactant_active_indices = [
+                self.reaction_atoms[i].index for i in active_atoms
+            ]
+            reactant_active_positions = np.array(
+                [self.positions[i] for i in reactant_active_indices])
+            rea_center = np.average(reactant_active_positions, axis=0)
             distance = np.linalg.norm(env_center - rea_center)
             # env_center
-            pdb_indices =  [pdb_atom.index for pdb_atom in pdb_atoms]
+            pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
             max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
+            max_dist_expr = "k*distance(g1,g2)"
 
             centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
             centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
             centroid_force.setName("Protein_Ligand_Centroid_force")
-            centroid_force.addPerBondParameter("rmax")
+            # centroid_force.addPerBondParameter("rmax")
             centroid_force.addPerBondParameter("k")
-            
+
             centroid_force.addGroup(reactant_active_indices)
             centroid_force.addGroup(pdb_indices)
-            centroid_force.addBond([0,1],[distance*0.1,self.centroid_k])
+            centroid_force.addBond([0, 1], [distance * 0.1, self.centroid_k])
 
             system.addForce(centroid_force)
-            self.ostream.print_info(f"Adding harmonic force between c.o.m. of reacting atoms and c.o.m. of the protein with distance {distance*0.1}nm")
-            self.ostream.print_info(f"Reacting atoms: {reactant_active_indices}, c.o.m.: {rea_center}, Enzyme c.o.m.: {env_center}")
+            self.ostream.print_info(
+                f"Adding harmonic force between c.o.m. of reacting atoms and c.o.m. of the protein with distance {distance*0.1}nm"
+            )
+            self.ostream.print_info(
+                f"Reacting atoms: {reactant_active_indices}, c.o.m.: {rea_center}, Enzyme c.o.m.: {env_center}"
+            )
             self.ostream.flush()
 
         # Set the positions and make a box for it
-        
+
         box = None
         if self.CNT or self.graphene:
             box = self._add_CNT_graphene(system, nb_force, topology, system_mol)
@@ -339,8 +347,6 @@ class EvbSystemBuilder():
             box = self._add_solvent(system, system_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
                                     box)
-        
-        
 
         if self.pressure > 0:
             barostat = self._add_barostat(system)
@@ -348,7 +354,6 @@ class EvbSystemBuilder():
         E_field = None
         if np.any(np.array(self.E_field) > 0.001):
             E_field = self._add_E_field(system, self.E_field)
-
 
         self.topology: mmapp.Topology = topology
         self.systems = self._interpolate_system(
@@ -372,8 +377,9 @@ class EvbSystemBuilder():
             env_modeller.delete([chains[1]])
         env_topology = env_modeller.getTopology()
         # env_positions = env_modeller.getPositions()
-        env_positions = np.array(env_modeller.getPositions().value_in_unit(mmunit.angstrom))
-        env_center = np.average(env_positions,axis=0)
+        env_positions = np.array(env_modeller.getPositions().value_in_unit(
+            mmunit.angstrom))
+        env_center = np.average(env_positions, axis=0)
         forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
 
         system = forcefield.createSystem(
@@ -972,10 +978,12 @@ class EvbSystemBuilder():
                     self._add_torsion(fourier_force, dihedral, atom_ids)
                 for key, dihedral in solvent_ff.impropers.items():
                     atom_ids = self._key_to_id(key, solvent_atoms)
-                    self._add_torsion(fourier_imp_force,
-                                      dihedral,
-                                      atom_ids,
-                                      improper=True,)
+                    self._add_torsion(
+                        fourier_imp_force,
+                        dihedral,
+                        atom_ids,
+                        improper=True,
+                    )
 
                 exceptions = self._create_exceptions_from_bonds(
                     solvent_ff.atoms, solvent_ff.bonds)
@@ -1453,7 +1461,6 @@ class EvbSystemBuilder():
                 [barrier_scaling * D, a, re],
             )
 
-
     def _add_angle(self, angle_force, atom_id, equil, fc):
         if fc > 0:
             angle_force.addAngle(
@@ -1870,7 +1877,7 @@ class EvbForceGroup(Enum):
     @classmethod
     def pes_forcegroups(cls):
         max_ind = cls.LJDECOMP1.value
-        return set(range(1,max_ind))
+        return set(range(1, max_ind))
 
     @classmethod
     #Simple method for printing a descrpitive header to be used in force group logging files
