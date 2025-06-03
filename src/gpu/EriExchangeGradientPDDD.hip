@@ -75,7 +75,7 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -84,10 +84,13 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -129,11 +132,6 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -142,7 +140,7 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -179,16 +177,16 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -239,11 +237,10 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 F8_t[0] * 0.25 * inv_S1 * inv_S1 * inv_S2 * a_i * (
                                     (delta[a0][b0] * delta[b1][grad_cart_ind] * delta[c1][d1] + delta[a0][b1] * delta[b0][grad_cart_ind] * delta[c1][d1] + delta[a0][grad_cart_ind] * delta[b0][b1] * delta[c1][d1]) * (QC_0 * QD_0)
@@ -389,32 +386,17 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -466,7 +448,7 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -475,10 +457,13 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -520,11 +505,6 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -533,7 +513,7 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -570,16 +550,16 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -630,11 +610,10 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[1] * 0.25 * inv_S1 * inv_S2 * inv_S4 * a_i * (
                                     (delta[b1][grad_cart_ind] * delta[c0][c1] * delta[d0][d1] + delta[b1][grad_cart_ind] * delta[c0][d0] * delta[c1][d1] + delta[b1][grad_cart_ind] * delta[c0][d1] * delta[c1][d0]) * (PA_0 * PB_0 * (-1.0) + PA_0 * PQ[b0] + PB_0 * PQ[a0])
@@ -927,32 +906,17 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -1004,7 +968,7 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -1013,10 +977,13 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -1058,11 +1025,6 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -1071,7 +1033,7 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -1108,16 +1070,16 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -1169,11 +1131,10 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[1] * (-1.0) * S2 * inv_S4 * (
                                     delta[a0][grad_cart_ind] * (PB_0 * PQ[b1] * QC_0 * QC_1 * QD_0 * QD_1 + PB_1 * PQ[b0] * QC_0 * QC_1 * QD_0 * QD_1)
@@ -1290,32 +1251,17 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -1367,7 +1313,7 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -1376,10 +1322,13 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -1421,11 +1370,6 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -1434,7 +1378,7 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -1471,16 +1415,16 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -1532,11 +1476,10 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * 0.5 * S1 * S1 * inv_S2 * inv_S2 * inv_S4 * inv_S4 * a_i * (
                                     (delta[c0][c1] * delta[d0][d1] + delta[c0][d0] * delta[c1][d1] + delta[c0][d1] * delta[c1][d0]) * (PA_0 * PA_x * PB_0 * PB_1)
@@ -1626,32 +1569,17 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -1703,7 +1631,7 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -1712,10 +1640,13 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -1757,11 +1688,6 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -1770,7 +1696,7 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -1807,16 +1733,16 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -1868,11 +1794,10 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * 0.5 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
                                     delta[b1][grad_cart_ind] * delta[d0][d1] * (PA_0 * PQ[b0] * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[a0] * QC_0 * QC_1 * (-1.0) + PQ[a0] * PQ[b0] * QC_0 * QC_1)
@@ -2074,32 +1999,17 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -2151,7 +2061,7 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -2160,10 +2070,13 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -2205,11 +2118,6 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -2218,7 +2126,7 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -2255,16 +2163,16 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -2317,11 +2225,10 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * (-0.5) * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     delta[a0][grad_cart_ind] * delta[d0][d1] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] + PB_0 * PB_1 * PQ[c0] * QC_1 + PB_0 * PB_1 * PQ[c1] * QC_0)
@@ -2513,32 +2420,17 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -2590,7 +2482,7 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -2599,10 +2491,13 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -2644,11 +2539,6 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -2657,7 +2547,7 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -2694,16 +2584,16 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -2756,11 +2646,10 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * 0.25 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     (delta[b1][c0] * delta[c1][d0] * delta[d1][grad_cart_ind] + delta[b1][c0] * delta[c1][d1] * delta[d0][grad_cart_ind] + delta[b1][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[b1][c1] * delta[c0][d0] * delta[d1][grad_cart_ind] + delta[b1][c1] * delta[c0][d1] * delta[d0][grad_cart_ind] + delta[b1][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[b1][d0] * delta[c0][c1] * delta[d1][grad_cart_ind] + delta[b1][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[b1][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[b1][d1] * delta[c0][c1] * delta[d0][grad_cart_ind] + delta[b1][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[b1][d1] * delta[c0][grad_cart_ind] * delta[c1][d0]) * (PA_0 * PB_0 * (-1.0))
@@ -2897,32 +2786,17 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -2974,7 +2848,7 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -2983,10 +2857,13 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -3028,11 +2905,6 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -3041,7 +2913,7 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -3078,16 +2950,16 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -3140,11 +3012,10 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * 0.5 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     (delta[c1][d0] * delta[d1][grad_cart_ind] + delta[c1][d1] * delta[d0][grad_cart_ind] + delta[c1][grad_cart_ind] * delta[d0][d1]) * (PA_0 * PB_0 * PB_1 * PQ[c0])
@@ -3222,32 +3093,17 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -3299,7 +3155,7 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -3308,10 +3164,13 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -3353,11 +3212,6 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -3366,7 +3220,7 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -3403,16 +3257,16 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -3465,11 +3319,10 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * 0.5 * S1 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     (delta[c1][d0] * delta[d1][grad_cart_ind] + delta[c1][d1] * delta[d0][grad_cart_ind] + delta[c1][grad_cart_ind] * delta[d0][d1]) * (PA_0 * PB_0 * PQ[b1] * PQ[c0] * (-1.0) + PA_0 * PB_0 * PQ[b1] * QC_0 * (-1.0) + PA_0 * PB_1 * PQ[b0] * PQ[c0] * (-1.0) + PA_0 * PB_1 * PQ[b0] * QC_0 * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[c0] * (-1.0) + PB_0 * PB_1 * PQ[a0] * QC_0 * (-1.0))
@@ -3606,32 +3459,17 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -3683,7 +3521,7 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -3692,10 +3530,13 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -3737,11 +3578,6 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -3750,7 +3586,7 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -3787,16 +3623,16 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -3849,11 +3685,10 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * (-0.5) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     delta[b1][grad_cart_ind] * delta[d0][d1] * (PQ[a0] * PQ[b0] * QC_0 * QC_1)
@@ -4022,32 +3857,17 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -4099,7 +3919,7 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -4108,10 +3928,13 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -4153,11 +3976,6 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -4166,7 +3984,7 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -4203,16 +4021,16 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -4265,11 +4083,10 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * (-1.0) * S1 * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     delta[d0][d1] * (PA_0 * PA_x * PB_0 * PB_1 * PQ[c0] * PQ[c1])
@@ -4436,32 +4253,17 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -4513,7 +4315,7 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -4522,10 +4324,13 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -4567,11 +4372,6 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -4580,7 +4380,7 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -4617,16 +4417,16 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -4680,11 +4480,10 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[a0][grad_cart_ind] * (PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * QD_1 + PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d1] * QD_0 + PB_0 * PB_1 * PQ[c0] * PQ[d0] * PQ[d1] * QC_1 + PB_0 * PB_1 * PQ[c1] * PQ[d0] * PQ[d1] * QC_0)
@@ -4883,32 +4682,17 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -4960,7 +4744,7 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -4969,10 +4753,13 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -5014,11 +4801,6 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -5027,7 +4809,7 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -5064,16 +4846,16 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -5127,11 +4909,10 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     (delta[c1][d0] * delta[d1][grad_cart_ind] + delta[c1][d1] * delta[d0][grad_cart_ind] + delta[c1][grad_cart_ind] * delta[d0][d1]) * (PA_0 * PB_0 * PQ[b1] * PQ[c0] + PA_0 * PB_1 * PQ[b0] * PQ[c0] + PB_0 * PB_1 * PQ[a0] * PQ[c0])
@@ -5262,32 +5043,17 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -5339,7 +5105,7 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -5348,10 +5114,13 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -5393,11 +5162,6 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -5406,7 +5170,7 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -5443,16 +5207,16 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -5506,11 +5270,10 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * 0.5 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     (delta[c1][d0] * delta[d1][grad_cart_ind] + delta[c1][d1] * delta[d0][grad_cart_ind] + delta[c1][grad_cart_ind] * delta[d0][d1]) * (PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * QC_0 * (-1.0))
@@ -5732,32 +5495,17 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -5809,7 +5557,7 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -5818,10 +5566,13 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -5863,11 +5614,6 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -5876,7 +5622,7 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -5913,16 +5659,16 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -5976,11 +5722,10 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     delta[d1][grad_cart_ind] * (PA_0 * PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0))
@@ -6082,32 +5827,17 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -6159,7 +5889,7 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -6168,10 +5898,13 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -6213,11 +5946,6 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -6226,7 +5954,7 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -6263,16 +5991,16 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -6326,11 +6054,10 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     delta[d0][d1] * (PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[grad_cart_ind] * QC_1 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[c1] * PQ[grad_cart_ind] * QC_0 * (-1.0) + PA_0 * PQ[b0] * PQ[b1] * PQ[grad_cart_ind] * QC_0 * QC_1 * (-1.0) + PA_x * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * (-1.0) + PA_x * PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * (-1.0) + PA_x * PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[grad_cart_ind] * QC_1 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * PQ[c1] * PQ[grad_cart_ind] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * PQ[grad_cart_ind] * QC_0 * QC_1 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[grad_cart_ind] * QC_1 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c1] * PQ[grad_cart_ind] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[grad_cart_ind] * QC_0 * QC_1 * (-1.0))
@@ -6489,32 +6216,17 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -6566,7 +6278,7 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -6575,10 +6287,13 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -6620,11 +6335,6 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -6633,7 +6343,7 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -6670,16 +6380,16 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -6734,11 +6444,10 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * 2.0 * S2 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     + PQ[a0] * PQ[b0] * PQ[b1] * PQ[grad_cart_ind] * QC_0 * QC_1 * QD_0 * QD_1
@@ -6999,32 +6708,17 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -7076,7 +6770,7 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -7085,10 +6779,13 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -7130,11 +6827,6 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -7143,7 +6835,7 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -7180,16 +6872,16 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -7244,11 +6936,10 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[5] * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
                                     delta[d1][grad_cart_ind] * (PA_0 * PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PA_0 * PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0) + PB_0 * PB_1 * PQ[a0] * PQ[c0] * PQ[c1] * PQ[d0] * (-1.0))
@@ -7352,32 +7043,17 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -7429,7 +7105,7 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -7438,10 +7114,13 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -7483,11 +7162,6 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -7496,7 +7170,7 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -7533,16 +7207,16 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -7600,11 +7274,10 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[5] * (-1.0) * S1 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * (
                                     delta[a0][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] + PB_1 * PQ[b0] * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1])
@@ -7920,32 +7593,17 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
 
                         );
 
-                grad_i_x -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -7997,7 +7655,7 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -8006,10 +7664,13 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -8051,11 +7712,6 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -8064,7 +7720,7 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -8101,16 +7757,16 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -8161,11 +7817,10 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 F8_t[0] * 0.25 * inv_S1 * inv_S2 * inv_S2 * a_k * (
                                     (delta[b0][b1] * delta[c0][c1] * delta[d1][grad_cart_ind] + delta[b0][b1] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[b0][b1] * delta[c0][grad_cart_ind] * delta[c1][d1]) * (PA_0 * QD_0)
@@ -8407,31 +8062,16 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -8483,7 +8123,7 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -8492,10 +8132,13 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -8537,11 +8180,6 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -8550,7 +8188,7 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -8587,16 +8225,16 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -8647,11 +8285,10 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[1] * 0.5 * inv_S2 * inv_S4 * a_k * (
                                     (delta[c1][d0] * delta[d1][grad_cart_ind] + delta[c1][d1] * delta[d0][grad_cart_ind] + delta[c1][grad_cart_ind] * delta[d0][d1]) * (PA_0 * PB_0 * PQ[b1] * QC_0 + PA_0 * PB_1 * PQ[b0] * QC_0 + PB_0 * PB_1 * PQ[a0] * QC_0)
@@ -8836,31 +8473,16 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -8912,7 +8534,7 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -8921,10 +8543,13 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -8966,11 +8591,6 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -8979,7 +8599,7 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -9016,16 +8636,16 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -9077,11 +8697,10 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[1] * 2.0 * S1 * inv_S4 * a_k * (
                                     + PA_0 * PB_0 * PB_1 * PQ[c0] * QC_1 * QC_x * QD_0 * QD_1 * (-1.0)
@@ -9143,31 +8762,16 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -9219,7 +8823,7 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -9228,10 +8832,13 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -9273,11 +8880,6 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -9286,7 +8888,7 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -9323,16 +8925,16 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -9384,11 +8986,10 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * (-0.25) * inv_S1 * inv_S4 * inv_S4 * a_k * (
                                     (delta[b0][b1] * delta[c1][d0] * delta[d1][grad_cart_ind] + delta[b0][b1] * delta[c1][d1] * delta[d0][grad_cart_ind] + delta[b0][b1] * delta[c1][grad_cart_ind] * delta[d0][d1]) * (PQ[a0] * QC_0)
@@ -9543,31 +9144,16 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -9619,7 +9205,7 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -9628,10 +9214,13 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -9673,11 +9262,6 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -9686,7 +9270,7 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -9723,16 +9307,16 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -9784,11 +9368,10 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * 0.25 * S1 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[b1][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[b1][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[b1][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[b1][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[b1][d1] * delta[c0][grad_cart_ind] * delta[c1][d0]) * (PA_0 * PB_0)
@@ -9972,31 +9555,16 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -10048,7 +9616,7 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -10057,10 +9625,13 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -10102,11 +9673,6 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -10115,7 +9681,7 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -10152,16 +9718,16 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -10213,11 +9779,10 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * 0.25 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[b1][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[b1][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[b1][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[b1][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[b1][d1] * delta[c0][grad_cart_ind] * delta[c1][d0]) * (PA_0 * PQ[b0] * (-1.0) + PB_0 * PQ[a0] * (-1.0))
@@ -10382,31 +9947,16 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -10458,7 +10008,7 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -10467,10 +10017,13 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -10512,11 +10065,6 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -10525,7 +10073,7 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -10562,16 +10110,16 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -10623,11 +10171,10 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * 0.5 * S2 * inv_S4 * inv_S4 * (
                                     delta[c1][grad_cart_ind] * delta[d0][d1] * (PA_0 * PQ[b0] * PQ[b1] * QC_0 * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * QC_0 * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * QC_0 * (-1.0))
@@ -10716,31 +10263,16 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -10792,7 +10324,7 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -10801,10 +10333,13 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -10846,11 +10381,6 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -10859,7 +10389,7 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -10896,16 +10426,16 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -10958,11 +10488,10 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[2] * 0.125 * inv_S2 * inv_S4 * inv_S4 * (
                                     (delta[a0][b0] * delta[b1][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[a0][b0] * delta[b1][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[a0][b0] * delta[b1][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[a0][b0] * delta[b1][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[a0][b0] * delta[b1][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[a0][b0] * delta[b1][d1] * delta[c0][grad_cart_ind] * delta[c1][d0] + delta[a0][b1] * delta[b0][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[a0][b1] * delta[b0][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[a0][b1] * delta[b0][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[a0][b1] * delta[b0][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[a0][b1] * delta[b0][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[a0][b1] * delta[b0][d1] * delta[c0][grad_cart_ind] * delta[c1][d0] + delta[a0][c0] * delta[b0][b1] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[a0][c1] * delta[b0][b1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[a0][d0] * delta[b0][b1] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[a0][d0] * delta[b0][b1] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[a0][d1] * delta[b0][b1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[a0][d1] * delta[b0][b1] * delta[c0][grad_cart_ind] * delta[c1][d0])
@@ -11094,31 +10623,16 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -11170,7 +10684,7 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -11179,10 +10693,13 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -11224,11 +10741,6 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -11237,7 +10749,7 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -11274,16 +10786,16 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -11336,11 +10848,10 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * (-0.125) * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[a0][b0] * delta[b1][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[a0][b0] * delta[b1][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[a0][b0] * delta[b1][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[a0][b0] * delta[b1][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[a0][b0] * delta[b1][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[a0][b0] * delta[b1][d1] * delta[c0][grad_cart_ind] * delta[c1][d0] + delta[a0][b1] * delta[b0][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[a0][b1] * delta[b0][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[a0][b1] * delta[b0][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[a0][b1] * delta[b0][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[a0][b1] * delta[b0][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[a0][b1] * delta[b0][d1] * delta[c0][grad_cart_ind] * delta[c1][d0] + delta[a0][c0] * delta[b0][b1] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[a0][c0] * delta[b0][d0] * delta[b1][d1] * delta[c1][grad_cart_ind] + delta[a0][c0] * delta[b0][d1] * delta[b1][d0] * delta[c1][grad_cart_ind] + delta[a0][c1] * delta[b0][b1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[a0][c1] * delta[b0][d0] * delta[b1][d1] * delta[c0][grad_cart_ind] + delta[a0][c1] * delta[b0][d1] * delta[b1][d0] * delta[c0][grad_cart_ind] + delta[a0][d0] * delta[b0][b1] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[a0][d0] * delta[b0][b1] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[a0][d0] * delta[b0][c0] * delta[b1][d1] * delta[c1][grad_cart_ind] + delta[a0][d0] * delta[b0][c1] * delta[b1][d1] * delta[c0][grad_cart_ind] + delta[a0][d0] * delta[b0][d1] * delta[b1][c0] * delta[c1][grad_cart_ind] + delta[a0][d0] * delta[b0][d1] * delta[b1][c1] * delta[c0][grad_cart_ind] + delta[a0][d1] * delta[b0][b1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[a0][d1] * delta[b0][b1] * delta[c0][grad_cart_ind] * delta[c1][d0] + delta[a0][d1] * delta[b0][c0] * delta[b1][d0] * delta[c1][grad_cart_ind] + delta[a0][d1] * delta[b0][c1] * delta[b1][d0] * delta[c0][grad_cart_ind] + delta[a0][d1] * delta[b0][d0] * delta[b1][c0] * delta[c1][grad_cart_ind] + delta[a0][d1] * delta[b0][d0] * delta[b1][c1] * delta[c0][grad_cart_ind])
@@ -11528,31 +11039,16 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -11604,7 +11100,7 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -11613,10 +11109,13 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -11658,11 +11157,6 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -11671,7 +11165,7 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -11708,16 +11202,16 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -11770,11 +11264,10 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * 0.25 * S1 * inv_S4 * inv_S4 * inv_S4 * (
                                     (delta[b1][c0] * delta[c1][grad_cart_ind] * delta[d0][d1] + delta[b1][c1] * delta[c0][grad_cart_ind] * delta[d0][d1] + delta[b1][d0] * delta[c0][d1] * delta[c1][grad_cart_ind] + delta[b1][d0] * delta[c0][grad_cart_ind] * delta[c1][d1] + delta[b1][d1] * delta[c0][d0] * delta[c1][grad_cart_ind] + delta[b1][d1] * delta[c0][grad_cart_ind] * delta[c1][d0]) * (PA_0 * PQ[b0] + PB_0 * PQ[a0])
@@ -12083,31 +11576,16 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -12159,7 +11637,7 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -12168,10 +11646,13 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -12213,11 +11694,6 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -12226,7 +11702,7 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -12263,16 +11739,16 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -12325,11 +11801,10 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     delta[d1][grad_cart_ind] * (PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1 * QD_0)
@@ -12472,31 +11947,16 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -12548,7 +12008,7 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -12557,10 +12017,13 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -12602,11 +12065,6 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -12615,7 +12073,7 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -12652,16 +12110,16 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -12715,11 +12173,10 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[3] * 2.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     + PQ[a0] * PQ[b0] * PQ[b1] * QC_0 * QC_1 * QC_x * QD_0 * QD_1
@@ -12916,31 +12373,16 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -12992,7 +12434,7 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -13001,10 +12443,13 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -13046,11 +12491,6 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -13059,7 +12499,7 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -13096,16 +12536,16 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -13159,11 +12599,10 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * 0.5 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     (delta[c0][c1] * delta[d1][grad_cart_ind] + delta[c0][d1] * delta[c1][grad_cart_ind] + delta[c0][grad_cart_ind] * delta[c1][d1]) * (PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * 2.0 + PA_0 * PQ[b0] * PQ[b1] * QD_0 + PB_0 * PQ[a0] * PQ[b1] * PQ[d0] * 2.0 + PB_0 * PQ[a0] * PQ[b1] * QD_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[d0] * 2.0 + PB_1 * PQ[a0] * PQ[b0] * QD_0)
@@ -13418,31 +12857,16 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -13494,7 +12918,7 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -13503,10 +12927,13 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -13548,11 +12975,6 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -13561,7 +12983,7 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -13598,16 +13020,16 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -13661,11 +13083,10 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     delta[d1][grad_cart_ind] * (PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * QD_0 + PA_0 * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0 + PA_0 * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * QD_0 + PA_0 * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * QC_1 + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * QC_1 * QD_0 + PB_0 * PQ[a0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0 + PB_0 * PQ[a0] * PQ[b1] * PQ[c1] * QC_0 * QD_0 + PB_0 * PQ[a0] * PQ[b1] * PQ[d0] * QC_0 * QC_1 + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[c1] * QD_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * PQ[d0] * QC_1 + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * QC_1 * QD_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[c1] * PQ[d0] * QC_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[c1] * QC_0 * QD_0 + PB_1 * PQ[a0] * PQ[b0] * PQ[d0] * QC_0 * QC_1)
@@ -13788,31 +13209,16 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -13864,7 +13270,7 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -13873,10 +13279,13 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -13918,11 +13327,6 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -13931,7 +13335,7 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -13968,16 +13372,16 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -14031,11 +13435,10 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[4] * 2.0 * S1 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     + PA_0 * PB_0 * PB_1 * PQ[c0] * PQ[c1] * PQ[d0] * PQ[d1] * QC_x
@@ -14160,31 +13563,16 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -14236,7 +13624,7 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -14245,10 +13633,13 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -14290,11 +13681,6 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -14303,7 +13689,7 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -14340,16 +13726,16 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -14404,11 +13790,10 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[5] * 0.5 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     (delta[c1][d0] * delta[d1][grad_cart_ind] + delta[c1][d1] * delta[d0][grad_cart_ind] + delta[c1][grad_cart_ind] * delta[d0][d1]) * (PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * (-1.0) + PB_0 * PQ[a0] * PQ[b1] * PQ[c0] * (-1.0) + PB_1 * PQ[a0] * PQ[b0] * PQ[c0] * (-1.0))
@@ -14681,31 +14066,16 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -14757,7 +14127,7 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -14766,10 +14136,13 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -14811,11 +14184,6 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -14824,7 +14192,7 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -14861,16 +14229,16 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -14925,11 +14293,10 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[5] * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     delta[d1][grad_cart_ind] * (PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * QD_0 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * PQ[d0] * QC_1 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c0] * QC_1 * QD_0 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * PQ[d0] * QC_0 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[c1] * QC_0 * QD_0 + PQ[a0] * PQ[b0] * PQ[b1] * PQ[d0] * QC_0 * QC_1)
@@ -15015,31 +14382,16 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
@@ -15091,7 +14443,7 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t skip_thread_block, i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
     __shared__ uint32_t a0, c0, c1;
     __shared__ uint32_t d_cart_inds[6][2];
@@ -15100,10 +14452,13 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
     const uint32_t ik = blockIdx.x;
 
     double d2 = 1.0;
-    double grad_i_x = 0.0, grad_k_x = 0.0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
+        count_i = 0;
+        count_k = 0;
 
         d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
         d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
@@ -15145,11 +14500,6 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
             c1 = d_cart_inds[k % 6][1];
 
         }
-        else
-        {
-            count_i = 0;
-            count_k = 0;
-        }
     }
 
     __syncthreads();
@@ -15158,7 +14508,7 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
     {
         const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
-        // to avoid memory hazard
+        // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
@@ -15195,16 +14545,16 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
 
         }
 
-        if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
-
-        __syncthreads();
 
         for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik < pair_inds_count_for_K_pd) && (j < count_i) && (l < count_k) && (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) > eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
             {
+                break;
+            }
+
                 const auto l_prim = D_inds_K_dd[displ_k + l];
 
                 const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
@@ -15262,11 +14612,10 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
                 const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                 const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                double eri_ijkl;
 
                 // lambda grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                                 + F8_t[5] * 2.0 * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
                                     + PA_0 * PQ[b0] * PQ[b1] * PQ[c0] * PQ[c1] * PQ[d0] * QC_x * QD_1 * (-1.0)
@@ -15584,31 +14933,16 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
 
                         );
 
-                grad_k_x -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
-            }
-            else
-            {
-                // indicator for early exit for thread block
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == m + 1) break;
+                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
-    if (ik < pair_inds_count_for_K_pd)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_k_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pd))
     {
-        grad_k_x = 0.0;
+        double grad_k_x = 0.0;
 
         for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
