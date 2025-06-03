@@ -98,8 +98,9 @@ class TestCrfOperatorsFD:
                     rsp_func_plus = qrf_result_plus[('qrf', wb, wc)]
                     rsp_func_minus = qrf_result_minus[('qrf', wb, wc)]
 
-                    rsp_func_fd = (rsp_func_plus - rsp_func_minus) / (2.0 *
-                                                                      delta_ef)
+                    # the minus sign is to account for the -mu operator
+                    rsp_func_fd = (-1.0) * (rsp_func_plus -
+                                            rsp_func_minus) / (2.0 * delta_ef)
 
                     # CRF
 

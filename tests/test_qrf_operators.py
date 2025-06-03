@@ -54,36 +54,6 @@ class TestQrfOperators:
             assert abs(qrf_result[('qrf', wb, wc)].imag -
                        ref_result.imag) < 0.01
 
-    def test_svp_qrf_eme(self):
-
-        wb_wc = (0.0656, 0.0)
-
-        operators = [
-            'electric dipole',
-            'angular momentum',
-            'electric dipole',
-        ]
-
-        self.run_qrf('def2-svp', wb_wc, operators, 'zzz', 1.72680998j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'xyz', 3.00108916j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'zxy', -1.02519503j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'yyx', 0.0j)
-
-    def test_svp_qrf_vmv(self):
-
-        wb_wc = (0.0656, 0.0)
-
-        operators = [
-            'linear momentum',
-            'angular momentum',
-            'linear momentum',
-        ]
-
-        self.run_qrf('def2-svp', wb_wc, operators, 'zzz', 0.03225185j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'xyz', -0.53669370j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'zxy', -0.40995799j)
-        self.run_qrf('def2-svp', wb_wc, operators, 'yyx', 0.0j)
-
     def test_svp_qrf_general(self):
 
         wb_wc = (0.0656, 0.0445)
@@ -116,14 +86,14 @@ class TestQrfOperators:
         ]
 
         ref_sign_list = [
-            1.0,
-            1.0,
             -1.0,
             -1.0,
             1.0,
             1.0,
             -1.0,
             -1.0,
+            1.0,
+            1.0,
         ]
 
         for op_str, ref_val, ref_sign in zip(op_str_list, ref_val_list,

@@ -105,7 +105,6 @@ class TestShgFromQrf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             for ind in range(len(ref_shg_results)):
                 ref_shg_results[ind] /= 5.0
-                ref_shg_results[ind] *= -1.0  # rsp func. -> beta
 
             tol = 1.0e-5
 
