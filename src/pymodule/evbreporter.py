@@ -52,10 +52,7 @@ class EvbReporter():
         self,
         energy_file,
         report_interval,
-        reactant_int_sys,
-        product_int_sys,
-        reactant_pes_sys,
-        product_pes_sys,
+        systems,
         topology,
         lambda_val,
         outputstream,
@@ -82,36 +79,11 @@ class EvbReporter():
         self.report_interval = report_interval
 
         self.lambda_val = lambda_val
-        self.simulation_dicts = {}
 
-        self.simulation_dicts.update({
-            'reactant_pes': {
-                "simulation":
-                mmapp.Simulation(topology, reactant_pes_sys,
-                                 mm.VerletIntegrator(1)),
-                "forcegroups":
-                EvbForceGroup.pes_forcegroups(),
-            },
-            'product_pes': {
-                "simulation":
-                mmapp.Simulation(topology, product_pes_sys,
-                                 mm.VerletIntegrator(1)),
-                "forcegroups":
-                EvbForceGroup.pes_forcegroups(),
-            },
-            'reactant_integration': {
-                "simulation":
-                mmapp.Simulation(topology, reactant_int_sys,
-                                 mm.VerletIntegrator(1)),
-                "forcegroups":-1,
-            },
-            'product_integration': {
-                "simulation":
-                mmapp.Simulation(topology, product_int_sys,
-                                 mm.VerletIntegrator(1)),
-                "forcegroups":-1,
-            },
-        })
+        self.simulations = {}
+        for name, system in systems.items():
+            sim = mmapp.Simulation(topology, system, mm.VerletIntegrator(1))
+            self.simulations.update({name: sim})
 
         if not append:
             header = "Lambda, reactant PES, product PES, reactant integration, product integration, Em \n"
@@ -155,9 +127,25 @@ class EvbReporter():
             self.pro_FG_out = open(pro_fg, 'a' if append else 'w')
 
             if not append:
-                self.FG_out.write(EvbForceGroup.get_header())
-                self.rea_FG_out.write(EvbForceGroup.get_header())
-                self.pro_FG_out.write(EvbForceGroup.get_header())
+                fg_header = EvbForceGroup.get_header()
+                # system_names = 
+                # decomps = 
+                # fg_header += ", "
+                # fg_header += ", ".join(decomps)
+                self.FG_out.write(fg_header)
+                self.rea_FG_out.write(fg_header)
+                self.pro_FG_out.write(fg_header)
+        self.decomp_names = [s for s in systems if 'decomp' in str(s)]
+
+        if len(self.decomp_names)>0:
+            self.report_decomp = True
+            dir = '/'.join(energy_file.split('/')[:-1])
+            filename = dir + '/Decompositions.csv'
+            self.decomp_out = open(filename,'a' if append else 'w')
+            if not append:
+                header = ", ".join(self.decomp_names)
+                header+='\n'
+                self.decomp_out.write(header)
 
     def __del__(self):
         self.E_out.close()
@@ -179,20 +167,21 @@ class EvbReporter():
             return {'steps': steps, 'periodic': True, 'include': include}
 
     def report(self, simulation, state):
-        E = []
-        for simulation_dict in self.simulation_dicts.values():
+        E = {}
+        for name, sim in self.simulations.items():
             e = self._get_potential_energy(
-                simulation_dict['simulation'],
-                simulation_dict['forcegroups'],
+                sim,
                 state=state,
             )
-            E.append(e)
-        E1_pes = E[0]
-        E2_pes = E[1]
-        E1_int = E[2]
-        E2_int = E[3]
+            E.update({name:e})
+        E1_pes = E['reactant']
+        E2_pes = E['product']
+        E1_int = E[0]
+        E2_int = E[1]
 
         Em = E1_pes * (1 - self.lambda_val) + E2_pes * self.lambda_val
+        line = f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e} \n"
+        self.E_out.write(line)
 
         # Em_dif = abs(Em_int - E1_int * (1 - self.lambda_val) +
         #              E2_int * self.lambda_val)
@@ -201,20 +190,14 @@ class EvbReporter():
         #     self.ostream.print_info(str(Em_dif))
         #     self.ostream.flush()
         # assert  <1e-2
-        line = f"{self.lambda_val}"
-        for e in E:
-            line += f", {e:.10e}"
-        line += f", {Em} \n"
-
-        self.E_out.write(line)
 
         Em_fg = []
         E1_fg = []
         E2_fg = []
         if self.report_forcegroups:
             line = ""
-            reasim = self.simulation_dicts['reactant_pes']['simulation']
-            prosim = self.simulation_dicts['product_pes']['simulation']
+            reasim = self.simulations['reactant']
+            prosim = self.simulations['product']
             for fg in EvbForceGroup:
                 em = self._get_potential_energy(simulation, fg)
                 e1 = self._get_potential_energy(reasim, fg)
@@ -262,60 +245,14 @@ class EvbReporter():
                 line += f", {velocities[i][0].value_in_unit(nmperps):.5e}, {velocities[i][1].value_in_unit(nmperps):.5e}, {velocities[i][2].value_in_unit(nmperps):.5e}"
             line += '\n'
             self.v_out.write(line)
-
-        # if self.debug:
-        #     # em = (1 - l) * E1 + l * E2
-        #     pes_recalc = (1 - self.Lambda) * E1_pes + self.Lambda * E2_pes
-        #     int_recalc = (1 - self.Lambda) * E1_int + self.Lambda * E2_int
-        #     if abs(pes_recalc - Em_pes) > 1e-1:
-        #         self.ostream.print_info(
-        #             f"Em pes recalculation is not consistent: {pes_recalc:.3f}(recalc)!={Em_pes:.3f}(em)"
-        #         )
-
-        #     if abs(int_recalc - Em_int) > 1e-1:
-        #         self.ostream.print_info(
-        #             f"Em int recalculation is not consistent: {int_recalc:.3f}(recalc)!={Em_int:.3f}(em)"
-        #         )
-
-        #     if self.report_forcegroups:
-        #         Em_pes_fg = 0
-        #         E1_pes_fg = 0
-        #         E2_pes_fg = 0
-        #         Em_int_fg = 0
-        #         E1_int_fg = 0
-        #         E2_int_fg = 0
-        #         for em, e1, e2, fg in zip(Em_fg, E1_fg, E2_fg, EvbForceGroup):
-        #             em_rec = (1 - self.Lambda) * e1 + self.Lambda * e2
-        #             # em = (1 - l) * E1 + l * E2 per forcegroup
-        #             if abs(em_rec - em) > 1e-2:
-        #                 self.ostream.print_info(
-        #                     f"em recalculation for force group {fg.name}({fg.value}) is not consistent: {em_rec:.3f}(recalc) != {em:.3f}(em)"
-        #                 )
-
-        #             if fg.value in EvbForceGroup.pes_force_groups():
-        #                 Em_pes_fg += em
-        #                 E1_pes_fg += e1
-        #                 E2_pes_fg += e2
-        #             if fg.value in EvbForceGroup.integration_force_groups():
-        #                 Em_int_fg += em
-        #                 E1_int_fg += e1
-        #                 E2_int_fg += e2
-
-        #         # check if forcegroups add up to E1, E2 and Em
-        #         labels = [
-        #             "Em_pes", "E1_pes", "E2_pes", "Em_int", "E1_int", "E2_int"
-        #         ]
-        #         fg_recalc = [
-        #             Em_pes_fg, E1_pes_fg, E2_pes_fg, Em_int_fg, E1_int_fg,
-        #             E2_int_fg
-        #         ]
-        #         original = [Em_pes, E1_pes, E2_pes, Em_int, E1_int, E2_int]
-        #         for label, recalc, orig in zip(labels, fg_recalc, original):
-        #             if abs(recalc - orig) > 1e-1:
-        #                 self.ostream.print_info(
-        #                     f"Force group summing {label} energy is not consistent: {recalc:.3f}(recalc) != {orig:.3f}(original)"
-        #                 )
-        #     self.ostream.flush()
+        
+        if self.report_decomp:
+            line = ""
+            for name in self.decomp_names:
+                line += f"{E[name]:.10e}, "
+            line= line[:-2]
+            line+= '\n'
+            self.decomp_out.write(line)
 
     @staticmethod
     def _get_potential_energy(simulation, forcegroups=None, state=None):
@@ -324,22 +261,17 @@ class EvbReporter():
         """
         # return 0
         if state is not None:
-            simulation.context.setState(state)
+            try:
+                simulation.context.setState(state)
+            except:
+                # Decomposition systems which have the barostat removed will throw an error on the above case
+                simulation.context.setPositions(state.getPositions())
 
         if forcegroups is None:
             return simulation.context.getState(
                 getEnergy=True, ).getPotentialEnergy().value_in_unit(
                     mm.unit.kilojoules_per_mole)
         else:
-            # if isinstance(forcegroups, str):
-            #     if forcegroups == 'pes':
-            #         forcegroups = EvbForceGroup.pes_force_groups()
-            #     elif forcegroups == 'int':
-            #         forcegroups = EvbForceGroup.integration_force_groups()
-            #     else:
-            #         raise ValueError(
-            #             f"Unknown force group: {forcegroups}. Use 'pes' or 'int'."
-            #         )
             if isinstance(forcegroups, EvbForceGroup):
                 forcegroups = set([forcegroups.value] )
 

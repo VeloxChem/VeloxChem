@@ -614,10 +614,7 @@ class EvbFepDriver():
         evb_reporter = EvbReporter(
             str(folder / f"Energies{name_suffix}.csv"),
             self.write_step,
-            self.systems[0],
-            self.systems[1],
-            self.systems['reactant'],
-            self.systems['product'],
+            self.systems,
             self.topology,
             l,
             self.ostream,

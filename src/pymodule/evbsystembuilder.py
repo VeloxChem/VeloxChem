@@ -36,6 +36,7 @@ import typing
 import copy
 import math
 import sys
+import itertools
 from enum import Enum, auto
 
 from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, Point
@@ -344,7 +345,7 @@ class EvbSystemBuilder():
 
         if self.solvent:
             #todo what about the box, and especially giving it to the solvator
-            box = self._add_solvent(system, system_mol, self.solvent, topology,
+            box= self._add_solvent(system, system_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
                                     box)
 
@@ -935,11 +936,12 @@ class EvbSystemBuilder():
                 for ang_id in solvent_ff.angles.keys():
                     solvent_ff.angles[ang_id] = water_model['angles']
 
+            self.solvent_atom_ids = []
             for i in range(solvent_count):
 
                 solvent_residue = topology.addResidue(name=resname,
                                                       chain=solvent_chain)
-                solvent_atoms = []
+                local_solvent_atoms = []
                 # Loop over all atoms in the solvent molecule
                 for j in range(num_solvent_atoms_per_molecule):
                     # Figure out the element of the atom
@@ -948,7 +950,8 @@ class EvbSystemBuilder():
                     # add the atom to the topology
                     solvent_atom = topology.addAtom(name, mm_element,
                                                     solvent_residue)
-                    solvent_atoms.append(solvent_atom)
+                    local_solvent_atoms.append(solvent_atom)
+                    self.solvent_atom_ids.append(solvent_atom.index)
                     # Add the atom as a particle to the system
                     system.addParticle(mm_element.mass)
                     solvent_system_atom_count += 1
@@ -956,7 +959,7 @@ class EvbSystemBuilder():
 
                 # add all bonded interactions in this molecule
                 for key, bond in solvent_ff.bonds.items():
-                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    atom_ids = self._key_to_id(key, local_solvent_atoms)
                     self._add_bond(
                         harmonic_bond_force,
                         atom_ids,
@@ -965,7 +968,7 @@ class EvbSystemBuilder():
                     )
 
                 for key, angle in solvent_ff.angles.items():
-                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    atom_ids = self._key_to_id(key, local_solvent_atoms)
                     self._add_angle(
                         harmonic_angle_force,
                         atom_ids,
@@ -974,10 +977,10 @@ class EvbSystemBuilder():
                     )
 
                 for key, dihedral in solvent_ff.dihedrals.items():
-                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    atom_ids = self._key_to_id(key, local_solvent_atoms)
                     self._add_torsion(fourier_force, dihedral, atom_ids)
                 for key, dihedral in solvent_ff.impropers.items():
-                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    atom_ids = self._key_to_id(key, local_solvent_atoms)
                     self._add_torsion(
                         fourier_imp_force,
                         dihedral,
@@ -1012,8 +1015,8 @@ class EvbSystemBuilder():
                                 qq = exceptions[key]["qq"]
 
                                 nb_force.addException(
-                                    solvent_atoms[i].index,
-                                    solvent_atoms[j].index,
+                                    local_solvent_atoms[i].index,
+                                    local_solvent_atoms[j].index,
                                     qq,
                                     sigma,
                                     epsilon,
@@ -1040,6 +1043,7 @@ class EvbSystemBuilder():
             self.ostream.print_info(
                 f"Added {solvent_nb_atom_count} atoms to the nonbonded force and {solvent_system_atom_count} atoms to the system"
             )
+            self.ostream.flush()
         return box
 
     def _add_barostat(self, system):
@@ -1108,11 +1112,12 @@ class EvbSystemBuilder():
         self._add_reaction_forces(rea_system, 0, pes=True)
         self._add_reaction_forces(pro_system, 1, pes=True)
         if self.decompose_bonded is not None:
-            self._add_bonded_decompositions(rea_system, 0)
-            self._add_bonded_decompositions(pro_system, 1)
+            # self._add_bonded_decompositions(rea_system, 0)
+            # self._add_bonded_decompositions(pro_system, 1)
+            pass
         if self.decompose_nb is not None:
-            self._add_nb_decompositions(rea_system)
-            self._add_nb_decompositions(pro_system)
+            systems.update(self._add_nb_decompositions(rea_system,'rea'))
+            systems.update(self._add_nb_decompositions(pro_system,'pro'))
         systems['reactant'] = rea_system
         systems['product'] = pro_system
         return systems
@@ -1179,17 +1184,47 @@ class EvbSystemBuilder():
 
         return system
 
-    def _add_nb_decompositions(self, system):
+    def _add_nb_decompositions(self, system, state_name):
+        systems = {}
         nbforce = [
             force for force in system.getForces()
             if isinstance(force, mm.NonbondedForce)
         ][0]
-        fg_ind = EvbForceGroup.LJDECOMP1.value
 
-        assert len(
-            self.decompose_nb
-        ) < 4, "Can only decompose the nonbonded interactions in 3 groups"
+        # forces for solvent solvent interactions
+        solcoul = copy.deepcopy(nbforce)
+        sollj = copy.deepcopy(nbforce)
+        
+        # remove all nonbonded parameters for the compound
+        for i, _ in enumerate(self.reactant.atoms.values()):
+            atom_id = self.reaction_atoms[i].index
+            solcoul.setParticleParameters(atom_id, 0, 1, 0)
+            sollj.setParticleParameters(atom_id, 0, 1, 0)
+        
+        #set the charges or epsilons of all solvent atoms to 0
+        for atom_id in self.solvent_atom_ids:
+            charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
+            sollj.setParticleParameters(atom_id, 0, sigma, epsilon)
+            solcoul.setParticleParameters(atom_id, charge, 1, 0)
+        
+        solcoul.setName('Coul solvent')
+        coul_system = copy.deepcopy(system)
+        self._remove_forces(coul_system)
+        coul_system.addForce(solcoul)
 
+        sollj.setName('LJ solvent')
+        lj_system = copy.deepcopy(system)
+        self._remove_forces(lj_system)
+        lj_system.addForce(sollj)
+
+        systems.update({
+            f"decomp_{state_name}_solvent_Coul": coul_system,
+            f"decomp_{state_name}_solvent_LJ": lj_system
+        })
+
+        #Remove all solvent solvent interactions in the other forces
+
+        nbforce = copy.deepcopy(nbforce)
         for to_decompose in self.decompose_nb:
 
             lj_dec = copy.deepcopy(nbforce)
@@ -1200,20 +1235,45 @@ class EvbSystemBuilder():
                 charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
 
                 if i in to_decompose:
-                    lj_dec.setParticleParameters(atom_id, 0, sigma, epsilon)
-                    coul_dec.setParticleParameters(atom_id, charge, 1, 0)
-                else:
-                    #If particle isn't listed in the decompositions, just set all the parameters to 0
-                    lj_dec.setParticleParameters(atom_id, 0, 0, 0)
-                    coul_dec.setParticleParameters(atom_id, 0, 0, 0)
-            lj_dec.setForceGroup(fg_ind)
-            fg_ind += 1
-            coul_dec.setForceGroup(fg_ind)
-            fg_ind += 1
-            system.addForce(lj_dec)
-            system.addForce(coul_dec)
+                    # Setting all system-solvent interactions as exceptions and defaulting everything to 0 is easier 
+                    # than setting all solvent-solvent interactions as exceptions with original parameters
+                    for solvent_atom in self.solvent_atom_ids:
+                        solv_charge, solv_sigma, solv_epsilon = nbforce.getParticleParameters(solvent_atom)
+                        qq = charge*solv_charge
+                        sig = 0.5 * (solv_sigma + sigma)
+                        eps = math.sqrt((epsilon*solv_epsilon).value_in_unit(mmunit.kilojoule_per_mole**2))
+                        lj_dec.addException(atom_id, solvent_atom, 0, sig, eps)
+                        coul_dec.addException(atom_id, solvent_atom, qq, 1,0)
+                
+                #Everything is handeled by the exceptions, so the default parameters can be set to 0
+                lj_dec.setParticleParameters(atom_id, 0, 1, 0)
+                coul_dec.setParticleParameters(atom_id, 0, 1, 0)
 
-        return system
+            # Since all system-solvent interactions are added as exceptions, all the parameters can be set to 0
+            for solvent_id in self.solvent_atom_ids:
+                lj_dec.setParticleParameters(solvent_id, 0, 1, 0)
+                coul_dec.setParticleParameters(solvent_id, 0, 1, 0)
+            name = "-".join(str(x) for x in to_decompose)
+            
+            coul_system = copy.deepcopy(system)
+            self._remove_forces(coul_system)
+            coul_system.addForce(coul_dec)
+
+            lj_system = copy.deepcopy(system)
+            self._remove_forces(lj_system)
+            lj_system.addForce(lj_dec)
+
+            systems.update({
+                f"decomp_{state_name}_{name}_Coul": coul_system,
+                f"decomp_{state_name}_{name}_LJ": lj_system
+            })
+
+        return systems
+
+    @staticmethod
+    def _remove_forces(system):
+        for i in range(system.getNumForces()):
+            system.removeForce(0)
 
     def _add_E_field(self, system, E_field):
 
@@ -1864,19 +1924,8 @@ class EvbForceGroup(Enum):
     PDB = auto()  # Bonded forces added from the PDB
     CENTROID = auto()
 
-    #Forcegroups to hold decomposed forces in
-    LJDECOMP1 = auto()
-    COULDECOMP1 = auto()
-    LJDECOMP2 = auto()
-    COULDECOMP2 = auto()
-    LJDECOMP3 = auto()
-    COULDECOMP3 = auto()
-    DEBUG1 = auto()  # Debugging force group 1
-    DEBUG2 = auto()  # Debugging force group 2
-
     @classmethod
     def pes_forcegroups(cls):
-        max_ind = cls.LJDECOMP1.value
         return set(range(1, max_ind))
 
     @classmethod

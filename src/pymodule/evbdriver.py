@@ -576,10 +576,8 @@ class EvbDriver():
         if isinstance(constraints, dict):
             constraints = [constraints]
 
-
-        
         if Lambda is None:
-            if configurations[0].get("debug",False):
+            if configurations[0].get("debug", False):
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
             else:
                 Lambda = np.linspace(0, 0.1, 6)
@@ -595,7 +593,6 @@ class EvbDriver():
             0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
         Lambda = [round(lam, 3) for lam in Lambda]
         self.Lambda = Lambda
-
 
         #Per configuration
         for conf in self.configurations:
@@ -621,6 +618,11 @@ class EvbDriver():
                 str(data_folder_path / "reactant_struct.xyz"))
             self.product.molecule.write_xyz_file(
                 str(data_folder_path / "product_struct.xyz"))
+
+            self.save_forcefield(
+                self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
+            self.save_forcefield(
+                self.product, str(data_folder_path / f"product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -665,8 +667,7 @@ class EvbDriver():
             self.update_options_json(dump_conf, conf)
             self.update_options_json(
                 {
-                    "Lambda":
-                    Lambda,
+                    "Lambda": Lambda,
                     # "integration forcegroups":
                     # list(EvbForceGroup.integration_force_groups()),
                     # "pes forcegroups":
@@ -748,18 +749,14 @@ class EvbDriver():
 
         path = Path().cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
-        for lam in self.Lambda:
-            file_path = str(path / f"{lam:.3f}_sys.xml")
-            with open(file_path, mode="w", encoding="utf-8") as output:
-                output.write(mm.XmlSerializer.serialize(systems[lam]))
-
-        file_path = str(path / f"reactant_sys.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems['reactant']))
-
-        file_path = str(path / f"product_sys.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems['product']))
+        self.ostream.flush()
+        for name,system in systems.items():
+            if isinstance(name,float) or isinstance(name,int):
+                filename = f"{name:.3f}_sys.xml"
+            else:
+                filename = f"{name}_sys.xml"
+            with open(path/filename, mode="w", encoding="utf-8") as output:
+                output.write(mm.XmlSerializer.serialize(system))
 
     def load_systems_from_xml(self, folder: str):
         """Load the systems from xml files in the given folder.
@@ -783,7 +780,6 @@ class EvbDriver():
 
     def run_FEP(
         self,
-        saved_frames_on_crash=None,
         platform=None,
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
@@ -803,8 +799,6 @@ class EvbDriver():
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver(ostream=self.ostream)
-            if saved_frames_on_crash is not None:
-                FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
                 Lambda=self.Lambda,
                 configuration=conf,
