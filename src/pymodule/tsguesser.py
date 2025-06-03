@@ -133,7 +133,6 @@ class TransitionStateGuesser():
         self.evb_drv.build_systems(
             ['ts_guesser'],
             self.lambda_vec,
-            save_output=False,
             constraints=constraints,
         )
         self.ostream.print_blank()
@@ -200,14 +199,19 @@ class TransitionStateGuesser():
 
     #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
     #todo add option for recalculating charges from ts_mol
-    def get_ts_ffgen(self, reaffgen=None, proffgen=None, l=0.5, ts_mol=None, recalculate = True):
+    def get_ts_ffgen(self,
+                     reaffgen=None,
+                     proffgen=None,
+                     l=0.5,
+                     ts_mol=None,
+                     recalculate=True):
         if reaffgen is None:
             reaffgen = self.evb_drv.reactant
         if proffgen is None:
             proffgen = self.evb_drv.product
         if ts_mol is None:
             ts_mol = self.molecule
-            
+
         if recalculate:
             assert ts_mol is not None, "Please provide a molecule, or turn of recalculation"
         ts_ffgen = MMForceFieldGenerator()
@@ -277,7 +281,7 @@ class TransitionStateGuesser():
         return ts_params
 
     @staticmethod
-    def _mix_dihedrals(rea_dihedrals, pro_dihedrals, l,mol):
+    def _mix_dihedrals(rea_dihedrals, pro_dihedrals, l, mol):
         ts_params = {}
         for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
             for id, param in dict.items():
@@ -293,7 +297,7 @@ class TransitionStateGuesser():
         return ts_params
 
     @staticmethod
-    def _merge_atoms(rea_atoms, pro_atoms, l,mol):
+    def _merge_atoms(rea_atoms, pro_atoms, l, mol):
         atoms = {}
         for i, (rea_atom, pro_atom) in enumerate(
                 zip(rea_atoms.values(), pro_atoms.values())):
