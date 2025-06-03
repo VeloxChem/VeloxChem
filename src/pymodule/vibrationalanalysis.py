@@ -1112,6 +1112,8 @@ class VibrationalAnalysis:
                 broadening_type='lorentzian',
                 broadening_value=20,
                 scaling_factor=1.0,
+                xmin=0.0,
+                xmax=4000.0,
                 invert_axes=False,
                 ax=None):
         """
@@ -1135,22 +1137,22 @@ class VibrationalAnalysis:
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
 
-        ax.set_xlabel('Wavenumber [cm$^{-1}$]')
-        ax.set_ylabel('IR intensity [km/mol]')
-        ax.set_title("IR Spectrum")
+        ax.set_xlabel('Wavenumber [cm$^{-1}$]')#, fontsize="xx-large")
+        ax.set_ylabel('IR intensity [km/mol]')#, fontsize="xx-large")
+        #ax.set_title("IR Spectrum")
 
         ax2 = ax.twinx()
 
-        freqs = vib_results['vib_frequencies']
+        freqs = vib_results['vib_frequencies'] * scaling_factor # JOSE
         ir_ints = vib_results['ir_intensities']
         if broadening_type.lower() == 'lorentzian':
-            x, y = self.lorentzian_broadening(freqs, ir_ints, 0, 4000, 1,
+            x, y = self.lorentzian_broadening(freqs, ir_ints, xmin, xmax, 1,
                                               broadening_value)
         elif broadening_type.lower() == 'gaussian':
             x, y = self.gaussian_broadening(freqs, ir_ints, 0, 4000, 1,
                                             broadening_value)
 
-        ax2.plot(x * scaling_factor,
+        ax2.plot(x,
                  y * 0.00001,
                  color="black",
                  alpha=0.9,
@@ -1162,27 +1164,36 @@ class VibrationalAnalysis:
                                     linewidth=2,
                                     label='IR intensity')
         label_spectrum = f'{broadening_type.capitalize()} '
-        label_spectrum += f'broadening ({broadening_value:.1f} ' + r'cm$^{-1}$)'
+        label_spectrum += f'broadening '#({broadening_value:.1f} ' + r'cm$^{-1}$)'
         legend_spectrum = mlines.Line2D([], [],
                                         color='black',
                                         linestyle='-',
                                         linewidth=2.5,
                                         label=label_spectrum)
         scaling = str(scaling_factor)
-        legend_scaling = mlines.Line2D([], [],
-                                       color='white',
-                                       linestyle='-',
-                                       alpha=0.0001,
-                                       label="Scaling factor: " + scaling)
-        ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
+        #legend_scaling = mlines.Line2D([], [],
+        #                               color='white',
+        #                               linestyle='-',
+        #                               alpha=0.0001,
+        #                               label="Scaling factor: " + scaling)
+        ax2.legend(handles=[legend_bars, legend_spectrum], #legend_scaling],
                    frameon=False,
                    borderaxespad=0.,
-                   loc='center left',
-                   bbox_to_anchor=(1.05, 0.5))
+                   #loc='center left',
+                   loc='upper left', #JOSE
+                   #bbox_to_anchor=(1.05, 0.5)
+                   #bbox_to_anchor=(1.00, 0.075), # JOSE
+                   #fontsize="xx-large" #JOSE
+                   )
         ax2.set_ylim(0, max(y * 0.00001) * 1.1)
         ax2.set_ylim(bottom=0)
-        ax2.set_xlim(0, 3900)
+        #ax2.set_xlim(0, 3900)
+        ax2.set_xlim(xmin, xmax)
         ax2.yaxis.set_ticks([])
+
+        # JOSE
+        #ax2.tick_params(which='major', labelsize='x-large')
+        #ax.tick_params(which='major', labelsize='x-large')
 
         for i in range(len(vib_results['vib_frequencies'])):
             ax.plot(
@@ -1200,8 +1211,8 @@ class VibrationalAnalysis:
 
         if invert_axes:
             ax.invert_xaxis()
-            ax.invert_yaxis()
-            ax2.invert_yaxis()
+            #ax.invert_yaxis()
+            #ax2.invert_yaxis()
 
     def plot_raman(self,
                    vib_results,
