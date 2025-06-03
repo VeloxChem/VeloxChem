@@ -372,7 +372,12 @@ export_orbdata(py::module &m)
         .def(py::init<const CGtoBlock &>())
         .def(py::init<const CMolecularBasis &, const CMolecule &, const int, const int>())
         .def(py::init<const CMolecularBasis &, const CMolecule &, const std::vector<int> &, const int, const int>())
-        .def("coordinates", &CGtoBlock::coordinates, "Gets vector of basis function Cartesian coordinates.")
+        .def("coordinates",
+             py::overload_cast<>(&CGtoBlock::coordinates, py::const_),
+            "Gets vector of basis function Cartesian coordinates.")
+        .def("coordinates",
+             py::overload_cast<const TPoint<double> &>(&CGtoBlock::coordinates, py::const_),
+            "Gets vector of basis function Cartesian coordinates with respect to given origin.")
         .def("exponents", &CGtoBlock::exponents, "Gets vector of basis function exponents.")
         .def("normalization_factors", &CGtoBlock::normalization_factors, "Gets vector of basis function normalization factors.")
         .def("orbital_indices", &CGtoBlock::orbital_indices, "Gets vector of orbital indices of GTOs.")

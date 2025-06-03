@@ -307,6 +307,27 @@ CGtoBlock::coordinates() const -> std::vector<TPoint<double>>
 }
 
 auto
+CGtoBlock::coordinates(const TPoint<double>& origin) const -> std::vector<TPoint<double>>
+{
+    auto o_xyz = origin.coordinates();
+    
+    std::vector<TPoint<double>> coords;
+    
+    coords.reserve(_coordinates.size());
+    
+    std::ranges::transform(_coordinates, std::back_inserter(coords),
+                           [&](const TPoint<double>& point)
+                           {
+                                auto p_xyz = point.coordinates();
+                                return TPoint<double>({p_xyz[0] - o_xyz[0],
+                                                       p_xyz[1] - o_xyz[1],
+                                                       p_xyz[2] - o_xyz[2]});
+                            });
+    
+    return coords;
+}
+
+auto
 CGtoBlock::exponents() const -> std::vector<double>
 {
     return _exponents;

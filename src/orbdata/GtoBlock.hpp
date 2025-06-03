@@ -114,6 +114,11 @@ class CGtoBlock
     /// @brief Gets vector of basis function Cartesian coordinates.
     /// @return The vector of Cartesian coordinates.
     auto coordinates() const -> std::vector<TPoint<double>>;
+    
+    /// @brief Gets vector of basis function Cartesian coordinates.
+    /// @param origin The origin of Cartesian coordinates system.
+    /// @return The vector of Cartesian coordinates.
+    auto coordinates(const TPoint<double>& origin) const -> std::vector<TPoint<double>>;
 
     /// @brief Gets vector of basis functions exponents.
     /// @return The vector of exponents.
