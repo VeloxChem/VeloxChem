@@ -90,7 +90,10 @@ class EvbSystemBuilder():
         self.sc_power: float = 1 / 6  # The exponential power in the soft core expression
         self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
+        
         self.centroid_k: float = 1000  # kj/mol nm, force constant for the position restraints
+        self.centroid_residue_radius: float = 4 # A
+
         # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
         # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
         self.coul14_scale: float = 0.833
@@ -198,6 +201,9 @@ class EvbSystemBuilder():
             "centroid_k": {
                 "type": float
             },
+            "centroid_residue_radius":{
+                "type": float
+            },
             "coul14_scale": {
                 "type": float
             },
@@ -297,6 +303,14 @@ class EvbSystemBuilder():
         self.positions = system_mol.get_coordinates_in_angstrom()
 
         if self.pdb:
+            lin_dist_expr = "k*distance(g1,g2)"
+            max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
+            centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
+            centroid_force.setName("Protein_Ligand_Centroid_force")
+            centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
+            centroid_force.addPerBondParameter("rmax")
+            centroid_force.addPerBondParameter("k")
+
             reabonds = set(self.reactant.bonds.keys())
             probonds = set(self.product.bonds.keys())
             active_bonds = reabonds ^ probonds  # Commutative set difference
@@ -310,28 +324,32 @@ class EvbSystemBuilder():
             reactant_active_positions = np.array(
                 [self.positions[i] for i in reactant_active_indices])
             rea_center = np.average(reactant_active_positions, axis=0)
-            distance = np.linalg.norm(env_center - rea_center)
-            # env_center
             pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
 
-            lin_dist_expr = "k*distance(g1,g2)"
-            # max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
-            # # centroid_force.addPerBondParameter("rmax")
-            centroid_force = mm.CustomCentroidBondForce(2, lin_dist_expr)
-            centroid_force.setName("Protein_Ligand_Centroid_force")
-            centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
-            centroid_force.addPerBondParameter("k")
+            # calculate per active reactant position the distance with all pdb positions
+            # keep the ones within a set radius, and get their residues
+            # per residue, add a stepped harmonic max distance force
+            residues = set()
+            for pdb_index  in pdb_indices:
+                pdb_pos = self.positions[pdb_index]
+                distance = np.linalg.norm(reactant_active_positions - pdb_pos,axis=1)
+                if any(distance<self.centroid_residue_radius):
+                    residues.update({pdb_atoms[pdb_index].residue})
+
             centroid_force.addGroup(reactant_active_indices)
-            centroid_force.addGroup(pdb_indices)
-            centroid_force.addBond([0, 1], [self.centroid_k])
+            for i, res in enumerate(residues):
+                res_indices = [atom.index for atom in res.atoms()]
+                res_positions = np.array(
+                    [self.positions[i] for i in res_indices])
+                res_center = np.average(res_positions,axis=0)
+                dist = np.linalg.norm(res_center-rea_center)
+                self.ostream.print_info(
+                    f"Adding centroid force to residue {res.name}({res.index}) with distance {dist:.3f}A"
+                )
+                centroid_force.addGroup(res_indices)
+                centroid_force.addBond([0, i], [self.centroid_k,dist])
 
             system.addForce(centroid_force)
-            self.ostream.print_info(
-                f"Adding linear force between c.o.m. of the reacting atoms of the ligand and c.o.m. of the protein"
-            )
-            self.ostream.print_info(
-                f"Reacting atoms: {reactant_active_indices}, c.o.m.: {rea_center}, Enzyme c.o.m.: {env_center}"
-            )
             self.ostream.flush()
 
         # Set the positions and make a box for it

@@ -94,12 +94,12 @@ class EvbFepDriver():
         self.temperature = -1
         self.pressure = -1
 
-        self.equil_NVT_steps = 20000
-        self.equil_NPT_steps = 20000
+        self.equil_NVT_steps = 50000
+        self.equil_NPT_steps = 50000
         self.sample_steps = 250000
         self.write_step = 1000
-        self.initial_equil_NVT_steps = 100000
-        self.initial_equil_NPT_steps = 100000
+        self.initial_equil_NVT_steps = 150000
+        self.initial_equil_NPT_steps = 150000
         self.step_size = 0.001  #ps
         self.equil_step_size = 0.001  #ps
         self.minimize_every_lambda: bool = False
@@ -437,7 +437,7 @@ class EvbFepDriver():
                               self.pdb_equil_temp_step))
                 temperatures.append(self.temperature)
                 self.ostream.print_info(
-                    f"Perfoming PDB warmup with T-vector {temperatures}")
+                    f"Perfoming PDB warmup with T-vector {np.array(temperatures)}")
                 self.ostream.flush()
                 for T in temperatures:
                     equil_simulation.integrator.setTemperature(T)
@@ -515,7 +515,7 @@ class EvbFepDriver():
         state_reporter = self._get_data_reporter(
             self.data_folder,
             "Data_combined.csv",
-            True,
+            append,
         )
 
         evb_reporter = self._get_evb_reporter(
