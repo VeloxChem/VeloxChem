@@ -49,6 +49,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .inputparser import parse_seq_fixed
 
 
 class ComplexResponse(LinearSolver):
@@ -301,6 +302,24 @@ class ComplexResponse(LinearSolver):
             dictionary containing solutions and kappa values when called from
             a non-linear response module.
         """
+
+        # take care of quadrupole components
+        if self.is_quadrupole(self.a_operator):
+            if isinstance(self.a_components, str):
+                self.a_components = parse_seq_fixed(self.a_components, 'str')
+        if self.is_quadrupole(self.b_operator):
+            if isinstance(self.b_components, str):
+                self.b_components = parse_seq_fixed(self.b_components, 'str')
+
+        # check operator components
+        for comp in self.a_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.a_operator),
+                'ComplexResponse: Undefined or invalid a_component')
+        for comp in self.b_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.b_operator),
+                'ComplexResponse: Undefined or invalid b_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -813,7 +832,7 @@ class ComplexResponse(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x)
+                                final_h5_fname, solution_keys, x, self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -1093,6 +1112,9 @@ class ComplexResponse(LinearSolver):
             'dipole': 'Dipole',
             'electric dipole': 'Dipole',
             'electric_dipole': 'Dipole',
+            'quadrupole': 'Quadru',
+            'electric quadrupole': 'Quadru',
+            'electric_quadrupole': 'Quadru',
             'linear_momentum': 'LinMom',
             'linear momentum': 'LinMom',
             'angular_momentum': 'AngMom',
@@ -1255,20 +1277,24 @@ class ComplexResponse(LinearSolver):
             hf = h5py.File(fname, 'a')
 
             # Write frequencies
-            xlabel = 'rsp/frequencies'
+            xlabel = self.group_label + '/frequencies'
             if xlabel in hf:
                 del hf[xlabel]
             hf.create_dataset(xlabel, data=rsp_results['frequencies'])
 
             spectrum = self.get_spectrum(rsp_results, 'au')
-            y_data = np.array(spectrum['y_data'])
 
-            if self.cpp_flag == 'absorption':
-                ylabel = 'rsp/sigma'
-            elif self.cpp_flag == 'ecd':
-                ylabel = 'rsp/delta-epsilon'
-            if ylabel in hf:
-                del hf[ylabel]
-            hf.create_dataset(ylabel, data=y_data)
+            # Write spectrum if an absorption or ecd calculation
+            # has been performed. Otherwise there is nothing to write.
+            if spectrum is not None:
+                y_data = np.array(spectrum['y_data'])
+
+                if self.cpp_flag == 'absorption':
+                    ylabel = self.group_label + '/sigma'
+                elif self.cpp_flag == 'ecd':
+                    ylabel = self.group_label + '/delta-epsilon'
+                if ylabel in hf:
+                    del hf[ylabel]
+                hf.create_dataset(ylabel, data=y_data)
 
             hf.close()

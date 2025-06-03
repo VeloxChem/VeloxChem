@@ -1488,3 +1488,39 @@ class NonlinearSolver:
             'magnetic dipole',
             'magnetic_dipole',
         ]
+
+    @staticmethod
+    def is_quadrupole(op):
+        """
+        Checks if an operator is quadrupole.
+
+        :param op:
+            The operator.
+
+        :return:
+            True if operator is quadrupole, False otherwise
+        """
+
+        return op in [
+            'quadrupole',
+            'electric quadrupole',
+            'electric_quadrupole',
+        ]
+
+    def is_valid_component(self, comp, op):
+        """
+        Checks if a component is valid.
+
+        :param comp:
+            The component.
+        :param op:
+            The operator.
+
+        :return:
+            True if component is valid, False otherwise
+        """
+
+        if self.is_quadrupole(op):
+            return comp in ['xx', 'xy', 'xz', 'yy', 'yz', 'zz']
+        else:
+            return comp in ['x', 'y', 'z']

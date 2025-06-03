@@ -631,7 +631,8 @@ class ScfDriver:
             self.ostream.print_blank()
 
         # D4 dispersion correction
-        if self.dispersion:
+        if self.dispersion or (self._dft and
+                               'D4' in self.xcfun.get_func_label().upper()):
             if self.rank == mpi_master():
                 disp = DispersionModel()
                 xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
@@ -2492,7 +2493,9 @@ class ScfDriver:
             e_a = self.molecular_orbitals.ea_to_numpy()
             occ_a = self.molecular_orbitals.occa_to_numpy()
 
-            for col in range(mo_a.shape[1]):
+            # Note: in case of linear dependency, mo_a and ref_mo_a may have
+            # different number of MOs
+            for col in range(min(mo_a.shape[1], ref_mo_a.shape[1])):
                 if np.dot(mo_a[:, col], ref_mo_a[:, col]) < 0.0:
                     mo_a[:, col] *= -1.0
 
@@ -2683,7 +2686,8 @@ class ScfDriver:
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.dispersion:
+        if self.dispersion or (self._dft and
+                               'D4' in self.xcfun.get_func_label().upper()):
             cur_str = 'Dispersion Correction           : D4'
             self.ostream.print_header(cur_str.ljust(str_width))
 
@@ -2972,7 +2976,8 @@ class ScfDriver:
             valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
-        if self.dispersion:
+        if self.dispersion or (self._dft and
+                               'D4' in self.xcfun.get_func_label().upper()):
             valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
