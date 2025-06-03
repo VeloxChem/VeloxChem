@@ -360,10 +360,7 @@ class EvbFepDriver():
                 EvbReporter(
                     str(self.run_folder / f"energies_equil_{l:.3f}.csv"),
                     self.write_step,
-                    self.systems[0],
-                    self.systems[1],
-                    self.systems['reactant'],
-                    self.systems['product'],
+                    self.systems,
                     self.topology,
                     l,
                     self.ostream,
@@ -390,7 +387,7 @@ class EvbFepDriver():
         equil_simulation.reporters.append(equil_reporter)
         if self.save_equil_traj:
             equil_traj_reporter = mmapp.XTCReporter(
-                str(self.run_folder / f"equil_traj_{l:.3f}.csv"),
+                str(self.run_folder / f"equil_traj_{l:.3f}.xtc"),
                 self.write_step,
                 enforcePeriodicBox=True,
             )
@@ -458,14 +455,20 @@ class EvbFepDriver():
                             equil_simulation, self.initial_equil_NPT_steps,
                             f"PDB warmup NPT equilibration T = {T}")
 
-            self.ostream.print_info(f"Turning off centroid force")
-            self.ostream.flush()
             centroid_force = [
                 force for force in equil_simulation.system.getForces()
                 if isinstance(force, mm.CustomCentroidBondForce)
             ][0]
-            dist = centroid_force.getBondParameters(0)[1][0]
-            centroid_force.setBondParameters(0, [0, 1], [dist, 0])
+            num_centroid_bonds = centroid_force.getNumBonds()
+            self.ostream.print_info(
+                f"Turning off centroid force on {num_centroid_bonds} bonds")
+            self.ostream.flush()
+
+            for i in range(num_centroid_bonds):
+                bond, params = centroid_force.getBondParameters(0)
+                if len(params)>1:
+                    params[1:] = [0] * (len(params) - 1)
+                centroid_force.setBondParameters(0, bond, params)
 
             if self.isobaric:
                 barostat.setFrequency(0)

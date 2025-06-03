@@ -90,7 +90,7 @@ class EvbSystemBuilder():
         self.sc_power: float = 1 / 6  # The exponential power in the soft core expression
         self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
-        self.centroid_k: float = 1000  # kj/mol nm^2, force constant for the position restraints
+        self.centroid_k: float = 1000  # kj/mol nm, force constant for the position restraints
         # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
         # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
         self.coul14_scale: float = 0.833
@@ -303,6 +303,7 @@ class EvbSystemBuilder():
             active_atoms = set()
             for bond in active_bonds:
                 active_atoms.update(bond)
+
             reactant_active_indices = [
                 self.reaction_atoms[i].index for i in active_atoms
             ]
@@ -312,22 +313,21 @@ class EvbSystemBuilder():
             distance = np.linalg.norm(env_center - rea_center)
             # env_center
             pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
-            max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
-            max_dist_expr = "k*distance(g1,g2)"
 
-            centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
-            centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
+            lin_dist_expr = "k*distance(g1,g2)"
+            # max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
+            # # centroid_force.addPerBondParameter("rmax")
+            centroid_force = mm.CustomCentroidBondForce(2, lin_dist_expr)
             centroid_force.setName("Protein_Ligand_Centroid_force")
-            # centroid_force.addPerBondParameter("rmax")
+            centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
             centroid_force.addPerBondParameter("k")
-
             centroid_force.addGroup(reactant_active_indices)
             centroid_force.addGroup(pdb_indices)
-            centroid_force.addBond([0, 1], [distance * 0.1, self.centroid_k])
+            centroid_force.addBond([0, 1], [self.centroid_k])
 
             system.addForce(centroid_force)
             self.ostream.print_info(
-                f"Adding harmonic force between c.o.m. of reacting atoms and c.o.m. of the protein with distance {distance*0.1}nm"
+                f"Adding linear force between c.o.m. of the reacting atoms of the ligand and c.o.m. of the protein"
             )
             self.ostream.print_info(
                 f"Reacting atoms: {reactant_active_indices}, c.o.m.: {rea_center}, Enzyme c.o.m.: {env_center}"
@@ -345,7 +345,7 @@ class EvbSystemBuilder():
 
         if self.solvent:
             #todo what about the box, and especially giving it to the solvator
-            box= self._add_solvent(system, system_mol, self.solvent, topology,
+            box = self._add_solvent(system, system_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
                                     box)
 
@@ -1116,8 +1116,8 @@ class EvbSystemBuilder():
             # self._add_bonded_decompositions(pro_system, 1)
             pass
         if self.decompose_nb is not None:
-            systems.update(self._add_nb_decompositions(rea_system,'rea'))
-            systems.update(self._add_nb_decompositions(pro_system,'pro'))
+            systems.update(self._add_nb_decompositions(rea_system, 'rea'))
+            systems.update(self._add_nb_decompositions(pro_system, 'pro'))
         systems['reactant'] = rea_system
         systems['product'] = pro_system
         return systems
@@ -1194,19 +1194,19 @@ class EvbSystemBuilder():
         # forces for solvent solvent interactions
         solcoul = copy.deepcopy(nbforce)
         sollj = copy.deepcopy(nbforce)
-        
+
         # remove all nonbonded parameters for the compound
         for i, _ in enumerate(self.reactant.atoms.values()):
             atom_id = self.reaction_atoms[i].index
             solcoul.setParticleParameters(atom_id, 0, 1, 0)
             sollj.setParticleParameters(atom_id, 0, 1, 0)
-        
+
         #set the charges or epsilons of all solvent atoms to 0
         for atom_id in self.solvent_atom_ids:
             charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
             sollj.setParticleParameters(atom_id, 0, sigma, epsilon)
             solcoul.setParticleParameters(atom_id, charge, 1, 0)
-        
+
         solcoul.setName('Coul solvent')
         coul_system = copy.deepcopy(system)
         self._remove_forces(coul_system)
@@ -1235,16 +1235,18 @@ class EvbSystemBuilder():
                 charge, sigma, epsilon = nbforce.getParticleParameters(atom_id)
 
                 if i in to_decompose:
-                    # Setting all system-solvent interactions as exceptions and defaulting everything to 0 is easier 
+                    # Setting all system-solvent interactions as exceptions and defaulting everything to 0 is easier
                     # than setting all solvent-solvent interactions as exceptions with original parameters
                     for solvent_atom in self.solvent_atom_ids:
-                        solv_charge, solv_sigma, solv_epsilon = nbforce.getParticleParameters(solvent_atom)
-                        qq = charge*solv_charge
+                        solv_charge, solv_sigma, solv_epsilon = nbforce.getParticleParameters(
+                            solvent_atom)
+                        qq = charge * solv_charge
                         sig = 0.5 * (solv_sigma + sigma)
-                        eps = math.sqrt((epsilon*solv_epsilon).value_in_unit(mmunit.kilojoule_per_mole**2))
+                        eps = math.sqrt((epsilon * solv_epsilon).value_in_unit(
+                            mmunit.kilojoule_per_mole**2))
                         lj_dec.addException(atom_id, solvent_atom, 0, sig, eps)
-                        coul_dec.addException(atom_id, solvent_atom, qq, 1,0)
-                
+                        coul_dec.addException(atom_id, solvent_atom, qq, 1, 0)
+
                 #Everything is handeled by the exceptions, so the default parameters can be set to 0
                 lj_dec.setParticleParameters(atom_id, 0, 1, 0)
                 coul_dec.setParticleParameters(atom_id, 0, 1, 0)
@@ -1254,7 +1256,7 @@ class EvbSystemBuilder():
                 lj_dec.setParticleParameters(solvent_id, 0, 1, 0)
                 coul_dec.setParticleParameters(solvent_id, 0, 1, 0)
             name = "-".join(str(x) for x in to_decompose)
-            
+
             coul_system = copy.deepcopy(system)
             self._remove_forces(coul_system)
             coul_system.addForce(coul_dec)

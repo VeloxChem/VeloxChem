@@ -137,6 +137,7 @@ class EvbReporter():
                 self.pro_FG_out.write(fg_header)
         self.decomp_names = [s for s in systems if 'decomp' in str(s)]
 
+        self.report_decomp = False
         if len(self.decomp_names)>0:
             self.report_decomp = True
             dir = '/'.join(energy_file.split('/')[:-1])
