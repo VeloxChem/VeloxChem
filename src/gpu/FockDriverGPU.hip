@@ -112,7 +112,7 @@ computeQMatrixOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> Q_omp(num_gpus_per_node);
 
@@ -578,7 +578,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> S_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> T_matrices(num_gpus_per_node);
@@ -1167,7 +1167,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
 
@@ -1737,7 +1737,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> MY_matrices(num_gpus_per_node);
@@ -2363,7 +2363,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> MY_matrices(num_gpus_per_node);
@@ -2972,7 +2972,7 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> MX_matrices(num_gpus_per_node);
     std::vector<CDenseMatrix> MY_matrices(num_gpus_per_node);
@@ -3692,7 +3692,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     auto gpu_rank = rank * num_gpus_per_node;
 

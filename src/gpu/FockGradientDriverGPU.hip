@@ -188,9 +188,9 @@ computeOverlapGradientOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> S_grad_omp(num_gpus_per_node);
 
@@ -731,9 +731,9 @@ computeKineticEnergyGradientOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     std::vector<CDenseMatrix> T_grad_omp(num_gpus_per_node);
 
@@ -1272,9 +1272,9 @@ computeNuclearPotentialGradientOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     const auto mol_charges = molecule.getCharges();
     const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
@@ -1890,9 +1890,9 @@ computePointChargesGradientOnGPU(const CMolecule& molecule,
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     const auto natoms = molecule.getNumberOfAtoms();
 
@@ -2498,9 +2498,9 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     auto gpu_rank = rank * num_gpus_per_node;
 

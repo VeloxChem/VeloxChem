@@ -37,7 +37,6 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
-#include <iostream>
 #include <sstream>
 
 #include "AOIndices.hpp"
@@ -1419,17 +1418,17 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
 
         for (int64_t j = 0; j < p_prim_count; j++)
         {
-            for (int64_t j_cart = 0; j_cart < 3; j_cart++)
+            for (int64_t s = 0; s < 3; s++)
             {
-                const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
+                const auto j_cgto = p_prim_aoinds[j + p_prim_count * s];
 
                 const auto W_ij = W_ptr[i_cgto * naos + j_cgto];
                 const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-                const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + j_cart];
+                const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + s];
 
                 if (Q_ij > _pair_threshold)
                 {
-                    sorted_sp_mat_Q.push_back(std::make_tuple(Q_ij, D_ij, i, j * 3 + j_cart, W_ij));
+                    sorted_sp_mat_Q.push_back(std::make_tuple(Q_ij, D_ij, i, j * 3 + s, W_ij));
                 }
             }
         }
@@ -1438,17 +1437,17 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
 
         for (int64_t j = 0; j < d_prim_count; j++)
         {
-            for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+            for (int64_t s = 0; s < 6; s++)
             {
-                const auto j_cgto = d_prim_aoinds[j + d_prim_count * j_cart];
+                const auto j_cgto = d_prim_aoinds[j + d_prim_count * s];
 
                 const auto W_ij = W_ptr[i_cgto * naos + j_cgto];
                 const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-                const auto Q_ij = _Q_matrix_sd.row(i)[j * 6 + j_cart];
+                const auto Q_ij = _Q_matrix_sd.row(i)[j * 6 + s];
 
                 if (Q_ij > _pair_threshold)
                 {
-                    sorted_sd_mat_Q.push_back(std::make_tuple(Q_ij, D_ij, i, j * 6 + j_cart, W_ij));
+                    sorted_sd_mat_Q.push_back(std::make_tuple(Q_ij, D_ij, i, j * 6 + s, W_ij));
                 }
             }
         }
@@ -1483,7 +1482,7 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
                 }
             }
         }
-    
+
         // P-D gto block pair
 
         for (int64_t j = 0; j < d_prim_count; j++)
@@ -1506,7 +1505,7 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
                     }
                 }
             }
-        }    
+        }
     }
 
     // D-D gto block pair
@@ -1538,7 +1537,6 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
                 }
             }
         }
-    
     }
 
     std::sort(sorted_ss_mat_Q.begin(), sorted_ss_mat_Q.end());
@@ -1681,16 +1679,16 @@ CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
         _dd_pair_data_local[gpu_id]   = std::vector<double>(dd_batch_size);
     }
 
-    auto nthreads = omp_get_max_threads();
-    auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
+    // auto nthreads = omp_get_max_threads();
+    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
     #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
 
-        if (thread_id % num_threads_per_gpu == 0)
+        if (thread_id < _num_gpus_per_node)
         {
-            auto gpu_id = thread_id / num_threads_per_gpu;
+            auto gpu_id = thread_id;
             auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
             auto gpu_count = nnodes * _num_gpus_per_node;
 
@@ -3802,16 +3800,16 @@ auto CGradientScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
         _local_D_ik_for_K_dd[gpu_id] = std::vector<double>(dd_batch_size);
     }
 
-    auto nthreads = omp_get_max_threads();
-    auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
+    // auto nthreads = omp_get_max_threads();
+    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
     #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
 
-        if (thread_id % num_threads_per_gpu == 0)
+        if (thread_id < _num_gpus_per_node)
         {
-            auto gpu_id = thread_id / num_threads_per_gpu;
+            auto gpu_id = thread_id;
             auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
             auto gpu_count = nnodes * _num_gpus_per_node;
 

@@ -48,7 +48,13 @@
 
 #define MATH_CONST_PI 3.14159265358979323846
 
-CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold, const int rank, const int nnodes)
+CScreeningData::CScreeningData(const CMolecule& molecule,
+                               const CMolecularBasis& basis,
+                               const int64_t num_gpus_per_node,
+                               const double pair_threshold,
+                               const double density_threshold,
+                               const int rank,
+                               const int nnodes)
 {
     _rank = rank;
 
@@ -75,9 +81,18 @@ CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis&
 
         const auto gto_ang = gto_block.getAngularMomentum();
 
-        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
-        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
-        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+        if (gto_ang == 0)
+        {
+            s_prim_count += npgtos * ncgtos;
+        }
+        else if (gto_ang == 1)
+        {
+            p_prim_count += npgtos * ncgtos;
+        }
+        else if (gto_ang == 2)
+        {
+            d_prim_count += npgtos * ncgtos;
+        }
     }
 
     // S gto block
@@ -1283,6 +1298,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_pd_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_dd_mat_Q;
 
+    // S-S gto block pair and S-P gto block pair
+
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         // S-S gto block pair
@@ -1316,6 +1333,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
         }
     }
 
+    // P-P gto block pair and P-D gto block pair
+
     for (int64_t i = 0; i < p_prim_count; i++)
     {
         // P-P gto block pair
@@ -1348,6 +1367,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
             }
         }
     }
+
+    // D-D gto block pair
 
     for (int64_t i = 0; i < d_prim_count; i++)
     {
@@ -1484,8 +1505,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
         _dd_pair_data_local[gpu_id]   = std::vector<double>(dd_batch_size);
     }
 
-    auto nthreads = omp_get_max_threads();
-    auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
+    // auto nthreads = omp_get_max_threads();
+    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
     #pragma omp parallel
     {
@@ -3348,14 +3369,16 @@ auto CScreeningData::form_Q_and_D_inds_for_K(const int64_t                s_prim
     }
 }
 
-auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void
+auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
+                                          const int64_t p_prim_count,
+                                          const int64_t d_prim_count,
+                                          const CDenseMatrix& Q_prime,
+                                          const double Q_prime_thresh) -> void
 {
     // TODO consider determining the maximum density associated
     // with the ik pair (i.e. max_D_jl for ik)
 
     // TODO: use uint2 for pair indices
-
-    // ss, sp, sd blocks
 
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_ss_Qp_ik;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_sp_Qp_ik;
@@ -3363,6 +3386,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_pp_Qp_ik;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_pd_Qp_ik;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_dd_Qp_ik;
+
+    // ss, sp, sd blocks
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -3390,12 +3415,6 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
 
     // pp, pd blocks
 
-    std::vector<uint32_t> pair_inds_i_for_K_pp;
-    std::vector<uint32_t> pair_inds_k_for_K_pp;
-
-    std::vector<uint32_t> pair_inds_i_for_K_pd;
-    std::vector<uint32_t> pair_inds_k_for_K_pd;
-
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
         for (int64_t k = i; k < p_prim_count * 3; k++)
@@ -3414,9 +3433,6 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
     }
 
     // dd block
-
-    std::vector<uint32_t> pair_inds_i_for_K_dd;
-    std::vector<uint32_t> pair_inds_k_for_K_dd;
 
     for (int64_t i = 0; i < d_prim_count * 6; i++)
     {
@@ -3511,8 +3527,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
         _local_pair_inds_k_for_K_dd[gpu_id] = std::vector<uint32_t>(dd_batch_size);
     }
 
-    auto nthreads = omp_get_max_threads();
-    auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
+    // auto nthreads = omp_get_max_threads();
+    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
     #pragma omp parallel
     {

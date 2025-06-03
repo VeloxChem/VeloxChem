@@ -1612,9 +1612,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     // GTOs blocks and number of AOs
 
@@ -1982,9 +1982,9 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     // GTOs blocks and number of AOs
 
@@ -2446,9 +2446,9 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     // GTOs blocks and number of AOs
 
@@ -2829,9 +2829,9 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     // GTOs blocks and number of AOs
 
@@ -3368,9 +3368,9 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     // GTOs blocks and number of AOs
 
@@ -3786,9 +3786,9 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
 
-    auto nthreads = omp_get_max_threads();
+    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     // GTOs blocks and number of AOs
 
