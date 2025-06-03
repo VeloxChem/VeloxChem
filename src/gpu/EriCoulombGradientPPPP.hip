@@ -65,19 +65,18 @@ computeCoulombGradientPPPP_I_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t skip_thread_block;
     __shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
     double PA_0, PB_0, PA_x, PB_x;
-    double grad_i_x;
     uint32_t i, j, a0, b0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
-        skip_thread_block = 0;
 
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
@@ -114,7 +113,6 @@ computeCoulombGradientPPPP_I_0(double*         grad_x,
         PA_x = (a_j  * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
         PB_x = (-a_i * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
-        grad_i_x = 0.0;
 
         a0 = i % 3;
         b0 = j % 3;
@@ -128,8 +126,11 @@ computeCoulombGradientPPPP_I_0(double*         grad_x,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
+        if ((kl >= pp_prim_pair_count) || (ij >= pp_prim_pair_count_local) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
+            break;
+        }
+
             const auto k = pp_first_inds[kl];
             const auto l = pp_second_inds[kl];
 
@@ -172,13 +173,12 @@ computeCoulombGradientPPPP_I_0(double*         grad_x,
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
-            double eri_ijkl;
 
             double kl_factor = (static_cast<double>(k != l) + 1.0);
 
             // mu grad
 
-            eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                         F5_t[0] * 0.5 * inv_S1 * inv_S2 * a_i * (
                             delta[a0][grad_cart_ind] * delta[c0][d0] * (PB_0)
@@ -445,31 +445,16 @@ computeCoulombGradientPPPP_I_0(double*         grad_x,
 
                     );
 
-            grad_i_x += eri_ijkl * pp_mat_D[kl] * kl_factor;
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
 
-        }
-        else
-        {
-            // indicator for early exit for thread block
-            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
-        }
-
-        __syncthreads();
-
-        // early exit for thread block
-        if (skip_thread_block == 1) break;
     }
 
-    if (ij < pp_prim_pair_count_local)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_i_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
-        grad_i_x = 0.0;
+        double grad_i_x = 0.0;
 
         for (uint32_t n = 0; n < TILE_DIM; n++)
         {
@@ -508,19 +493,18 @@ computeCoulombGradientPPPP_J_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t skip_thread_block;
     __shared__ double   delta[3][3];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
     double PA_0, PB_0, PA_x, PB_x;
-    double grad_j_x;
     uint32_t i, j, a0, b0;
+
+    ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
-        skip_thread_block = 0;
 
         delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
@@ -557,7 +541,6 @@ computeCoulombGradientPPPP_J_0(double*         grad_x,
         PA_x = (a_j  * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
         PB_x = (-a_i * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
-        grad_j_x = 0.0;
 
         a0 = i % 3;
         b0 = j % 3;
@@ -571,8 +554,11 @@ computeCoulombGradientPPPP_J_0(double*         grad_x,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > eri_threshold))
+        if ((kl >= pp_prim_pair_count) || (ij >= pp_prim_pair_count_local) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
         {
+            break;
+        }
+
             const auto k = pp_first_inds[kl];
             const auto l = pp_second_inds[kl];
 
@@ -615,13 +601,12 @@ computeCoulombGradientPPPP_J_0(double*         grad_x,
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
-            double eri_ijkl;
 
             double kl_factor = (static_cast<double>(k != l) + 1.0);
 
             // nu grad
 
-            eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                         F5_t[0] * 0.5 * inv_S1 * inv_S2 * a_j * (
                             delta[a0][grad_cart_ind] * delta[c0][d0] * (PB_0)
@@ -889,30 +874,15 @@ computeCoulombGradientPPPP_J_0(double*         grad_x,
 
                     );
 
-            grad_j_x += eri_ijkl * pp_mat_D[kl] * kl_factor;
-        }
-        else
-        {
-            // indicator for early exit for thread block
-            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
-        }
-
-        __syncthreads();
-
-        // early exit for thread block
-        if (skip_thread_block == 1) break;
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * kl_factor;
     }
 
-    if (ij < pp_prim_pair_count_local)
-    {
-        ERIs[threadIdx.y][threadIdx.x] = grad_j_x;
-    }
 
     __syncthreads();
 
     if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
-        grad_j_x = 0.0;
+        double grad_j_x = 0.0;
 
         for (uint32_t n = 0; n < TILE_DIM; n++)
         {
