@@ -32,7 +32,10 @@
 
 #include "CorePotentialDriver.hpp"
 
+#include "GtoFunc.hpp"
 #include "MatrixFunc.hpp"
+#include "OpenMPFunc.hpp"
+#include "T2CDistributor.hpp"
 
 auto
 CCorePotentialDriver::compute(const CMolecularBasis& basis, const CMolecularCorePotential& core_potential, const CMolecule& molecule) const -> CMatrix
@@ -43,40 +46,73 @@ CCorePotentialDriver::compute(const CMolecularBasis& basis, const CMolecularCore
 
     ecp_mat.zero();
 
-//    // prepare pointers for OMP parallel region
-//
-//    auto ptr_basis = &basis;
-//
-//    auto ptr_molecule = &molecule;
-//
-//    auto ptr_ovl_mat = &ovl_mat;
-//
-//    // execute OMP tasks with static scheduling
-//
-//    omp::set_static_scheduler();
-//
-//#pragma omp parallel shared(ptr_basis, ptr_molecule, ptr_ovl_mat)
-//    {
-//#pragma omp single nowait
-//        {
-//            const auto gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
-//
-//            const auto tasks = omp::make_work_tasks(gto_blocks);
-//
-//            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
-//                auto bra_gtos    = gto_blocks[task[0]];
-//                auto ket_gtos    = gto_blocks[task[1]];
-//                auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};
-//                auto ket_indices = std::pair<size_t, size_t>{task[4], task[5]};
-//                bool bkequal     = (task[0] == task[1]) && (task[2] == task[4]) && (task[3] == task[5]);
-//#pragma omp task firstprivate(bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal)
-//                {
-//                    CT2CDistributor<CMatrix> distributor(ptr_ovl_mat);
-//                    ovlfunc::compute(distributor, bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal);
-//                }
-//            });
-//        }
-//    }
+    // prepare pointers for OMP parallel region
+
+    auto ptr_basis = &basis;
+    
+    auto ptr_core_potential = &core_potential;
+
+    auto ptr_molecule = &molecule;
+
+    auto ptr_ecp_mat = &ecp_mat;
+
+    // execute OMP tasks with static scheduling
+
+    omp::set_static_scheduler();
+
+    #pragma omp parallel shared(ptr_basis, ptr_core_potential, ptr_molecule, ptr_ecp_mat)
+    {
+        #pragma omp single nowait
+        {
+            const auto gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
+
+            const auto tasks = omp::make_work_tasks(gto_blocks);
+
+            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
+                auto bra_gtos    = gto_blocks[task[0]];
+                auto ket_gtos    = gto_blocks[task[1]];
+                auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};
+                auto ket_indices = std::pair<size_t, size_t>{task[4], task[5]};
+                bool bkequal     = (task[0] == task[1]) && (task[2] == task[4]) && (task[3] == task[5]);
+                #pragma omp task firstprivate(bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal)
+                {
+                    CT2CDistributor<CMatrix> distributor(ptr_ecp_mat);
+                    
+                    // set up core potentials data
+                    
+                    auto ecp_potentials = ptr_core_potential->core_potentials();
+                    
+                    auto ecp_indices = ptr_core_potential->indices();
+                    
+                    auto atm_indices = ptr_core_potential->atomic_indices();
+                    
+                    // loop over atomic core potentials
+                    
+                    for (size_t i = 0; i < atm_indices.size(); i++)
+                    {
+                        auto r_xyz = ptr_molecule->atom_coordinates(atm_indices[i]);
+                        
+                        auto r_pot = ecp_potentials[ecp_indices[i]];
+                        
+                        // compute local potential contribution
+                        
+                        //ecpfunc::compute(distributor,r_pot.get_local_potential(), r_xyz,   bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal);
+                        
+                        // compute projected potential contributions
+                        
+                        auto p_pots = r_pot.get_projected_potentials();
+                        
+                        auto p_moms = r_pot.get_angular_momentums();
+                        
+                        for (size_t j = 0; j < p_pots.size(); j++)
+                        {
+                            //ecpfunc::compute(distributor, p_pots[j], p_moms[j],  r_xyz,   bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal);
+                        }
+                    }
+                }
+            });
+        }
+    }
 
     return ecp_mat;
 }
