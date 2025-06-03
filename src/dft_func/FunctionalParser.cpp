@@ -44,7 +44,7 @@ getAvailableFunctionals()
 {
     return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
-                                     "LRC-WPBEH", "CAM-B3LYP", "RCAM-B3LYP", "WB97X-V",
+                                     "LRC-WPBEH", "CAM-B3LYP", "CAM-QTP00", "CAM-QTP01", "CAM-QTP02", "RCAM-B3LYP", "WB97X-V", "WB97X-D", "WB97X-D3",
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
                                      "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
 }
@@ -105,11 +105,21 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (format::upper_case(xcLabel) == "LRC-WPBEH") return CXCFunctional("LRC-WPBEH", {"HYB_GGA_XC_LRC_WPBEH"}, {1.0});
 
         if (format::upper_case(xcLabel) == "CAM-B3LYP") return CXCFunctional("CAM-B3LYP", {"HYB_GGA_XC_CAM_B3LYP"}, {1.0});
+        
+        if (format::upper_case(xcLabel) == "CAM-QTP00") return CXCFunctional("CAM-QTP00", {"HYB_GGA_XC_CAM_QTP_00"}, {1.0});
+        
+        if (format::upper_case(xcLabel) == "CAM-QTP01") return CXCFunctional("CAM-QTP01", {"HYB_GGA_XC_CAM_QTP_01"}, {1.0});
+        
+        if (format::upper_case(xcLabel) == "CAM-QTP02") return CXCFunctional("CAM-QTP02", {"HYB_GGA_XC_CAM_QTP_02"}, {1.0});
 
         if (format::upper_case(xcLabel) == "RCAM-B3LYP") return CXCFunctional("RCAM-B3LYP", {"HYB_GGA_XC_RCAM_B3LYP"}, {1.0});
 
         if (format::upper_case(xcLabel) == "WB97X-V") return CXCFunctional("WB97X-V", {"HYB_GGA_XC_WB97X_V"}, {1.0});
+        
+        if (format::upper_case(xcLabel) == "WB97X-D") return CXCFunctional("WB97X-D", {"HYB_GGA_XC_WB97X_D"}, {1.0});
 
+        if (format::upper_case(xcLabel) == "WB97X-D3") return CXCFunctional("WB97X-D3", {"HYB_GGA_XC_WB97X_D3"}, {1.0});
+        
         // meta-GGA
 
         if (format::upper_case(xcLabel) == "TPSS") return CXCFunctional("TPSS", {"MGGA_X_TPSS", "MGGA_C_TPSS"}, {1.0, 1.0});
