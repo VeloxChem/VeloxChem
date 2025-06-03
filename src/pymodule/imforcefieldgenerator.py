@@ -349,8 +349,8 @@ class IMForceFieldGenerator:
 
         
         self.z_matrix = self.define_z_matrix(molecule)
-        angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), 0)
-        dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), 0)
+        angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), len(self.z_matrix))
+        dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), len(self.z_matrix))
 
         self.qm_data_points = None
         self.molecule = molecule
@@ -1680,8 +1680,30 @@ class IMForceFieldGenerator:
                             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
                 
                         label = None
-                        grad_mw = gradients[number] / np.sqrt(masses)[:, None]
-                        H_mw = hessians[number] * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
+                        grad = gradients[number].copy()
+                        hess = hessians[number].copy()
+
+
+                        if self.ghost_atom[0]:
+
+                            # All DOFs: 0 to 17
+                            n_atoms = len(molecule.get_labels()) + 1
+                            full_cart_indices = np.arange(3 * n_atoms)
+
+                            # Cartesian indices to remove: 3 * ghost_atom_index + [0, 1, 2]
+                            ghost_cartesian_indices = np.arange(3 * self.ghost_atom[1], 3 * self.ghost_atom[1] + 3)
+
+                            # Remaining indices
+                            indices = np.setdiff1d(full_cart_indices, ghost_cartesian_indices)
+
+                            grad = grad.reshape(-1)  # if it's (6, 3), flatten to (18,)
+                            grad = grad[indices].reshape(-1, 3) 
+                            hess = hess[np.ix_(indices, indices)]  # shape will now be (15, 15)
+
+                           
+
+                        grad_mw = grad / np.sqrt(masses)[:, None]
+                        H_mw = hess * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
                         
         
                         if label_counter == 0:
