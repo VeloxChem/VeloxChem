@@ -74,12 +74,11 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
     __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
-    double grad_i_x = 0.0;
 
-    if (ij < dd_prim_pair_count_local)
-    {
         if ((threadIdx.y == 0) && (threadIdx.x == 0))
         {
 
@@ -93,6 +92,9 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
             delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
             delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
             delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+            if (ij < dd_prim_pair_count_local)
+            {
 
             i = dd_first_inds_local[ij];
             j = dd_second_inds_local[ij];
@@ -129,6 +131,7 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
             PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
             PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+            }
         }
 
         __syncthreads();
@@ -137,12 +140,11 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
         {
             const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-            if (kl < ss_prim_pair_count)
+            if ((ij >= dd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
             {
-                if (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold)
-                {
-                    break;
-                }
+                break;
+            }
+
                 const auto k = ss_first_inds[kl];
                 const auto l = ss_second_inds[kl];
 
@@ -181,13 +183,12 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
                 gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
 
-                double eri_ijkl;
 
                 double kl_factor = (static_cast<double>(k != l) + 1.0);
 
                 // mu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                             F5_t[0] * 0.5 * inv_S1 * inv_S1 * a_i * (
                                 (delta[a0][a1] * delta[b1][grad_cart_ind] + delta[a0][b1] * delta[a1][grad_cart_ind] + delta[a0][grad_cart_ind] * delta[a1][b1]) * (PB_0)
@@ -379,23 +380,16 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
 
                         );
 
-                grad_i_x += eri_ijkl * ss_mat_D[kl] * kl_factor;
+                ERIs[threadIdx.y] += eri_ijkl * ss_mat_D[kl] * kl_factor;
 
-            }
         }
+
 
         __syncthreads();
 
-        if (threadIdx.y < TILE_DIM_LARGE)
+        if ((threadIdx.y == 0) && (ij < dd_prim_pair_count_local))
         {
-            ERIs[threadIdx.y] = grad_i_x;
-        }
-
-        __syncthreads();
-
-        if (threadIdx.y == 0)
-        {
-            grad_i_x = 0.0;
+            double grad_i_x = 0.0;
 
             for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
             {
@@ -404,7 +398,6 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
 
             atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], grad_i_x * ij_factor_D * 2.0 * prefac_coulomb);
         }
-    }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
@@ -444,12 +437,11 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
     __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
+    ERIs[threadIdx.y] = 0.0;
+
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
-    double grad_j_x = 0.0;
 
-    if (ij < dd_prim_pair_count_local)
-    {
         if ((threadIdx.y == 0) && (threadIdx.x == 0))
         {
 
@@ -463,6 +455,9 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
             delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
             delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
             delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+
+            if (ij < dd_prim_pair_count_local)
+            {
 
             i = dd_first_inds_local[ij];
             j = dd_second_inds_local[ij];
@@ -499,6 +494,7 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
             PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
             PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
+            }
         }
 
         __syncthreads();
@@ -507,12 +503,11 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
         {
             const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-            if (kl < ss_prim_pair_count)
+            if ((ij >= dd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
             {
-                if (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold)
-                {
-                    break;
-                }
+                break;
+            }
+
                 const auto k = ss_first_inds[kl];
                 const auto l = ss_second_inds[kl];
 
@@ -551,13 +546,12 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
                 gpu::computeBoysFunction(F5_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
 
-                double eri_ijkl;
 
                 double kl_factor = (static_cast<double>(k != l) + 1.0);
 
                 // nu grad
 
-                eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
                             F5_t[0] * 0.5 * inv_S1 * inv_S1 * a_j * (
                                 (delta[a0][a1] * delta[b1][grad_cart_ind] + delta[a0][b1] * delta[a1][grad_cart_ind] + delta[a0][grad_cart_ind] * delta[a1][b1]) * (PB_0)
@@ -750,22 +744,15 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
 
                         );
 
-                grad_j_x += eri_ijkl * ss_mat_D[kl] * kl_factor;
+                ERIs[threadIdx.y] += eri_ijkl * ss_mat_D[kl] * kl_factor;
             }
-        }
+
 
         __syncthreads();
 
-        if (threadIdx.y < TILE_DIM_LARGE)
+        if ((threadIdx.y == 0) && (ij < dd_prim_pair_count_local))
         {
-            ERIs[threadIdx.y] = grad_j_x;
-        }
-
-        __syncthreads();
-
-        if (threadIdx.y == 0)
-        {
-            grad_j_x = 0.0;
+            double grad_j_x = 0.0;
 
             for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
             {
@@ -774,7 +761,6 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
 
             atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], grad_j_x * ij_factor_D * 2.0 * prefac_coulomb);
         }
-    }
 }
 
 
