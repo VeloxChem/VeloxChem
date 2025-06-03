@@ -293,7 +293,7 @@ class InterpolationDatapoint:
         
         # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
         number_of_positive_values = np.count_nonzero(s_inv)
-
+        
         # If more elements are zero than allowed, restore the largest ones
         if number_of_positive_values > dimension:
             print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')

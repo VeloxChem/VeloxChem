@@ -235,7 +235,7 @@ class InterpolationDriver():
             if remove_from_label in key:
 
                 label = key.replace(remove_from_label, "")
-                if label not in labels and '_symmetry' not in label:
+                if label not in labels:
                     labels.append(label)
                 
                 if counter == 0:
@@ -470,6 +470,7 @@ class InterpolationDriver():
         averaged_int_dists = []
         weight_gradients_cart = []
         used_labels = []
+
         sum_weight_gradients_cart = np.zeros((natms - len(self.symmetry_information[4]), 3))
 
         distances_and_gradients = []
@@ -477,7 +478,7 @@ class InterpolationDriver():
         self.time_step_reducer = False
         
 
-        if not self.use_symmetry:
+        if not self.use_symmetry and 1==2:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
                 distance, denominator, weight_gradient, distance_vector, dihedral_dist = self.cartesian_distance(data_point)
@@ -507,8 +508,7 @@ class InterpolationDriver():
         # internal_distance_dict = []
         for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
             
-            
-            weight_cart = 1.0 / (denominator_cart + dihedral_dist)
+            weight_cart = 1.0 / (denominator_cart)
 
             # used_labels.append(label_idx)
             sum_weights_cart += weight_cart
@@ -548,7 +548,9 @@ class InterpolationDriver():
 
         S            = w_i.sum()                         # Σ wᵢ
         sum_grad_w   = grad_w_i.sum(axis=0)              # Σ ∇wᵢ      shape (natms, 3)
-
+        for lbl, wi in zip(used_labels, w_i):
+            self.weights[lbl] = wi
+        self.sum_of_weights = S
         # --- 2.  normalised weights and their gradients ------------------------------
         W_i          = w_i / S
         grad_W_i     = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2
@@ -560,21 +562,22 @@ class InterpolationDriver():
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
         # ∇U = Σ Wᵢ ∇Uᵢ  +  Σ Uᵢ ∇Wᵢ
-
-        if len(self.symmetry_information[3]) != 0:
+        if len(self.symmetry_information[3]) != natms:
             self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
             # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
             # Add contributions only to the selected rows
             
             self.impes_coordinate.gradient[self.symmetry_information[3]] += np.tensordot(potentials, grad_W_i, axes=1)
         else:
+
             self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
 
-        # --- 4.  book-keeping (optional) ---------------------------------------------
-        for lbl, Wi in zip(used_labels, W_i):
-            self.weights[lbl] = Wi
 
-        self.sum_of_weights      = W_i.sum()          # if you really need it later
+        # --- 4.  book-keeping (optional) ---------------------------------------------
+        # for lbl, Wi in zip(used_labels, W_i):
+        #     self.weights[lbl] = Wi
+
+        # self.sum_of_weights      = W_i.sum()          # if you really need it later
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
         
             # self.impes_coordinate.energy += potentials[i]
@@ -720,9 +723,8 @@ class InterpolationDriver():
         natm = data_point.cartesian_coordinates.shape[0]
         # print(len(self.qm_symmetry_data_points))
         dp_label = data_point.point_label 
-        if len(self.qm_symmetry_data_points[dp_label]) > 1:
+        if len(self.qm_symmetry_data_points[dp_label]) > 1 and self.use_symmetry:
 
-            
             symmetry_data_points = self.qm_symmetry_data_points[dp_label]
   
             symmetry_weights = []
@@ -780,6 +782,9 @@ class InterpolationDriver():
                             dist_check[i] = np.sin(dist_org[i])  
                             dist_correlation[i] = np.sin(dist_org[i])
 
+                        # print('sum sym dihedral', sum_sym_dihedral)
+                    
+                    # print('\n\n')
                     self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
                     self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
                     self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_information[-1][1]:]**2))))
@@ -788,9 +793,9 @@ class InterpolationDriver():
                         continue
                     
                     
-                    symmetry_weights.append(sum_sym_dihedral**6)
+                    symmetry_weights.append(sum_sym_dihedral**10)
 
-                    symmetry_weight_gradients.append(6 * sum_sym_dihedral**5 * sum_sym_dihedral_prime.reshape(natm, 3))
+                    symmetry_weight_gradients.append(10 * sum_sym_dihedral**9 * sum_sym_dihedral_prime.reshape(natm, 3))
 
                     pes = (energy + np.matmul(dist_check.T, grad) +
                         0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
@@ -821,6 +826,7 @@ class InterpolationDriver():
             # 2. normalised weights and their gradients
             # ---------------------------------------------------------------------------
             W_i       = w_i / S                                                    # (m,)
+
             grad_W_i  = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2    # (m, natm, 3)
             # print('internal wieghts', W_i)
             # ---------------------------------------------------------------------------
@@ -854,11 +860,16 @@ class InterpolationDriver():
             dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
             dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
 
+
+            
             for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
                                        
                 dist_check[i] = np.sin(dist_org[i])
 
 
+            self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
+            self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
+            self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[self.symmetry_information[-1][1]:]**2))))
             pes = (energy + np.matmul(dist_check.T, grad) +
                         0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
             
@@ -871,6 +882,10 @@ class InterpolationDriver():
             pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
 
             return pes, pes_prime, hessian_error
+
+
+        
+
 
     
     def te_weight_gradient(self, theta, b_matrix_col):
@@ -1533,12 +1548,10 @@ class InterpolationDriver():
             
             gradient = np.zeros_like(potentials_prime[0])
 
-            print('PES in gradient', np.sum(potentials * weights))
+
             for i in range(len(weights)):
                 gradient += potentials_prime[i] * weights[i] + potentials[i] * weights_prime[i] / total_weight_sum - potentials[i] * weights[i] * total_weight_grad_sum / total_weight_sum    
 
-        
-            print('Gradient of the new section', gradient, '\n\n', np.linalg.norm(gradient))
 
             # exit()
         
@@ -1616,12 +1629,12 @@ class InterpolationDriver():
     def trust_radius_weight_gradient(self, datapoint):
         
         confidence_radius = datapoint.confidence_radius
-        distance, _, _, _ = self.cartesian_distance(datapoint)
+        distance, _, _, _, _ = self.cartesian_distance_symmetry(datapoint)
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
-                (distance / confidence_radius)**(2 * self.exponent_q))**2
-        trust_radius_weight_gradient = -2.0 * (( -1.0 * (self.exponent_p * ((distance)**(2 * self.exponent_p) * (1/confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
-                                             (self.exponent_q * ((distance)**(2 * self.exponent_q) * (1/confidence_radius)**(2 * self.exponent_q)) / confidence_radius))) / denominator
+                (distance / confidence_radius)**(2 * self.exponent_q))
+        trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((distance / confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
+                                             (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
         return trust_radius_weight_gradient
 
     def shepard_weight_gradient(self, distance_vector, distance, confidence_radius, deriv_int_nom=0, deriv_int_den=0, calc_cart=False):
@@ -1713,8 +1726,8 @@ class InterpolationDriver():
         #     deriv_int_denominator = 1e-6
         #     deriv_int_nominator[:] = 0 
         # print(deriv_int_denominator.shape, distance_vector.shape)
-        if distance < 1e-7:
-            distance = 1e-5
+        if distance < 1e-9:
+            distance = 1e-8
             distance_vector[:] = 0
         if self.interpolation_type == 'shepard':
             denominator, weight_gradient = self.shepard_weight_gradient(
@@ -1847,8 +1860,11 @@ class InterpolationDriver():
         # distance_vector_norm = np.zeros(reference_coordinates.shape[0])
         # for i in range(len(distance_vector_norm)):
         #     distance_vector_norm[i] += np.linalg.norm(distance_vector[i])
-
         confidence_radius = data_point.confidence_radius
+
+        if not isinstance(confidence_radius, (float, int)):
+            confidence_radius = 0.5
+ 
         dihedral_dist = 0.0
         if distance < 1e-8:
             distance = 1e-8
@@ -1893,7 +1909,6 @@ class InterpolationDriver():
 
             partial_energies = np.zeros(N)
 
-            print('Int distance', internal_coord_elem_distance)
         
             # First handle linear parts
             for i in range(N):

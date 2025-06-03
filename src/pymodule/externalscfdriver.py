@@ -161,15 +161,34 @@ conda activate vlxenv_simd_master
         os.chmod(script_path, 0o755)
      
     
+    def create_ghost_atom_line(self, coordinates, atom_label="Ne"):
+        """
+        Create a formatted string for a ghost atom at the centroid.
+
+        Parameters:
+        - coordinates: np.ndarray of shape (N_atoms, 3)
+        - atom_label: str, default "Ne"
+
+        Returns:
+        - insert_line: str, e.g., "Ne: 1.234 2.345 3.456\n"
+        """
+        centroid = np.mean(coordinates, axis=0)
+        insert_line = f"{atom_label}: {centroid[0]:.6f} {centroid[1]:.6f} {centroid[2]:.6f}\n"
+        return insert_line
+    
     def compute_energy(self, molecule, basis):
         
         self.basis_set_label = basis
         molecule.write_xyz_file('current_geometry.xyz')
         
         if self.add_ghost_atom:
+
+            
             with open('current_geometry.xyz', 'r') as f:
                 
-                insert_line = "Ne: 0.0 0.0 0.0\n"
+                
+
+                insert_line = self.create_ghost_atom_line(molecule.get_coordinates_in_angstrom())
                 lines = f.readlines()
 
                 # Insert the line at the 3rd index (line 4)

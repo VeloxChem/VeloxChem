@@ -303,17 +303,17 @@ conda activate vlxenv_new_compile
 
 
 
-            current_path = os.getcwd()
-        
-            pattern = os.path.join(current_path, 'current_*')
-            files_to_remove = glob.glob(pattern)
+            # current_path = os.getcwd()
 
-            for file in files_to_remove:
-                try:
-                    os.remove(file)
-                    print(f'Removed file: {file}')
-                except Exception as e:
-                    print(f'Error removing file {file} : {e}')
+            # pattern = os.path.join(current_path, 'current_*')
+            # files_to_remove = glob.glob(pattern)
+        
+            # for file in files_to_remove:
+            #     try:
+            #         os.remove(file)
+            #         print(f'Removed file: {file}')
+            #     except Exception as e:
+            #         print(f'Error removing file {file} : {e}')
             return hessians
         except Exception as e:
             print(f"Error extracting gradients: {e}")
@@ -325,16 +325,7 @@ conda activate vlxenv_new_compile
         Run the pymolcas command with the input file and redirect output to the output file.
         """
 
-        current_job_id = None
-
-        if molecule_geometry:
-
-            self.full_output_filename = self.output_filename + molecule_geometry
-            current_molecule.write_xyz_file(f'current_geometry_{molecule_geometry}.xyz')
-            self.xyz_filename = f'current_geometry_{molecule_geometry}.xyz'
-        
-        else:
-            self.full_output_filename = self.output_filename
+        self.full_output_filename = self.output_filename
         if self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is None:
             if self.program == 'MOLCAS':
                 self.create_input_file_gradient()
