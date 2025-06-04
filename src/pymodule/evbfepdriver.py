@@ -447,9 +447,8 @@ class EvbFepDriver():
                                     self.initial_equil_NVT_steps,
                                     f"PDB warmup NVT equilibration T = {T}")
 
-                if self.isobaric:
-                    barostat.setFrequency(25)
-                    for T in temperatures:
+                    if self.isobaric:
+                        barostat.setFrequency(25)
                         equil_simulation.integrator.setTemperature(T)
                         self._safe_step(
                             equil_simulation, self.initial_equil_NPT_steps,
@@ -465,10 +464,11 @@ class EvbFepDriver():
             self.ostream.flush()
 
             for i in range(num_centroid_bonds):
-                bond, params = centroid_force.getBondParameters(0)
+                bond, params = centroid_force.getBondParameters(i)
+                params = list(params)
                 if len(params)>1:
                     params[1:] = [0] * (len(params) - 1)
-                centroid_force.setBondParameters(0, bond, params)
+                centroid_force.setBondParameters(i, bond, params)
 
             if self.isobaric:
                 barostat.setFrequency(0)
