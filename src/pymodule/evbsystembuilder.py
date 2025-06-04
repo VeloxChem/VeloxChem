@@ -111,7 +111,7 @@ class EvbSystemBuilder():
         self.soft_core_lj_pes = True
 
         self.soft_core_coulomb_int = False
-        self.soft_core_lj_int = True
+        self.soft_core_lj_int = False
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.1  # Scaling factor for the bonded integration forces.
