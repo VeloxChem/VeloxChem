@@ -765,22 +765,36 @@ class OpenMMDynamics:
             conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
             and their corresponding coordinates in XYZ format.
         """
-        # Maybe add evaluation of spacing factor in building the system here?
-        # TODO: Add check for equivalent molecules (to avoid creating multiple xmls)
+        # TODO: Maybe add evaluation of spacing factor in building the system here?
         if molecules:
             self.ostream.print_info("Generating system...")
             self.ostream.flush()
             self.atom_dict = {}
             xml_files = [] 
+
             for i, mol in enumerate(molecules):
                 ff_gen = MMForceFieldGenerator()
                 ff_gen.ostream.mute()
-                if partial_charges:
-                    ff_gen.partial_charges = partial_charges[i]
-                ff_gen.create_topology(mol)
-                if mol.get_labels() != ['O', 'H', 'H']: # skip for water since OMM checks the template of water specifically
-                    ff_gen.generate_residue_xml(f'molecule_{i}.xml',f'M{i+1:02d}')
-                    xml_files.append(f'molecule_{i}.xml')
+
+                duplicate = False
+                for j in range(i):
+                    if (mol.get_labels() == molecules[j].get_labels() and
+                        mol.get_connectivity_matrix().shape == molecules[j].get_connectivity_matrix().shape and
+                        (mol.get_connectivity_matrix() == molecules[j].get_connectivity_matrix()).all()):
+
+                        ff_gen.create_topology(mol, resp=False)
+                        self.atom_dict[f'{i}'] = ff_gen.atoms
+                        duplicate = True
+                        break
+
+                if not duplicate:
+                    if partial_charges:
+                        ff_gen.partial_charges = partial_charges[i]
+                    ff_gen.create_topology(mol)
+                    if mol.get_labels() != ['O', 'H', 'H']:  # skip for water
+                        ff_gen.generate_residue_xml(f'molecule_{i}.xml', f'M{i+1:02d}')
+                        xml_files.append(f'molecule_{i}.xml')
+                
                 self.atom_dict[f'{i}'] = ff_gen.atoms
 
             pdb_file = 'system.pdb'
