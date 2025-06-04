@@ -39,26 +39,26 @@ namespace gpu {  // gpu namespace
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombGradientSSSS_I_0(double*         grad_x,
-                       const uint32_t  grad_cart_ind,
-                       const double    prefac_coulomb,
-                       const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
-                       const double*   ss_mat_D_local,
-                       const double*   ss_mat_D,
-                       const double*   ss_mat_Q_local,
-                       const double*   ss_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
-                       const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
-                       const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
-                       const uint32_t* prim_cart_ao_to_atom_inds,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold)
+                               const uint32_t  grad_cart_ind,
+                               const double    prefac_coulomb,
+                               const double*   s_prim_info,
+                               const uint32_t  s_prim_count,
+                               const double*   ss_mat_D_local,
+                               const double*   ss_mat_D,
+                               const double*   ss_mat_Q_local,
+                               const double*   ss_mat_Q,
+                               const uint32_t* ss_first_inds_local,
+                               const uint32_t* ss_second_inds_local,
+                               const double*   ss_pair_data_local,
+                               const uint32_t  ss_prim_pair_count_local,
+                               const uint32_t* ss_first_inds,
+                               const uint32_t* ss_second_inds,
+                               const double*   ss_pair_data,
+                               const uint32_t  ss_prim_pair_count,
+                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const double*   boys_func_table,
+                               const double*   boys_func_ft,
+                               const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
@@ -72,11 +72,6 @@ computeCoulombGradientSSSS_I_0(double*         grad_x,
     uint32_t i, j;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-
-    }
 
     __syncthreads();
 
@@ -198,26 +193,26 @@ computeCoulombGradientSSSS_I_0(double*         grad_x,
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombGradientSSSS_J_0(double*         grad_x,
-                       const uint32_t  grad_cart_ind,
-                       const double    prefac_coulomb,
-                       const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
-                       const double*   ss_mat_D_local,
-                       const double*   ss_mat_D,
-                       const double*   ss_mat_Q_local,
-                       const double*   ss_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
-                       const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
-                       const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
-                       const uint32_t* prim_cart_ao_to_atom_inds,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold)
+                               const uint32_t  grad_cart_ind,
+                               const double    prefac_coulomb,
+                               const double*   s_prim_info,
+                               const uint32_t  s_prim_count,
+                               const double*   ss_mat_D_local,
+                               const double*   ss_mat_D,
+                               const double*   ss_mat_Q_local,
+                               const double*   ss_mat_Q,
+                               const uint32_t* ss_first_inds_local,
+                               const uint32_t* ss_second_inds_local,
+                               const double*   ss_pair_data_local,
+                               const uint32_t  ss_prim_pair_count_local,
+                               const uint32_t* ss_first_inds,
+                               const uint32_t* ss_second_inds,
+                               const double*   ss_pair_data,
+                               const uint32_t  ss_prim_pair_count,
+                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const double*   boys_func_table,
+                               const double*   boys_func_ft,
+                               const double    eri_threshold)
 {
     // each thread row scans over [ij|??] and sum up to a primitive J matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
@@ -231,11 +226,6 @@ computeCoulombGradientSSSS_J_0(double*         grad_x,
     uint32_t i, j;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-    {
-
-    }
 
     __syncthreads();
 
