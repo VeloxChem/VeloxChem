@@ -176,285 +176,285 @@ computeExchangeGradientSDSD_I_0(double*         grad_x,
                 break;
             }
 
-                const auto l_prim = D_inds_K_sd[displ_k + l];
+            const auto l_prim = D_inds_K_sd[displ_k + l];
 
-                const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
 
-                const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
 
-                const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                       d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                       d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
 
-                const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
 
-                const auto d0 = d_cart_inds[l_prim % 6][0];
-                const auto d1 = d_cart_inds[l_prim % 6][1];
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                // J. Chem. Phys. 84, 3963-3974 (1986)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                const auto S2 = a_k + a_l;
+            const auto S2 = a_k + a_l;
 
-                const auto inv_S2 = 1.0 / S2;
-                const auto inv_S4 = 1.0 / (S1 + S2);
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
 
-                const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                      (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                      (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
 
-                const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
-                const auto rho = S1 * S2 * inv_S4;
+            const auto rho = S1 * S2 * inv_S4;
 
-                if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
 
-                const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
 
-                double F5_t[6];
+            double F5_t[6];
 
-                gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-                if (omega != 0.0)
-                {
-                    F5_t[1] *= d2;
-                    F5_t[2] *= d2 * d2;
-                    F5_t[3] *= d2 * d2 * d2;
-                    F5_t[4] *= d2 * d2 * d2 * d2;
-                    F5_t[5] *= d2 * d2 * d2 * d2 * d2;
-                }
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
 
-                const double QC_x = (a_l * inv_S2) * (r_l[grad_cart_ind] - r_k[grad_cart_ind]);
+            const double QC_x = (a_l * inv_S2) * (r_l[grad_cart_ind] - r_k[grad_cart_ind]);
 
-                const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-                const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
 
-                // mu grad
+            // mu grad
 
-                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                                F5_t[0] * 0.5 * inv_S1 * inv_S2 * a_i * (
-                                    delta[b1][grad_cart_ind] * delta[d0][d1] * (PB_0)
-                                    + delta[b0][grad_cart_ind] * delta[d0][d1] * (PB_1)
-                                    + delta[b0][b1] * delta[d0][d1] * (PA_x)
-                                )
+                            F5_t[0] * 0.5 * inv_S1 * inv_S2 * a_i * (
+                                delta[b1][grad_cart_ind] * delta[d0][d1] * (PB_0)
+                                + delta[b0][grad_cart_ind] * delta[d0][d1] * (PB_1)
+                                + delta[b0][b1] * delta[d0][d1] * (PA_x)
+                            )
 
-                                + F5_t[0] * inv_S1 * a_i * (
-                                    delta[b1][grad_cart_ind] * (PB_0 * QD_0 * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PB_1 * QD_0 * QD_1)
-                                    + delta[b0][b1] * (PA_x * QD_0 * QD_1)
-                                )
+                            + F5_t[0] * inv_S1 * a_i * (
+                                delta[b1][grad_cart_ind] * (PB_0 * QD_0 * QD_1)
+                                + delta[b0][grad_cart_ind] * (PB_1 * QD_0 * QD_1)
+                                + delta[b0][b1] * (PA_x * QD_0 * QD_1)
+                            )
 
-                                + F5_t[0] * inv_S2 * a_i * (
-                                    delta[d0][d1] * (PA_x * PB_0 * PB_1)
-                                )
+                            + F5_t[0] * inv_S2 * a_i * (
+                                delta[d0][d1] * (PA_x * PB_0 * PB_1)
+                            )
 
-                                + F5_t[0] * 2.0 * a_i * (
-                                    + PA_x * PB_0 * PB_1 * QD_0 * QD_1
-                                )
+                            + F5_t[0] * 2.0 * a_i * (
+                                + PA_x * PB_0 * PB_1 * QD_0 * QD_1
+                            )
 
-                                + F5_t[1] * 0.5 * inv_S1 * inv_S4 * a_i * (
-                                    delta[b1][grad_cart_ind] * delta[d0][d1] * (PB_0 * (-1.0) + PQ[b0])
-                                    + delta[b0][grad_cart_ind] * delta[d0][d1] * (PB_1 * (-1.0) + PQ[b1])
-                                    + delta[b0][b1] * delta[d0][d1] * (PA_x * (-1.0) + PQ[grad_cart_ind])
-                                    + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (QD_0)
-                                    + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (QD_1)
-                                )
+                            + F5_t[1] * 0.5 * inv_S1 * inv_S4 * a_i * (
+                                delta[b1][grad_cart_ind] * delta[d0][d1] * (PB_0 * (-1.0) + PQ[b0])
+                                + delta[b0][grad_cart_ind] * delta[d0][d1] * (PB_1 * (-1.0) + PQ[b1])
+                                + delta[b0][b1] * delta[d0][d1] * (PA_x * (-1.0) + PQ[grad_cart_ind])
+                                + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (QD_0)
+                                + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (QD_1)
+                            )
 
-                                + F5_t[1] * (-0.5) * inv_S2 * inv_S4 * a_i * (
-                                    delta[b1][grad_cart_ind] * delta[d0][d1] * (PB_0)
-                                    + delta[b0][grad_cart_ind] * delta[d0][d1] * (PB_1)
-                                    + delta[b0][b1] * delta[d0][d1] * (PA_x)
-                                )
+                            + F5_t[1] * (-0.5) * inv_S2 * inv_S4 * a_i * (
+                                delta[b1][grad_cart_ind] * delta[d0][d1] * (PB_0)
+                                + delta[b0][grad_cart_ind] * delta[d0][d1] * (PB_1)
+                                + delta[b0][b1] * delta[d0][d1] * (PA_x)
+                            )
 
-                                + F5_t[1] * (-1.0) * S1 * inv_S2 * inv_S4 * a_i * (
-                                    delta[d0][d1] * (PA_x * PB_0 * PB_1)
-                                )
+                            + F5_t[1] * (-1.0) * S1 * inv_S2 * inv_S4 * a_i * (
+                                delta[d0][d1] * (PA_x * PB_0 * PB_1)
+                            )
 
-                                + F5_t[1] * S2 * inv_S1 * inv_S4 * a_i * (
-                                    delta[b1][grad_cart_ind] * (PB_0 * QD_0 * QD_1 * (-1.0) + PQ[b0] * QD_0 * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PB_1 * QD_0 * QD_1 * (-1.0) + PQ[b1] * QD_0 * QD_1)
-                                    + delta[b0][b1] * (PA_x * QD_0 * QD_1 * (-1.0) + PQ[grad_cart_ind] * QD_0 * QD_1)
-                                )
+                            + F5_t[1] * S2 * inv_S1 * inv_S4 * a_i * (
+                                delta[b1][grad_cart_ind] * (PB_0 * QD_0 * QD_1 * (-1.0) + PQ[b0] * QD_0 * QD_1)
+                                + delta[b0][grad_cart_ind] * (PB_1 * QD_0 * QD_1 * (-1.0) + PQ[b1] * QD_0 * QD_1)
+                                + delta[b0][b1] * (PA_x * QD_0 * QD_1 * (-1.0) + PQ[grad_cart_ind] * QD_0 * QD_1)
+                            )
 
-                                + F5_t[1] * inv_S4 * a_i * (
-                                    delta[d0][d1] * (PA_x * PB_0 * PQ[b1] + PA_x * PB_1 * PQ[b0] + PB_0 * PB_1 * PQ[grad_cart_ind])
-                                    + delta[d1][grad_cart_ind] * (PB_0 * PB_1 * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * QD_1)
-                                    + delta[b1][d1] * (PA_x * PB_0 * QD_0)
-                                    + delta[b1][d0] * (PA_x * PB_0 * QD_1)
-                                    + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * (-1.0))
-                                    + delta[b0][d1] * (PA_x * PB_1 * QD_0)
-                                    + delta[b0][d0] * (PA_x * PB_1 * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[d1] * QD_0 * (-1.0))
-                                    + delta[b0][b1] * (PA_x * PQ[d0] * QD_1 * (-1.0) + PA_x * PQ[d1] * QD_0 * (-1.0))
-                                )
+                            + F5_t[1] * inv_S4 * a_i * (
+                                delta[d0][d1] * (PA_x * PB_0 * PQ[b1] + PA_x * PB_1 * PQ[b0] + PB_0 * PB_1 * PQ[grad_cart_ind])
+                                + delta[d1][grad_cart_ind] * (PB_0 * PB_1 * QD_0)
+                                + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * QD_1)
+                                + delta[b1][d1] * (PA_x * PB_0 * QD_0)
+                                + delta[b1][d0] * (PA_x * PB_0 * QD_1)
+                                + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * (-1.0))
+                                + delta[b0][d1] * (PA_x * PB_1 * QD_0)
+                                + delta[b0][d0] * (PA_x * PB_1 * QD_1)
+                                + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[d1] * QD_0 * (-1.0))
+                                + delta[b0][b1] * (PA_x * PQ[d0] * QD_1 * (-1.0) + PA_x * PQ[d1] * QD_0 * (-1.0))
+                            )
 
-                                + F5_t[1] * 2.0 * S1 * inv_S4 * a_i * (
-                                    + PA_x * PB_0 * PB_1 * PQ[d0] * QD_1 * (-1.0)
-                                    + PA_x * PB_0 * PB_1 * PQ[d1] * QD_0 * (-1.0)
-                                )
+                            + F5_t[1] * 2.0 * S1 * inv_S4 * a_i * (
+                                + PA_x * PB_0 * PB_1 * PQ[d0] * QD_1 * (-1.0)
+                                + PA_x * PB_0 * PB_1 * PQ[d1] * QD_0 * (-1.0)
+                            )
 
-                                + F5_t[1] * 2.0 * S2 * inv_S4 * a_i * (
-                                    + PA_x * PB_0 * PQ[b1] * QD_0 * QD_1
-                                    + PA_x * PB_1 * PQ[b0] * QD_0 * QD_1
-                                    + PB_0 * PB_1 * PQ[grad_cart_ind] * QD_0 * QD_1
-                                )
+                            + F5_t[1] * 2.0 * S2 * inv_S4 * a_i * (
+                                + PA_x * PB_0 * PQ[b1] * QD_0 * QD_1
+                                + PA_x * PB_1 * PQ[b0] * QD_0 * QD_1
+                                + PB_0 * PB_1 * PQ[grad_cart_ind] * QD_0 * QD_1
+                            )
 
-                                + F5_t[2] * (-0.5) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
-                                    delta[b1][grad_cart_ind] * delta[d0][d1] * (PQ[b0])
-                                    + delta[b0][grad_cart_ind] * delta[d0][d1] * (PQ[b1])
-                                    + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind])
-                                    + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (QD_0)
-                                    + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (QD_1)
-                                )
+                            + F5_t[2] * (-0.5) * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
+                                delta[b1][grad_cart_ind] * delta[d0][d1] * (PQ[b0])
+                                + delta[b0][grad_cart_ind] * delta[d0][d1] * (PQ[b1])
+                                + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind])
+                                + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (QD_0)
+                                + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (QD_1)
+                            )
 
-                                + F5_t[2] * 0.5 * inv_S4 * inv_S4 * a_i * (
-                                    (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind]) * (PB_0)
-                                    + delta[b1][grad_cart_ind] * delta[d0][d1] * (PQ[b0] * (-1.0) + PB_0)
-                                    + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind]) * (PB_1)
-                                    + delta[b0][grad_cart_ind] * delta[d0][d1] * (PQ[b1] * (-1.0) + PB_1)
-                                    + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (PQ[d0] * (-1.0))
-                                    + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (PQ[d1] * (-1.0))
-                                    + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind] * (-1.0) + PA_x)
-                                    + (delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (PA_x)
-                                )
+                            + F5_t[2] * 0.5 * inv_S4 * inv_S4 * a_i * (
+                                (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind]) * (PB_0)
+                                + delta[b1][grad_cart_ind] * delta[d0][d1] * (PQ[b0] * (-1.0) + PB_0)
+                                + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind]) * (PB_1)
+                                + delta[b0][grad_cart_ind] * delta[d0][d1] * (PQ[b1] * (-1.0) + PB_1)
+                                + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (PQ[d0] * (-1.0))
+                                + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (PQ[d1] * (-1.0))
+                                + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind] * (-1.0) + PA_x)
+                                + (delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (PA_x)
+                            )
 
-                                + F5_t[2] * S1 * inv_S4 * inv_S4 * a_i * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PB_1 * PQ[d0] * (-1.0))
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * PQ[d1] * (-1.0))
-                                    + delta[d0][d1] * (PA_x * PB_0 * PQ[b1] * (-1.0) + PA_x * PB_1 * PQ[b0] * (-1.0) + PB_0 * PB_1 * PQ[grad_cart_ind] * (-1.0))
-                                    + delta[b1][d1] * (PA_x * PB_0 * PQ[d0] * (-1.0))
-                                    + delta[b1][d0] * (PA_x * PB_0 * PQ[d1] * (-1.0))
-                                    + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * PQ[d1])
-                                    + delta[b0][d1] * (PA_x * PB_1 * PQ[d0] * (-1.0))
-                                    + delta[b0][d0] * (PA_x * PB_1 * PQ[d1] * (-1.0))
-                                    + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * PQ[d1])
-                                    + delta[b0][b1] * (PA_x * PQ[d0] * PQ[d1])
-                                )
+                            + F5_t[2] * S1 * inv_S4 * inv_S4 * a_i * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PB_1 * PQ[d0] * (-1.0))
+                                + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * PQ[d1] * (-1.0))
+                                + delta[d0][d1] * (PA_x * PB_0 * PQ[b1] * (-1.0) + PA_x * PB_1 * PQ[b0] * (-1.0) + PB_0 * PB_1 * PQ[grad_cart_ind] * (-1.0))
+                                + delta[b1][d1] * (PA_x * PB_0 * PQ[d0] * (-1.0))
+                                + delta[b1][d0] * (PA_x * PB_0 * PQ[d1] * (-1.0))
+                                + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * PQ[d1])
+                                + delta[b0][d1] * (PA_x * PB_1 * PQ[d0] * (-1.0))
+                                + delta[b0][d0] * (PA_x * PB_1 * PQ[d1] * (-1.0))
+                                + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * PQ[d1])
+                                + delta[b0][b1] * (PA_x * PQ[d0] * PQ[d1])
+                            )
 
-                                + F5_t[2] * (-1.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
-                                    delta[b1][grad_cart_ind] * (PQ[b0] * QD_0 * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PQ[b1] * QD_0 * QD_1)
-                                    + delta[b0][b1] * (PQ[grad_cart_ind] * QD_0 * QD_1)
-                                )
+                            + F5_t[2] * (-1.0) * S2 * S2 * inv_S1 * inv_S4 * inv_S4 * a_i * (
+                                delta[b1][grad_cart_ind] * (PQ[b0] * QD_0 * QD_1)
+                                + delta[b0][grad_cart_ind] * (PQ[b1] * QD_0 * QD_1)
+                                + delta[b0][b1] * (PQ[grad_cart_ind] * QD_0 * QD_1)
+                            )
 
-                                + F5_t[2] * S2 * inv_S4 * inv_S4 * a_i * (
-                                    delta[d0][d1] * (PA_x * PQ[b0] * PQ[b1] + PB_0 * PQ[b1] * PQ[grad_cart_ind] + PB_1 * PQ[b0] * PQ[grad_cart_ind])
-                                    + delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * QD_0 + PB_1 * PQ[b0] * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * QD_1 + PB_1 * PQ[b0] * QD_1)
-                                    + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * QD_1 * (-1.0) + PQ[b0] * PQ[d1] * QD_0 * (-1.0) + PB_0 * PQ[d0] * QD_1 + PB_0 * PQ[d1] * QD_0)
-                                    + delta[b1][d1] * (PA_x * PQ[b0] * QD_0 + PB_0 * PQ[grad_cart_ind] * QD_0)
-                                    + delta[b1][d0] * (PA_x * PQ[b0] * QD_1 + PB_0 * PQ[grad_cart_ind] * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * QD_1 * (-1.0) + PQ[b1] * PQ[d1] * QD_0 * (-1.0) + PB_1 * PQ[d0] * QD_1 + PB_1 * PQ[d1] * QD_0)
-                                    + delta[b0][d1] * (PA_x * PQ[b1] * QD_0 + PB_1 * PQ[grad_cart_ind] * QD_0)
-                                    + delta[b0][d0] * (PA_x * PQ[b1] * QD_1 + PB_1 * PQ[grad_cart_ind] * QD_1)
-                                    + delta[b0][b1] * (PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0) + PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0) + PA_x * PQ[d0] * QD_1 + PA_x * PQ[d1] * QD_0)
-                                )
+                            + F5_t[2] * S2 * inv_S4 * inv_S4 * a_i * (
+                                delta[d0][d1] * (PA_x * PQ[b0] * PQ[b1] + PB_0 * PQ[b1] * PQ[grad_cart_ind] + PB_1 * PQ[b0] * PQ[grad_cart_ind])
+                                + delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * QD_0 + PB_1 * PQ[b0] * QD_0)
+                                + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * QD_1 + PB_1 * PQ[b0] * QD_1)
+                                + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * QD_1 * (-1.0) + PQ[b0] * PQ[d1] * QD_0 * (-1.0) + PB_0 * PQ[d0] * QD_1 + PB_0 * PQ[d1] * QD_0)
+                                + delta[b1][d1] * (PA_x * PQ[b0] * QD_0 + PB_0 * PQ[grad_cart_ind] * QD_0)
+                                + delta[b1][d0] * (PA_x * PQ[b0] * QD_1 + PB_0 * PQ[grad_cart_ind] * QD_1)
+                                + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * QD_1 * (-1.0) + PQ[b1] * PQ[d1] * QD_0 * (-1.0) + PB_1 * PQ[d0] * QD_1 + PB_1 * PQ[d1] * QD_0)
+                                + delta[b0][d1] * (PA_x * PQ[b1] * QD_0 + PB_1 * PQ[grad_cart_ind] * QD_0)
+                                + delta[b0][d0] * (PA_x * PQ[b1] * QD_1 + PB_1 * PQ[grad_cart_ind] * QD_1)
+                                + delta[b0][b1] * (PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0) + PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0) + PA_x * PQ[d0] * QD_1 + PA_x * PQ[d1] * QD_0)
+                            )
 
-                                + F5_t[2] * 2.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * (
-                                    + PA_x * PB_0 * PB_1 * PQ[d0] * PQ[d1]
-                                )
+                            + F5_t[2] * 2.0 * S1 * S1 * inv_S4 * inv_S4 * a_i * (
+                                + PA_x * PB_0 * PB_1 * PQ[d0] * PQ[d1]
+                            )
 
-                                + F5_t[2] * 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
-                                    + PA_x * PB_0 * PQ[b1] * PQ[d0] * QD_1 * (-1.0)
-                                    + PA_x * PB_0 * PQ[b1] * PQ[d1] * QD_0 * (-1.0)
-                                    + PA_x * PB_1 * PQ[b0] * PQ[d0] * QD_1 * (-1.0)
-                                    + PA_x * PB_1 * PQ[b0] * PQ[d1] * QD_0 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
-                                )
+                            + F5_t[2] * 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                                + PA_x * PB_0 * PQ[b1] * PQ[d0] * QD_1 * (-1.0)
+                                + PA_x * PB_0 * PQ[b1] * PQ[d1] * QD_0 * (-1.0)
+                                + PA_x * PB_1 * PQ[b0] * PQ[d0] * QD_1 * (-1.0)
+                                + PA_x * PB_1 * PQ[b0] * PQ[d1] * QD_0 * (-1.0)
+                                + PB_0 * PB_1 * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
+                                + PB_0 * PB_1 * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
+                            )
 
-                                + F5_t[2] * 2.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * (
-                                    + PA_x * PQ[b0] * PQ[b1] * QD_0 * QD_1
-                                    + PB_0 * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1
-                                    + PB_1 * PQ[b0] * PQ[grad_cart_ind] * QD_0 * QD_1
-                                )
+                            + F5_t[2] * 2.0 * S2 * S2 * inv_S4 * inv_S4 * a_i * (
+                                + PA_x * PQ[b0] * PQ[b1] * QD_0 * QD_1
+                                + PB_0 * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1
+                                + PB_1 * PQ[b0] * PQ[grad_cart_ind] * QD_0 * QD_1
+                            )
 
-                                + F5_t[3] * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * (-1.0))
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d1] * (-1.0) + PB_1 * PQ[b0] * PQ[d1] * (-1.0))
-                                    + delta[d0][d1] * (PA_x * PQ[b0] * PQ[b1] * (-1.0) + PB_0 * PQ[b1] * PQ[grad_cart_ind] * (-1.0) + PB_1 * PQ[b0] * PQ[grad_cart_ind] * (-1.0))
-                                    + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * PQ[d1] * (-1.0) + PQ[b0] * PQ[d0] * PQ[d1])
-                                    + delta[b1][d1] * (PA_x * PQ[b0] * PQ[d0] * (-1.0) + PB_0 * PQ[d0] * PQ[grad_cart_ind] * (-1.0))
-                                    + delta[b1][d0] * (PA_x * PQ[b0] * PQ[d1] * (-1.0) + PB_0 * PQ[d1] * PQ[grad_cart_ind] * (-1.0))
-                                    + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * PQ[d1] * (-1.0) + PQ[b1] * PQ[d0] * PQ[d1])
-                                    + delta[b0][d1] * (PA_x * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[d0] * PQ[grad_cart_ind] * (-1.0))
-                                    + delta[b0][d0] * (PA_x * PQ[b1] * PQ[d1] * (-1.0) + PB_1 * PQ[d1] * PQ[grad_cart_ind] * (-1.0))
-                                    + delta[b0][b1] * (PA_x * PQ[d0] * PQ[d1] * (-1.0) + PQ[d0] * PQ[d1] * PQ[grad_cart_ind])
-                                )
+                            + F5_t[3] * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * (-1.0))
+                                + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d1] * (-1.0) + PB_1 * PQ[b0] * PQ[d1] * (-1.0))
+                                + delta[d0][d1] * (PA_x * PQ[b0] * PQ[b1] * (-1.0) + PB_0 * PQ[b1] * PQ[grad_cart_ind] * (-1.0) + PB_1 * PQ[b0] * PQ[grad_cart_ind] * (-1.0))
+                                + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * PQ[d1] * (-1.0) + PQ[b0] * PQ[d0] * PQ[d1])
+                                + delta[b1][d1] * (PA_x * PQ[b0] * PQ[d0] * (-1.0) + PB_0 * PQ[d0] * PQ[grad_cart_ind] * (-1.0))
+                                + delta[b1][d0] * (PA_x * PQ[b0] * PQ[d1] * (-1.0) + PB_0 * PQ[d1] * PQ[grad_cart_ind] * (-1.0))
+                                + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * PQ[d1] * (-1.0) + PQ[b1] * PQ[d0] * PQ[d1])
+                                + delta[b0][d1] * (PA_x * PQ[b1] * PQ[d0] * (-1.0) + PB_1 * PQ[d0] * PQ[grad_cart_ind] * (-1.0))
+                                + delta[b0][d0] * (PA_x * PQ[b1] * PQ[d1] * (-1.0) + PB_1 * PQ[d1] * PQ[grad_cart_ind] * (-1.0))
+                                + delta[b0][b1] * (PA_x * PQ[d0] * PQ[d1] * (-1.0) + PQ[d0] * PQ[d1] * PQ[grad_cart_ind])
+                            )
 
-                                + F5_t[3] * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_1)
-                                    + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * QD_1 + PQ[b0] * PQ[d1] * QD_0)
-                                    + delta[b1][d1] * (PQ[b0] * PQ[grad_cart_ind] * QD_0)
-                                    + delta[b1][d0] * (PQ[b0] * PQ[grad_cart_ind] * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * QD_1 + PQ[b1] * PQ[d1] * QD_0)
-                                    + delta[b0][d1] * (PQ[b1] * PQ[grad_cart_ind] * QD_0)
-                                    + delta[b0][d0] * (PQ[b1] * PQ[grad_cart_ind] * QD_1)
-                                    + delta[b0][b1] * (PQ[d0] * PQ[grad_cart_ind] * QD_1 + PQ[d1] * PQ[grad_cart_ind] * QD_0)
-                                    + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind])
-                                )
+                            + F5_t[3] * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_0)
+                                + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_1)
+                                + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * QD_1 + PQ[b0] * PQ[d1] * QD_0)
+                                + delta[b1][d1] * (PQ[b0] * PQ[grad_cart_ind] * QD_0)
+                                + delta[b1][d0] * (PQ[b0] * PQ[grad_cart_ind] * QD_1)
+                                + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * QD_1 + PQ[b1] * PQ[d1] * QD_0)
+                                + delta[b0][d1] * (PQ[b1] * PQ[grad_cart_ind] * QD_0)
+                                + delta[b0][d0] * (PQ[b1] * PQ[grad_cart_ind] * QD_1)
+                                + delta[b0][b1] * (PQ[d0] * PQ[grad_cart_ind] * QD_1 + PQ[d1] * PQ[grad_cart_ind] * QD_0)
+                                + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind])
+                            )
 
-                                + F5_t[3] * 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    + PA_x * PB_0 * PQ[b1] * PQ[d0] * PQ[d1]
-                                    + PA_x * PB_1 * PQ[b0] * PQ[d0] * PQ[d1]
-                                    + PB_0 * PB_1 * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
-                                )
+                            + F5_t[3] * 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                + PA_x * PB_0 * PQ[b1] * PQ[d0] * PQ[d1]
+                                + PA_x * PB_1 * PQ[b0] * PQ[d0] * PQ[d1]
+                                + PB_0 * PB_1 * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
+                            )
 
-                                + F5_t[3] * 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    + PA_x * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * (-1.0)
-                                    + PA_x * PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * (-1.0)
-                                    + PB_0 * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
-                                    + PB_0 * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
-                                )
+                            + F5_t[3] * 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                + PA_x * PQ[b0] * PQ[b1] * PQ[d0] * QD_1 * (-1.0)
+                                + PA_x * PQ[b0] * PQ[b1] * PQ[d1] * QD_0 * (-1.0)
+                                + PB_0 * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
+                                + PB_0 * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
+                                + PB_1 * PQ[b0] * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
+                                + PB_1 * PQ[b0] * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
+                            )
 
-                                + F5_t[3] * 2.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    + PQ[b0] * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1
-                                )
+                            + F5_t[3] * 2.0 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                + PQ[b0] * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1
+                            )
 
-                                + F5_t[3] * 0.5 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PQ[b0])
-                                    + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PQ[b1])
-                                    + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (PQ[d0])
-                                    + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (PQ[d1])
-                                    + (delta[b0][b1] * delta[d0][d1] + delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (PQ[grad_cart_ind])
-                                )
+                            + F5_t[3] * 0.5 * S2 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PQ[b0])
+                                + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PQ[b1])
+                                + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (PQ[d0])
+                                + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (PQ[d1])
+                                + (delta[b0][b1] * delta[d0][d1] + delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (PQ[grad_cart_ind])
+                            )
 
-                                + F5_t[4] * (-1.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d0])
-                                    + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d1])
-                                    + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind])
-                                    + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * PQ[d1])
-                                    + delta[b1][d1] * (PQ[b0] * PQ[d0] * PQ[grad_cart_ind])
-                                    + delta[b1][d0] * (PQ[b0] * PQ[d1] * PQ[grad_cart_ind])
-                                    + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * PQ[d1])
-                                    + delta[b0][d1] * (PQ[b1] * PQ[d0] * PQ[grad_cart_ind])
-                                    + delta[b0][d0] * (PQ[b1] * PQ[d1] * PQ[grad_cart_ind])
-                                    + delta[b0][b1] * (PQ[d0] * PQ[d1] * PQ[grad_cart_ind])
-                                )
+                            + F5_t[4] * (-1.0) * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d0])
+                                + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d1])
+                                + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind])
+                                + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * PQ[d1])
+                                + delta[b1][d1] * (PQ[b0] * PQ[d0] * PQ[grad_cart_ind])
+                                + delta[b1][d0] * (PQ[b0] * PQ[d1] * PQ[grad_cart_ind])
+                                + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * PQ[d1])
+                                + delta[b0][d1] * (PQ[b1] * PQ[d0] * PQ[grad_cart_ind])
+                                + delta[b0][d0] * (PQ[b1] * PQ[d1] * PQ[grad_cart_ind])
+                                + delta[b0][b1] * (PQ[d0] * PQ[d1] * PQ[grad_cart_ind])
+                            )
 
-                                + F5_t[4] * 2.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    + PA_x * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1]
-                                    + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
-                                    + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
-                                )
+                            + F5_t[4] * 2.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                + PA_x * PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1]
+                                + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
+                                + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
+                            )
 
-                                + F5_t[4] * 2.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    + PQ[b0] * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
-                                    + PQ[b0] * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
-                                )
+                            + F5_t[4] * 2.0 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                + PQ[b0] * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1 * (-1.0)
+                                + PQ[b0] * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0 * (-1.0)
+                            )
 
-                                + F5_t[5] * 2.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
-                                    PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
-                                )
+                            + F5_t[5] * 2.0 * S1 * S1 * S2 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_i * (
+                                PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
+                            )
 
-                        );
+                    );
 
-                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
 
         }
     }
@@ -617,286 +617,286 @@ computeExchangeGradientSDSD_K_0(double*         grad_x,
                 break;
             }
 
-                const auto l_prim = D_inds_K_sd[displ_k + l];
+            const auto l_prim = D_inds_K_sd[displ_k + l];
 
-                const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
 
-                const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
 
-                const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                       d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                       d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
+                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
 
-                const auto S_kl_00 = pair_data_K_sd[displ_k + l];
+            const auto S_kl_00 = pair_data_K_sd[displ_k + l];
 
-                const auto d0 = d_cart_inds[l_prim % 6][0];
-                const auto d1 = d_cart_inds[l_prim % 6][1];
+            const auto d0 = d_cart_inds[l_prim % 6][0];
+            const auto d1 = d_cart_inds[l_prim % 6][1];
 
-                // J. Chem. Phys. 84, 3963-3974 (1986)
+            // J. Chem. Phys. 84, 3963-3974 (1986)
 
-                const auto S2 = a_k + a_l;
+            const auto S2 = a_k + a_l;
 
-                const auto inv_S2 = 1.0 / S2;
-                const auto inv_S4 = 1.0 / (S1 + S2);
+            const auto inv_S2 = 1.0 / S2;
+            const auto inv_S4 = 1.0 / (S1 + S2);
 
-                const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                      (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                      (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
 
-                const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
-                const auto rho = S1 * S2 * inv_S4;
+            const auto rho = S1 * S2 * inv_S4;
 
-                if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
+            if (omega != 0.0) d2 = omega * omega / (rho + omega * omega);
 
-                const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
+            const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
 
-                double F5_t[6];
+            double F5_t[6];
 
-                gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
+            gpu::computeBoysFunction(F5_t, rho * d2 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-                if (omega != 0.0)
-                {
-                    F5_t[1] *= d2;
-                    F5_t[2] *= d2 * d2;
-                    F5_t[3] *= d2 * d2 * d2;
-                    F5_t[4] *= d2 * d2 * d2 * d2;
-                    F5_t[5] *= d2 * d2 * d2 * d2 * d2;
-                }
+            if (omega != 0.0)
+            {
+                F5_t[1] *= d2;
+                F5_t[2] *= d2 * d2;
+                F5_t[3] *= d2 * d2 * d2;
+                F5_t[4] *= d2 * d2 * d2 * d2;
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2;
+            }
 
-                const double QC_x = (a_l * inv_S2) * (r_l[grad_cart_ind] - r_k[grad_cart_ind]);
+            const double QC_x = (a_l * inv_S2) * (r_l[grad_cart_ind] - r_k[grad_cart_ind]);
 
-                const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-                const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
-
-
-                // lambda grad
-
-                const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                                F5_t[0] * 0.5 * inv_S1 * inv_S2 * a_k * (
-                                    delta[b0][b1] * delta[d1][grad_cart_ind] * (QD_0)
-                                    + delta[b0][b1] * delta[d0][grad_cart_ind] * (QD_1)
-                                    + delta[b0][b1] * delta[d0][d1] * (QC_x)
-                                )
-
-                                + F5_t[0] * inv_S1 * a_k * (
-                                    delta[b0][b1] * (QC_x * QD_0 * QD_1)
-                                )
-
-                                + F5_t[0] * inv_S2 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PB_1 * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * QD_1)
-                                    + delta[d0][d1] * (PB_0 * PB_1 * QC_x)
-                                )
-
-                                + F5_t[0] * 2.0 * a_k * (
-                                    + PB_0 * PB_1 * QC_x * QD_0 * QD_1
-                                )
-
-                                + F5_t[1] * (-0.5) * inv_S1 * inv_S4 * a_k * (
-                                    delta[b0][b1] * delta[d1][grad_cart_ind] * (QD_0)
-                                    + delta[b0][b1] * delta[d0][grad_cart_ind] * (QD_1)
-                                    + delta[b0][b1] * delta[d0][d1] * (QC_x)
-                                )
-
-                                + F5_t[1] * 0.5 * inv_S2 * inv_S4 * a_k * (
-                                    (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PB_0)
-                                    + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PB_1)
-                                    + delta[b0][b1] * delta[d1][grad_cart_ind] * (PQ[d0] * (-1.0) + QD_0 * (-1.0))
-                                    + delta[b0][b1] * delta[d0][grad_cart_ind] * (PQ[d1] * (-1.0) + QD_1 * (-1.0))
-                                    + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind] * (-1.0) + QC_x * (-1.0))
-                                )
-
-                                + F5_t[1] * (-1.0) * S1 * inv_S2 * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PB_1 * PQ[d0] + PB_0 * PB_1 * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * PQ[d1] + PB_0 * PB_1 * QD_1)
-                                    + delta[d0][d1] * (PB_0 * PB_1 * PQ[grad_cart_ind] + PB_0 * PB_1 * QC_x)
-                                )
-
-                                + F5_t[1] * (-1.0) * S2 * inv_S1 * inv_S4 * a_k * (
-                                    delta[b0][b1] * (QC_x * QD_0 * QD_1)
-                                )
-
-                                + F5_t[1] * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * QD_0 + PB_1 * PQ[b0] * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * QD_1 + PB_1 * PQ[b0] * QD_1)
-                                    + delta[d0][d1] * (PB_0 * PQ[b1] * QC_x + PB_1 * PQ[b0] * QC_x)
-                                    + delta[b1][grad_cart_ind] * (PB_0 * QD_0 * QD_1)
-                                    + delta[b1][d1] * (PB_0 * QC_x * QD_0)
-                                    + delta[b1][d0] * (PB_0 * QC_x * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PB_1 * QD_0 * QD_1)
-                                    + delta[b0][d1] * (PB_1 * QC_x * QD_0)
-                                    + delta[b0][d0] * (PB_1 * QC_x * QD_1)
-                                    + delta[b0][b1] * (PQ[d0] * QC_x * QD_1 * (-1.0) + PQ[d1] * QC_x * QD_0 * (-1.0) + PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0))
-                                )
-
-                                + F5_t[1] * 2.0 * S1 * inv_S4 * a_k * (
-                                    + PB_0 * PB_1 * PQ[d0] * QC_x * QD_1 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[d1] * QC_x * QD_0 * (-1.0)
-                                    + PB_0 * PB_1 * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
-                                )
-
-                                + F5_t[1] * 2.0 * S2 * inv_S4 * a_k * (
-                                    + PB_0 * PQ[b1] * QC_x * QD_0 * QD_1
-                                    + PB_1 * PQ[b0] * QC_x * QD_0 * QD_1
-                                )
-
-                                + F5_t[2] * 0.5 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * (
-                                    (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PB_0 * (-1.0))
-                                    + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PB_1 * (-1.0))
-                                    + delta[b0][b1] * delta[d1][grad_cart_ind] * (PQ[d0])
-                                    + delta[b0][b1] * delta[d0][grad_cart_ind] * (PQ[d1])
-                                    + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind])
-                                )
-
-                                + F5_t[2] * 0.5 * inv_S4 * inv_S4 * a_k * (
-                                    delta[b0][b1] * delta[d1][grad_cart_ind] * (PQ[d0] + QD_0)
-                                    + (delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (QD_0)
-                                    + delta[b0][b1] * delta[d0][grad_cart_ind] * (PQ[d1] + QD_1)
-                                    + (delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (QD_1)
-                                    + (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PQ[b0])
-                                    + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PQ[b1])
-                                    + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind] + QC_x)
-                                    + (delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (QC_x)
-                                )
-
-                                + F5_t[2] * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PB_1 * PQ[d0])
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * PQ[d1])
-                                    + delta[d0][d1] * (PB_0 * PB_1 * PQ[grad_cart_ind])
-                                )
-
-                                + F5_t[2] * S1 * inv_S4 * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d0] * (-1.0) + PB_0 * PQ[b1] * QD_0 * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * (-1.0) + PB_1 * PQ[b0] * QD_0 * (-1.0))
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d1] * (-1.0) + PB_0 * PQ[b1] * QD_1 * (-1.0) + PB_1 * PQ[b0] * PQ[d1] * (-1.0) + PB_1 * PQ[b0] * QD_1 * (-1.0))
-                                    + delta[d0][d1] * (PB_0 * PQ[b1] * PQ[grad_cart_ind] * (-1.0) + PB_0 * PQ[b1] * QC_x * (-1.0) + PB_1 * PQ[b0] * PQ[grad_cart_ind] * (-1.0) + PB_1 * PQ[b0] * QC_x * (-1.0))
-                                    + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * (-1.0))
-                                    + delta[b1][d1] * (PB_0 * PQ[d0] * QC_x * (-1.0) + PB_0 * PQ[grad_cart_ind] * QD_0 * (-1.0))
-                                    + delta[b1][d0] * (PB_0 * PQ[d1] * QC_x * (-1.0) + PB_0 * PQ[grad_cart_ind] * QD_1 * (-1.0))
-                                    + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[d1] * QD_0 * (-1.0))
-                                    + delta[b0][d1] * (PB_1 * PQ[d0] * QC_x * (-1.0) + PB_1 * PQ[grad_cart_ind] * QD_0 * (-1.0))
-                                    + delta[b0][d0] * (PB_1 * PQ[d1] * QC_x * (-1.0) + PB_1 * PQ[grad_cart_ind] * QD_1 * (-1.0))
-                                    + delta[b0][b1] * (PQ[d0] * PQ[d1] * QC_x + PQ[d0] * PQ[grad_cart_ind] * QD_1 + PQ[d1] * PQ[grad_cart_ind] * QD_0)
-                                )
-
-                                + F5_t[2] * S2 * inv_S4 * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_1)
-                                    + delta[b1][grad_cart_ind] * (PQ[b0] * QD_0 * QD_1)
-                                    + delta[b1][d1] * (PQ[b0] * QC_x * QD_0)
-                                    + delta[b1][d0] * (PQ[b0] * QC_x * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PQ[b1] * QD_0 * QD_1)
-                                    + delta[b0][d1] * (PQ[b1] * QC_x * QD_0)
-                                    + delta[b0][d0] * (PQ[b1] * QC_x * QD_1)
-                                    + delta[b0][b1] * (PQ[d0] * QC_x * QD_1 + PQ[d1] * QC_x * QD_0 + PQ[grad_cart_ind] * QD_0 * QD_1)
-                                    + delta[d0][d1] * (PQ[b0] * PQ[b1] * QC_x)
-                                )
-
-                                + F5_t[2] * 2.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * (
-                                    + PB_0 * PB_1 * PQ[d0] * PQ[d1] * QC_x
-                                    + PB_0 * PB_1 * PQ[d0] * PQ[grad_cart_ind] * QD_1
-                                    + PB_0 * PB_1 * PQ[d1] * PQ[grad_cart_ind] * QD_0
-                                )
-
-                                + F5_t[2] * 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
-                                    + PB_0 * PQ[b1] * PQ[d0] * QC_x * QD_1 * (-1.0)
-                                    + PB_0 * PQ[b1] * PQ[d1] * QC_x * QD_0 * (-1.0)
-                                    + PB_0 * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[d0] * QC_x * QD_1 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[d1] * QC_x * QD_0 * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
-                                )
-
-                                + F5_t[2] * 2.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * (
-                                    + PQ[b0] * PQ[b1] * QC_x * QD_0 * QD_1
-                                )
-
-                                + F5_t[3] * (-0.5) * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PQ[b0])
-                                    + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PQ[b1])
-                                    + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (PQ[d0])
-                                    + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (PQ[d1])
-                                    + (delta[b0][b1] * delta[d0][d1] + delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (PQ[grad_cart_ind])
-                                )
-
-                                + F5_t[3] * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d0] + PB_1 * PQ[b0] * PQ[d0])
-                                    + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d1] + PB_1 * PQ[b0] * PQ[d1])
-                                    + delta[d0][d1] * (PB_0 * PQ[b1] * PQ[grad_cart_ind] + PB_1 * PQ[b0] * PQ[grad_cart_ind])
-                                    + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * PQ[d1])
-                                    + delta[b1][d1] * (PB_0 * PQ[d0] * PQ[grad_cart_ind])
-                                    + delta[b1][d0] * (PB_0 * PQ[d1] * PQ[grad_cart_ind])
-                                    + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * PQ[d1])
-                                    + delta[b0][d1] * (PB_1 * PQ[d0] * PQ[grad_cart_ind])
-                                    + delta[b0][d0] * (PB_1 * PQ[d1] * PQ[grad_cart_ind])
-                                    + delta[b0][b1] * (PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0))
-                                )
-
-                                + F5_t[3] * (-1.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d0] + PQ[b0] * PQ[b1] * QD_0)
-                                    + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d1] + PQ[b0] * PQ[b1] * QD_1)
-                                    + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind] + PQ[b0] * PQ[b1] * QC_x)
-                                    + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * QD_1 + PQ[b0] * PQ[d1] * QD_0)
-                                    + delta[b1][d1] * (PQ[b0] * PQ[d0] * QC_x + PQ[b0] * PQ[grad_cart_ind] * QD_0)
-                                    + delta[b1][d0] * (PQ[b0] * PQ[d1] * QC_x + PQ[b0] * PQ[grad_cart_ind] * QD_1)
-                                    + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * QD_1 + PQ[b1] * PQ[d1] * QD_0)
-                                    + delta[b0][d1] * (PQ[b1] * PQ[d0] * QC_x + PQ[b1] * PQ[grad_cart_ind] * QD_0)
-                                    + delta[b0][d0] * (PQ[b1] * PQ[d1] * QC_x + PQ[b1] * PQ[grad_cart_ind] * QD_1)
-                                    + delta[b0][b1] * (PQ[d0] * PQ[d1] * QC_x + PQ[d0] * PQ[grad_cart_ind] * QD_1 + PQ[d1] * PQ[grad_cart_ind] * QD_0)
-                                )
-
-                                + F5_t[3] * 2.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    + PB_0 * PB_1 * PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0)
-                                )
-
-                                + F5_t[3] * 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * QC_x
-                                    + PB_0 * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1
-                                    + PB_0 * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0
-                                    + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_x
-                                    + PB_1 * PQ[b0] * PQ[d0] * PQ[grad_cart_ind] * QD_1
-                                    + PB_1 * PQ[b0] * PQ[d1] * PQ[grad_cart_ind] * QD_0
-                                )
-
-                                + F5_t[3] * 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    + PQ[b0] * PQ[b1] * PQ[d0] * QC_x * QD_1 * (-1.0)
-                                    + PQ[b0] * PQ[b1] * PQ[d1] * QC_x * QD_0 * (-1.0)
-                                    + PQ[b0] * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
-                                )
-
-                                + F5_t[4] * 2.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0)
-                                    + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0)
-                                )
-
-                                + F5_t[4] * 2.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    + PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_x
-                                    + PQ[b0] * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1
-                                    + PQ[b0] * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0
-                                )
-
-                                + F5_t[4] * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d0])
-                                    + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d1])
-                                    + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind])
-                                    + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * PQ[d1])
-                                    + delta[b1][d1] * (PQ[b0] * PQ[d0] * PQ[grad_cart_ind])
-                                    + delta[b1][d0] * (PQ[b0] * PQ[d1] * PQ[grad_cart_ind])
-                                    + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * PQ[d1])
-                                    + delta[b0][d1] * (PQ[b1] * PQ[d0] * PQ[grad_cart_ind])
-                                    + delta[b0][d0] * (PQ[b1] * PQ[d1] * PQ[grad_cart_ind])
-                                    + delta[b0][b1] * (PQ[d0] * PQ[d1] * PQ[grad_cart_ind])
-                                )
-
-                                + F5_t[5] * (-2.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
-                                    PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
-                                )
+            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
 
-                        );
+            // lambda grad
 
-                ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                            F5_t[0] * 0.5 * inv_S1 * inv_S2 * a_k * (
+                                delta[b0][b1] * delta[d1][grad_cart_ind] * (QD_0)
+                                + delta[b0][b1] * delta[d0][grad_cart_ind] * (QD_1)
+                                + delta[b0][b1] * delta[d0][d1] * (QC_x)
+                            )
+
+                            + F5_t[0] * inv_S1 * a_k * (
+                                delta[b0][b1] * (QC_x * QD_0 * QD_1)
+                            )
+
+                            + F5_t[0] * inv_S2 * a_k * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PB_1 * QD_0)
+                                + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * QD_1)
+                                + delta[d0][d1] * (PB_0 * PB_1 * QC_x)
+                            )
+
+                            + F5_t[0] * 2.0 * a_k * (
+                                + PB_0 * PB_1 * QC_x * QD_0 * QD_1
+                            )
+
+                            + F5_t[1] * (-0.5) * inv_S1 * inv_S4 * a_k * (
+                                delta[b0][b1] * delta[d1][grad_cart_ind] * (QD_0)
+                                + delta[b0][b1] * delta[d0][grad_cart_ind] * (QD_1)
+                                + delta[b0][b1] * delta[d0][d1] * (QC_x)
+                            )
+
+                            + F5_t[1] * 0.5 * inv_S2 * inv_S4 * a_k * (
+                                (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PB_0)
+                                + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PB_1)
+                                + delta[b0][b1] * delta[d1][grad_cart_ind] * (PQ[d0] * (-1.0) + QD_0 * (-1.0))
+                                + delta[b0][b1] * delta[d0][grad_cart_ind] * (PQ[d1] * (-1.0) + QD_1 * (-1.0))
+                                + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind] * (-1.0) + QC_x * (-1.0))
+                            )
+
+                            + F5_t[1] * (-1.0) * S1 * inv_S2 * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PB_1 * PQ[d0] + PB_0 * PB_1 * QD_0)
+                                + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * PQ[d1] + PB_0 * PB_1 * QD_1)
+                                + delta[d0][d1] * (PB_0 * PB_1 * PQ[grad_cart_ind] + PB_0 * PB_1 * QC_x)
+                            )
+
+                            + F5_t[1] * (-1.0) * S2 * inv_S1 * inv_S4 * a_k * (
+                                delta[b0][b1] * (QC_x * QD_0 * QD_1)
+                            )
+
+                            + F5_t[1] * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * QD_0 + PB_1 * PQ[b0] * QD_0)
+                                + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * QD_1 + PB_1 * PQ[b0] * QD_1)
+                                + delta[d0][d1] * (PB_0 * PQ[b1] * QC_x + PB_1 * PQ[b0] * QC_x)
+                                + delta[b1][grad_cart_ind] * (PB_0 * QD_0 * QD_1)
+                                + delta[b1][d1] * (PB_0 * QC_x * QD_0)
+                                + delta[b1][d0] * (PB_0 * QC_x * QD_1)
+                                + delta[b0][grad_cart_ind] * (PB_1 * QD_0 * QD_1)
+                                + delta[b0][d1] * (PB_1 * QC_x * QD_0)
+                                + delta[b0][d0] * (PB_1 * QC_x * QD_1)
+                                + delta[b0][b1] * (PQ[d0] * QC_x * QD_1 * (-1.0) + PQ[d1] * QC_x * QD_0 * (-1.0) + PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0))
+                            )
+
+                            + F5_t[1] * 2.0 * S1 * inv_S4 * a_k * (
+                                + PB_0 * PB_1 * PQ[d0] * QC_x * QD_1 * (-1.0)
+                                + PB_0 * PB_1 * PQ[d1] * QC_x * QD_0 * (-1.0)
+                                + PB_0 * PB_1 * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
+                            )
+
+                            + F5_t[1] * 2.0 * S2 * inv_S4 * a_k * (
+                                + PB_0 * PQ[b1] * QC_x * QD_0 * QD_1
+                                + PB_1 * PQ[b0] * QC_x * QD_0 * QD_1
+                            )
+
+                            + F5_t[2] * 0.5 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * (
+                                (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PB_0 * (-1.0))
+                                + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PB_1 * (-1.0))
+                                + delta[b0][b1] * delta[d1][grad_cart_ind] * (PQ[d0])
+                                + delta[b0][b1] * delta[d0][grad_cart_ind] * (PQ[d1])
+                                + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind])
+                            )
+
+                            + F5_t[2] * 0.5 * inv_S4 * inv_S4 * a_k * (
+                                delta[b0][b1] * delta[d1][grad_cart_ind] * (PQ[d0] + QD_0)
+                                + (delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (QD_0)
+                                + delta[b0][b1] * delta[d0][grad_cart_ind] * (PQ[d1] + QD_1)
+                                + (delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (QD_1)
+                                + (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PQ[b0])
+                                + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PQ[b1])
+                                + delta[b0][b1] * delta[d0][d1] * (PQ[grad_cart_ind] + QC_x)
+                                + (delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (QC_x)
+                            )
+
+                            + F5_t[2] * S1 * S1 * inv_S2 * inv_S4 * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PB_1 * PQ[d0])
+                                + delta[d0][grad_cart_ind] * (PB_0 * PB_1 * PQ[d1])
+                                + delta[d0][d1] * (PB_0 * PB_1 * PQ[grad_cart_ind])
+                            )
+
+                            + F5_t[2] * S1 * inv_S4 * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d0] * (-1.0) + PB_0 * PQ[b1] * QD_0 * (-1.0) + PB_1 * PQ[b0] * PQ[d0] * (-1.0) + PB_1 * PQ[b0] * QD_0 * (-1.0))
+                                + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d1] * (-1.0) + PB_0 * PQ[b1] * QD_1 * (-1.0) + PB_1 * PQ[b0] * PQ[d1] * (-1.0) + PB_1 * PQ[b0] * QD_1 * (-1.0))
+                                + delta[d0][d1] * (PB_0 * PQ[b1] * PQ[grad_cart_ind] * (-1.0) + PB_0 * PQ[b1] * QC_x * (-1.0) + PB_1 * PQ[b0] * PQ[grad_cart_ind] * (-1.0) + PB_1 * PQ[b0] * QC_x * (-1.0))
+                                + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * QD_1 * (-1.0) + PB_0 * PQ[d1] * QD_0 * (-1.0))
+                                + delta[b1][d1] * (PB_0 * PQ[d0] * QC_x * (-1.0) + PB_0 * PQ[grad_cart_ind] * QD_0 * (-1.0))
+                                + delta[b1][d0] * (PB_0 * PQ[d1] * QC_x * (-1.0) + PB_0 * PQ[grad_cart_ind] * QD_1 * (-1.0))
+                                + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * QD_1 * (-1.0) + PB_1 * PQ[d1] * QD_0 * (-1.0))
+                                + delta[b0][d1] * (PB_1 * PQ[d0] * QC_x * (-1.0) + PB_1 * PQ[grad_cart_ind] * QD_0 * (-1.0))
+                                + delta[b0][d0] * (PB_1 * PQ[d1] * QC_x * (-1.0) + PB_1 * PQ[grad_cart_ind] * QD_1 * (-1.0))
+                                + delta[b0][b1] * (PQ[d0] * PQ[d1] * QC_x + PQ[d0] * PQ[grad_cart_ind] * QD_1 + PQ[d1] * PQ[grad_cart_ind] * QD_0)
+                            )
+
+                            + F5_t[2] * S2 * inv_S4 * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_0)
+                                + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * QD_1)
+                                + delta[b1][grad_cart_ind] * (PQ[b0] * QD_0 * QD_1)
+                                + delta[b1][d1] * (PQ[b0] * QC_x * QD_0)
+                                + delta[b1][d0] * (PQ[b0] * QC_x * QD_1)
+                                + delta[b0][grad_cart_ind] * (PQ[b1] * QD_0 * QD_1)
+                                + delta[b0][d1] * (PQ[b1] * QC_x * QD_0)
+                                + delta[b0][d0] * (PQ[b1] * QC_x * QD_1)
+                                + delta[b0][b1] * (PQ[d0] * QC_x * QD_1 + PQ[d1] * QC_x * QD_0 + PQ[grad_cart_ind] * QD_0 * QD_1)
+                                + delta[d0][d1] * (PQ[b0] * PQ[b1] * QC_x)
+                            )
+
+                            + F5_t[2] * 2.0 * S1 * S1 * inv_S4 * inv_S4 * a_k * (
+                                + PB_0 * PB_1 * PQ[d0] * PQ[d1] * QC_x
+                                + PB_0 * PB_1 * PQ[d0] * PQ[grad_cart_ind] * QD_1
+                                + PB_0 * PB_1 * PQ[d1] * PQ[grad_cart_ind] * QD_0
+                            )
+
+                            + F5_t[2] * 2.0 * S1 * S2 * inv_S4 * inv_S4 * a_k * (
+                                + PB_0 * PQ[b1] * PQ[d0] * QC_x * QD_1 * (-1.0)
+                                + PB_0 * PQ[b1] * PQ[d1] * QC_x * QD_0 * (-1.0)
+                                + PB_0 * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
+                                + PB_1 * PQ[b0] * PQ[d0] * QC_x * QD_1 * (-1.0)
+                                + PB_1 * PQ[b0] * PQ[d1] * QC_x * QD_0 * (-1.0)
+                                + PB_1 * PQ[b0] * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
+                            )
+
+                            + F5_t[2] * 2.0 * S2 * S2 * inv_S4 * inv_S4 * a_k * (
+                                + PQ[b0] * PQ[b1] * QC_x * QD_0 * QD_1
+                            )
+
+                            + F5_t[3] * (-0.5) * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                (delta[b1][d0] * delta[d1][grad_cart_ind] + delta[b1][d1] * delta[d0][grad_cart_ind] + delta[b1][grad_cart_ind] * delta[d0][d1]) * (PQ[b0])
+                                + (delta[b0][d0] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[d0][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[d0][d1]) * (PQ[b1])
+                                + (delta[b0][b1] * delta[d1][grad_cart_ind] + delta[b0][d1] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d1]) * (PQ[d0])
+                                + (delta[b0][b1] * delta[d0][grad_cart_ind] + delta[b0][d0] * delta[b1][grad_cart_ind] + delta[b0][grad_cart_ind] * delta[b1][d0]) * (PQ[d1])
+                                + (delta[b0][b1] * delta[d0][d1] + delta[b0][d0] * delta[b1][d1] + delta[b0][d1] * delta[b1][d0]) * (PQ[grad_cart_ind])
+                            )
+
+                            + F5_t[3] * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d0] + PB_1 * PQ[b0] * PQ[d0])
+                                + delta[d0][grad_cart_ind] * (PB_0 * PQ[b1] * PQ[d1] + PB_1 * PQ[b0] * PQ[d1])
+                                + delta[d0][d1] * (PB_0 * PQ[b1] * PQ[grad_cart_ind] + PB_1 * PQ[b0] * PQ[grad_cart_ind])
+                                + delta[b1][grad_cart_ind] * (PB_0 * PQ[d0] * PQ[d1])
+                                + delta[b1][d1] * (PB_0 * PQ[d0] * PQ[grad_cart_ind])
+                                + delta[b1][d0] * (PB_0 * PQ[d1] * PQ[grad_cart_ind])
+                                + delta[b0][grad_cart_ind] * (PB_1 * PQ[d0] * PQ[d1])
+                                + delta[b0][d1] * (PB_1 * PQ[d0] * PQ[grad_cart_ind])
+                                + delta[b0][d0] * (PB_1 * PQ[d1] * PQ[grad_cart_ind])
+                                + delta[b0][b1] * (PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0))
+                            )
+
+                            + F5_t[3] * (-1.0) * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d0] + PQ[b0] * PQ[b1] * QD_0)
+                                + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d1] + PQ[b0] * PQ[b1] * QD_1)
+                                + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind] + PQ[b0] * PQ[b1] * QC_x)
+                                + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * QD_1 + PQ[b0] * PQ[d1] * QD_0)
+                                + delta[b1][d1] * (PQ[b0] * PQ[d0] * QC_x + PQ[b0] * PQ[grad_cart_ind] * QD_0)
+                                + delta[b1][d0] * (PQ[b0] * PQ[d1] * QC_x + PQ[b0] * PQ[grad_cart_ind] * QD_1)
+                                + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * QD_1 + PQ[b1] * PQ[d1] * QD_0)
+                                + delta[b0][d1] * (PQ[b1] * PQ[d0] * QC_x + PQ[b1] * PQ[grad_cart_ind] * QD_0)
+                                + delta[b0][d0] * (PQ[b1] * PQ[d1] * QC_x + PQ[b1] * PQ[grad_cart_ind] * QD_1)
+                                + delta[b0][b1] * (PQ[d0] * PQ[d1] * QC_x + PQ[d0] * PQ[grad_cart_ind] * QD_1 + PQ[d1] * PQ[grad_cart_ind] * QD_0)
+                            )
+
+                            + F5_t[3] * 2.0 * S1 * S1 * S1 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                + PB_0 * PB_1 * PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0)
+                            )
+
+                            + F5_t[3] * 2.0 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * QC_x
+                                + PB_0 * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1
+                                + PB_0 * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0
+                                + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * QC_x
+                                + PB_1 * PQ[b0] * PQ[d0] * PQ[grad_cart_ind] * QD_1
+                                + PB_1 * PQ[b0] * PQ[d1] * PQ[grad_cart_ind] * QD_0
+                            )
+
+                            + F5_t[3] * 2.0 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                + PQ[b0] * PQ[b1] * PQ[d0] * QC_x * QD_1 * (-1.0)
+                                + PQ[b0] * PQ[b1] * PQ[d1] * QC_x * QD_0 * (-1.0)
+                                + PQ[b0] * PQ[b1] * PQ[grad_cart_ind] * QD_0 * QD_1 * (-1.0)
+                            )
+
+                            + F5_t[4] * 2.0 * S1 * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                + PB_0 * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0)
+                                + PB_1 * PQ[b0] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind] * (-1.0)
+                            )
+
+                            + F5_t[4] * 2.0 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                + PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * QC_x
+                                + PQ[b0] * PQ[b1] * PQ[d0] * PQ[grad_cart_ind] * QD_1
+                                + PQ[b0] * PQ[b1] * PQ[d1] * PQ[grad_cart_ind] * QD_0
+                            )
+
+                            + F5_t[4] * S1 * S1 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                delta[d1][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d0])
+                                + delta[d0][grad_cart_ind] * (PQ[b0] * PQ[b1] * PQ[d1])
+                                + delta[d0][d1] * (PQ[b0] * PQ[b1] * PQ[grad_cart_ind])
+                                + delta[b1][grad_cart_ind] * (PQ[b0] * PQ[d0] * PQ[d1])
+                                + delta[b1][d1] * (PQ[b0] * PQ[d0] * PQ[grad_cart_ind])
+                                + delta[b1][d0] * (PQ[b0] * PQ[d1] * PQ[grad_cart_ind])
+                                + delta[b0][grad_cart_ind] * (PQ[b1] * PQ[d0] * PQ[d1])
+                                + delta[b0][d1] * (PQ[b1] * PQ[d0] * PQ[grad_cart_ind])
+                                + delta[b0][d0] * (PQ[b1] * PQ[d1] * PQ[grad_cart_ind])
+                                + delta[b0][b1] * (PQ[d0] * PQ[d1] * PQ[grad_cart_ind])
+                            )
+
+                            + F5_t[5] * (-2.0) * S1 * S1 * S1 * S2 * S2 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * inv_S4 * a_k * (
+                                PQ[b0] * PQ[b1] * PQ[d0] * PQ[d1] * PQ[grad_cart_ind]
+                            )
+
+
+                    );
+
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
         }
     }
 
