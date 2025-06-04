@@ -121,62 +121,62 @@ computeCoulombGradientSSSS_I_0(double*         grad_x,
             break;
         }
 
-            const auto k = ss_first_inds[kl];
-            const auto l = ss_second_inds[kl];
+        const auto k = ss_first_inds[kl];
+        const auto l = ss_second_inds[kl];
 
-            const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = s_prim_info[k + s_prim_count * 0];
 
-            const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                                   s_prim_info[k + s_prim_count * 3],
-                                   s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
+                               s_prim_info[k + s_prim_count * 3],
+                               s_prim_info[k + s_prim_count * 4]};
 
-            const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = s_prim_info[l + s_prim_count * 0];
 
-            const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                                   s_prim_info[l + s_prim_count * 3],
-                                   s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
+                               s_prim_info[l + s_prim_count * 3],
+                               s_prim_info[l + s_prim_count * 4]};
 
-            const auto S_kl_00 = ss_pair_data[kl];
-
-
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto S2 = a_k + a_l;
-
-            const auto inv_S2 = 1.0 / S2;
-            const auto inv_S4 = 1.0 / (S1 + S2);
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
-
-            double F1_t[2];
-
-            gpu::computeBoysFunction(F1_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+        const auto S_kl_00 = ss_pair_data[kl];
 
 
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            double kl_factor = (static_cast<double>(k != l) + 1.0);
+        const auto S2 = a_k + a_l;
 
-            // mu grad
+        const auto inv_S2 = 1.0 / S2;
+        const auto inv_S4 = 1.0 / (S1 + S2);
 
-            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+        const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                              (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                              (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
 
-                        F1_t[0] * 2.0 * a_i * (
-                            PA_x
-                        )
+        const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
-                        + F1_t[1] * 2.0 * S2 * inv_S4 * a_i * (
-                            PQ[grad_cart_ind]
-                        )
+        const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
-                    );
+        double F1_t[2];
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
+        gpu::computeBoysFunction(F1_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+
+
+
+        double kl_factor = (static_cast<double>(k != l) + 1.0);
+
+        // mu grad
+
+        const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    F1_t[0] * 2.0 * a_i * (
+                        PA_x
+                    )
+
+                    + F1_t[1] * 2.0 * S2 * inv_S4 * a_i * (
+                        PQ[grad_cart_ind]
+                    )
+
+                );
+
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
 
     }
 
@@ -280,63 +280,63 @@ computeCoulombGradientSSSS_J_0(double*         grad_x,
             break;
         }
 
-            const auto k = ss_first_inds[kl];
-            const auto l = ss_second_inds[kl];
+        const auto k = ss_first_inds[kl];
+        const auto l = ss_second_inds[kl];
 
-            const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = s_prim_info[k + s_prim_count * 0];
 
-            const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                                   s_prim_info[k + s_prim_count * 3],
-                                   s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
+                               s_prim_info[k + s_prim_count * 3],
+                               s_prim_info[k + s_prim_count * 4]};
 
-            const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = s_prim_info[l + s_prim_count * 0];
 
-            const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                                   s_prim_info[l + s_prim_count * 3],
-                                   s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
+                               s_prim_info[l + s_prim_count * 3],
+                               s_prim_info[l + s_prim_count * 4]};
 
-            const auto S_kl_00 = ss_pair_data[kl];
-
-
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto S2 = a_k + a_l;
-
-            const auto inv_S2 = 1.0 / S2;
-            const auto inv_S4 = 1.0 / (S1 + S2);
-
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
-
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
-
-            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
-
-            double F1_t[2];
-
-            gpu::computeBoysFunction(F1_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
+        const auto S_kl_00 = ss_pair_data[kl];
 
 
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            double kl_factor = (static_cast<double>(k != l) + 1.0);
+        const auto S2 = a_k + a_l;
 
-            // nu grad
+        const auto inv_S2 = 1.0 / S2;
+        const auto inv_S4 = 1.0 / (S1 + S2);
 
-            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+        const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                              (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                              (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
 
-                        F1_t[0] * 2.0 * a_j * (
-                            + PB_x
-                        )
+        const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
-                        + F1_t[1] * 2.0 * S2 * inv_S4 * a_j * (
-                            PQ[grad_cart_ind]
-                        )
+        const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+
+        double F1_t[2];
+
+        gpu::computeBoysFunction(F1_t, S1 * S2 * inv_S4 * r2_PQ, 1, boys_func_table, boys_func_ft);
 
 
-                    );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
+        double kl_factor = (static_cast<double>(k != l) + 1.0);
+
+        // nu grad
+
+        const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    F1_t[0] * 2.0 * a_j * (
+                        + PB_x
+                    )
+
+                    + F1_t[1] * 2.0 * S2 * inv_S4 * a_j * (
+                        PQ[grad_cart_ind]
+                    )
+
+
+                );
+
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * kl_factor;
     }
 
 

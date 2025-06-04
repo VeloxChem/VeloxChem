@@ -128,76 +128,76 @@ computeCoulombGradientSSSP_I_0(double*         grad_x,
             break;
         }
 
-            const auto k = sp_first_inds[kl];
-            const auto l = sp_second_inds[kl];
+        const auto k = sp_first_inds[kl];
+        const auto l = sp_second_inds[kl];
 
-            const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = s_prim_info[k + s_prim_count * 0];
 
-            const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                                   s_prim_info[k + s_prim_count * 3],
-                                   s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
+                               s_prim_info[k + s_prim_count * 3],
+                               s_prim_info[k + s_prim_count * 4]};
 
-            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
 
-            const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                                   p_prim_info[l / 3 + p_prim_count * 3],
-                                   p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                               p_prim_info[l / 3 + p_prim_count * 3],
+                               p_prim_info[l / 3 + p_prim_count * 4]};
 
-            const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = sp_pair_data[kl];
 
-            const auto d0 = l % 3;
+        const auto d0 = l % 3;
 
-            // J. Chem. Phys. 84, 3963-3974 (1986)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S2 = a_k + a_l;
+        const auto S2 = a_k + a_l;
 
-            const auto inv_S2 = 1.0 / S2;
-            const auto inv_S4 = 1.0 / (S1 + S2);
+        const auto inv_S2 = 1.0 / S2;
+        const auto inv_S4 = 1.0 / (S1 + S2);
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+        const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                              (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                              (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
 
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+        const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
-            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+        const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
-            double F2_t[3];
+        double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunction(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
 
-            double kl_factor = 2.0;
+        double kl_factor = 2.0;
 
-            // mu grad
+        // mu grad
 
-            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+        const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
-                        F2_t[0] * 2.0 * a_i * (
-                            + PA_x * QD_0
-                        )
+                    F2_t[0] * 2.0 * a_i * (
+                        + PA_x * QD_0
+                    )
 
-                        + F2_t[1] * (-2.0) * S1 * inv_S4 * a_i * (
-                            PA_x * PQ[d0]
-                        )
+                    + F2_t[1] * (-2.0) * S1 * inv_S4 * a_i * (
+                        PA_x * PQ[d0]
+                    )
 
-                        + F2_t[1] * 2.0 * S2 * inv_S4 * a_i * (
-                            + PQ[grad_cart_ind] * QD_0
-                        )
+                    + F2_t[1] * 2.0 * S2 * inv_S4 * a_i * (
+                        + PQ[grad_cart_ind] * QD_0
+                    )
 
-                        + F2_t[1] * inv_S4 * a_i * (
-                            delta[d0][grad_cart_ind]
-                        )
+                    + F2_t[1] * inv_S4 * a_i * (
+                        delta[d0][grad_cart_ind]
+                    )
 
-                        + F2_t[2] * (-2.0) * S1 * S2 * inv_S4 * inv_S4 * a_i * (
-                            PQ[d0] * PQ[grad_cart_ind]
-                        )
+                    + F2_t[2] * (-2.0) * S1 * S2 * inv_S4 * inv_S4 * a_i * (
+                        PQ[d0] * PQ[grad_cart_ind]
+                    )
 
-                    );
+                );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * kl_factor;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * kl_factor;
 
     }
 
@@ -308,77 +308,77 @@ computeCoulombGradientSSSP_J_0(double*         grad_x,
             break;
         }
 
-            const auto k = sp_first_inds[kl];
-            const auto l = sp_second_inds[kl];
+        const auto k = sp_first_inds[kl];
+        const auto l = sp_second_inds[kl];
 
-            const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = s_prim_info[k + s_prim_count * 0];
 
-            const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                                   s_prim_info[k + s_prim_count * 3],
-                                   s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
+                               s_prim_info[k + s_prim_count * 3],
+                               s_prim_info[k + s_prim_count * 4]};
 
-            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
 
-            const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                                   p_prim_info[l / 3 + p_prim_count * 3],
-                                   p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
+                               p_prim_info[l / 3 + p_prim_count * 3],
+                               p_prim_info[l / 3 + p_prim_count * 4]};
 
-            const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = sp_pair_data[kl];
 
-            const auto d0 = l % 3;
+        const auto d0 = l % 3;
 
-            // J. Chem. Phys. 84, 3963-3974 (1986)
+        // J. Chem. Phys. 84, 3963-3974 (1986)
 
-            const auto S2 = a_k + a_l;
+        const auto S2 = a_k + a_l;
 
-            const auto inv_S2 = 1.0 / S2;
-            const auto inv_S4 = 1.0 / (S1 + S2);
+        const auto inv_S2 = 1.0 / S2;
+        const auto inv_S4 = 1.0 / (S1 + S2);
 
-            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
-                                  (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
-                                  (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
+        const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                              (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
+                              (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
 
-            const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
+        const auto r2_PQ = PQ[0] * PQ[0] + PQ[1] * PQ[1] + PQ[2] * PQ[2];
 
-            const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
+        const auto Lambda = sqrt(4.0 * S1 * S2 * MATH_CONST_INV_PI * inv_S4);
 
-            double F2_t[3];
+        double F2_t[3];
 
-            gpu::computeBoysFunction(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
+        gpu::computeBoysFunction(F2_t, S1 * S2 * inv_S4 * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-
-
-            double kl_factor = 2.0;
-
-            // nu grad
-
-            const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
-
-                        F2_t[0] * 2.0 * a_j * (
-                            + PB_x * QD_0
-                        )
-
-                        + F2_t[1] * 2.0 * S1 * inv_S4 * a_j * (
-                            + PB_x * PQ[d0] * (-1.0)
-                        )
-
-                        + F2_t[1] * 2.0 * S2 * inv_S4 * a_j * (
-                            + PQ[grad_cart_ind] * QD_0
-                        )
-
-                        + F2_t[1] * inv_S4 * a_j * (
-                            delta[d0][grad_cart_ind]
-                        )
-
-                        + F2_t[2] * (-2.0) * S1 * S2 * inv_S4 * inv_S4 * a_j * (
-                            PQ[d0] * PQ[grad_cart_ind]
-                        )
+        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
 
 
-                    );
+        double kl_factor = 2.0;
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * kl_factor;
+        // nu grad
+
+        const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
+
+                    F2_t[0] * 2.0 * a_j * (
+                        + PB_x * QD_0
+                    )
+
+                    + F2_t[1] * 2.0 * S1 * inv_S4 * a_j * (
+                        + PB_x * PQ[d0] * (-1.0)
+                    )
+
+                    + F2_t[1] * 2.0 * S2 * inv_S4 * a_j * (
+                        + PQ[grad_cart_ind] * QD_0
+                    )
+
+                    + F2_t[1] * inv_S4 * a_j * (
+                        delta[d0][grad_cart_ind]
+                    )
+
+                    + F2_t[2] * (-2.0) * S1 * S2 * inv_S4 * inv_S4 * a_j * (
+                        PQ[d0] * PQ[grad_cart_ind]
+                    )
+
+
+                );
+
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * kl_factor;
     }
 
 
