@@ -20,6 +20,7 @@ target_sources(vlxobjs
     OldOneElecIntsDrivers.cpp
     OverlapHessian101.cpp
     KineticEnergyHessian101.cpp
+    TCOSFock1GOST.cpp
   )
 
 target_include_directories(vlxobjs
