@@ -41,7 +41,7 @@ import rdkit
 import time
 
 
-from .veloxchemlib import mpi_master, hartree_in_kjpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .smdsolventproperties import get_smd_solvent_properties, get_sigma_properties, get_rzz_parameters
 from .molecule import Molecule
@@ -244,11 +244,7 @@ class SMDDriver:
         
         self.sigma_i = sigma_i
 
-    def _calculate_sigma_k(self):
-        # OBS: from SI 003
-        # for Z_k = F, Si, S, Cl, and Br: sigma_k = sigma_tilde_Z_k
-        # for Z_k != H, C, N, O, F, Si, S, Cl, or Br: sigma_k = 0
-        
+    def _calculate_sigma_k(self):        
         # Table 4:  Any possible surface tension parameter that is not in this table is set equal to zero in SMD. 
         # For example, there is no surface tension on P atoms in SMD. cal/molÅ^2
         param = self.smd_solvent_parameters
@@ -260,17 +256,32 @@ class SMDDriver:
         atoms = self.solute.get_labels()
         num_atoms = len(atoms)
 
+        halogens = ['F', 'Si', 'S', 'Cl', 'Br'] #if Zk in [F, Si, S, Cl, Br], sigma_k = sigma_tilde_Z_k 
+        all_smd_atoms = ['H', 'C', 'N', 'O'] + halogens #Z_k != H, C, N, O, F, Si, S, Cl, or Br: sigma_k = 0
+
         sigma_k = {}
         r_ZZ_param = self.r_zz_dict
 
         for k in range(num_atoms):
-            
-            # TODO: Add a check here: if Zk in [F, Si, S, Cl, Br], sigma_k = sigma_tilde_Z_k 
-            # ... to skip proceeding to pairs
+
             Zk = atoms[k]
             sigma = 0.0
 
+            if Zk not in all_smd_atoms:
+                sigma_k[k] = 0.0
+                continue
+
             # atomic surface tension
+            if Zk in halogens:
+                if self.solvent == 'water':
+                    sigma += sigma_params.get((Zk,), 0.0)
+                else:
+                    s_n, s_alpha, s_beta = sigma_params.get((Zk,), (0.0, 0.0, 0.0))
+                    sigma += n * s_n + alpha * s_alpha + beta * s_beta
+                
+                sigma_k[k] = sigma
+                continue
+
             if self.solvent == 'water':
                 sigma += sigma_params.get((Zk,), 0.0)
             else:
@@ -428,20 +439,28 @@ class SMDDriver:
         self.ostream.print_info("Computing Solvent Accessible Surface Area (SASA) per atom...")
         self.ostream.flush()
         
-        vdw_radii = self.solute.vdw_radii_to_numpy()
+        vdw_radii = self.solute.vdw_radii_to_numpy() * bohr_in_angstrom()
         self.ostream.print_info(f"vdw radii: {vdw_radii.tolist()}")
         self.ostream.print_info(f"atoms: {self.solute.get_labels()}")
         self.ostream.flush()
 
         solute = Chem.MolFromXYZBlock(self.solute.get_xyz_string())
-        r_s = 0.4 # Å (0.4 Å according to SMD paper (1.4 Å according to e.g., SM6, Lee&Richards etc.))
+        r_s = 1.4 # Å (0.4 Å according to SMD paper (1.4 Å according to e.g., SM6, Lee&Richards etc.))
         
-        rdFreeSASA.SASAOpts.algorithm = rdFreeSASA.SASAAlgorithm.LeeRichards
-        rdFreeSASA.SASAOpts.probeRadius = r_s
-        rdFreeSASA.CalcSASA(solute, radii=vdw_radii.tolist())
+        opts = rdFreeSASA.SASAOpts(
+            rdFreeSASA.SASAAlgorithm.LeeRichards,
+            rdFreeSASA.SASAClassifier.Protor,  # optimized for small molecules
+            r_s
+        )
+        
+        #rdFreeSASA.CalcSASA(solute, radii=vdw_radii.tolist())
 
-        #radii = rdFreeSASA.classifyAtoms(solute)
-        #rdFreeSASA.CalcSASA(solute, radii=radii)
+        ptable = Chem.GetPeriodicTable()
+        ptable_radii = [ptable.GetRvdw(atom.GetAtomicNum()) for atom in solute.GetAtoms()]
+        self.ostream.print_info(f"p-table radii: {ptable_radii}")
+        self.ostream.flush()
+
+        rdFreeSASA.CalcSASA(solute, radii=vdw_radii.tolist(), confIdx=-1, opts=opts)
 
         atoms = solute.GetAtoms()
         SASA_list = [float(atoms[i].GetProp("SASA")) for i in range(len(atoms))]

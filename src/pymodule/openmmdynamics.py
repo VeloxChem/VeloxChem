@@ -730,7 +730,7 @@ class OpenMMDynamics:
 
     # Simulation methods
     def conformational_sampling_multiple(self,
-                                molecules = None, # List of VeloxChem Molecule objects, alternatively, pdb files?
+                                molecules = None,
                                 pdb_file=None,
                                 xml_files=None,
                                 partial_charges = None,
@@ -755,7 +755,7 @@ class OpenMMDynamics:
         :param timestep:
             Timestep of the simulation in femtoseconds. Default is 2.0 fs.
         :param nsteps:
-            Number of steps in the simulation. Default is ?.
+            Number of steps in the simulation. Default is 500 000.
         :param snapshots:
             The number of snapshots to save. Default is 10.
         :param lowest_conformations:
@@ -766,20 +766,23 @@ class OpenMMDynamics:
             and their corresponding coordinates in XYZ format.
         """
         # Maybe add evaluation of spacing factor in building the system here?
+        # TODO: Add check for equivalent molecules (to avoid creating multiple xmls)
         if molecules:
             self.ostream.print_info("Generating system...")
             self.ostream.flush()
             self.atom_dict = {}
+            xml_files = [] 
             for i, mol in enumerate(molecules):
                 ff_gen = MMForceFieldGenerator()
                 ff_gen.ostream.mute()
                 if partial_charges:
                     ff_gen.partial_charges = partial_charges[i]
                 ff_gen.create_topology(mol)
-                ff_gen.generate_residue_xml(f'molecule_{i}.xml',f'M{i+1:02d}')
+                if mol.get_labels() != ['O', 'H', 'H']: # skip for water since OMM checks the template of water specifically
+                    ff_gen.generate_residue_xml(f'molecule_{i}.xml',f'M{i+1:02d}')
+                    xml_files.append(f'molecule_{i}.xml')
                 self.atom_dict[f'{i}'] = ff_gen.atoms
-            
-            xml_files = [f'molecule_{i}.xml' for i in range(len(molecules))]
+
             pdb_file = 'system.pdb'
             self._create_system_from_multiple_molecules(molecules, pdb_file)
         else:
