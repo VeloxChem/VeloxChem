@@ -223,6 +223,7 @@ class oldRixsDriver:
         self.sra = False
         self.tda = False
         
+        num_vir_orbitals  = np.squeeze(rsp_tensors['num_vir'])
         # TODO: add safeguards for when both num_intermediate_states and cvs is given
         # TODO: ever a case where get_num_val_orbs() don't find all valence?
         """
@@ -244,6 +245,7 @@ class oldRixsDriver:
             #self.ostream.print_info(
             #    'Running RIXS with CVS approximation.')
             self.cvs = True
+            """
             try:
                 num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
                 num_final_states = len(rsp_tensors['eigenvalues'])
@@ -262,6 +264,17 @@ class oldRixsDriver:
             num_tot_states = num_final_states + num_intermediate_states
             core_states = list(range(num_intermediate_states))
             occupied_core = num_core_orbitals
+            """
+            num_core_orbitals = np.squeeze(cvs_rsp_tensors['num_core'])
+            num_val_orbitals  = nocc - num_core_orbitals # self.get_num_val_orbs(rsp_tensors) # = nocc
+
+            num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
+            num_final_states = len(rsp_tensors['eigenvalues'])
+            num_tot_states = num_final_states + num_intermediate_states
+
+            core_states = list(range(num_intermediate_states))
+            occupied_core = num_core_orbitals
+            val_states = list(range(num_final_states))
 
         else:
             # What if too few states to include all valence orbitals?
