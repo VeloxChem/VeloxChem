@@ -80,7 +80,7 @@ class oldRixsDriver:
         # method settings
         self.photon_energy = None
         self.theta = 0
-        self.gamma_n = .124/hartree_in_ev() # a.u.
+        self.gamma = .124/hartree_in_ev() # a.u.
 
         # input keywords
         self.input_keywords = {
