@@ -117,6 +117,8 @@ class EvbSystemBuilder():
         self.bonded_integration_bond_fac: float = 0.1  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
 
+        self.proper_torsion_lambda_switch: float = 0.4 # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
+
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
         self.verbose = False
@@ -1453,11 +1455,18 @@ class EvbSystemBuilder():
                 self._add_torsion(fourier_force, dihedA, atom_ids, 1 - lam)
                 self._add_torsion(fourier_force, dihedB, atom_ids, lam)
             else:
+                # Create a linear switching function that turns on the proper torsions only past a certain lambda value
                 if key in self.reactant.dihedrals.keys():
-                    scale = 1 - lam
+                    x0 = self.proper_torsion_lambda_switch
+                    a=-1/x0
+                    b=1
+                    scale = a*lam+b
                     dihed = self.reactant.dihedrals[key]
                 else:
-                    scale = lam
+                    x0 = self.proper_torsion_lambda_switch
+                    a = 1/(1-x0)
+                    b=1-a
+                    scale = a*lam + b
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
