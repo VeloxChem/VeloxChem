@@ -322,8 +322,10 @@ class oldRixsDriver:
         #val_states = list(range(num_final_states))
         core_eigvals    = cvs_rsp_tensors['eigenvalues'][core_states]
         valence_eigvals = rsp_tensors['eigenvalues'][val_states]
-        core_eigvecs    = np.array([self.get_full_solution_vector(cvs_rsp_tensors['eigenvectors_distributed'][state]) for state in core_states])
-        valence_eigvecs = np.array([self.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][state]) for state in val_states])
+        #core_eigvecs    = np.array([self.get_full_solution_vector(cvs_rsp_tensors['eigenvectors_distributed'][state]) for state in core_states])
+        #valence_eigvecs = np.array([self.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][state]) for state in val_states])
+        core_eigvecs    = np.array([cvs_rsp_tensors['S' + str(i + 1)] for i in core_states])
+        valence_eigvecs = np.array([rsp_tensors['S' + str(i + 1)] for i in val_states])
         """
         try:
             core_eigvals    = cvs_rsp_tensors['eigenvalues'][core_states]
