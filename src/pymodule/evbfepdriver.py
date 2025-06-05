@@ -469,7 +469,7 @@ class EvbFepDriver():
                 if len(params)>1:
                     params[1:] = [0] * (len(params) - 1)
                 centroid_force.setBondParameters(i, bond, params)
-
+            centroid_force.updateParametersInContext(equil_simulation.context)
             if self.isobaric:
                 barostat.setFrequency(0)
                 self._safe_step(equil_simulation, self.equil_NVT_steps,
