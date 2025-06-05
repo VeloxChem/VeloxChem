@@ -1051,8 +1051,11 @@ class LinearSolver:
 
         max_eri_timing = np.max(all_eri_timing)
 
-        eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
-            all_eri_timing.size * max_eri_timing)
+        if max_eri_timing > 0.0:
+            eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
+                all_eri_timing.size * max_eri_timing)
+        else:
+            eri_load_imb = 0.0
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
