@@ -47,6 +47,26 @@
     #define gpuMemcpy(dst, src, size, kind)     cudaMemcpy(dst, src, size, kind)
     #define gpuMemcpyHostToDevice               cudaMemcpyHostToDevice
     #define gpuMemcpyDeviceToHost               cudaMemcpyDeviceToHost
+    #define gpuHostMallocDefault                cudaHostMallocDefault
+    #define gpuHostMalloc(ptr, size, f)         cudaHostMalloc(ptr, size, f)
+    #define gpuHostFree(ptr)                    cudaHostFree(ptr)
+    #define gpuMemcpyAsync(dst, src, size, kind, stream) \
+            cudaMemcpyAsync(dst, src, size, kind, stream)
+    #define gpuEvent_t                          cudaEvent_t
+    #define gpuEventDestroy(e)                  cudaEventDestroy(e)
+    #define gpuEventCreateWithFlags             cudaEventCreateWithFlags
+    #define gpuEventDisableTiming               cudaEventDisableTiming
+    #define gpuEventSynchronize(e)              cudaEventSynchronize(e)
+    #define gpuEventRecord(e)                   cudaEventRecord(e)
+    #define gpuEventRecordStream(e, s)          cudaEventRecord(e, s)
+    #define gpuStream_t                         cudaStream_t
+    #define gpuStreamDestroy(s)                 cudaStreamDestroy(s)
+    #define gpuStreamCreate(s)                  cudaStreamCreate(s)
+    #define gpuDeviceGetStreamPriorityRange(ptr, p) \
+            cudaDeviceGetStreamPriorityRange(ptr, p)
+    #define gpuStreamDefault                    cudaStreamDefault
+    #define gpuStreamCreateWithPriority(s, f, p) \
+            cudaStreamCreateWithPriority(s, f, p)
 
 #elif defined(USE_HIP)
 
@@ -62,7 +82,26 @@
     #define gpuMemcpy(dst, src, size, kind)     hipMemcpy(dst, src, size, kind)
     #define gpuMemcpyHostToDevice               hipMemcpyHostToDevice
     #define gpuMemcpyDeviceToHost               hipMemcpyDeviceToHost
-
+    #define gpuHostMallocDefault                hipHostMallocDefault
+    #define gpuHostMalloc(ptr, size, f)         hipHostMalloc(ptr, size, f)
+    #define gpuHostFree(ptr)                    hipHostFree(ptr)
+    #define gpuMemcpyAsync(dst, src, size, kind, stream) \
+            hipMemcpyAsync(dst, src, size, kind, stream)
+    #define gpuEvent_t                          hipEvent_t
+    #define gpuEventDestroy(e)                  hipEventDestroy(e)
+    #define gpuEventCreateWithFlags             hipEventCreateWithFlags
+    #define gpuEventDisableTiming               hipEventDisableTiming
+    #define gpuEventSynchronize(e)              hipEventSynchronize(e)
+    #define gpuEventRecord(e)                   hipEventRecord(e)
+    #define gpuEventRecordStream(e, s)          hipEventRecord(e, s)
+    #define gpuStream_t                         hipStream_t
+    #define gpuStreamDestroy(s)                 hipStreamDestroy(s)
+    #define gpuStreamCreate(s)                  hipStreamCreate(s)
+    #define gpuDeviceGetStreamPriorityRange(ptr, p) \
+            hipDeviceGetStreamPriorityRange(ptr, p)
+    #define gpuStreamDefault                    hipStreamDefault
+    #define gpuStreamCreateWithPriority(s, f, p) \
+            hipStreamCreateWithPriority(s, f, p)
 #else
 
   #error "Please define either USE_CUDA or USE_HIP"
