@@ -4852,7 +4852,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<double> mat_K(max_pair_inds_count);
 
-    hipSafe(hipMalloc(&d_mat_K, max_pair_inds_count * sizeof(double)));
+    const uint32_t numCalculationBlocks = 6;
+
+    hipSafe(hipMalloc(&d_mat_K, max_pair_inds_count * sizeof(double) * numCalculationBlocks));
 
     hipSafe(hipMalloc(&d_pair_inds_i_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_pair_inds_k_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
@@ -5037,15 +5039,15 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         timer.start("  K block SS");
 
+        const uint32_t offset = 0 * max_pair_inds_count;
+
         // zeroize K on device
 
         dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
         dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_ss));
-
-        hipSafe(hipDeviceSynchronize());
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K + offset, static_cast<uint32_t>(pair_inds_count_for_K_ss));
 
         // set up thread blocks for K
 
@@ -5057,7 +5059,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5077,13 +5079,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SS|SP)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSSSP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5111,13 +5111,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SP|SS)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPSS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5145,13 +5143,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SP|SP)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPSP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5174,13 +5170,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SS|SD)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSSSD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5208,13 +5202,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SD|SS)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDSS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5242,13 +5234,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SP|SD)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPSD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5279,13 +5269,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SD|SP)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDSP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5316,13 +5304,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipDeviceSynchronize());
-
         // K: (SD|SD)
         //     *  *
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDSD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
                            static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -5345,7 +5331,2538 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+        timer.stop("  K block SS");
+    }
+
+    // K: S-P block
+
+    if (pair_inds_count_for_K_sp > 0)
+    {
+        timer.start("  K block SP");
+
+        const uint32_t offset = 1 * max_pair_inds_count;
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K + offset, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_sp, 1);
+
+        // K: (SS|PS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSPS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           ss_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ss,
+                           d_Q_K_ps,
+                           d_D_inds_K_ss,
+                           d_D_inds_K_ps,
+                           d_pair_displs_K_ss,
+                           d_pair_displs_K_ps,
+                           d_pair_counts_K_ss,
+                           d_pair_counts_K_ps,
+                           d_pair_data_K_ss,
+                           d_pair_data_K_ps,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SS|PP)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ss,
+                           d_Q_K_pp,
+                           d_D_inds_K_ss,
+                           d_D_inds_K_pp,
+                           d_pair_displs_K_ss,
+                           d_pair_displs_K_pp,
+                           d_pair_counts_K_ss,
+                           d_pair_counts_K_pp,
+                           d_pair_data_K_ss,
+                           d_pair_data_K_pp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SP|PS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPPS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sp,
+                           d_Q_K_ps,
+                           d_D_inds_K_sp,
+                           d_D_inds_K_ps,
+                           d_pair_displs_K_sp,
+                           d_pair_displs_K_ps,
+                           d_pair_counts_K_sp,
+                           d_pair_counts_K_ps,
+                           d_pair_data_K_sp,
+                           d_pair_data_K_ps,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SP|PP)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           pp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sp,
+                           d_Q_K_pp,
+                           d_D_inds_K_sp,
+                           d_D_inds_K_pp,
+                           d_pair_displs_K_sp,
+                           d_pair_displs_K_pp,
+                           d_pair_counts_K_sp,
+                           d_pair_counts_K_pp,
+                           d_pair_data_K_sp,
+                           d_pair_data_K_pp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SS|PD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ss,
+                           d_Q_K_pd,
+                           d_D_inds_K_ss,
+                           d_D_inds_K_pd,
+                           d_pair_displs_K_ss,
+                           d_pair_displs_K_pd,
+                           d_pair_counts_K_ss,
+                           d_pair_counts_K_pd,
+                           d_pair_data_K_ss,
+                           d_pair_data_K_pd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SD|PS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDPS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sd,
+                           d_Q_K_ps,
+                           d_D_inds_K_sd,
+                           d_D_inds_K_ps,
+                           d_pair_displs_K_sd,
+                           d_pair_displs_K_ps,
+                           d_pair_counts_K_sd,
+                           d_pair_counts_K_ps,
+                           d_pair_data_K_sd,
+                           d_pair_data_K_ps,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SP|PD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sp,
+                           d_Q_K_pd,
+                           d_D_inds_K_sp,
+                           d_D_inds_K_pd,
+                           d_pair_displs_K_sp,
+                           d_pair_displs_K_pd,
+                           d_pair_counts_K_sp,
+                           d_pair_counts_K_pd,
+                           d_pair_data_K_sp,
+                           d_pair_data_K_pd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SD|PP)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sd,
+                           d_Q_K_pp,
+                           d_D_inds_K_sd,
+                           d_D_inds_K_pp,
+                           d_pair_displs_K_sd,
+                           d_pair_displs_K_pp,
+                           d_pair_counts_K_sd,
+                           d_pair_counts_K_pp,
+                           d_pair_data_K_sd,
+                           d_pair_data_K_pp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SD|PD)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sp,
+                           d_pair_inds_k_for_K_sp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sd,
+                           d_Q_K_pd,
+                           d_D_inds_K_sd,
+                           d_D_inds_K_pd,
+                           d_pair_displs_K_sd,
+                           d_pair_displs_K_pd,
+                           d_pair_counts_K_sd,
+                           d_pair_counts_K_pd,
+                           d_pair_data_K_sd,
+                           d_pair_data_K_pd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("  K block SP");
+    }
+
+    // K: P-P block
+
+    if (pair_inds_count_for_K_pp > 0)
+    {
+        timer.start("  K block PP");
+
+        const uint32_t offset = 2 * max_pair_inds_count;
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K + offset, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_pp, 1);
+
+        // K: (PS|PS)
+        //     *  *
+
+        timer.start("    K block PSPS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSPS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           ss_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ps,
+                           d_D_inds_K_ps,
+                           d_pair_displs_K_ps,
+                           d_pair_counts_K_ps,
+                           d_pair_data_K_ps,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PSPS");
+
+        // K: (PS|PP)
+        //     *  *
+
+        timer.start("    K block PSPP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ps,
+                           d_Q_K_pp,
+                           d_D_inds_K_ps,
+                           d_D_inds_K_pp,
+                           d_pair_displs_K_ps,
+                           d_pair_displs_K_pp,
+                           d_pair_counts_K_ps,
+                           d_pair_counts_K_pp,
+                           d_pair_data_K_ps,
+                           d_pair_data_K_pp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PSPP");
+
+        // K: (PP|PS)
+        //     *  *
+
+        timer.start("    K block PPPS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPPS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pp,
+                           d_Q_K_ps,
+                           d_D_inds_K_pp,
+                           d_D_inds_K_ps,
+                           d_pair_displs_K_pp,
+                           d_pair_displs_K_ps,
+                           d_pair_counts_K_pp,
+                           d_pair_counts_K_ps,
+                           d_pair_data_K_pp,
+                           d_pair_data_K_ps,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PPPS");
+
+        // K: (PP|PP)
+        //     *  *
+
+        timer.start("    K block PPPP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           pp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pp,
+                           d_D_inds_K_pp,
+                           d_pair_displs_K_pp,
+                           d_pair_counts_K_pp,
+                           d_pair_data_K_pp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PPPP");
+
+        // K: (PS|PD)
+        //     *  *
+
+        timer.start("    K block PSPD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ps,
+                           d_Q_K_pd,
+                           d_D_inds_K_ps,
+                           d_D_inds_K_pd,
+                           d_pair_displs_K_ps,
+                           d_pair_displs_K_pd,
+                           d_pair_counts_K_ps,
+                           d_pair_counts_K_pd,
+                           d_pair_data_K_ps,
+                           d_pair_data_K_pd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PSPD");
+
+        // K: (PD|PS)
+        //     *  *
+
+        timer.start("    K block PDPS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_ps,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_ps,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_ps,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_ps,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_ps,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PDPS");
+
+        // K: (PP|PD)
+        //     *  *
+
+        timer.start("    K block PPPD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pp,
+                           d_Q_K_pd,
+                           d_D_inds_K_pp,
+                           d_D_inds_K_pd,
+                           d_pair_displs_K_pp,
+                           d_pair_displs_K_pd,
+                           d_pair_counts_K_pp,
+                           d_pair_counts_K_pd,
+                           d_pair_data_K_pp,
+                           d_pair_data_K_pd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PPPD");
+
+        // K: (PD|PP)
+        //     *  *
+
+        timer.start("    K block PDPP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_pp,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_pp,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_pp,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_pp,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_pp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PDPP");
+
+        // K: (PD|PD)
+        //     *  *
+
+        timer.start("    K block PDPD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pp,
+                           d_pair_inds_k_for_K_pp,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_D_inds_K_pd,
+                           d_pair_displs_K_pd,
+                           d_pair_counts_K_pd,
+                           d_pair_data_K_pd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PDPD");
+
+        timer.stop("  K block PP");
+    }
+
+    // K: S-D block
+
+    if (pair_inds_count_for_K_sd > 0)
+    {
+        timer.start("  K block SD");
+
+        const uint32_t offset = 3 * max_pair_inds_count;
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K + offset, static_cast<uint32_t>(pair_inds_count_for_K_sd));
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_sd, 1);
+
+        // K: (SS|DS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ss_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ss,
+                           d_Q_K_ds,
+                           d_D_inds_K_ss,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_ss,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_ss,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_ss,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SS|DP)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ss,
+                           d_Q_K_dp,
+                           d_D_inds_K_ss,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_ss,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_ss,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_ss,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SP|DS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sp,
+                           d_Q_K_ds,
+                           d_D_inds_K_sp,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_sp,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_sp,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_sp,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (SP|DP)
+        //     *  *
+
+        timer.start("    K block SPDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sp,
+                           d_Q_K_dp,
+                           d_D_inds_K_sp,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_sp,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_sp,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_sp,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block SPDP");
+
+        // K: (SS|DD)
+        //     *  *
+
+        timer.start("    K block SSDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ss,
+                           d_Q_K_dd,
+                           d_D_inds_K_ss,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_ss,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_ss,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_ss,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block SSDD");
+
+        // K: (SD|DS)
+        //     *  *
+
+        timer.start("    K block SDDS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sd,
+                           d_Q_K_ds,
+                           d_D_inds_K_sd,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_sd,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_sd,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_sd,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block SDDS");
+
+        // K: (SP|DD)
+        //     *  *
+
+        timer.start("    K block SPDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sp,
+                           d_Q_K_dd,
+                           d_D_inds_K_sp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_sp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_sp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_sp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block SPDD");
+
+        // K: (SD|DP)
+        //     *  *
+
+        timer.start("    K block SDDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sd,
+                           d_Q_K_dp,
+                           d_D_inds_K_sd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_sd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_sd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_sd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block SDDP");
+
+        // K: (SD|DD)
+        //     *  *
+
+        timer.start("    K block SDDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_sd,
+                           d_pair_inds_k_for_K_sd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_sd,
+                           d_Q_K_dd,
+                           d_D_inds_K_sd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_sd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_sd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_sd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block SDDD");
+
+        timer.stop("  K block SD");
+    }
+
+    // K: P-D block
+
+    if (pair_inds_count_for_K_pd > 0)
+    {
+        timer.start("  K block PD");
+
+        const uint32_t offset = 4 * max_pair_inds_count;
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K + offset, static_cast<uint32_t>(pair_inds_count_for_K_pd));
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_pd, 1);
+
+        // K: (PS|DS)
+        //     *  *
+
+        timer.start("    K block PSDS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ss_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ps,
+                           d_Q_K_ds,
+                           d_D_inds_K_ps,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_ps,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_ps,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_ps,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PSDS");
+
+        // K: (PS|DP)
+        //     *  *
+
+        timer.start("    K block PSDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ps,
+                           d_Q_K_dp,
+                           d_D_inds_K_ps,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_ps,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_ps,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_ps,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PSDP");
+
+        // K: (PP|DS)
+        //     *  *
+
+        timer.start("    K block PPDS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pp,
+                           d_Q_K_ds,
+                           d_D_inds_K_pp,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_pp,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_pp,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_pp,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PPDS");
+
+        // K: (PS|DD)
+        //     *  *
+
+        timer.start("    K block PSDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ps,
+                           d_Q_K_dd,
+                           d_D_inds_K_ps,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_ps,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_ps,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_ps,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PSDD");
+
+        // K: (PD|DS)
+        //     *  *
+
+        timer.start("    K block PDDS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_ds,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PDDS");
+
+        // K: (PP|DP)
+        //     *  *
+
+        timer.start("    K block PPDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pp,
+                           d_Q_K_dp,
+                           d_D_inds_K_pp,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_pp,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_pp,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_pp,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PPDP");
+
+        // K: (PP|DD)
+        //     *  *
+
+        timer.start("    K block PPDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pp,
+                           d_Q_K_dd,
+                           d_D_inds_K_pp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PPDD");
+
+        // K: (PD|DP)
+        //     *  *
+
+        timer.start("    K block PDDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dp,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PDDP");
+
+        // K: (PD|DD)
+        //     *  *
+
+        timer.start("    K block PDDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD0, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dd,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD1, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dd,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD2, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dd,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD3, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dd,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD4, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dd,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD5, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dd,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD6, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_pd,
+                           d_pair_inds_k_for_K_pd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_pd,
+                           d_Q_K_dd,
+                           d_D_inds_K_pd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_pd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_pd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_pd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block PDDD");
+
+        timer.stop("  K block PD");
+    }
+
+    // K: D-D block
+
+    if (pair_inds_count_for_K_dd > 0)
+    {
+        timer.start("  K block DD");
+
+        const uint32_t offset = 5 * max_pair_inds_count;
+
+        // zeroize K on device
+
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
+
+        dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K + offset, static_cast<uint32_t>(pair_inds_count_for_K_dd));
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
+
+        num_blocks = dim3(pair_inds_count_for_K_dd, 1);
+
+        // K: (DS|DS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDSDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ss_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ds,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (DS|DP)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDSDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ds,
+                           d_Q_K_dp,
+                           d_D_inds_K_ds,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_ds,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_ds,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_ds,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (DP|DS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ps_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_ds,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        // K: (DS|DD)
+        //     *  *
+
+        timer.start("    K block DSDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDSDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           sd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_ds,
+                           d_Q_K_dd,
+                           d_D_inds_K_ds,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_ds,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_ds,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_ds,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block DSDD");
+
+        // K: (DD|DS)
+        //     *  *
+
+        timer.start("    K block DDDS");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDS, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_s_prim_info,
+                           d_s_prim_aoinds,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           ds_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_ds,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_ds,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_ds,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_ds,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_ds,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block DDDS");
+
+        // K: (DP|DP)
+        //     *  *
+
+        timer.start("    K block DPDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block DPDP");
+
+        // K: (DP|DD)
+        //     *  *
+
+        timer.start("    K block DPDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD0, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_dd,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD1, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_dd,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD2, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_dd,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD3, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_dd,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD4, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_dd,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD5, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_dd,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD6, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           pd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dp,
+                           d_Q_K_dd,
+                           d_D_inds_K_dp,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dp,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block DPDD");
+
+        // K: (DD|DP)
+        //     *  *
+
+        timer.start("    K block DDDP");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP0, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP1, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP2, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP3, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP4, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP5, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP6, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_p_prim_info,
+                           d_p_prim_aoinds,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dp_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_Q_K_dp,
+                           d_D_inds_K_dd,
+                           d_D_inds_K_dp,
+                           d_pair_displs_K_dd,
+                           d_pair_displs_K_dp,
+                           d_pair_counts_K_dd,
+                           d_pair_counts_K_dp,
+                           d_pair_data_K_dd,
+                           d_pair_data_K_dp,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block DDDP");
+
+        // K: (DD|DD)
+        //     *  *
+
+        timer.start("    K block DDDD");
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K + offset,
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_d_prim_info,
+                           d_d_prim_aoinds,
+                           static_cast<uint32_t>(d_prim_count),
+                           dd_max_D,
+                           d_mat_D_full_AO,
+                           static_cast<uint32_t>(cart_naos),
+                           d_Q_K_dd,
+                           d_D_inds_K_dd,
+                           d_pair_displs_K_dd,
+                           d_pair_counts_K_dd,
+                           d_pair_data_K_dd,
+                           d_boys_func_table,
+                           d_boys_func_ft,
+                           omega,
+                           eri_threshold);
+
+        timer.stop("    K block DDDD");
+
+        timer.stop("  K block DD");
+    }
+
+    hipSafe(hipDeviceSynchronize());
+
+    if (pair_inds_count_for_K_ss > 0)
+    {
+        const uint32_t offset = 0 * max_pair_inds_count;
+    
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -5361,352 +7878,13 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange * symm_pref;
         }
-
-        timer.stop("  K block SS");
     }
-
-    // K: S-P block
 
     if (pair_inds_count_for_K_sp > 0)
     {
-        timer.start("  K block SP");
+        const uint32_t offset = 1 * max_pair_inds_count;
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
-
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sp));
-
-        hipSafe(hipDeviceSynchronize());
-
-        // set up thread blocks for K
-
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
-
-        num_blocks = dim3(pair_inds_count_for_K_sp, 1);
-
-        // K: (SS|PS)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSPS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           ss_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ss,
-                           d_Q_K_ps,
-                           d_D_inds_K_ss,
-                           d_D_inds_K_ps,
-                           d_pair_displs_K_ss,
-                           d_pair_displs_K_ps,
-                           d_pair_counts_K_ss,
-                           d_pair_counts_K_ps,
-                           d_pair_data_K_ss,
-                           d_pair_data_K_ps,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SS|PP)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           sp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ss,
-                           d_Q_K_pp,
-                           d_D_inds_K_ss,
-                           d_D_inds_K_pp,
-                           d_pair_displs_K_ss,
-                           d_pair_displs_K_pp,
-                           d_pair_counts_K_ss,
-                           d_pair_counts_K_pp,
-                           d_pair_data_K_ss,
-                           d_pair_data_K_pp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SP|PS)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPPS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           ps_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sp,
-                           d_Q_K_ps,
-                           d_D_inds_K_sp,
-                           d_D_inds_K_ps,
-                           d_pair_displs_K_sp,
-                           d_pair_displs_K_ps,
-                           d_pair_counts_K_sp,
-                           d_pair_counts_K_ps,
-                           d_pair_data_K_sp,
-                           d_pair_data_K_ps,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SP|PP)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           pp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sp,
-                           d_Q_K_pp,
-                           d_D_inds_K_sp,
-                           d_D_inds_K_pp,
-                           d_pair_displs_K_sp,
-                           d_pair_displs_K_pp,
-                           d_pair_counts_K_sp,
-                           d_pair_counts_K_pp,
-                           d_pair_data_K_sp,
-                           d_pair_data_K_pp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SS|PD)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ss,
-                           d_Q_K_pd,
-                           d_D_inds_K_ss,
-                           d_D_inds_K_pd,
-                           d_pair_displs_K_ss,
-                           d_pair_displs_K_pd,
-                           d_pair_counts_K_ss,
-                           d_pair_counts_K_pd,
-                           d_pair_data_K_ss,
-                           d_pair_data_K_pd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SD|PS)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDPS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ds_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sd,
-                           d_Q_K_ps,
-                           d_D_inds_K_sd,
-                           d_D_inds_K_ps,
-                           d_pair_displs_K_sd,
-                           d_pair_displs_K_ps,
-                           d_pair_counts_K_sd,
-                           d_pair_counts_K_ps,
-                           d_pair_data_K_sd,
-                           d_pair_data_K_ps,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SP|PD)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sp,
-                           d_Q_K_pd,
-                           d_D_inds_K_sp,
-                           d_D_inds_K_pd,
-                           d_pair_displs_K_sp,
-                           d_pair_displs_K_pd,
-                           d_pair_counts_K_sp,
-                           d_pair_counts_K_pd,
-                           d_pair_data_K_sp,
-                           d_pair_data_K_pd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SD|PP)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sd,
-                           d_Q_K_pp,
-                           d_D_inds_K_sd,
-                           d_D_inds_K_pp,
-                           d_pair_displs_K_sd,
-                           d_pair_displs_K_pp,
-                           d_pair_counts_K_sd,
-                           d_pair_counts_K_pp,
-                           d_pair_data_K_sd,
-                           d_pair_data_K_pp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SD|PD)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sp,
-                           d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sd,
-                           d_Q_K_pd,
-                           d_D_inds_K_sd,
-                           d_D_inds_K_pd,
-                           d_pair_displs_K_sd,
-                           d_pair_displs_K_pd,
-                           d_pair_counts_K_sd,
-                           d_pair_counts_K_pd,
-                           d_pair_data_K_sd,
-                           d_pair_data_K_pd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
         {
@@ -5731,363 +7909,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                 mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange * symm_pref;
             }
         }
-
-        timer.stop("  K block SP");
     }
-
-    // K: P-P block
 
     if (pair_inds_count_for_K_pp > 0)
     {
-        timer.start("  K block PP");
+        const uint32_t offset = 2 * max_pair_inds_count;
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
-
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pp));
-
-        hipSafe(hipDeviceSynchronize());
-
-        // set up thread blocks for K
-
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
-
-        num_blocks = dim3(pair_inds_count_for_K_pp, 1);
-
-        // K: (PS|PS)
-        //     *  *
-
-        timer.start("    K block PSPS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSPS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           ss_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ps,
-                           d_D_inds_K_ps,
-                           d_pair_displs_K_ps,
-                           d_pair_counts_K_ps,
-                           d_pair_data_K_ps,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PSPS");
-
-        // K: (PS|PP)
-        //     *  *
-
-        timer.start("    K block PSPP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           sp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ps,
-                           d_Q_K_pp,
-                           d_D_inds_K_ps,
-                           d_D_inds_K_pp,
-                           d_pair_displs_K_ps,
-                           d_pair_displs_K_pp,
-                           d_pair_counts_K_ps,
-                           d_pair_counts_K_pp,
-                           d_pair_data_K_ps,
-                           d_pair_data_K_pp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PSPP");
-
-        // K: (PP|PS)
-        //     *  *
-
-        timer.start("    K block PPPS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPPS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           ps_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pp,
-                           d_Q_K_ps,
-                           d_D_inds_K_pp,
-                           d_D_inds_K_ps,
-                           d_pair_displs_K_pp,
-                           d_pair_displs_K_ps,
-                           d_pair_counts_K_pp,
-                           d_pair_counts_K_ps,
-                           d_pair_data_K_pp,
-                           d_pair_data_K_ps,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PPPS");
-
-        // K: (PP|PP)
-        //     *  *
-
-        timer.start("    K block PPPP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           pp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pp,
-                           d_D_inds_K_pp,
-                           d_pair_displs_K_pp,
-                           d_pair_counts_K_pp,
-                           d_pair_data_K_pp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PPPP");
-
-        // K: (PS|PD)
-        //     *  *
-
-        timer.start("    K block PSPD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ps,
-                           d_Q_K_pd,
-                           d_D_inds_K_ps,
-                           d_D_inds_K_pd,
-                           d_pair_displs_K_ps,
-                           d_pair_displs_K_pd,
-                           d_pair_counts_K_ps,
-                           d_pair_counts_K_pd,
-                           d_pair_data_K_ps,
-                           d_pair_data_K_pd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PSPD");
-
-        // K: (PD|PS)
-        //     *  *
-
-        timer.start("    K block PDPS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ds_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_ps,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_ps,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_ps,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_ps,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_ps,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PDPS");
-
-        // K: (PP|PD)
-        //     *  *
-
-        timer.start("    K block PPPD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pp,
-                           d_Q_K_pd,
-                           d_D_inds_K_pp,
-                           d_D_inds_K_pd,
-                           d_pair_displs_K_pp,
-                           d_pair_displs_K_pd,
-                           d_pair_counts_K_pp,
-                           d_pair_counts_K_pd,
-                           d_pair_data_K_pp,
-                           d_pair_data_K_pd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PPPD");
-
-        // K: (PD|PP)
-        //     *  *
-
-        timer.start("    K block PDPP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_pp,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_pp,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_pp,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_pp,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_pp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PDPP");
-
-        // K: (PD|PD)
-        //     *  *
-
-        timer.start("    K block PDPD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pp,
-                           d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_D_inds_K_pd,
-                           d_pair_displs_K_pd,
-                           d_pair_counts_K_pd,
-                           d_pair_data_K_pd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PDPD");
-
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
         {
@@ -6119,378 +7947,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                 }
             }
         }
-
-        timer.stop("  K block PP");
     }
-
-    // K: S-D block
 
     if (pair_inds_count_for_K_sd > 0)
     {
-        timer.start("  K block SD");
+        const uint32_t offset = 3 * max_pair_inds_count;
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_sd + threads_per_block.x - 1) / threads_per_block.x);
-
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sd));
-
-        hipSafe(hipDeviceSynchronize());
-
-        // set up thread blocks for K
-
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
-
-        num_blocks = dim3(pair_inds_count_for_K_sd, 1);
-
-        // K: (SS|DS)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ss_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ss,
-                           d_Q_K_ds,
-                           d_D_inds_K_ss,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_ss,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_ss,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_ss,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SS|DP)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ss,
-                           d_Q_K_dp,
-                           d_D_inds_K_ss,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_ss,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_ss,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_ss,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SP|DS)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ps_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sp,
-                           d_Q_K_ds,
-                           d_D_inds_K_sp,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_sp,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_sp,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_sp,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (SP|DP)
-        //     *  *
-
-        timer.start("    K block SPDP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sp,
-                           d_Q_K_dp,
-                           d_D_inds_K_sp,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_sp,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_sp,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_sp,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block SPDP");
-
-        // K: (SS|DD)
-        //     *  *
-
-        timer.start("    K block SSDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSSDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ss,
-                           d_Q_K_dd,
-                           d_D_inds_K_ss,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_ss,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_ss,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_ss,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block SSDD");
-
-        // K: (SD|DS)
-        //     *  *
-
-        timer.start("    K block SDDS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ds_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sd,
-                           d_Q_K_ds,
-                           d_D_inds_K_sd,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_sd,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_sd,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_sd,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block SDDS");
-
-        // K: (SP|DD)
-        //     *  *
-
-        timer.start("    K block SPDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSPDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sp,
-                           d_Q_K_dd,
-                           d_D_inds_K_sp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_sp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_sp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_sp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block SPDD");
-
-        // K: (SD|DP)
-        //     *  *
-
-        timer.start("    K block SDDP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sd,
-                           d_Q_K_dp,
-                           d_D_inds_K_sd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_sd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_sd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_sd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block SDDP");
-
-        // K: (SD|DD)
-        //     *  *
-
-        timer.start("    K block SDDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockSDDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_sd,
-                           d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_sd,
-                           d_Q_K_dd,
-                           d_D_inds_K_sd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_sd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_sd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_sd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block SDDD");
-
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_sd * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sd; ik++)
         {
@@ -6515,564 +7978,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                 mat_Fock_omp[gpu_id].row(k_cgto_sph)[i_cgto] += mat_K[ik] * k_coef_sph * (-1.0) * frac_exact_exchange * symm_pref;
             }
         }
-
-        timer.stop("  K block SD");
     }
-
-    // K: P-D block
 
     if (pair_inds_count_for_K_pd > 0)
     {
-        timer.start("  K block PD");
+        const uint32_t offset = 4 * max_pair_inds_count;
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_pd + threads_per_block.x - 1) / threads_per_block.x);
-
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pd));
-
-        hipSafe(hipDeviceSynchronize());
-
-        // set up thread blocks for K
-
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
-
-        num_blocks = dim3(pair_inds_count_for_K_pd, 1);
-
-        // K: (PS|DS)
-        //     *  *
-
-        timer.start("    K block PSDS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ss_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ps,
-                           d_Q_K_ds,
-                           d_D_inds_K_ps,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_ps,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_ps,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_ps,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PSDS");
-
-        // K: (PS|DP)
-        //     *  *
-
-        timer.start("    K block PSDP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ps,
-                           d_Q_K_dp,
-                           d_D_inds_K_ps,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_ps,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_ps,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_ps,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PSDP");
-
-        // K: (PP|DS)
-        //     *  *
-
-        timer.start("    K block PPDS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ps_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pp,
-                           d_Q_K_ds,
-                           d_D_inds_K_pp,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_pp,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_pp,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_pp,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PPDS");
-
-        // K: (PS|DD)
-        //     *  *
-
-        timer.start("    K block PSDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPSDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ps,
-                           d_Q_K_dd,
-                           d_D_inds_K_ps,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_ps,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_ps,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_ps,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PSDD");
-
-        // K: (PD|DS)
-        //     *  *
-
-        timer.start("    K block PDDS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ds_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_ds,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PDDS");
-
-        // K: (PP|DP)
-        //     *  *
-
-        timer.start("    K block PPDP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pp,
-                           d_Q_K_dp,
-                           d_D_inds_K_pp,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_pp,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_pp,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_pp,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PPDP");
-
-        // K: (PP|DD)
-        //     *  *
-
-        timer.start("    K block PPDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPPDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pp,
-                           d_Q_K_dd,
-                           d_D_inds_K_pp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PPDD");
-
-        // K: (PD|DP)
-        //     *  *
-
-        timer.start("    K block PDDP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dp,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PDDP");
-
-        // K: (PD|DD)
-        //     *  *
-
-        timer.start("    K block PDDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD0, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dd,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD1, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dd,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD2, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dd,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD3, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dd,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD4, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dd,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD5, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dd,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockPDDD6, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_pd,
-                           d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_pd,
-                           d_Q_K_dd,
-                           d_D_inds_K_pd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_pd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_pd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_pd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block PDDD");
-
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_pd * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pd; ik++)
         {
@@ -7104,993 +8016,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                 }
             }
         }
-
-        timer.stop("  K block PD");
     }
-
-    // K: D-D block
 
     if (pair_inds_count_for_K_dd > 0)
     {
-        timer.start("  K block DD");
+        const uint32_t offset = 5 * max_pair_inds_count;
 
-        // zeroize K on device
-
-        dim3 threads_per_block(TILE_DIM * TILE_DIM);
-
-        dim3 num_blocks((pair_inds_count_for_K_dd + threads_per_block.x - 1) / threads_per_block.x);
-
-        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_dd));
-
-        hipSafe(hipDeviceSynchronize());
-
-        // set up thread blocks for K
-
-        threads_per_block = dim3(TILE_DIM_X_K, TILE_DIM_Y_K);
-
-        num_blocks = dim3(pair_inds_count_for_K_dd, 1);
-
-        // K: (DS|DS)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDSDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ss_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ds,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (DS|DP)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDSDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ds,
-                           d_Q_K_dp,
-                           d_D_inds_K_ds,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_ds,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_ds,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_ds,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (DP|DS)
-        //     *  *
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ps_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_ds,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        // K: (DS|DD)
-        //     *  *
-
-        timer.start("    K block DSDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDSDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           sd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_ds,
-                           d_Q_K_dd,
-                           d_D_inds_K_ds,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_ds,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_ds,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_ds,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block DSDD");
-
-        // K: (DD|DS)
-        //     *  *
-
-        timer.start("    K block DDDS");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_s_prim_info,
-                           d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           ds_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_ds,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_ds,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_ds,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_ds,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_ds,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block DDDS");
-
-        // K: (DP|DP)
-        //     *  *
-
-        timer.start("    K block DPDP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block DPDP");
-
-        // K: (DP|DD)
-        //     *  *
-
-        timer.start("    K block DPDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD0, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_dd,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD1, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_dd,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD2, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_dd,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD3, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_dd,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD4, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_dd,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD5, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_dd,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDPDD6, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           pd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dp,
-                           d_Q_K_dd,
-                           d_D_inds_K_dp,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dp,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block DPDD");
-
-        // K: (DD|DP)
-        //     *  *
-
-        timer.start("    K block DDDP");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP0, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_dp,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP1, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_dp,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP2, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_dp,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP3, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_dp,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP4, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_dp,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP5, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_dp,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDP6, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_p_prim_info,
-                           d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dp_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_Q_K_dp,
-                           d_D_inds_K_dd,
-                           d_D_inds_K_dp,
-                           d_pair_displs_K_dd,
-                           d_pair_displs_K_dp,
-                           d_pair_counts_K_dd,
-                           d_pair_counts_K_dp,
-                           d_pair_data_K_dd,
-                           d_pair_data_K_dp,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block DDDP");
-
-        // K: (DD|DD)
-        //     *  *
-
-        timer.start("    K block DDDD");
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
-                           d_pair_inds_i_for_K_dd,
-                           d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
-                           d_d_prim_info,
-                           d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
-                           dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
-                           d_Q_K_dd,
-                           d_D_inds_K_dd,
-                           d_pair_displs_K_dd,
-                           d_pair_counts_K_dd,
-                           d_pair_data_K_dd,
-                           d_boys_func_table,
-                           d_boys_func_ft,
-                           omega,
-                           eri_threshold);
-
-        hipSafe(hipDeviceSynchronize());
-
-        timer.stop("    K block DDDD");
-
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_dd * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_dd; ik++)
         {
@@ -8122,15 +8054,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                 }
             }
         }
-
-        timer.stop("  K block DD");
     }
 
     }  // end of compute K
 
     timer.stop("K computation");
-
-    hipSafe(hipDeviceSynchronize());
 
     exchange_timer.stop();
 
