@@ -128,10 +128,6 @@ class EvbReporter():
 
             if not append:
                 fg_header = EvbForceGroup.get_header()
-                # system_names = 
-                # decomps = 
-                # fg_header += ", "
-                # fg_header += ", ".join(decomps)
                 self.FG_out.write(fg_header)
                 self.rea_FG_out.write(fg_header)
                 self.pro_FG_out.write(fg_header)

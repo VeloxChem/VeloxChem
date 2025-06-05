@@ -437,7 +437,8 @@ class EvbFepDriver():
                               self.pdb_equil_temp_step))
                 temperatures.append(self.temperature)
                 self.ostream.print_info(
-                    f"Perfoming PDB warmup with T-vector {np.array(temperatures)}")
+                    f"Perfoming PDB warmup with T-vector {np.array(temperatures)}"
+                )
                 self.ostream.flush()
                 for T in temperatures:
                     equil_simulation.integrator.setTemperature(T)
@@ -454,9 +455,8 @@ class EvbFepDriver():
                             equil_simulation, self.initial_equil_NPT_steps,
                             f"PDB warmup NPT equilibration T = {T}")
 
-            equil_simulation.context.setParameter('centroid_k',0)
-            self.ostream.print_info(
-                f"Turning off centroid force on bonds")
+            equil_simulation.context.setParameter('centroid_k', 0)
+            self.ostream.print_info(f"Turning off centroid force on bonds")
             self.ostream.flush()
             # centroid_force = [
             #     force for force in equil_simulation.system.getForces()

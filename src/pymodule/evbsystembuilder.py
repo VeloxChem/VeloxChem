@@ -284,6 +284,7 @@ class EvbSystemBuilder():
             topology = mmapp.Topology()
 
             nb_force = mm.NonbondedForce()
+            
             cmm_remover = mm.CMMotionRemover()
             system.addForce(nb_force)
             system.addForce(cmm_remover)
@@ -304,76 +305,14 @@ class EvbSystemBuilder():
         nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
         cmm_remover.setName("CMMotionRemover")
         if not self.no_force_groups:
-            nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
+            nb_force.setForceGroup(EvbForceGroup.NB_FORCE_INT.value)
             cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
 
         self.reaction_atoms = self._add_reactant(system, topology, nb_force)
         self.positions = system_mol.get_coordinates_in_angstrom()
 
         if self.pdb:
-            lin_dist_expr = "k*distance(g1,g2)"
-            max_dist_expr = "centroid_k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
-            centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
-            centroid_force.setName("Protein_Ligand_Centroid_force")
-            centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
-            centroid_force.addPerBondParameter("rmax")
-            centroid_force.addGlobalParameter("centroid_k",self.centroid_k)
-
-
-            if self.centroid_complete_ligand:
-                reactant_active_indices = [
-                    atom.index for atom in self.reaction_atoms
-                ]
-                reactant_active_positions = np.array(
-                    [self.positions[i] for i in reactant_active_indices])
-                rea_center = np.average(reactant_active_positions, axis=0)
-                self.ostream.print_info(
-                    f"Adding centroid force to reactand with c.o.m. {rea_center}A"
-                )
-            else:
-                reabonds = set(self.reactant.bonds.keys())
-                probonds = set(self.product.bonds.keys())
-                active_bonds = reabonds ^ probonds  # Commutative set difference
-                active_atoms = set()
-                for bond in active_bonds:
-                    active_atoms.update(bond)
-                reactant_active_indices = [
-                    self.reaction_atoms[i].index for i in active_atoms
-                ]
-                reactant_active_positions = np.array(
-                    [self.positions[i] for i in reactant_active_indices])
-                rea_center = np.average(reactant_active_positions, axis=0)
-                self.ostream.print_info(
-                    f"Adding centroid force to from reactant active site with indices{reactant_active_indices} and c.o.m. {rea_center}A"
-                )
-            pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
-
-            # calculate per active reactant position the distance with all pdb positions
-            # keep the ones within a set radius, and get their residues
-            # per residue, add a stepped harmonic max distance force
-            residues = set()
-            for pdb_index in pdb_indices:
-                pdb_pos = self.positions[pdb_index]
-                distance = np.linalg.norm(reactant_active_positions - pdb_pos,
-                                          axis=1)
-                if any(distance < self.centroid_residue_radius):
-                    residues.update({pdb_atoms[pdb_index].residue})
-
-            centroid_force.addGroup(reactant_active_indices)
-            for i, res in enumerate(residues):
-                res_indices = [atom.index for atom in res.atoms()]
-                res_positions = np.array(
-                    [self.positions[i] for i in res_indices])
-                res_center = np.average(res_positions, axis=0)
-                dist = np.linalg.norm(res_center - rea_center)
-                self.ostream.print_info(
-                    f"Adding centroid force to residue {res.name}({res.index+1}) with distance {dist:.3f}A"
-                )
-                centroid_force.addGroup(res_indices)
-                centroid_force.addBond([0, i], [dist])
-
-            system.addForce(centroid_force)
-            self.ostream.flush()
+            self._add_centroid(system,pdb_atoms)
 
         # Set the positions and make a box for it
 
@@ -535,6 +474,71 @@ class EvbSystemBuilder():
                 )
 
         return reaction_atoms
+
+    def _add_centroid(self,system,pdb_atoms):
+        lin_dist_expr = "k*distance(g1,g2)"
+        max_dist_expr = "centroid_k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
+        centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
+        centroid_force.setName("Protein_Ligand_Centroid_force")
+        centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
+        centroid_force.addPerBondParameter("rmax")
+        centroid_force.addGlobalParameter("centroid_k",self.centroid_k)
+
+
+        if self.centroid_complete_ligand:
+            reactant_active_indices = [
+                atom.index for atom in self.reaction_atoms
+            ]
+            reactant_active_positions = np.array(
+                [self.positions[i] for i in reactant_active_indices])
+            rea_center = np.average(reactant_active_positions, axis=0)
+            self.ostream.print_info(
+                f"Adding centroid force to reactand with c.o.m. {rea_center}A"
+            )
+        else:
+            reabonds = set(self.reactant.bonds.keys())
+            probonds = set(self.product.bonds.keys())
+            active_bonds = reabonds ^ probonds  # Commutative set difference
+            active_atoms = set()
+            for bond in active_bonds:
+                active_atoms.update(bond)
+            reactant_active_indices = [
+                self.reaction_atoms[i].index for i in active_atoms
+            ]
+            reactant_active_positions = np.array(
+                [self.positions[i] for i in reactant_active_indices])
+            rea_center = np.average(reactant_active_positions, axis=0)
+            self.ostream.print_info(
+                f"Adding centroid force to from reactant active site with indices{reactant_active_indices} and c.o.m. {rea_center}A"
+            )
+        pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
+
+        # calculate per active reactant position the distance with all pdb positions
+        # keep the ones within a set radius, and get their residues
+        # per residue, add a stepped harmonic max distance force
+        residues = set()
+        for pdb_index in pdb_indices:
+            pdb_pos = self.positions[pdb_index]
+            distance = np.linalg.norm(reactant_active_positions - pdb_pos,
+                                        axis=1)
+            if any(distance < self.centroid_residue_radius):
+                residues.update({pdb_atoms[pdb_index].residue})
+
+        centroid_force.addGroup(reactant_active_indices)
+        for i, res in enumerate(residues):
+            res_indices = [atom.index for atom in res.atoms()]
+            res_positions = np.array(
+                [self.positions[i] for i in res_indices])
+            res_center = np.average(res_positions, axis=0)
+            dist = np.linalg.norm(res_center - rea_center)
+            self.ostream.print_info(
+                f"Adding centroid force to residue {res.name}({res.index+1}) with distance {dist:.3f}A"
+            )
+            centroid_force.addGroup(res_indices)
+            centroid_force.addBond([0, i], [dist])
+
+        system.addForce(centroid_force)
+        self.ostream.flush()
 
     def _add_CNT_graphene(self, system, nb_force, topology, system_mol):
 
@@ -1168,6 +1172,10 @@ class EvbSystemBuilder():
                     f"Skipping nonbonded force decompositions for vacuum system"
                 )
             self.ostream.flush()
+
+        reasystem = self._split_nb_force(rea_system)
+        prosystem = self._split_nb_force(pro_system)
+
         systems['reactant'] = rea_system
         systems['product'] = pro_system
         return systems
@@ -1236,10 +1244,11 @@ class EvbSystemBuilder():
 
     def _add_nb_decompositions(self, system, state_name):
         systems = {}
-        nbforce = [
+        nbforce = copy.deepcopy([
             force for force in system.getForces()
             if isinstance(force, mm.NonbondedForce)
-        ][0]
+        ][0])
+        nbforce.setExceptionsUsePeriodicBoundaryConditions(True)
 
         # forces for solvent solvent interactions
         solcoul = copy.deepcopy(nbforce)
@@ -1274,7 +1283,7 @@ class EvbSystemBuilder():
 
         #Remove all solvent solvent interactions in the other forces
 
-        nbforce = copy.deepcopy(nbforce)
+        
         for to_decompose in self.decompose_nb:
 
             lj_dec = copy.deepcopy(nbforce)
@@ -1321,6 +1330,31 @@ class EvbSystemBuilder():
             })
 
         return systems
+
+    @staticmethod
+    def _split_nb_force(system):
+        nb_force = [
+            force for force in system.getForces()
+            if isinstance(force, mm.NonbondedForce)
+        ][0]
+        coul_force = nb_force
+        lj_force = copy.copy(nb_force)
+        coul_force.setName('Solvent coul')
+        coul_force.setForceGroup(EvbForceGroup.SOL_COUL.value)
+        lj_force.setName('Solvent lj')
+        lj_force.setForceGroup(EvbForceGroup.SOL_LJ.value)
+
+        for i in range(nb_force.getNumParticles()):
+            charge, sigma, epsilon = nb_force.getParticleParameters(i)
+            coul_force.setParticleParameters(i, charge, 1, 0)
+            lj_force.setParticleParameters(i,0,sigma,epsilon)
+        
+        for i in range(nb_force.getNumExceptions()):
+            p1, p2, charge, sigma, epsilon = nb_force.getExceptionParameters(i)
+            coul_force.setExceptionParameters(i, p1,p2,charge,1,0)
+            lj_force.setExceptionParameters(i,p1,p2,0,sigma,epsilon)
+        
+        system.addForce(lj_force)
 
     @staticmethod
     def _remove_forces(system):
@@ -1995,7 +2029,7 @@ class EvbForceGroup(Enum):
     CONSTRAINT = auto()
 
     CMM_REMOVER = auto()  # Center of mass motion remover
-    NB_FORCE = auto()  # Solvent-solvent and solvent-solute nb force
+    NB_FORCE_INT = auto()  # Solvent-solvent and solvent-solute nb force
     BAROSTAT = auto()  # Barostat
     E_FIELD = auto()  # Electric field force
     REA_HARM_BOND = auto()  # Bonded forces for the reaction atoms
@@ -2011,6 +2045,8 @@ class EvbForceGroup(Enum):
     )  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
     CARBON = auto()  # Graphene and CNTs
     PDB = auto()  # Bonded forces added from the PDB
+    SOL_COUL = auto()
+    SOL_LJ = auto()
     CENTROID = auto()
 
     @classmethod
