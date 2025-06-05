@@ -91,8 +91,9 @@ class EvbSystemBuilder():
         self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
 
-        self.centroid_k: float = 1000  # kj/mol nm, force constant for the position restraints
+        self.centroid_k: float = 10000  # kj/mol nm, force constant for the position restraints
         self.centroid_residue_radius: float = 4  # A
+        self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
 
         # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
         # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
@@ -116,7 +117,7 @@ class EvbSystemBuilder():
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.1  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
-        self.torsion_lambda_switch: float = 0.4 # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
+        self.torsion_lambda_switch: float = 0.4  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
@@ -160,8 +161,8 @@ class EvbSystemBuilder():
             "bonded_integration_angle_fac": {
                 "type": float
             },
-            "torsion_lambda_switch":{
-                "type":float
+            "torsion_lambda_switch": {
+                "type": float
             },
             "soft_core_coulomb_pes": {
                 "type": bool
@@ -207,6 +208,9 @@ class EvbSystemBuilder():
             },
             "centroid_residue_radius": {
                 "type": float
+            },
+            "centroid_complete_ligand":{
+                "type":bool
             },
             "coul14_scale": {
                 "type": float
@@ -308,26 +312,40 @@ class EvbSystemBuilder():
 
         if self.pdb:
             lin_dist_expr = "k*distance(g1,g2)"
-            max_dist_expr = "k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
+            max_dist_expr = "centroid_k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
             centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
             centroid_force.setName("Protein_Ligand_Centroid_force")
             centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
             centroid_force.addPerBondParameter("rmax")
-            centroid_force.addPerBondParameter("k")
+            centroid_force.addGlobalParameter("centroid_k",self.centroid_k)
 
-            reabonds = set(self.reactant.bonds.keys())
-            probonds = set(self.product.bonds.keys())
-            active_bonds = reabonds ^ probonds  # Commutative set difference
-            active_atoms = set()
-            for bond in active_bonds:
-                active_atoms.update(bond)
 
-            reactant_active_indices = [
-                self.reaction_atoms[i].index for i in active_atoms
-            ]
-            reactant_active_positions = np.array(
-                [self.positions[i] for i in reactant_active_indices])
-            rea_center = np.average(reactant_active_positions, axis=0)
+            if self.centroid_complete_ligand:
+                reactant_active_indices = [
+                    atom.index for atom in self.reaction_atoms
+                ]
+                reactant_active_positions = np.array(
+                    [self.positions[i] for i in reactant_active_indices])
+                rea_center = np.average(reactant_active_positions, axis=0)
+                self.ostream.print_info(
+                    f"Adding centroid force to reactand with c.o.m. {rea_center}A"
+                )
+            else:
+                reabonds = set(self.reactant.bonds.keys())
+                probonds = set(self.product.bonds.keys())
+                active_bonds = reabonds ^ probonds  # Commutative set difference
+                active_atoms = set()
+                for bond in active_bonds:
+                    active_atoms.update(bond)
+                reactant_active_indices = [
+                    self.reaction_atoms[i].index for i in active_atoms
+                ]
+                reactant_active_positions = np.array(
+                    [self.positions[i] for i in reactant_active_indices])
+                rea_center = np.average(reactant_active_positions, axis=0)
+                self.ostream.print_info(
+                    f"Adding centroid force to from reactant active site with indices{reactant_active_indices} and c.o.m. {rea_center}A"
+                )
             pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
 
             # calculate per active reactant position the distance with all pdb positions
@@ -349,10 +367,10 @@ class EvbSystemBuilder():
                 res_center = np.average(res_positions, axis=0)
                 dist = np.linalg.norm(res_center - rea_center)
                 self.ostream.print_info(
-                    f"Adding centroid force to residue {res.name}({res.index}) with distance {dist:.3f}A"
+                    f"Adding centroid force to residue {res.name}({res.index+1}) with distance {dist:.3f}A"
                 )
                 centroid_force.addGroup(res_indices)
-                centroid_force.addBond([0, i], [dist, self.centroid_k])
+                centroid_force.addBond([0, i], [dist])
 
             system.addForce(centroid_force)
             self.ostream.flush()
@@ -1139,8 +1157,17 @@ class EvbSystemBuilder():
             # self._add_bonded_decompositions(pro_system, 1)
             pass
         if self.decompose_nb is not None:
-            systems.update(self._add_nb_decompositions(rea_system, 'rea'))
-            systems.update(self._add_nb_decompositions(pro_system, 'pro'))
+            if self.solvent:
+                self.ostream.print_info(
+                    f"Adding nonbonded force decomposition reporting for particles {self.decompose_nb}"
+                )
+                systems.update(self._add_nb_decompositions(rea_system, 'rea'))
+                systems.update(self._add_nb_decompositions(pro_system, 'pro'))
+            else:
+                self.ostream.print_info(
+                    f"Skipping nonbonded force decompositions for vacuum system"
+                )
+            self.ostream.flush()
         systems['reactant'] = rea_system
         systems['product'] = pro_system
         return systems
@@ -1454,32 +1481,32 @@ class EvbSystemBuilder():
                     and key in self.product.dihedrals.keys()):
                 dihedA = self.reactant.dihedrals[key]
                 dihedB = self.product.dihedrals[key]
-                if dihedA['barrier']==0 or dihedB['barrier']==0:
+                if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
                     x0 = self.torsion_lambda_switch
-                    a=-1/x0
-                    b=1
-                    reascale = a*lam+b
-                    a = 1/(1-x0)
-                    b=1-a
-                    proscale = a*lam + b
+                    a = -1 / x0
+                    b = 1
+                    reascale = a * lam + b
+                    a = 1 / (1 - x0)
+                    b = 1 - a
+                    proscale = a * lam + b
                 else:
-                    reascale = 1-lam
+                    reascale = 1 - lam
                     proscale = lam
                 self._add_torsion(fourier_force, dihedA, atom_ids, reascale)
-                self._add_torsion(fourier_force, dihedB, atom_ids,proscale)
+                self._add_torsion(fourier_force, dihedB, atom_ids, proscale)
             else:
                 # Create a linear switching function that turns on the proper torsions only past a certain lambda value
                 if key in self.reactant.dihedrals.keys():
                     x0 = self.torsion_lambda_switch
-                    a=-1/x0
-                    b=1
-                    scale = a*lam+b
+                    a = -1 / x0
+                    b = 1
+                    scale = a * lam + b
                     dihed = self.reactant.dihedrals[key]
                 else:
                     x0 = self.torsion_lambda_switch
-                    a = 1/(1-x0)
-                    b=1-a
-                    scale = a*lam + b
+                    a = 1 / (1 - x0)
+                    b = 1 - a
+                    scale = a * lam + b
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
@@ -1502,16 +1529,16 @@ class EvbSystemBuilder():
                 dihedA = self.reactant.impropers[key]
                 dihedB = self.product.impropers[key]
 
-                if dihedA['barrier']==0 or dihedB['barrier']==0:
+                if dihedA['barrier'] == 0 or dihedB['barrier'] == 0:
                     x0 = self.torsion_lambda_switch
-                    a=-1/x0
-                    b=1
-                    reascale = a*lam+b
-                    a = 1/(1-x0)
-                    b=1-a
-                    proscale = a*lam + b
+                    a = -1 / x0
+                    b = 1
+                    reascale = a * lam + b
+                    a = 1 / (1 - x0)
+                    b = 1 - a
+                    proscale = a * lam + b
                 else:
-                    reascale = 1-lam
+                    reascale = 1 - lam
                     proscale = lam
 
                 self._add_torsion(fourier_force,
@@ -1527,15 +1554,15 @@ class EvbSystemBuilder():
             else:
                 if key in self.reactant.impropers.keys():
                     x0 = self.torsion_lambda_switch
-                    a=-1/x0
-                    b=1
-                    scale = a*lam+b
+                    a = -1 / x0
+                    b = 1
+                    scale = a * lam + b
                     dihed = self.reactant.impropers[key]
                 else:
                     x0 = self.torsion_lambda_switch
-                    a = 1/(1-x0)
-                    b=1-a
-                    scale = a*lam+b
+                    a = 1 / (1 - x0)
+                    b = 1 - a
+                    scale = a * lam + b
                     dihed = self.product.impropers[key]
                 if scale > 0:
                     self._add_torsion(fourier_force,

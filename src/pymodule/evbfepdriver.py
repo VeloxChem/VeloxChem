@@ -454,22 +454,22 @@ class EvbFepDriver():
                             equil_simulation, self.initial_equil_NPT_steps,
                             f"PDB warmup NPT equilibration T = {T}")
 
-            centroid_force = [
-                force for force in equil_simulation.system.getForces()
-                if isinstance(force, mm.CustomCentroidBondForce)
-            ][0]
-            num_centroid_bonds = centroid_force.getNumBonds()
+            equil_simulation.context.setParameter('centroid_k',0)
             self.ostream.print_info(
-                f"Turning off centroid force on {num_centroid_bonds} bonds")
+                f"Turning off centroid force on bonds")
             self.ostream.flush()
+            # centroid_force = [
+            #     force for force in equil_simulation.system.getForces()
+            #     if isinstance(force, mm.CustomCentroidBondForce)
+            # ][0]
 
-            for i in range(num_centroid_bonds):
-                bond, params = centroid_force.getBondParameters(i)
-                params = list(params)
-                if len(params)>1:
-                    params[1:] = [0] * (len(params) - 1)
-                centroid_force.setBondParameters(i, bond, params)
-            centroid_force.updateParametersInContext(equil_simulation.context)
+            # for i in range(num_centroid_bonds):
+            #     bond, params = centroid_force.getBondParameters(i)
+            #     params = list(params)
+            #     if len(params)>1:
+            #         params[1:] = [0] * (len(params) - 1)
+            #     centroid_force.setBondParameters(i, bond, params)
+            # centroid_force.updateParametersInContext(equil_simulation.context)
             if self.isobaric:
                 barostat.setFrequency(0)
                 self._safe_step(equil_simulation, self.equil_NVT_steps,
