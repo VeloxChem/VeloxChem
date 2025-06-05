@@ -460,6 +460,7 @@ class oldRixsDriver:
                     'scattering_amplitudes': scattering_amplitudes,
                     'emission_energies': emission_enes,
                     'energy_losses': ene_losses,
+                    'excitation_energies': core_eigvals
                     }
         if gen_abs:
             self.absorption_properties = {
