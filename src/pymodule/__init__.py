@@ -184,7 +184,6 @@ from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
 from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
-from .smddriver import SMDDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
