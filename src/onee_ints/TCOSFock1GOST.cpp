@@ -71,7 +71,7 @@ CDenseMatrix
 
     // points info
 
-    std::vector<double> points_info(npoints * 4);
+    std::vector<double> points_info(npoints * 5);
 
     for (int c = 0; c < npoints; c++)
     {
@@ -415,6 +415,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -422,6 +424,14 @@ CDenseMatrix
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -434,7 +444,7 @@ CDenseMatrix
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -447,6 +457,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < ss_prim_pair_count; ij++)
@@ -514,6 +526,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -521,6 +535,14 @@ CDenseMatrix
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -530,11 +552,11 @@ CDenseMatrix
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -547,6 +569,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < sp_prim_pair_count; ij++)
@@ -617,6 +641,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -624,6 +650,14 @@ CDenseMatrix
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -633,12 +667,12 @@ CDenseMatrix
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
-            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * (y_c - y_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
+            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * CB[b1]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -655,6 +689,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < sd_prim_pair_count; ij++)
@@ -727,6 +763,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -734,6 +772,14 @@ CDenseMatrix
             const auto z_c = points_info[c + npoints * 2];
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
+
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -743,13 +789,13 @@ CDenseMatrix
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
-            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * (y_c - y_j)) / (a_i + a_j + zeta_c));
-            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * (z_c - z_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
+            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * CB[b1]) / (a_i + a_j + zeta_c));
+            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * CB[b2]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -768,6 +814,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < sf_prim_pair_count; ij++)
@@ -838,6 +886,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -846,6 +896,14 @@ CDenseMatrix
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
 
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
+
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
                                   (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
@@ -853,13 +911,13 @@ CDenseMatrix
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-            const auto GA_0 = ((a_j * rij[a0] + zeta_c * (x_c - x_i)) / (a_i + a_j + zeta_c));
+            const auto GA_0 = ((a_j * rij[a0] + zeta_c * CA[a0]) / (a_i + a_j + zeta_c));
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -876,6 +934,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < pp_prim_pair_count; ij++)
@@ -949,6 +1009,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -957,6 +1019,14 @@ CDenseMatrix
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
 
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
+
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
                                   (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
@@ -964,14 +1034,14 @@ CDenseMatrix
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-            const auto GA_0 = ((a_j * rij[a0] + zeta_c * (x_c - x_i)) / (a_i + a_j + zeta_c));
+            const auto GA_0 = ((a_j * rij[a0] + zeta_c * CA[a0]) / (a_i + a_j + zeta_c));
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
-            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * (y_c - y_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
+            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * CB[b1]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -990,6 +1060,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < pd_prim_pair_count; ij++)
@@ -1065,6 +1137,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -1073,6 +1147,14 @@ CDenseMatrix
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
 
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
+
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
                                   (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
@@ -1080,15 +1162,15 @@ CDenseMatrix
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-            const auto GA_0 = ((a_j * rij[a0] + zeta_c * (x_c - x_i)) / (a_i + a_j + zeta_c));
+            const auto GA_0 = ((a_j * rij[a0] + zeta_c * CA[a0]) / (a_i + a_j + zeta_c));
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
-            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * (y_c - y_j)) / (a_i + a_j + zeta_c));
-            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * (z_c - z_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
+            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * CB[b1]) / (a_i + a_j + zeta_c));
+            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * CB[b2]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -1114,6 +1196,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < pf_prim_pair_count; ij++)
@@ -1189,6 +1273,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -1197,6 +1283,14 @@ CDenseMatrix
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
 
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
+
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
                                   (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
@@ -1204,15 +1298,15 @@ CDenseMatrix
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-            const auto GA_0 = ((a_j * rij[a0] + zeta_c * (x_c - x_i)) / (a_i + a_j + zeta_c));
-            const auto GA_1 = ((a_j * rij[a1] + zeta_c * (y_c - y_i)) / (a_i + a_j + zeta_c));
+            const auto GA_0 = ((a_j * rij[a0] + zeta_c * CA[a0]) / (a_i + a_j + zeta_c));
+            const auto GA_1 = ((a_j * rij[a1] + zeta_c * CA[a1]) / (a_i + a_j + zeta_c));
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
-            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * (y_c - y_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
+            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * CB[b1]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -1238,6 +1332,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < dd_prim_pair_count; ij++)
@@ -1315,6 +1411,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -1323,6 +1421,14 @@ CDenseMatrix
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
 
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
+
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
                                   (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
@@ -1330,16 +1436,16 @@ CDenseMatrix
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-            const auto GA_0 = ((a_j * rij[a0] + zeta_c * (x_c - x_i)) / (a_i + a_j + zeta_c));
-            const auto GA_1 = ((a_j * rij[a1] + zeta_c * (y_c - y_i)) / (a_i + a_j + zeta_c));
+            const auto GA_0 = ((a_j * rij[a0] + zeta_c * CA[a0]) / (a_i + a_j + zeta_c));
+            const auto GA_1 = ((a_j * rij[a1] + zeta_c * CA[a1]) / (a_i + a_j + zeta_c));
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
-            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * (y_c - y_j)) / (a_i + a_j + zeta_c));
-            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * (z_c - z_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
+            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * CB[b1]) / (a_i + a_j + zeta_c));
+            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * CB[b2]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -1373,6 +1479,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < df_prim_pair_count; ij++)
@@ -1452,6 +1560,8 @@ CDenseMatrix
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_ij = 0.0;
+
         for (int c = 0; c < npoints; c++)
         {
             const auto x_c = points_info[c + npoints * 0];
@@ -1460,6 +1570,14 @@ CDenseMatrix
             const auto zeta_c = points_info[c + npoints * 3];
             const auto p_c = points_info[c + npoints * 4];
 
+            const double CA[3] = {x_c - x_i,
+                                  y_c - y_i,
+                                  z_c - z_i};
+
+            const double CB[3] = {x_c - x_j,
+                                  y_c - y_j,
+                                  z_c - z_j};
+
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
                                   (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
@@ -1467,17 +1585,17 @@ CDenseMatrix
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
             const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-            const auto GA_0 = ((a_j * rij[a0] + zeta_c * (x_c - x_i)) / (a_i + a_j + zeta_c));
-            const auto GA_1 = ((a_j * rij[a1] + zeta_c * (y_c - y_i)) / (a_i + a_j + zeta_c));
-            const auto GA_2 = ((a_j * rij[a2] + zeta_c * (z_c - z_i)) / (a_i + a_j + zeta_c));
+            const auto GA_0 = ((a_j * rij[a0] + zeta_c * CA[a0]) / (a_i + a_j + zeta_c));
+            const auto GA_1 = ((a_j * rij[a1] + zeta_c * CA[a1]) / (a_i + a_j + zeta_c));
+            const auto GA_2 = ((a_j * rij[a2] + zeta_c * CA[a2]) / (a_i + a_j + zeta_c));
 
-            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * (x_c - x_j)) / (a_i + a_j + zeta_c));
-            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * (y_c - y_j)) / (a_i + a_j + zeta_c));
-            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * (z_c - z_j)) / (a_i + a_j + zeta_c));
+            const auto GB_0 = ((-a_i * rij[b0] + zeta_c * CB[b0]) / (a_i + a_j + zeta_c));
+            const auto GB_1 = ((-a_i * rij[b1] + zeta_c * CB[b1]) / (a_i + a_j + zeta_c));
+            const auto GB_2 = ((-a_i * rij[b2] + zeta_c * CB[b2]) / (a_i + a_j + zeta_c));
 
 
 
-            tco_s[ij] += p_c * S_ij_00 * (
+            V_ij += p_c * S_ij_00 * (
 
 
                 G_ij_00 * (
@@ -1530,6 +1648,8 @@ CDenseMatrix
 
             );
         }
+
+        tco_s[ij] = V_ij;
     }
 
     for (int ij = 0; ij < ff_prim_pair_count; ij++)
