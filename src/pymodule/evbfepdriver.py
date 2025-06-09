@@ -121,7 +121,7 @@ class EvbFepDriver():
         self.pdb = None
         self.pdb_equil_start_temp = 10  #kelvin
         self.pdb_equil_temp_step = 50  # kelvin
-        self.pdb_posres_equil = True 
+        self.pdb_posres_equil = False 
         self.posres_k = -1
 
         self.keywords = {
