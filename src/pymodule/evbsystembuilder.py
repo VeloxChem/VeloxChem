@@ -91,10 +91,12 @@ class EvbSystemBuilder():
         self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
 
-        self.centroid_k: float = 50000  # kj/mol nm, force constant for the position restraints
-        self.centroid_offset: float = -0.2 #A
-        self.centroid_residue_radius: float = 4  # A
-        self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
+        # self.centroid_k: float = 50000  # kj/mol nm, force constant for the position restraints
+        # self.centroid_offset: float = -0.2 #A
+        # self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
+
+        self.posres_residue_radius: float = 4  # A
+        self.posres_k = 10000
 
         # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
         # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
@@ -204,18 +206,21 @@ class EvbSystemBuilder():
             "morse_couple": {
                 "type": float
             },
-            "centroid_k": {
+            "posres_k": {
                 "type": float
             },
-            "centroid_offset":{
-                "type":float
-            },
-            "centroid_residue_radius": {
+            # "centroid_k": {
+            #     "type": float
+            # },
+            # "centroid_offset":{
+            #     "type":float
+            # },
+            "posres_residue_radius": {
                 "type": float
             },
-            "centroid_complete_ligand":{
-                "type":bool
-            },
+            # "centroid_complete_ligand":{
+            #     "type":bool
+            # },
             "coul14_scale": {
                 "type": float
             },
@@ -316,7 +321,7 @@ class EvbSystemBuilder():
         self.positions = system_mol.get_coordinates_in_angstrom()
 
         if self.pdb:
-            self._add_centroid(system,pdb_atoms)
+            self._add_posres(system,pdb_atoms)
 
         # Set the positions and make a box for it
 
@@ -479,74 +484,58 @@ class EvbSystemBuilder():
 
         return reaction_atoms
 
-    def _add_centroid(self,system,pdb_atoms):
-        lin_dist_expr = "k*distance(g1,g2)"
-        max_dist_expr = f"""
-        centroid_k*step(r)*(r)^2;
-        r = distance(g1,g2)-rmax-r_offset;
-        """
-        centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
-        centroid_force.setName("Protein_Ligand_Centroid_force")
-        centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
-        centroid_force.addPerBondParameter("rmax")
-        centroid_force.addGlobalParameter("centroid_k",self.centroid_k)
-        centroid_force.addGlobalParameter("r_offset",self.centroid_offset)
+    def _add_posres(self,system,pdb_atoms):
+        # lin_dist_expr = "k*distance(g1,g2)"
+        # max_dist_expr = f"""
+        # centroid_k*step(r)*(r)^2;
+        # r = distance(g1,g2)-rmax-r_offset;
+        # """
+        # centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
+        # centroid_force.setName("Protein_Ligand_Centroid_force")
+        # centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
+        # centroid_force.addPerBondParameter("rmax")
+        # centroid_force.addGlobalParameter("centroid_k",self.centroid_k)
+        # centroid_force.addGlobalParameter("r_offset",self.centroid_offset)
 
+        posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
+        posres_force = mm.CustomExternalForce(posres_expr)
+        posres_force.setName("protein_ligand_posres")
+        posres_force.addGlobalParameter('posres_k',self.posres_k)
+        posres_force.addPerParticleParameter('x0')
+        posres_force.addPerParticleParameter('y0')
+        posres_force.addPerParticleParameter('z0')
+        
+        reactant_active_indices = [
+            atom.index for atom in self.reaction_atoms
+        ]
+        reactant_active_positions = np.array(
+            [self.positions[i] for i in reactant_active_indices])
 
-        if self.centroid_complete_ligand:
-            reactant_active_indices = [
-                atom.index for atom in self.reaction_atoms
-            ]
-            reactant_active_positions = np.array(
-                [self.positions[i] for i in reactant_active_indices])
-            rea_center = np.average(reactant_active_positions, axis=0)
-            self.ostream.print_info(
-                f"Adding centroid force to reactand with c.o.m. {rea_center}A"
-            )
-        else:
-            reabonds = set(self.reactant.bonds.keys())
-            probonds = set(self.product.bonds.keys())
-            active_bonds = reabonds ^ probonds  # Commutative set difference
-            active_atoms = set()
-            for bond in active_bonds:
-                active_atoms.update(bond)
-            reactant_active_indices = [
-                self.reaction_atoms[i].index for i in active_atoms
-            ]
-            reactant_active_positions = np.array(
-                [self.positions[i] for i in reactant_active_indices])
-            rea_center = np.average(reactant_active_positions, axis=0)
-            self.ostream.print_info(
-                f"Adding centroid force to from reactant active site with indices{reactant_active_indices} and c.o.m. {rea_center}A"
-            )
+        indices = reactant_active_indices
+        positions = reactant_active_positions
+
         pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
-
-        # calculate per active reactant position the distance with all pdb positions
-        # keep the ones within a set radius, and get their residues
-        # per residue, add a stepped harmonic max distance force
         residues = set()
         for pdb_index in pdb_indices:
             pdb_pos = self.positions[pdb_index]
             distance = np.linalg.norm(reactant_active_positions - pdb_pos,
                                         axis=1)
-            if any(distance < self.centroid_residue_radius):
+            if any(distance < self.posres_residue_radius):
                 residues.update({pdb_atoms[pdb_index].residue})
-
-        centroid_force.addGroup(reactant_active_indices)
         for i, res in enumerate(residues):
             res_indices = [atom.index for atom in res.atoms()]
             res_positions = np.array(
                 [self.positions[i] for i in res_indices])
-            res_center = np.average(res_positions, axis=0)
-            dist = np.linalg.norm(res_center - rea_center)
-            self.ostream.print_info(
-                f"Adding centroid force to residue {res.name}({res.index+1}) with distance {dist:.3f}A"
-            )
-            centroid_force.addGroup(res_indices)
-            centroid_force.addBond([0, i], [dist])
+            indices+=res_indices
+            positions=np.vstack((positions,res_positions))
 
-        system.addForce(centroid_force)
+        positions*=0.1
+        for index, position in zip(indices,positions):
+            posres_force.addParticle(index,position)
+
+        self.ostream.print_info(f"Adding {len(indices)} particles to posres force")
         self.ostream.flush()
+        system.addForce(posres_force)
 
     def _add_CNT_graphene(self, system, nb_force, topology, system_mol):
 

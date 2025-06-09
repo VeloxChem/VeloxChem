@@ -121,8 +121,8 @@ class EvbFepDriver():
         self.pdb = None
         self.pdb_equil_start_temp = 10  #kelvin
         self.pdb_equil_temp_step = 50  # kelvin
-        self.pdb_centroid_equil = True 
-        self.centroid_k = -1
+        self.pdb_posres_equil = True 
+        self.posres_k = -1
 
         self.keywords = {
             "langevin_friction": {
@@ -218,10 +218,10 @@ class EvbFepDriver():
             "pdb_equil_start_temp": {
                 "type": int
             },
-            "pdb_centroid_equil":{
+            "pdb_posres_equil":{
                 "type": bool
             },
-            "centroid_k":{
+            "posres_k":{
                 "type":float
             }
         }
@@ -384,8 +384,8 @@ class EvbFepDriver():
                         simulation, self.initial_equil_NPT_steps,
                         f"PDB warmup NPT equilibration T = {T}")
 
-            self.ostream.print_info("Turning centroid force off")
-            simulation.context.setParameter('centroid_k', 0)
+            self.ostream.print_info("Turning posres force off")
+            simulation.context.setParameter('posres_k', 0)
             
 
         return simulation.context.getState(
@@ -455,13 +455,13 @@ class EvbFepDriver():
             )
             simulation.reporters.append(equil_traj_reporter)
         
-        if self.pdb is not None and self.pdb_centroid_equil:
-            self.ostream.print_info("Turning centroid force on")
-            simulation.context.setParameter('centroid_k', self.centroid_k)
+        if self.pdb is not None and self.pdb_posres_equil:
+            self.ostream.print_info("Turning posres force on")
+            simulation.context.setParameter('posres_k', self.posres_k)
             self._safe_step(simulation, self.equil_NVT_steps,
-                            "NVT centroid equilibration")
-            self.ostream.print_info("Turning centroid force off")
-            simulation.context.setParameter('centroid_k', 0)
+                            "NVT posres equilibration")
+            self.ostream.print_info("Turning posres force off")
+            simulation.context.setParameter('posres_k', 0)
 
         if self.isobaric:
             barostat = self._get_barostat(simulation)
