@@ -15518,8 +15518,8 @@
 		</Force>
 		<Force forceGroup="11" name="Reaction improper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
 			<Torsions>
-				<Torsion k="1.8409600000000002" p1="0" p2="1" p3="4" p4="5" periodicity="2" phase="3.141592653589793"/>
-				<Torsion k="1.8409600000000002" p1="1" p2="0" p3="2" p4="3" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="1.8409600000000002" p1="0" p2="1" p3="2" p4="3" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="1.8409600000000002" p1="1" p2="0" p3="4" p4="5" periodicity="2" phase="3.141592653589793"/>
 			</Torsions>
 		</Force>
 		<Force energy=" (1-l) * LjtotA   + l  * LjtotB; LjtotA     = A12 / r^12 - A6 / r^6;LjtotB     = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; " forceGroup="2" name="Reaction internal lennard-jones" type="CustomBondForce" usesPeriodic="0" version="3">
