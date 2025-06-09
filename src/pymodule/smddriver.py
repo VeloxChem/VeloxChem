@@ -431,18 +431,11 @@ class SMDDriver:
         # OBS: The calculations for each atom are completely independent and can thus be parallelized over an arbitrary number of threads, whereas the calculation of adjacency lists has not been parallelized.
         from rdkit import Chem
         from rdkit.Chem import rdFreeSASA
-        from rdkit.Chem import AllChem
-        
-        # TODO: check the definition of the radii; using radii = rdFreeSASA.classifyAtoms(hmol) or  ptable = Chem.GetPeriodicTable(), radii = [ptable.GetRvdw(atom.GetAtomicNum()) for atom in hmol.GetAtoms()]
-        # Gives drastically different results.
-
+    
         self.ostream.print_info("Computing Solvent Accessible Surface Area (SASA) per atom...")
         self.ostream.flush()
         
         vdw_radii = self.solute.vdw_radii_to_numpy() * bohr_in_angstrom()
-        self.ostream.print_info(f"vdw radii: {vdw_radii.tolist()}")
-        self.ostream.print_info(f"atoms: {self.solute.get_labels()}")
-        self.ostream.flush()
 
         solute = Chem.MolFromXYZBlock(self.solute.get_xyz_string())
         r_s = 1.4 # Å (0.4 Å according to SMD paper (1.4 Å according to e.g., SM6, Lee&Richards etc.))
@@ -452,13 +445,6 @@ class SMDDriver:
             rdFreeSASA.SASAClassifier.Protor,  # optimized for small molecules
             r_s
         )
-        
-        #rdFreeSASA.CalcSASA(solute, radii=vdw_radii.tolist())
-
-        ptable = Chem.GetPeriodicTable()
-        ptable_radii = [ptable.GetRvdw(atom.GetAtomicNum()) for atom in solute.GetAtoms()]
-        self.ostream.print_info(f"p-table radii: {ptable_radii}")
-        self.ostream.flush()
 
         rdFreeSASA.CalcSASA(solute, radii=vdw_radii.tolist(), confIdx=-1, opts=opts)
 

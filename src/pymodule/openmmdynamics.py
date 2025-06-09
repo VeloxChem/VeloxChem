@@ -152,8 +152,8 @@ class OpenMMDynamics:
         self.padding = 1.0
         self.cutoff = 1.0
         self.integrator = None
-        self.k = 3000
-        self.r0 = 0.2
+        self.k = 1000
+        self.r0 = 0.5
 
         # OpenMM objects
         self.system = None
@@ -736,7 +736,7 @@ class OpenMMDynamics:
                                 partial_charges = None,
                                 temperature=700, 
                                 timestep=2.0, 
-                                nsteps=500000,
+                                nsteps=100000,
                                 snapshots=100,
                                 lowest_conformations=10,
                                 ):
