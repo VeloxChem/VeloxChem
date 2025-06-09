@@ -91,7 +91,8 @@ class EvbSystemBuilder():
         self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
 
-        self.centroid_k: float = 10000  # kj/mol nm, force constant for the position restraints
+        self.centroid_k: float = 50000  # kj/mol nm, force constant for the position restraints
+        self.centroid_offset: float = -0.2 #A
         self.centroid_residue_radius: float = 4  # A
         self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
 
@@ -205,6 +206,9 @@ class EvbSystemBuilder():
             },
             "centroid_k": {
                 "type": float
+            },
+            "centroid_offset":{
+                "type":float
             },
             "centroid_residue_radius": {
                 "type": float
@@ -477,12 +481,16 @@ class EvbSystemBuilder():
 
     def _add_centroid(self,system,pdb_atoms):
         lin_dist_expr = "k*distance(g1,g2)"
-        max_dist_expr = "centroid_k*step(distance(g1,g2)-rmax)*(distance(g1,g2)-rmax)^2"
+        max_dist_expr = f"""
+        centroid_k*step(r)*(r)^2;
+        r = distance(g1,g2)-rmax-r_offset;
+        """
         centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
         centroid_force.setName("Protein_Ligand_Centroid_force")
         centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
         centroid_force.addPerBondParameter("rmax")
         centroid_force.addGlobalParameter("centroid_k",self.centroid_k)
+        centroid_force.addGlobalParameter("r_offset",self.centroid_offset)
 
 
         if self.centroid_complete_ligand:
@@ -1337,6 +1345,7 @@ class EvbSystemBuilder():
             force for force in system.getForces()
             if isinstance(force, mm.NonbondedForce)
         ][0]
+        # nb_force.setNonbondedMethod(mm.NonbondedForce.CutoffNonPeriodic)
         coul_force = nb_force
         lj_force = copy.copy(nb_force)
         coul_force.setName('Solvent coul')

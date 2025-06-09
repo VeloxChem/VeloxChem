@@ -121,6 +121,8 @@ class EvbFepDriver():
         self.pdb = None
         self.pdb_equil_start_temp = 10  #kelvin
         self.pdb_equil_temp_step = 50  # kelvin
+        self.pdb_centroid_equil = True 
+        self.centroid_k = -1
 
         self.keywords = {
             "langevin_friction": {
@@ -216,6 +218,12 @@ class EvbFepDriver():
             "pdb_equil_start_temp": {
                 "type": int
             },
+            "pdb_centroid_equil":{
+                "type": bool
+            },
+            "centroid_k":{
+                "type":float
+            }
         }
 
     def run_FEP(
@@ -306,8 +314,11 @@ class EvbFepDriver():
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
-
-            equil_state = self._minimize_and_equilibrate(
+            if l == 0:
+                state = self._initial_equilibrate(system,positions)
+                positions = state.getPositions()
+                velocities = state.getVelocities()
+            equil_state = self._equilibrate(
                 system, l, positions, velocities)
 
             if self.constrain_H:
@@ -321,33 +332,84 @@ class EvbFepDriver():
             velocities = state.getVelocities()
         self.ostream.flush()
 
-    def _minimize_and_equilibrate(self, system, l, positions, velocities=None):
-        equil_simulation = self._get_simulation(system, self.equil_step_size)
-        equil_simulation.context.setPositions(positions)
-        if velocities is not None:
-            equil_simulation.context.setVelocities(velocities)
+    def _initial_equilibrate(self,system,positions):
+        simulation = self._get_simulation(system, self.equil_step_size)
+        simulation.context.setPositions(positions)
+        
+        platformname = simulation.context.getPlatform()
+        self.ostream.print_info(
+            f"Running FEP on platform: {platformname.getName()}")
+        self.ostream.flush()
 
-        if l == 0:
-            platformname = equil_simulation.context.getPlatform()
+        self._minimize(simulation)
+        
+        if self.pdb is None:
+            if self.isobaric:
+                barostat = self._get_barostat(simulation)
+                barostat.setFrequency(0)
+                self._safe_step(simulation,
+                                self.initial_equil_NVT_steps,
+                                "initial NVT equilibration")
+                barostat.setFrequency(25)
+                self._safe_step(simulation,
+                                self.initial_equil_NPT_steps,
+                                "initial NPT equilibration")
+            else:
+                self._safe_step(simulation,
+                                self.initial_equil_NVT_steps,
+                                "initial equilibration")
+        else:
+            temperatures = list(
+                np.arange(self.pdb_equil_start_temp, self.temperature,
+                            self.pdb_equil_temp_step))
+            temperatures.append(self.temperature)
             self.ostream.print_info(
-                f"Running FEP on platform: {platformname.getName()}")
+                f"Perfoming PDB warmup with T-vector {np.array(temperatures)}"
+            )
             self.ostream.flush()
+            if self.isobaric:
+                barostat = self._get_barostat(simulation)
+            for T in temperatures:
+                simulation.integrator.setTemperature(T)
+                if self.isobaric:
+                    barostat.setFrequency(0)
+                self._safe_step(simulation,
+                                self.initial_equil_NVT_steps,
+                                f"PDB warmup NVT equilibration T = {T}")
 
-        if (l == 0 or self.minimize_every_lambda):
-            self.ostream.print_info("Minimizing energy")
-            self.ostream.flush()
-            equil_simulation.minimizeEnergy()
-            positions = equil_simulation.context.getState(
-                getPositions=True, enforcePeriodicBox=True).getPositions()
+                if self.isobaric:
+                    barostat.setFrequency(25)
+                    simulation.integrator.setTemperature(T)
+                    self._safe_step(
+                        simulation, self.initial_equil_NPT_steps,
+                        f"PDB warmup NPT equilibration T = {T}")
 
-        mmapp.PDBFile.writeFile(
-            self.topology,
-            np.array(positions.value_in_unit(mm.unit.angstrom)),
-            open(self.run_folder / f"minim_{l:.3f}.pdb", "w"),
+            self.ostream.print_info("Turning centroid force off")
+            simulation.context.setParameter('centroid_k', 0)
+            
+
+        return simulation.context.getState(
+            getPositions=True,
+            getVelocities=True,
+            getForces=True,
+            getEnergy=True,
+            getParameters=True,
+            getParameterDerivatives=True,
+            getIntegratorParameters=True,
+            enforcePeriodicBox=True,
         )
+
+    def _equilibrate(self, system, l, positions, velocities=None):
+        simulation = self._get_simulation(system, self.equil_step_size)
+        simulation.context.setPositions(positions)
+        if velocities is not None:
+            simulation.context.setVelocities(velocities)
+        if self.minimize_every_lambda:
+            self._minimize(simulation)
+
         if self.debug:
-            self._save_state(equil_simulation, f"minim_{l:.3f}")
-            equil_simulation.reporters.append(
+            self._save_state(simulation, f"minim_{l:.3f}")
+            simulation.reporters.append(
                 mmapp.PDBReporter(
                     str(self.run_folder / f"traj_equil_{l:.3f}.pdb"),
                     self.write_step,
@@ -356,7 +418,7 @@ class EvbFepDriver():
             f_file = str(self.run_folder / f"forces_equil_{l:.3f}.csv")
             v_file = str(self.run_folder / f"velocities_equil_{l:.3f}.csv")
             g_file = str(self.run_folder / f"forcegroups_equil_{l:.3f}.csv")
-            equil_simulation.reporters.append(
+            simulation.reporters.append(
                 EvbReporter(
                     str(self.run_folder / f"energies_equil_{l:.3f}.csv"),
                     self.write_step,
@@ -371,7 +433,7 @@ class EvbFepDriver():
                 ))
 
         sz = self.equil_step_size * mmunit.picoseconds
-        equil_simulation.integrator.setStepSize(sz)
+        simulation.integrator.setStepSize(sz)
         self.ostream.print_info(f"Equilibration with step size {sz}")
 
         equil_reporter = self._get_data_reporter(
@@ -383,105 +445,37 @@ class EvbFepDriver():
             l,
             f"_{l:.3f}",
         )
-        equil_simulation.reporters.append(equil_evb_reporter)
-        equil_simulation.reporters.append(equil_reporter)
+        simulation.reporters.append(equil_evb_reporter)
+        simulation.reporters.append(equil_reporter)
         if self.save_equil_traj:
             equil_traj_reporter = mmapp.XTCReporter(
                 str(self.run_folder / f"equil_traj_{l:.3f}.xtc"),
                 self.write_step,
                 enforcePeriodicBox=True,
             )
-            equil_simulation.reporters.append(equil_traj_reporter)
-        if self.pdb is None:
-            if self.isobaric:
-                barostat = [
-                    force for force in equil_simulation.system.getForces()
-                    if isinstance(force, mm.MonteCarloBarostat)
-                    or isinstance(force, mm.MonteCarloAnisotropicBarostat)
-                ][0]
-            if l == 0:
-                if self.isobaric:
-                    barostat.setFrequency(0)
-                    self._safe_step(equil_simulation,
-                                    self.initial_equil_NVT_steps,
-                                    "initial NVT equilibration")
-                    barostat.setFrequency(25)
-                    self._safe_step(equil_simulation,
-                                    self.initial_equil_NPT_steps,
-                                    "initial NPT equilibration")
-                else:
-                    self._safe_step(equil_simulation,
-                                    self.initial_equil_NVT_steps,
-                                    "initial equilibration")
+            simulation.reporters.append(equil_traj_reporter)
+        
+        if self.pdb is not None and self.pdb_centroid_equil:
+            self.ostream.print_info("Turning centroid force on")
+            simulation.context.setParameter('centroid_k', self.centroid_k)
+            self._safe_step(simulation, self.equil_NVT_steps,
+                            "NVT centroid equilibration")
+            self.ostream.print_info("Turning centroid force off")
+            simulation.context.setParameter('centroid_k', 0)
 
-            if self.isobaric:
-                barostat.setFrequency(0)
-                self._safe_step(equil_simulation, self.equil_NVT_steps,
-                                "NVT equilibration")
-                barostat.setFrequency(25)
-                self._safe_step(equil_simulation, self.equil_NPT_steps,
-                                "NPT equilibration")
-            else:
-                self._safe_step(equil_simulation, self.equil_NVT_steps,
-                                "equilibration")
+        if self.isobaric:
+            barostat = self._get_barostat(simulation)
+            barostat.setFrequency(0)
+            self._safe_step(simulation, self.equil_NVT_steps,
+                            "NVT equilibration")
+            barostat.setFrequency(25)
+            self._safe_step(simulation, self.equil_NPT_steps,
+                            "NPT equilibration")
         else:
-            if self.isobaric:
-                barostat = [
-                    force for force in equil_simulation.system.getForces()
-                    if isinstance(force, mm.MonteCarloBarostat)
-                    or isinstance(force, mm.MonteCarloAnisotropicBarostat)
-                ][0]
-            if l == 0:
-                temperatures = list(
-                    np.arange(self.pdb_equil_start_temp, self.temperature,
-                              self.pdb_equil_temp_step))
-                temperatures.append(self.temperature)
-                self.ostream.print_info(
-                    f"Perfoming PDB warmup with T-vector {np.array(temperatures)}"
-                )
-                self.ostream.flush()
-                for T in temperatures:
-                    equil_simulation.integrator.setTemperature(T)
-                    if self.isobaric:
-                        barostat.setFrequency(0)
-                    self._safe_step(equil_simulation,
-                                    self.initial_equil_NVT_steps,
-                                    f"PDB warmup NVT equilibration T = {T}")
+            self._safe_step(simulation, self.equil_NVT_steps,
+                            "equilibration")
 
-                    if self.isobaric:
-                        barostat.setFrequency(25)
-                        equil_simulation.integrator.setTemperature(T)
-                        self._safe_step(
-                            equil_simulation, self.initial_equil_NPT_steps,
-                            f"PDB warmup NPT equilibration T = {T}")
-
-            equil_simulation.context.setParameter('centroid_k', 0)
-            self.ostream.print_info(f"Turning off centroid force on bonds")
-            self.ostream.flush()
-            # centroid_force = [
-            #     force for force in equil_simulation.system.getForces()
-            #     if isinstance(force, mm.CustomCentroidBondForce)
-            # ][0]
-
-            # for i in range(num_centroid_bonds):
-            #     bond, params = centroid_force.getBondParameters(i)
-            #     params = list(params)
-            #     if len(params)>1:
-            #         params[1:] = [0] * (len(params) - 1)
-            #     centroid_force.setBondParameters(i, bond, params)
-            # centroid_force.updateParametersInContext(equil_simulation.context)
-            if self.isobaric:
-                barostat.setFrequency(0)
-                self._safe_step(equil_simulation, self.equil_NVT_steps,
-                                "NVT equilibration")
-                barostat.setFrequency(25)
-                self._safe_step(equil_simulation, self.equil_NPT_steps,
-                                "NPT equilibration")
-            else:
-                self._safe_step(equil_simulation, self.equil_NVT_steps,
-                                "equilibration")
-
-        equil_state = equil_simulation.context.getState(
+        equil_state = simulation.context.getState(
             getPositions=True,
             getVelocities=True,
             getForces=True,
@@ -494,12 +488,34 @@ class EvbFepDriver():
 
         if self.debug:
             self._save_state(
-                equil_simulation,
+                simulation,
                 f"equil_state_{l:.3f}",
                 xml=False,
             )
 
         return equil_state
+
+    def _minimize(self,simulation, filename=None):
+        self.ostream.print_info("Minimizing energy")
+        self.ostream.flush()
+        simulation.minimizeEnergy()
+        positions = simulation.context.getState(
+            getPositions=True, enforcePeriodicBox=True).getPositions()
+        if filename is not None:
+            mmapp.PDBFile.writeFile(
+                self.topology,
+                np.array(positions.value_in_unit(mm.unit.angstrom)),
+                open(self.run_folder / f"minim_{filename}.pdb", "w"),
+            )
+        
+    @staticmethod
+    def _get_barostat(simulation):
+        return [
+            force for force in simulation.system.getForces()
+            if isinstance(force, mm.MonteCarloBarostat)
+            or isinstance(force, mm.MonteCarloAnisotropicBarostat)
+        ][0]
+
 
     def _sample(self, system, l, initial_state):
         run_simulation = self._get_simulation(system, self.equil_step_size)
