@@ -1424,7 +1424,7 @@ class MMForceFieldGenerator:
                             bond_found = True
                             break
             
-            elif use_water_model: ##TODO: Double check the UNITS
+            elif use_water_model: 
                 r = water_bonds['equilibrium']
                 k_r = water_bonds['force_constant']
                 comment = 'ow-hw'
