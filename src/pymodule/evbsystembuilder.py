@@ -88,7 +88,7 @@ class EvbSystemBuilder():
         self.sc_alpha_q: float = 0.3
         self.sc_sigma_q: float = 1.0
         self.sc_power: float = 1 / 6  # The exponential power in the soft core expression
-        self.morse_D_default: float = 10000  # kj/mol, default dissociation energy if none is given
+        self.morse_D_default: float = 500  # kj/mol, default dissociation energy if none is given
         self.morse_couple: float = 1  # kj/mol, scaling for the morse potential to emulate a coupling between two overlapping bonded states
 
         # self.centroid_k: float = 50000  # kj/mol nm, force constant for the position restraints
@@ -1390,6 +1390,8 @@ class EvbSystemBuilder():
         bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
         for key in bond_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
+            eq = 0
+            fc = 0
             if key in self.reactant.bonds and key in self.product.bonds:
                 bondA = self.reactant.bonds[key]
                 fcA = bondA['force_constant']
@@ -1397,30 +1399,30 @@ class EvbSystemBuilder():
                 bondB = self.product.bonds[key]
                 fcB = bondB['force_constant']
                 eqB = bondB['equilibrium']
-            elif key in self.reactant.bonds:
-                bondA = self.reactant.bonds[key]
-                fcA = bondA['force_constant']
-                eqA = bondA['equilibrium']
+                eq = eqA * (1 - lam) + eqB * lam
+                fc = fcA * (1 - lam) + fcB * lam
+            elif model_broken:
+                if key in self.reactant.bonds:
+                    bondA = self.reactant.bonds[key]
+                    fcA = bondA['force_constant']
+                    eqA = bondA['equilibrium']
 
-                coords = self.product.molecule.get_coordinates_in_angstrom()
-                eqB = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
-                if model_broken:
+                    coords = self.product.molecule.get_coordinates_in_angstrom()
+                    eqB = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
                     fcB = fcA * self.bonded_integration_bond_fac
+                    # if model_broken:
                 else:
-                    fcB = 0
-            else:
-                bondB = self.product.bonds[key]
-                fcB = bondB['force_constant']
-                eqB = bondB['equilibrium']
+                    bondB = self.product.bonds[key]
+                    fcB = bondB['force_constant']
+                    eqB = bondB['equilibrium']
 
-                coords = self.reactant.molecule.get_coordinates_in_angstrom()
-                eqA = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
-                if model_broken:
+                    coords = self.reactant.molecule.get_coordinates_in_angstrom()
+                    eqA = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
+                    
                     fcA = fcB * self.bonded_integration_bond_fac
-                else:
-                    fcA = 0
-            eq = eqA * (1 - lam) + eqB * lam
-            fc = fcA * (1 - lam) + fcB * lam
+                eq = eqA * (1 - lam) + eqB * lam
+                fc = fcA * (1 - lam) + fcB * lam
+            
             self._add_bond(harmonic_force, atom_ids, eq, fc)
 
         return harmonic_force
