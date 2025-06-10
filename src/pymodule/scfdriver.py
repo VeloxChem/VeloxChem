@@ -2349,13 +2349,18 @@ class ScfDriver:
                 density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            e_pr, V_pr = self._gostshyp_drv.get_vectorized_gostshyp_contribution(density_matrix)
+            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
+            #e_pr, V_pr, g_time, f_time = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
             #print('Energy contribution from  GOSTSHYP: ', e_pr) #should be printed in ostream?
+            #print(g_time, f_time)
         else:
             e_pr, V_pr = 0.0, None
 
-        if self.timing and self._gostshyp:
+        if self.timing and self._gostshyp and not self._first_step:
             profiler.add_timing_info('FockGOSTSHYP', tm.time() - gostshyp_t0)
+            # profiler.add_timing_info('g_mat', g_time)
+            # profiler.add_timing_info('f_mat', f_time)
+            # profiler.add_timing_info('g_mat+f_mat', g_time + f_time)
 
         return fock_mat, vxc_mat, vkx_mat, e_emb, V_emb, e_pr, V_pr
 
@@ -2962,6 +2967,11 @@ class ScfDriver:
                     e_grad, max_grad, diff_den)
 
                 self.ostream.print_header(valstr)
+
+                if self._gostshyp:
+                    valstr = 'Total of {:d} Negative Gaussian Amplitudes'.format(self._gostshyp_drv._neg_p_amp)
+                    self.ostream.print_header(valstr.ljust(92))
+
                 self.ostream.flush()
 
     def get_scf_energy(self):

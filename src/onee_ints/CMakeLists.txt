@@ -15,6 +15,10 @@ target_sources(vlxobjs
     NuclearPotentialValues.cpp
     QuadrupoleIntegrals.cpp
     OldOneElecIntsDrivers.cpp
+    TCOSFock1GOST.cpp
+    TCOSValues.cpp
+    TCOPFock2GOST.cpp
+    TCOPValues.cpp
   )
 
 target_include_directories(vlxobjs

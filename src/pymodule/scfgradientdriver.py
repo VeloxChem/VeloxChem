@@ -525,7 +525,7 @@ class ScfGradientDriver(GradientDriver):
                 'tess_file': self.scf_driver.tess_file #TODO: remove (added for testing of gradient with fixed cavity)
             }
 
-            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad(2 * D, tessellation_settings)
+            gostshyp_grad = self._gostshyp_drv.get_vectorized_gostshyp_grad(2 * D, tessellation_settings)
 
             self.gradient += gostshyp_grad
 

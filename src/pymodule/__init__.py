@@ -99,6 +99,10 @@ from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
 from .veloxchemlib import partition_atoms
 from .veloxchemlib import gen_lebedev_grid
+from .veloxchemlib import compute_tco_s_fock
+from .veloxchemlib import compute_tco_s_values
+from .veloxchemlib import compute_tco_p_fock
+from .veloxchemlib import compute_tco_p_values
 
 # C++ enums
 from .veloxchemlib import mat_t
@@ -210,6 +214,8 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
+#from .oneeints import compute_quadrupole_integrals
+#from .oneeints import compute_tco_s_fock
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
