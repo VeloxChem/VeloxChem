@@ -82,6 +82,7 @@ class TransitionStateGuesser():
         self.scf_xcfun = "b3lyp"
         self.scf_basis = 'def2-svp'
         self.mute_scf = True
+        self.mute_evb = True
         self.mm_temperature = 600
         self.mm_steps = 1000
         self.mm_step_size = 0.001 * mmunit.picoseconds
@@ -92,7 +93,11 @@ class TransitionStateGuesser():
 
     def find_TS(
         self,
-        evb_drv,
+        reactant: Molecule | list[Molecule],
+        product: Molecule | list[Molecule],
+        reactant_partial_charges: list[float] | list[list[float]] = None,
+        product_partial_charges: list[float] | list[list[float]] = None,
+        breaking_bonds: list[tuple[int, int]] = [],
         scf=True,
         scf_drv=None,
         constraints=None,
@@ -115,6 +120,16 @@ class TransitionStateGuesser():
         Returns:
             molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
         """
+        evb_drv = EvbDriver()
+        evb_drv.build_ff_from_molecules(
+            reactant,
+            product,
+            reactant_partial_charges=reactant_partial_charges,
+            product_partial_charges=product_partial_charges,
+            breaking_bonds=breaking_bonds,
+        )
+        if self.mute_evb:
+            evb_drv.ostream.mute()
         self.evb_drv = evb_drv
         self.scf_drv = scf_drv
         if scf:

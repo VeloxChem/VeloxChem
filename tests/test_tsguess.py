@@ -24,14 +24,13 @@ class TestTransitionStateGuesser:
     def test_ts_guesser(self):
         rea = Molecule.read_smiles("C1CCC=C1")
         pro = Molecule.read_smiles("C=CC1CC1")
-        evb = EvbDriver()
-        evb.build_ff_from_molecules(rea, pro)
         ts_guesser = TransitionStateGuesser()
         ts_guesser.scf_xcfun = "HF"
         ts_guesser.scf_basis = "STO-3G"
-        ts_mol, results = ts_guesser.find_TS(evb)
+        ts_mol, results = ts_guesser.find_TS(rea, pro)
         folder = Path(__file__).parent / 'data'
-        reference_results = evb._load_dict_from_h5(
+
+        reference_results = EvbDriver._load_dict_from_h5(
             folder / "ts_guesser_reference_results.h5")
 
         assert results['broken_bonds'] == {
