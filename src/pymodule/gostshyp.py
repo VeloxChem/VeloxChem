@@ -39,6 +39,10 @@ from .veloxchemlib import ThreeCenterOverlapGradientGeom100Driver
 from .veloxchemlib import ThreeCenterOverlapGradientGeom001Driver
 from .veloxchemlib import ThreeCenterR2Driver
 from .veloxchemlib import ThreeCenterRR2Driver
+from .veloxchemlib import compute_tco_s_fock
+from .veloxchemlib import compute_tco_s_values
+from .veloxchemlib import compute_tco_p_fock
+from .veloxchemlib import compute_tco_p_values
 from .outputstream import OutputStream
 from .tessellation import TessellationDriver
 from .inputparser import (parse_input, print_keywords)
@@ -96,6 +100,7 @@ class GostshypDriver:
         self.pressure_units = pressure_units
         self.num_tes_points = 0
         self.tessellation = None
+        self._neg_p_amp = 0
 
         # mpi information
         self.comm = comm
@@ -114,116 +119,10 @@ class GostshypDriver:
         }
 
 
-    def get_vectorized_gostshyp_contribution(self, den_mat, tessellation_settings=None):
-
-        if self.num_tes_points == 0:
-            self.generate_tessellation(tessellation_settings)
-
-        timing_info = np.zeros((2))
-
-        t0_step_1 = tm.time()
-    
-        energy_contrib = np.sum(  np.apply_along_axis(func1d = self.get_single_point_gostshyp_energy_contribution, 
-                                    axis = 0, 
-                                    arr = self.tessellation,
-                                    den_mat = den_mat), 
-                                axis = 0)
-        
-        timing_info[0] = (tm.time() - t0_step_1)
-
-        t0_step_2 = tm.time()
-        
-        fock_contrib = np.sum(   np.apply_along_axis(func1d = self.get_single_point_gostshyp_fock_contribution, 
-                                    axis = 0, 
-                                    arr = self.tessellation,
-                                    den_mat = den_mat), 
-                                axis = 2)
-
-        timing_info[1] = (tm.time() - t0_step_2)
-                            
-        print()
-        print('Accumulated time of energy contribution \n', timing_info[0], '\n\n Accumulated time of Fock matrix contribution \n', timing_info[1])
-        print()
-
-        return energy_contrib, fock_contrib
-
-    def get_single_point_gostshyp_energy_contribution(self, gaussian_information, den_mat):
-    
-        #num_tess_points = tessellation.shape[1]
-        #pressure = parse_pressure_units(p, p_unit)
-            
-        #gaussian_information = tessellation[:, j]
-        a = gaussian_information[3]
-
-        f_tilde = self.comp_f_tilde(gaussian_information, den_mat)
-        g_tilde = self.comp_g_tilde(gaussian_information, den_mat)
-
-        # compute Gaussian amplitude
-        p_amp = self.pressure * a / f_tilde
-
-        # compute energy contribution
-        e_contrib = p_amp * g_tilde
-
-        # TODO: raise the detection of negative amplitudes properly
-        #       (counter and proper output)
-        if (p_amp >= 0.0):
-            return e_contrib
-        else:
-            print('NEGATIVE AMPLITUDE DETECTED')
-            return 0
-    
-    def get_single_point_gostshyp_fock_contribution(self, gaussian_information, den_mat):
-    
-        #num_tess_points = tessellation.shape[1]
-        #pressure = parse_pressure_units(p, p_unit)
-            
-        #gaussian_information = tessellation[:, j]
-        a = gaussian_information[3]
-        width_params = np.pi * np.log(2.0) / gaussian_information[3]
-        exp = [width_params]
-        center = [gaussian_information[:3].tolist()]
-        norm_vec = gaussian_information[4:7]
-        pre_fac = [1]
-        
-        tco_drv = ThreeCenterOverlapDriver()
-        tcog_drv = ThreeCenterOverlapGradientDriver()
-
-        # compute the three center overlap matrix and three center overlap gradient matrices
-        tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
-
-        x_mat_grad = tcog_mats.matrix_to_numpy('X')
-        y_mat_grad = tcog_mats.matrix_to_numpy('Y')
-        z_mat_grad = tcog_mats.matrix_to_numpy('Z')
-
-        # compute dot product between normal vector and 
-        # three center overlap gradient matrices
-        f_mat = ( norm_vec[0] * x_mat_grad
-                + norm_vec[1] * y_mat_grad
-                + norm_vec[2] * z_mat_grad  ) * (-1)
-        
-        f_tilde = np.einsum('pq,pq->', den_mat, f_mat)
-        
-        p_amp = self.pressure * a / f_tilde
-
-        if (p_amp >= 0.0):
-            tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
-            g_tilde = np.einsum('pq,pq->', den_mat, tco_mat.to_numpy())
-            
-            V_pr = ( p_amp * tco_mat.to_numpy() 
-                    - g_tilde * p_amp / f_tilde * f_mat )
-            
-            return V_pr
-        else:
-            print('NEGATIVE AMPLITUDE DETECTED')
-            return np.zeros(den_mat.shape)
-
     def get_gostshyp_contribution(self, den_mat, tessellation_settings=None):
-
         """
         Computes contributions to the total energy and Fock matrix from
         GOSTSHYP method.
-
-        Pausch, Zeller, Neudecker: J. Chem. Theory Comput. 2025, 21, 747-761 
 
         :param den_mat:
             The density matrix.
@@ -237,76 +136,327 @@ class GostshypDriver:
         if self.num_tes_points == 0:
             self.generate_tessellation(tessellation_settings)
 
-        # initialize energy and Hamiltonian contribution:
-        e_pr, V_pr = 0.0, np.zeros(den_mat.shape)
-        neg_p_amp = 0
+        # set up needed components:
 
-        timing_info = np.zeros((2))
+        # width parameters w_j
+        width_params = np.pi * np.log(2.0) / self.tessellation[3]
 
-        # first try: loop over tessellation points j
-        for j in range(self.num_tes_points):
-
-            t0_step_1 = tm.time()
-            
-            gaussian_information = self.tessellation[:, j]
-
-            a = gaussian_information[3]
-            width_params = np.pi * np.log(2.0) / gaussian_information[3]
-            exp = [width_params]
-            center = [gaussian_information[:3].tolist()]
-            norm_vec = gaussian_information[4:7]
-            pre_fac = [1]
-            
-            f_tilde = self.comp_f_tilde(gaussian_information, den_mat)
-            g_tilde = self.comp_g_tilde(gaussian_information, den_mat)
-            
-            # compute Gaussian amplitude
-            p_amp = self.pressure * a / f_tilde
-            
-            # compute energy contribution
-            e_contrib = p_amp * g_tilde
-
-            # TODO: raise the detection of negative amplitudes properly
-            #       (counter and proper output)
-            if (p_amp >= 0.0):
-                e_pr += e_contrib
-            else:
-                print('NEGATIVE AMPLITUDE DETECTED')
-                neg_p_amp += 1
-                continue
-
-            timing_info[0] += (tm.time() - t0_step_1)
-
-            t0_step_2 = tm.time()
-
-            # drivers for g_{mu nu, j}, f_{mu nu, j} matrices
-            tco_drv = ThreeCenterOverlapDriver()
-            tcog_drv = ThreeCenterOverlapGradientDriver()
+        #compute f_tilde vector
+        f_tilde = compute_tco_p_values(self.molecule, 
+                                       self.basis, 
+                                       (self.tessellation[:3].T).tolist(), 
+                                       width_params.tolist(), 
+                                       np.full((self.num_tes_points), 1.0).tolist(), 
+                                       (self.tessellation[4:7].T).tolist(), 
+                                       den_mat)
         
-            # compute the three center overlap matrix and three center overlap gradient matrices
-            tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
-            tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+        amplitudes = self.pressure * self.tessellation[3] / f_tilde
         
-            x_mat_grad = tcog_mats.matrix_to_numpy('X')
-            y_mat_grad = tcog_mats.matrix_to_numpy('Y')
-            z_mat_grad = tcog_mats.matrix_to_numpy('Z')
-            
-            # compute dot product between normal vector and 
-            # three center overlap gradient matrices
-            f_mat = ( norm_vec[0] * x_mat_grad
-                    + norm_vec[1] * y_mat_grad
-                    + norm_vec[2] * z_mat_grad  ) * (-1)
-            
-            V_pr += ( p_amp * tco_mat.to_numpy() 
-                    - g_tilde * p_amp / f_tilde * f_mat )
+        p_times_g_tilde = compute_tco_s_values(self.molecule, 
+                                    self.basis, 
+                                    (self.tessellation[:3].T).tolist(), 
+                                    width_params.tolist(), 
+                                    amplitudes.tolist(), 
+                                    den_mat)
+        
+        e_pr = np.sum(p_times_g_tilde)
 
-            timing_info[1] += (tm.time() - t0_step_2)
+        V1_pr = compute_tco_s_fock(self.molecule, 
+                                    self.basis, 
+                                    (self.tessellation[:3].T).tolist(), 
+                                    width_params.tolist(), 
+                                    amplitudes.tolist())
+        
+        pre_fac_V2_pr = p_times_g_tilde / f_tilde
 
-        print()
-        print('Accumulated time of energy contribution \n', timing_info[0], '\n\n Accumulated time of Fock matrix contribution \n', timing_info[1])
-        print()
+        
+        # print(np.shape(self.tessellation[:3]))
+        # print(np.shape(width_params))
+        # print(np.shape(pre_fac_V2_pr))
+        # print(np.shape(self.tessellation[4:7]))
+        
+        V2_pr = compute_tco_p_fock(self.molecule, 
+                                    self.basis, 
+                                    (self.tessellation[:3].T).tolist(), 
+                                    width_params.tolist(), 
+                                    pre_fac_V2_pr.tolist(),
+                                    (self.tessellation[4:7].T).tolist())
+        
+        V_pr = V1_pr - V2_pr
+        
+        return e_pr, V_pr
+
+    
+    # def get_gostshyp_contribution(self, den_mat, tessellation_settings=None):
+    #     """
+    #     Computes contributions to the total energy and Fock matrix from
+    #     GOSTSHYP method.
+
+    #     :param den_mat:
+    #         The density matrix.
+    #     :param tessellation_settings:
+    #         The dictionary of tessellation settings
+
+    #     :return:
+    #         The GOSTSHYP contribution to energy and Fock matrix.
+    #     """
+
+    #     if self.num_tes_points == 0:
+    #         self.generate_tessellation(tessellation_settings)
+
+    #     # set up needed components:
+
+    #     # width parameters w_j
+    #     width_params = np.pi * np.log(2.0) / self.tessellation[3]
+
+    #     # initialize three center overlap integral drivers
+    #     tco_drv = ThreeCenterOverlapDriver()
+    #     tcog_drv = ThreeCenterOverlapGradientDriver()
+
+    #     # initialize energy and Hamiltonian contribution:
+    #     # (definition of V_pr unnecessarily complicated)
+    #     e_pr, V_pr = 0.0, np.zeros(den_mat.shape)
+
+    #     # timing
+    #     g_time, f_time = 0.0, 0.0
+
+    #     # first try: loop over tessellation points j
+    #     for j in range(self.num_tes_points):
+
+    #         # define Gaussian functions and normal vector components
+    #         exp = [width_params[j]]
+    #         center = [self.tessellation[:3, j].tolist()]
+    #         norm_vec = self.tessellation[4:7, j]
+    #         pre_fac = [1]
             
-        return e_pr, V_pr #, neg_p_amp
+    #         g_t0 = tm.time()
+    #         tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+    #         g_time += (tm.time() - g_t0)
+
+    #         f_t0 = tm.time()
+    #         tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+    #         f_time += (tm.time() - f_t0)
+
+    #         g_mat = tco_mat.to_numpy()
+
+    #         x_mat = tcog_mats.matrix('X').to_numpy()
+    #         y_mat = tcog_mats.matrix('Y').to_numpy()
+    #         z_mat = tcog_mats.matrix('Z').to_numpy()
+
+    #         f_mat =     ( norm_vec[0] * x_mat
+    #                     + norm_vec[1] * y_mat
+    #                     + norm_vec[2] * z_mat ) * (-1)
+
+    #         f_tilde = np.sum(den_mat * f_mat)
+
+    #         # calculate parameter p_j
+    #         p = self.pressure * self.tessellation[3, j] / f_tilde
+
+    #         g_tilde = np.sum(den_mat * g_mat)
+
+    #         e_contrib = p * g_tilde
+
+    #         pos_amp = (e_contrib >= 0.0)
+
+    #         if pos_amp:
+    #             e_pr += e_contrib
+    #         else:
+    #             print('NEGATIVE AMPLITUDE DETECTED')
+    #             continue
+
+    #         # components from above enable the caluclation of the contribution
+    #         # to the Hamiltonian
+
+    #         V_pr += (p * g_mat - p * g_tilde / f_tilde * f_mat)
+
+    #     return e_pr, V_pr, g_time, f_time
+
+    # def get_vectorized_gostshyp_contribution(self, den_mat, tessellation_settings=None):
+
+    #     if self.num_tes_points == 0:
+    #         self.generate_tessellation(tessellation_settings)
+
+    #     e_contribs = np.apply_along_axis(func1d = self.get_single_point_gostshyp_energy_contribution, 
+    #                                 axis = 0, 
+    #                                 arr = self.tessellation,
+    #                                 den_mat = den_mat)
+        
+    #     self._neg_p_amp = np.sum(np.isnan(e_contribs))
+    #     e_pr = np.nansum(e_contribs, axis = 0)
+        
+    #     fock_pr = np.sum(   np.apply_along_axis(func1d = self.get_single_point_gostshyp_fock_contribution, 
+    #                                 axis = 0, 
+    #                                 arr = self.tessellation,
+    #                                 den_mat = den_mat), 
+    #                         axis = 2    )
+
+    #     return e_pr, fock_pr
+
+    # def get_single_point_gostshyp_energy_contribution(self, gaussian_information, den_mat):
+
+    #     """
+    #     Computes contribution to the energy from a single tessellation point.
+
+    #     Pausch, Zeller, Neudecker: J. Chem. Theory Comput. 2025, 21, 747-761 
+
+    #     :param den_mat:
+    #         The density matrix.
+    #     :param tessellation_settings:
+    #         The dictionary of tessellation settings
+
+    #     :return:
+    #         The GOSTSHYP contribution to energy.
+    #     """
+        
+    #     a = gaussian_information[3]
+
+    #     f_tilde = self.comp_f_tilde(gaussian_information, den_mat)
+    #     g_tilde = self.comp_g_tilde(gaussian_information, den_mat)
+
+    #     # compute Gaussian amplitude
+    #     p_amp = self.pressure * a / f_tilde
+
+    #     # compute energy contribution
+    #     e_contrib = p_amp * g_tilde
+
+    #     # TODO: raise the detection of negative amplitudes properly
+    #     #       (counter and proper output)
+    #     if (p_amp >= 0.0):
+    #         return e_contrib
+    #     else:
+    #         #print('NEGATIVE AMPLITUDE DETECTED')
+    #         return np.nan
+    
+    # def get_single_point_gostshyp_fock_contribution(self, gaussian_information, den_mat):
+
+    #     """
+    #     Computes contribution to the Fock matrix from a single tessellation point.
+
+    #     Pausch, Zeller, Neudecker: J. Chem. Theory Comput. 2025, 21, 747-761 
+
+    #     :param den_mat:
+    #         The density matrix.
+    #     :param tessellation_settings:
+    #         The dictionary of tessellation settings
+
+    #     :return:
+    #         The GOSTSHYP contribution to the Fock matrix.
+    #     """
+    
+    #     a = gaussian_information[3]
+    #     width_params = np.pi * np.log(2.0) / gaussian_information[3]
+    #     exp = [width_params]
+    #     center = [gaussian_information[:3].tolist()]
+    #     norm_vec = gaussian_information[4:7]
+    #     pre_fac = [1]
+        
+    #     tco_drv = ThreeCenterOverlapDriver()
+    #     tcog_drv = ThreeCenterOverlapGradientDriver()
+
+    #     # compute the three center overlap matrix and three center overlap gradient matrices
+    #     tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+
+    #     x_mat_grad = tcog_mats.matrix_to_numpy('X')
+    #     y_mat_grad = tcog_mats.matrix_to_numpy('Y')
+    #     z_mat_grad = tcog_mats.matrix_to_numpy('Z')
+
+    #     # compute dot product between normal vector and 
+    #     # three center overlap gradient matrices
+    #     f_mat = ( norm_vec[0] * x_mat_grad
+    #             + norm_vec[1] * y_mat_grad
+    #             + norm_vec[2] * z_mat_grad  ) * (-1)
+        
+    #     f_tilde = np.einsum('pq,pq->', den_mat, f_mat)
+        
+    #     p_amp = self.pressure * a / f_tilde
+
+    #     if (p_amp >= 0.0):
+    #         tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+    #         g_tilde = np.einsum('pq,pq->', den_mat, tco_mat.to_numpy())
+            
+    #         V_pr = ( p_amp * tco_mat.to_numpy() 
+    #                 - g_tilde * p_amp / f_tilde * f_mat )
+            
+    #         return V_pr
+    #     else:
+    #         return np.zeros(den_mat.shape)
+
+    # def get_gostshyp_contribution(self, den_mat, tessellation_settings=None):
+
+    #     """
+    #     Computes contributions to the total energy and Fock matrix from
+    #     GOSTSHYP method.
+
+    #     Pausch, Zeller, Neudecker: J. Chem. Theory Comput. 2025, 21, 747-761 
+
+    #     :param den_mat:
+    #         The density matrix.
+    #     :param tessellation_settings:
+    #         The dictionary of tessellation settings
+
+    #     :return:
+    #         The GOSTSHYP contribution to energy and Fock matrix.
+    #     """
+
+    #     if self.num_tes_points == 0:
+    #         self.generate_tessellation(tessellation_settings)
+
+    #     # initialize energy and Hamiltonian contribution:
+    #     e_pr, V_pr = 0.0, np.zeros(den_mat.shape)
+    #     neg_p_amp = 0
+
+    #     # first try: loop over tessellation points j
+    #     for j in range(self.num_tes_points):
+            
+    #         gaussian_information = self.tessellation[:, j]
+
+    #         a = gaussian_information[3]
+    #         width_params = np.pi * np.log(2.0) / gaussian_information[3]
+    #         exp = [width_params]
+    #         center = [gaussian_information[:3].tolist()]
+    #         norm_vec = gaussian_information[4:7]
+    #         pre_fac = [1]
+            
+    #         f_tilde = self.comp_f_tilde(gaussian_information, den_mat)
+    #         g_tilde = self.comp_g_tilde(gaussian_information, den_mat)
+            
+    #         # compute Gaussian amplitude
+    #         p_amp = self.pressure * a / f_tilde
+            
+    #         # compute energy contribution
+    #         e_contrib = p_amp * g_tilde
+
+    #         # TODO: raise the detection of negative amplitudes properly
+    #         #       (counter and proper output)
+    #         if (p_amp >= 0.0):
+    #             e_pr += e_contrib
+    #         else:
+    #             print('NEGATIVE AMPLITUDE DETECTED')
+    #             neg_p_amp += 1
+    #             continue
+
+    #         # drivers for g_{mu nu, j}, f_{mu nu, j} matrices
+    #         tco_drv = ThreeCenterOverlapDriver()
+    #         tcog_drv = ThreeCenterOverlapGradientDriver()
+        
+    #         # compute the three center overlap matrix and three center overlap gradient matrices
+    #         tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+    #         tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+        
+    #         x_mat_grad = tcog_mats.matrix_to_numpy('X')
+    #         y_mat_grad = tcog_mats.matrix_to_numpy('Y')
+    #         z_mat_grad = tcog_mats.matrix_to_numpy('Z')
+            
+    #         # compute dot product between normal vector and 
+    #         # three center overlap gradient matrices
+    #         f_mat = ( norm_vec[0] * x_mat_grad
+    #                 + norm_vec[1] * y_mat_grad
+    #                 + norm_vec[2] * z_mat_grad  ) * (-1)
+            
+    #         V_pr += ( p_amp * tco_mat.to_numpy() 
+    #                 - g_tilde * p_amp / f_tilde * f_mat )
+            
+    #     return e_pr, V_pr #, neg_p_amp
 
     def generate_tessellation(self, tessellation_settings={}):
         """
@@ -352,7 +502,7 @@ class GostshypDriver:
         width_params = np.pi * np.log(2.0) / gaussian_information[3]
         exp = [width_params]
         center = [gaussian_information[:3].tolist()]
-        norm_vec = gaussian_information[4:7]
+        #norm_vec = gaussian_information[4:7]
         pre_fac = [1]
         n_basis = self.basis.get_dimensions_of_basis()
 
@@ -461,7 +611,7 @@ class GostshypDriver:
         width_params = np.pi * np.log(2.0) / gaussian_information[3]
         exp = [width_params]
         center = [gaussian_information[:3].tolist()]
-        norm_vec = gaussian_information[4:7]
+        #norm_vec = gaussian_information[4:7]
         pre_fac = [1]
         
         n_basis = self.basis.get_dimensions_of_basis()
@@ -579,7 +729,7 @@ class GostshypDriver:
         width_params = np.pi * np.log(2.0) / gaussian_information[3]
         exp = [width_params]
         center = [gaussian_information[:3].tolist()]
-        norm_vec = gaussian_information[4:7]
+        #norm_vec = gaussian_information[4:7]
         pre_fac = [1]
         
         # driver
@@ -658,7 +808,7 @@ class GostshypDriver:
         width_params = np.pi * np.log(2.0) / gaussian_information[3]
         exp = [width_params]
         center = [gaussian_information[:3].tolist()]
-        norm_vec = gaussian_information[4:7]
+        #norm_vec = gaussian_information[4:7]
         pre_fac = [1]
         
         # driver
@@ -715,6 +865,66 @@ class GostshypDriver:
         e_tilde = np.einsum('pq,pq->', den_mat, e_mat) #scalar
         
         return e_tilde
+
+    def get_vectorized_gostshyp_grad(self, den_mat, tessellation_settings=None):
+    
+        grad = np.zeros((self.molecule.number_of_atoms(), 3))
+
+        tessellation_drv = TessellationDriver(self.comm, self.ostream)
+        tessellation_drv.update_settings(tessellation_settings)
+
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+        
+        for atom in range(self.molecule.number_of_atoms()):
+            
+            a_grads = tessellation_drv.comp_area_grad(self.molecule, self.tessellation, atom)
+            
+            tessellation_with_a_grad = np.vstack((self.tessellation, a_grads))
+            
+            grad_contribs = np.apply_along_axis(func1d=self.grad_single_point_contrib, 
+                                                    axis=0, 
+                                                    arr=tessellation_with_a_grad,  
+                                                    den_mat=den_mat, 
+                                                    atom=atom)
+            
+            # TODO negative amplitudes
+            self._neg_p_amp = np.sum(np.isnan(grad_contribs)) // 3
+            
+            grad[atom] = np.nansum(grad_contribs, axis=1)
+            
+        return grad
+
+    def grad_single_point_contrib(self, gaussian_information, den_mat, atom):
+        
+        a = gaussian_information[3]
+        w = np.pi * np.log(2.0) / gaussian_information[3]
+
+        a_grad = gaussian_information[-3:]
+
+        f_tilde = self.comp_f_tilde(gaussian_information, den_mat)
+        g_tilde = self.comp_g_tilde(gaussian_information, den_mat)
+        d_tilde = self.comp_d_tilde(gaussian_information, den_mat)
+        e_tilde = self.comp_e_tilde(gaussian_information, den_mat)
+
+        p_amp = self.pressure * a / f_tilde
+
+        if p_amp < 0:
+            return np.full((3), np.nan)
+
+        # compute contribution from bra, ket and center derivatives of the unscaled gaussian j (constant exponents)
+        grad_g_tilde = self.comp_grad_g_tilde(gaussian_information, den_mat, atom)
+
+        # compute contribution from bra, ket and center derivatives of f part of amplitude (constant exponents)
+        grad_f_tilde = self.comp_grad_f_tilde(gaussian_information, den_mat, atom)
+
+        # gradient contribution
+        grad_contrib = (  ( 2 * g_tilde * p_amp / a - p_amp * w * d_tilde / a
+                        + g_tilde * p_amp * w * e_tilde / (f_tilde * a) ) * a_grad # terms of non-constant exponents
+                        + p_amp * (grad_g_tilde - g_tilde / f_tilde * grad_f_tilde   ) # terms of constant exponents
+                        )
+        
+        return grad_contrib
 
     def get_gostshyp_grad(self, den_mat, tessellation_settings=None):
         """
