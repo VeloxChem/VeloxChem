@@ -151,36 +151,39 @@ class GostshypDriver:
                                        den_mat)
         
         amplitudes = self.pressure * self.tessellation[3] / f_tilde
+
+        amplitudes_mask = amplitudes >= 0.0
+
+        self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
+
+        centers = (self.tessellation[:3].T[amplitudes_mask]).tolist()
+        exponents = width_params[amplitudes_mask].tolist()
+        amps = amplitudes[amplitudes_mask].tolist()
+        norms = (self.tessellation[4:7].T[amplitudes_mask]).tolist()
         
         p_times_g_tilde = compute_tco_s_values(self.molecule, 
                                     self.basis, 
-                                    (self.tessellation[:3].T).tolist(), 
-                                    width_params.tolist(), 
-                                    amplitudes.tolist(), 
+                                    centers, 
+                                    exponents, 
+                                    amps, 
                                     den_mat)
         
         e_pr = np.sum(p_times_g_tilde)
 
         V1_pr = compute_tco_s_fock(self.molecule, 
-                                    self.basis, 
-                                    (self.tessellation[:3].T).tolist(), 
-                                    width_params.tolist(), 
-                                    amplitudes.tolist())
+                                   self.basis, 
+                                   centers, 
+                                   exponents, 
+                                   amps)
         
-        pre_fac_V2_pr = p_times_g_tilde / f_tilde
-
-        
-        # print(np.shape(self.tessellation[:3]))
-        # print(np.shape(width_params))
-        # print(np.shape(pre_fac_V2_pr))
-        # print(np.shape(self.tessellation[4:7]))
+        pre_fac_V2_pr = (p_times_g_tilde / f_tilde[amplitudes_mask]).tolist()
         
         V2_pr = compute_tco_p_fock(self.molecule, 
-                                    self.basis, 
-                                    (self.tessellation[:3].T).tolist(), 
-                                    width_params.tolist(), 
-                                    pre_fac_V2_pr.tolist(),
-                                    (self.tessellation[4:7].T).tolist())
+                                   self.basis, 
+                                   centers, 
+                                   exponents, 
+                                   pre_fac_V2_pr,
+                                   norms)
         
         V_pr = V1_pr - V2_pr
         
