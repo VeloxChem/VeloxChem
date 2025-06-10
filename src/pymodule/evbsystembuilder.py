@@ -95,8 +95,8 @@ class EvbSystemBuilder():
         # self.centroid_offset: float = -0.2 #A
         # self.centroid_complete_ligand: bool = True # If false, the centroid force will only be applied to the reacting atoms, if true, the complete ligand will be used for the centroid force
 
-        self.posres_residue_radius: float = 4  # A
-        self.posres_k = 10000
+        self.posres_residue_radius: float = -1  # A, cutoff measured from the com of the ligand for which residues to add to the position restraints, -1 includes the whole molecule
+        self.posres_k = 1000  # kj/mol nm^2, default in gromacs
 
         # self.restraint_r_default: float = 0.5  # nm, default position restraint distance if none is given
         # self.restraint_r_offset: float = 0.1  # nm, distance added to the measured distance in a structure to set the position restraint distance
@@ -293,7 +293,7 @@ class EvbSystemBuilder():
             topology = mmapp.Topology()
 
             nb_force = mm.NonbondedForce()
-            
+
             cmm_remover = mm.CMMotionRemover()
             system.addForce(nb_force)
             system.addForce(cmm_remover)
@@ -321,7 +321,7 @@ class EvbSystemBuilder():
         self.positions = system_mol.get_coordinates_in_angstrom()
 
         if self.pdb:
-            self._add_posres(system,pdb_atoms)
+            self._add_posres(system, pdb_atoms)
 
         # Set the positions and make a box for it
 
@@ -484,7 +484,7 @@ class EvbSystemBuilder():
 
         return reaction_atoms
 
-    def _add_posres(self,system,pdb_atoms):
+    def _add_posres(self, system, pdb_atoms):
         # lin_dist_expr = "k*distance(g1,g2)"
         # max_dist_expr = f"""
         # centroid_k*step(r)*(r)^2;
@@ -500,14 +500,12 @@ class EvbSystemBuilder():
         posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
         posres_force = mm.CustomExternalForce(posres_expr)
         posres_force.setName("protein_ligand_posres")
-        posres_force.addGlobalParameter('posres_k',self.posres_k)
+        posres_force.addGlobalParameter('posres_k', self.posres_k)
         posres_force.addPerParticleParameter('x0')
         posres_force.addPerParticleParameter('y0')
         posres_force.addPerParticleParameter('z0')
-        
-        reactant_active_indices = [
-            atom.index for atom in self.reaction_atoms
-        ]
+
+        reactant_active_indices = [atom.index for atom in self.reaction_atoms]
         reactant_active_positions = np.array(
             [self.positions[i] for i in reactant_active_indices])
 
@@ -519,21 +517,22 @@ class EvbSystemBuilder():
         for pdb_index in pdb_indices:
             pdb_pos = self.positions[pdb_index]
             distance = np.linalg.norm(reactant_active_positions - pdb_pos,
-                                        axis=1)
-            if any(distance < self.posres_residue_radius):
+                                      axis=1)
+            if any(distance < self.posres_residue_radius
+                   ) or self.posres_residue_radius == -1:
                 residues.update({pdb_atoms[pdb_index].residue})
         for i, res in enumerate(residues):
             res_indices = [atom.index for atom in res.atoms()]
-            res_positions = np.array(
-                [self.positions[i] for i in res_indices])
-            indices+=res_indices
-            positions=np.vstack((positions,res_positions))
+            res_positions = np.array([self.positions[i] for i in res_indices])
+            indices += res_indices
+            positions = np.vstack((positions, res_positions))
 
-        positions*=0.1
-        for index, position in zip(indices,positions):
-            posres_force.addParticle(index,position)
+        positions *= 0.1
+        for index, position in zip(indices, positions):
+            posres_force.addParticle(index, position)
 
-        self.ostream.print_info(f"Adding {len(indices)} particles to posres force")
+        self.ostream.print_info(
+            f"Adding {len(indices)} particles to posres force")
         self.ostream.flush()
         system.addForce(posres_force)
 
@@ -1280,7 +1279,6 @@ class EvbSystemBuilder():
 
         #Remove all solvent solvent interactions in the other forces
 
-        
         for to_decompose in self.decompose_nb:
 
             lj_dec = copy.deepcopy(nbforce)
@@ -1345,13 +1343,13 @@ class EvbSystemBuilder():
         for i in range(nb_force.getNumParticles()):
             charge, sigma, epsilon = nb_force.getParticleParameters(i)
             coul_force.setParticleParameters(i, charge, 1, 0)
-            lj_force.setParticleParameters(i,0,sigma,epsilon)
-        
+            lj_force.setParticleParameters(i, 0, sigma, epsilon)
+
         for i in range(nb_force.getNumExceptions()):
             p1, p2, charge, sigma, epsilon = nb_force.getExceptionParameters(i)
-            coul_force.setExceptionParameters(i, p1,p2,charge,1,0)
-            lj_force.setExceptionParameters(i,p1,p2,0,sigma,epsilon)
-        
+            coul_force.setExceptionParameters(i, p1, p2, charge, 1, 0)
+            lj_force.setExceptionParameters(i, p1, p2, 0, sigma, epsilon)
+
         system.addForce(lj_force)
 
     @staticmethod
@@ -1408,7 +1406,8 @@ class EvbSystemBuilder():
                     eqA = bondA['equilibrium']
 
                     coords = self.product.molecule.get_coordinates_in_angstrom()
-                    eqB = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
+                    eqB = self.measure_length(coords[key[0]],
+                                              coords[key[1]]) * 0.1
                     fcB = fcA * self.bonded_integration_bond_fac
                     # if model_broken:
                 else:
@@ -1416,13 +1415,15 @@ class EvbSystemBuilder():
                     fcB = bondB['force_constant']
                     eqB = bondB['equilibrium']
 
-                    coords = self.reactant.molecule.get_coordinates_in_angstrom()
-                    eqA = self.measure_length(coords[key[0]], coords[key[1]]) * 0.1
-                    
+                    coords = self.reactant.molecule.get_coordinates_in_angstrom(
+                    )
+                    eqA = self.measure_length(coords[key[0]],
+                                              coords[key[1]]) * 0.1
+
                     fcA = fcB * self.bonded_integration_bond_fac
                 eq = eqA * (1 - lam) + eqB * lam
                 fc = fcA * (1 - lam) + fcB * lam
-            
+
             self._add_bond(harmonic_force, atom_ids, eq, fc)
 
         return harmonic_force

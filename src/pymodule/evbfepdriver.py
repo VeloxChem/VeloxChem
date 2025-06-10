@@ -121,7 +121,7 @@ class EvbFepDriver():
         self.pdb = None
         self.pdb_equil_start_temp = 10  #kelvin
         self.pdb_equil_temp_step = 50  # kelvin
-        self.pdb_posres_equil = False 
+        self.pdb_posres_equil = False
         self.posres_k = -1
 
         self.keywords = {
@@ -218,11 +218,11 @@ class EvbFepDriver():
             "pdb_equil_start_temp": {
                 "type": int
             },
-            "pdb_posres_equil":{
+            "pdb_posres_equil": {
                 "type": bool
             },
-            "posres_k":{
-                "type":float
+            "posres_k": {
+                "type": float
             }
         }
 
@@ -315,11 +315,10 @@ class EvbFepDriver():
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
             if l == 0:
-                state = self._initial_equilibrate(system,positions)
+                state = self._initial_equilibrate(system, positions)
                 positions = state.getPositions()
                 velocities = state.getVelocities()
-            equil_state = self._equilibrate(
-                system, l, positions, velocities)
+            equil_state = self._equilibrate(system, l, positions, velocities)
 
             if self.constrain_H:
                 info = "Removing constraints involving H atoms"
@@ -332,61 +331,55 @@ class EvbFepDriver():
             velocities = state.getVelocities()
         self.ostream.flush()
 
-    def _initial_equilibrate(self,system,positions):
+    def _initial_equilibrate(self, system, positions):
         simulation = self._get_simulation(system, self.equil_step_size)
         simulation.context.setPositions(positions)
-        
+
         platformname = simulation.context.getPlatform()
         self.ostream.print_info(
             f"Running FEP on platform: {platformname.getName()}")
         self.ostream.flush()
 
         self._minimize(simulation)
-        
+
         if self.pdb is None:
             if self.isobaric:
                 barostat = self._get_barostat(simulation)
                 barostat.setFrequency(0)
-                self._safe_step(simulation,
-                                self.initial_equil_NVT_steps,
+                self._safe_step(simulation, self.initial_equil_NVT_steps,
                                 "initial NVT equilibration")
                 barostat.setFrequency(25)
-                self._safe_step(simulation,
-                                self.initial_equil_NPT_steps,
+                self._safe_step(simulation, self.initial_equil_NPT_steps,
                                 "initial NPT equilibration")
             else:
-                self._safe_step(simulation,
-                                self.initial_equil_NVT_steps,
+                self._safe_step(simulation, self.initial_equil_NVT_steps,
                                 "initial equilibration")
         else:
             temperatures = list(
                 np.arange(self.pdb_equil_start_temp, self.temperature,
-                            self.pdb_equil_temp_step))
+                          self.pdb_equil_temp_step))
             temperatures.append(self.temperature)
             self.ostream.print_info(
-                f"Perfoming PDB warmup with T-vector {np.array(temperatures)}"
-            )
+                f"Perfoming PDB warmup with T-vector {np.array(temperatures)}")
             self.ostream.flush()
             if self.isobaric:
                 barostat = self._get_barostat(simulation)
+                barostat.setFrequency(0)
             for T in temperatures:
                 simulation.integrator.setTemperature(T)
                 if self.isobaric:
-                    barostat.setFrequency(0)
-                self._safe_step(simulation,
-                                self.initial_equil_NVT_steps,
+                self._safe_step(simulation, self.initial_equil_NVT_steps,
                                 f"PDB warmup NVT equilibration T = {T}")
 
-                if self.isobaric:
-                    barostat.setFrequency(25)
-                    simulation.integrator.setTemperature(T)
-                    self._safe_step(
-                        simulation, self.initial_equil_NPT_steps,
-                        f"PDB warmup NPT equilibration T = {T}")
 
+            if self.isobaric:
+                barostat.setFrequency(25)
+                simulation.integrator.setTemperature(T)
+                self._safe_step(simulation, self.initial_equil_NPT_steps,
+                                f"PDB warmup NPT equilibration T = {T}")
+                                
             self.ostream.print_info("Turning posres force off")
             simulation.context.setParameter('posres_k', 0)
-            
 
         return simulation.context.getState(
             getPositions=True,
@@ -454,7 +447,7 @@ class EvbFepDriver():
                 enforcePeriodicBox=True,
             )
             simulation.reporters.append(equil_traj_reporter)
-        
+
         if self.pdb is not None and self.pdb_posres_equil:
             self.ostream.print_info("Turning posres force on")
             simulation.context.setParameter('posres_k', self.posres_k)
@@ -472,8 +465,7 @@ class EvbFepDriver():
             self._safe_step(simulation, self.equil_NPT_steps,
                             "NPT equilibration")
         else:
-            self._safe_step(simulation, self.equil_NVT_steps,
-                            "equilibration")
+            self._safe_step(simulation, self.equil_NVT_steps, "equilibration")
 
         equil_state = simulation.context.getState(
             getPositions=True,
@@ -495,7 +487,7 @@ class EvbFepDriver():
 
         return equil_state
 
-    def _minimize(self,simulation, filename=None):
+    def _minimize(self, simulation, filename=None):
         self.ostream.print_info("Minimizing energy")
         self.ostream.flush()
         simulation.minimizeEnergy()
@@ -507,7 +499,7 @@ class EvbFepDriver():
                 np.array(positions.value_in_unit(mm.unit.angstrom)),
                 open(self.run_folder / f"minim_{filename}.pdb", "w"),
             )
-        
+
     @staticmethod
     def _get_barostat(simulation):
         return [
@@ -515,7 +507,6 @@ class EvbFepDriver():
             if isinstance(force, mm.MonteCarloBarostat)
             or isinstance(force, mm.MonteCarloAnisotropicBarostat)
         ][0]
-
 
     def _sample(self, system, l, initial_state):
         run_simulation = self._get_simulation(system, self.equil_step_size)
