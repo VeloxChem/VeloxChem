@@ -341,7 +341,13 @@ class EvbFepDriver():
         self.ostream.flush()
 
         self._minimize(simulation)
-
+        if self.save_equil_traj:
+            equil_traj_reporter = mmapp.XTCReporter(
+                str(self.run_folder / f"equil_traj_initial.xtc"),
+                self.write_step,
+                enforcePeriodicBox=True,
+            )
+            simulation.reporters.append(equil_traj_reporter)
         if self.pdb is None:
             if self.isobaric:
                 barostat = self._get_barostat(simulation)
@@ -368,8 +374,8 @@ class EvbFepDriver():
             for T in temperatures:
                 simulation.integrator.setTemperature(T)
                 if self.isobaric:
-                self._safe_step(simulation, self.initial_equil_NVT_steps,
-                                f"PDB warmup NVT equilibration T = {T}")
+                    self._safe_step(simulation, self.initial_equil_NVT_steps,
+                                    f"PDB warmup NVT equilibration T = {T}")
 
 
             if self.isobaric:
@@ -401,7 +407,7 @@ class EvbFepDriver():
             self._minimize(simulation)
 
         if self.debug:
-            self._save_state(simulation, f"minim_{l:.3f}")
+            self._save_state(simulation, f"pre_equil_{l:.3f}")
             simulation.reporters.append(
                 mmapp.PDBReporter(
                     str(self.run_folder / f"traj_equil_{l:.3f}.pdb"),

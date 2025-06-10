@@ -504,35 +504,17 @@ class EvbSystemBuilder():
         posres_force.addPerParticleParameter('x0')
         posres_force.addPerParticleParameter('y0')
         posres_force.addPerParticleParameter('z0')
-
-        reactant_active_indices = [atom.index for atom in self.reaction_atoms]
-        reactant_active_positions = np.array(
-            [self.positions[i] for i in reactant_active_indices])
-
-        indices = reactant_active_indices
-        positions = reactant_active_positions
-
-        pdb_indices = [pdb_atom.index for pdb_atom in pdb_atoms]
-        residues = set()
-        for pdb_index in pdb_indices:
-            pdb_pos = self.positions[pdb_index]
-            distance = np.linalg.norm(reactant_active_positions - pdb_pos,
-                                      axis=1)
-            if any(distance < self.posres_residue_radius
-                   ) or self.posres_residue_radius == -1:
-                residues.update({pdb_atoms[pdb_index].residue})
-        for i, res in enumerate(residues):
-            res_indices = [atom.index for atom in res.atoms()]
-            res_positions = np.array([self.positions[i] for i in res_indices])
-            indices += res_indices
-            positions = np.vstack((positions, res_positions))
-
-        positions *= 0.1
-        for index, position in zip(indices, positions):
-            posres_force.addParticle(index, position)
+        atoms = self.reaction_atoms + pdb_atoms
+        count = 0
+        for atom in atoms:
+            if atom.element is not mmapp.element.hydrogen:
+                index = atom.index
+                position = self.positions[index]
+                posres_force.addParticle(index, position * 0.1)
+                count+=1
 
         self.ostream.print_info(
-            f"Adding {len(indices)} particles to posres force")
+            f"Adding {count} particles to posres force")
         self.ostream.flush()
         system.addForce(posres_force)
 
