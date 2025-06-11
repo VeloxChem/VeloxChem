@@ -97,12 +97,12 @@ class TransitionStateGuesser():
         product: Molecule | list[Molecule],
         reactant_partial_charges: list[float] | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
+        reactant_total_multiplicity = -1,
+        product_total_multiplicity = -1,
         breaking_bonds: list[tuple[int, int]] = [],
         scf=True,
         scf_drv=None,
         constraints=None,
-        charge=None,
-        multiplicity=None,
     ):
         """Find a guess for the transition state using a force field scan.
 
@@ -136,10 +136,10 @@ class TransitionStateGuesser():
             molecule_sanity_check(self.evb_drv.reactant.molecule)
 
         self.molecule = self.evb_drv.reactant.molecule
-        if charge is not None:
-            self.molecule.set_charge(charge)
-        if multiplicity is not None:
-            self.molecule.set_multiplicity(multiplicity)
+        # if charge is not None:
+        #     self.molecule.set_charge(charge)
+        # if multiplicity is not None:
+        #     self.molecule.set_multiplicity(multiplicity)
         print(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )

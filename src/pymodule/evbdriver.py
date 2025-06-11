@@ -162,6 +162,8 @@ class EvbDriver():
         product: Molecule | list[Molecule],
         reactant_partial_charges: list[float] | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
+        reactant_total_multiplicity: int = -1,
+        product_total_multiplicity: int =-1,
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
@@ -179,6 +181,7 @@ class EvbDriver():
             reactant,
             reactant_partial_charges,
         )
+        
         pro_input, product_total_charge = self._process_molecule_input(
             product,
             product_partial_charges,
@@ -194,10 +197,12 @@ class EvbDriver():
             breaking_bonds = [breaking_bonds]
 
         self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
-            rea_input,
-            pro_input,
-            ordered_input,
-            breaking_bonds,
+            reactant_input=rea_input,
+            product_input=pro_input,
+            reactant_total_multiplicity=reactant_total_multiplicity,
+            product_total_multiplicity=product_total_multiplicity,
+            ordered_input=ordered_input,
+            breaking_bonds=breaking_bonds,
         )
 
     @staticmethod

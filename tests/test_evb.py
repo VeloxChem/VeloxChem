@@ -85,9 +85,7 @@ class TestEvb:
         }]
 
         reactant, product, formed_bonds, broken_bonds, reactants, products = ffbuilder.build_forcefields(
-            [reactant_input],
-            product_input,
-        )
+            [reactant_input], product_input, 1, 1)
 
         here = Path(__file__).parent
         reapath = str(here / 'data' / 'evb_ethanol_ff_data.json')

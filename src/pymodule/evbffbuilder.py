@@ -97,6 +97,8 @@ class EvbForceFieldBuilder():
         self,
         reactant_input: list[dict],
         product_input: list[dict],
+        reactant_total_multiplicity: int,
+        product_total_multiplicity: int,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ):
@@ -108,8 +110,9 @@ class EvbForceFieldBuilder():
 
         self.ostream.print_info("Creating combined reactant force field")
         self.ostream.flush()
-        reamol = molecule = self._combine_molecule(
-            [rea['molecule'] for rea in reactant_input])
+        reamol = self._combine_molecule(
+            [rea['molecule'] for rea in reactant_input],reactant_total_multiplicity)
+        self.ostream.print_info(f"Combined reactant with total charge {reamol.get_charge()} and multiplicity {reamol.get_multiplicity()}")
         self.reactant = self._combine_forcefield(reactants)
         self.reactant.molecule = reamol
 
@@ -121,7 +124,8 @@ class EvbForceFieldBuilder():
 
         self.ostream.print_info("Creating combined product force field")
         self.ostream.flush()
-        promol = self._combine_molecule([pro['molecule'] for pro in product_input],)
+        promol = self._combine_molecule([pro['molecule'] for pro in product_input],product_total_multiplicity)
+        self.ostream.print_info(f"Combined product with total charge {promol.get_charge()} and multiplicity {promol.get_multiplicity()}")
         self.product = self._combine_forcefield(products)
         self.product.molecule = promol
 
@@ -152,12 +156,15 @@ class EvbForceFieldBuilder():
         return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products
 
     @staticmethod
-    def _combine_molecule(molecules):
+    def _combine_molecule(molecules, total_multiplicity):
         
         combined_molecule = molecules[0]
         # pos = []
+        charge = 0
+        Sm1 = 0
         for mol in molecules[1:]:
-
+            charge += mol.get_charge()
+            Sm1 += mol.get_multiplicity()-1
             max_x = max(combined_molecule.get_coordinates_in_angstrom()[:, 0])
             min_x = min(combined_molecule.get_coordinates_in_angstrom()[:, 0])
             shift = max_x - min_x + 2
@@ -167,6 +174,11 @@ class EvbForceFieldBuilder():
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
+        combined_molecule.set_charge(charge)
+        if total_multiplicity > -1:
+            combined_molecule.set_multiplicity(total_multiplicity)
+        else:
+            combined_molecule.set_multiplicity(Sm1+1)
 
         molecule_sanity_check(combined_molecule)
         return combined_molecule
