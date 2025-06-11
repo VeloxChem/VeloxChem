@@ -110,12 +110,12 @@ class EvbFepDriver():
         self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
-        self.save_frames: int = 5000
+        self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
         self.save_crash_xml: bool = True
         self.save_equil_traj: bool = True
         self.xml_crash_save_interval: int = 50
-        self.pdb_crash_save_interval: int = 10
+        self.pdb_crash_save_interval: int = 1
         self.NVT_integrator = "nose-hoover"
 
         self.pdb = None
@@ -750,16 +750,18 @@ class EvbFepDriver():
             energies[j, 1] = kin
             energies[j, 2] = pot
             energies[j, 3] = vol
-
-            simulation.context.setState(state)
-            for k, fg in enumerate(EvbForceGroup):
-                fg_state = simulation.context.getState(
-                    getEnergy=True,
-                    groups=set([fg.value]),
-                )
-                energy = fg_state.getPotentialEnergy()
-                energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
-                energies[j, k + 4] = energy
+            try:
+                simulation.context.setState(state)
+                for k, fg in enumerate(EvbForceGroup):
+                    fg_state = simulation.context.getState(
+                        getEnergy=True,
+                        groups=set([fg.value]),
+                    )
+                    energy = fg_state.getPotentialEnergy()
+                    energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
+                    energies[j, k + 4] = energy
+            except:
+                self.ostream.print_warning("Encountered error while saving forcegroups, continuing without forcegroups")
 
         # Combine all saved PDB files into one and remove the sigle ones
         if self.save_crash_pdb:
