@@ -485,21 +485,10 @@ class EvbSystemBuilder():
         return reaction_atoms
 
     def _add_posres(self, system, pdb_atoms):
-        # lin_dist_expr = "k*distance(g1,g2)"
-        # max_dist_expr = f"""
-        # centroid_k*step(r)*(r)^2;
-        # r = distance(g1,g2)-rmax-r_offset;
-        # """
-        # centroid_force = mm.CustomCentroidBondForce(2, max_dist_expr)
-        # centroid_force.setName("Protein_Ligand_Centroid_force")
-        # centroid_force.setForceGroup(EvbForceGroup.CENTROID.value)
-        # centroid_force.addPerBondParameter("rmax")
-        # centroid_force.addGlobalParameter("centroid_k",self.centroid_k)
-        # centroid_force.addGlobalParameter("r_offset",self.centroid_offset)
-
         posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
         posres_force = mm.CustomExternalForce(posres_expr)
         posres_force.setName("protein_ligand_posres")
+        posres_force.setForceGroup(EvbForceGroup.POSRES.value)
         posres_force.addGlobalParameter('posres_k', self.posres_k)
         posres_force.addPerParticleParameter('x0')
         posres_force.addPerParticleParameter('y0')
@@ -2030,7 +2019,7 @@ class EvbForceGroup(Enum):
     PDB = auto()  # Bonded forces added from the PDB
     SOL_COUL = auto()
     SOL_LJ = auto()
-    CENTROID = auto()
+    POSRES = auto()
 
     @classmethod
     def pes_forcegroups(cls):

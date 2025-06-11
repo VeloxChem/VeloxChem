@@ -377,13 +377,12 @@ class EvbFepDriver():
                     self._safe_step(simulation, self.initial_equil_NVT_steps,
                                     f"PDB warmup NVT equilibration T = {T}")
 
-
             if self.isobaric:
                 barostat.setFrequency(25)
                 simulation.integrator.setTemperature(T)
                 self._safe_step(simulation, self.initial_equil_NPT_steps,
                                 f"PDB warmup NPT equilibration T = {T}")
-                                
+
             self.ostream.print_info("Turning posres force off")
             simulation.context.setParameter('posres_k', 0)
 
