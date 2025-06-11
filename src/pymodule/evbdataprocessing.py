@@ -128,6 +128,7 @@ class EvbDataProcessing:
             self.alpha, self.H12 = self._fit_EVB_parameters()
         else:
             self.ostream.print_info("Using provided H12 and alpha")
+        results.update({'alpha':self.alpha,'H12':self.H12})
         self.ostream.print_info("Calculating FEP and EVB curves")
         self.ostream.flush()
         self._get_FEP_and_EVB()
@@ -774,3 +775,100 @@ class EvbDataProcessing:
             r"$\nu$",
             r"$\Delta G_{EVB,ana.}$",
         ])
+
+    @staticmethod
+    def plot_force_decomp(results, dif_to=0):
+        from IPython.display import clear_output
+        from IPython.display import display
+        import matplotlib.pyplot as plt
+        import ipywidgets as widgets
+
+        lam = results['Lambda']
+        bins = results['coordinate_bins']
+        config_results = results['configuration_results']
+        relevant_fgs = []
+
+        dp = EvbDataProcessing()
+        dp.Lambda_frame = results["Lambda_frame"]
+        dp.Lambda = lam
+        dp.Lambda_indices = results["Lambda_indices"]
+        dp.alpha = results['alpha']
+        dp.H12 = results['H12']
+
+        for fg in EvbForceGroup.pes_forcegroups():
+            for result in config_results.values():
+                if not np.all(result['E1_fg'][fg - 1] == 0) or not np.all(
+                        result['E2_fg'][fg - 1] == 0):
+                    if fg not in relevant_fgs:
+                        relevant_fgs.append(fg)
+                    continue
+
+        checkboxes = [
+            widgets.Checkbox(
+                True,
+                description=f"{EvbForceGroup(fg_val).name} ({fg_val})",
+            ) for fg_val in relevant_fgs
+        ]
+        plot_output = widgets.Output()
+
+        def update_plot(change=None):
+            x = np.linspace(0, 10, 500)
+            with plot_output:
+                fig1, ax1 = plt.subplots(1, 3, figsize=(18, 4))
+                fig2, ax2 = plt.subplots(1, 1, figsize=(18, 4))
+                evbs = []
+                for name, result in config_results.items():
+                    print(name)
+                    clear_output(wait=True)
+
+                    to_sum = []
+                    for fg, cb in zip(relevant_fgs, checkboxes):
+                        if cb.value:
+                            to_sum.append(fg - 1)
+                    E1_fg = np.sum(result['E1_fg'][to_sum], axis=0)
+                    E2_fg = np.sum(result['E2_fg'][to_sum], axis=0)
+                    E2_shifted, V, dE, Eg = dp._calculate_Eg_V_dE(
+                        E1_fg,
+                        E2_fg,
+                        dp.alpha,
+                        dp.H12,
+                    )
+                    dGfep = dp._calculate_dGfep(dE, result['Temp_set'])
+                    dGevb, shift, fepxi = dp._dGevb_analytical(
+                        dGfep,
+                        lam,
+                        dp.H12,
+                        bins,
+                    )
+                    evbs.append(dGevb)
+                    ax1[0].plot(lam, dGfep)
+
+                    ax1[1].plot(bins, dGevb, label=name)
+
+                    ax2.plot(E1_fg - np.min(E1_fg), label=f'rea {name}')
+                    ax2.plot(E2_fg - np.min(E2_fg), label=f'pro {name}')
+                for i, (name, evb) in enumerate(zip(config_results.keys(), evbs)):
+                    if not i == dif_to:
+                        dif = evbs[dif_to] - evb
+                        ax1[2].plot(bins, dif, label=name)
+
+                fig1.legend()
+                fig2.legend()
+                plt.show()
+
+        # Observe checkbox changes
+        for cb in checkboxes:
+            cb.observe(update_plot, names='value')
+
+        # Layout in 5x5 grid
+        grid = widgets.GridBox(
+            checkboxes,
+            layout=widgets.Layout(
+                grid_template_columns="repeat(5, 180px)",
+                grid_gap="5px",
+            ),
+        )
+
+        # Initial display
+        display(grid, plot_output)
+        update_plot()  # initial empty plot

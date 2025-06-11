@@ -2023,6 +2023,7 @@ class EvbForceGroup(Enum):
 
     @classmethod
     def pes_forcegroups(cls):
+        max_ind = cls.POSRES.value
         return set(range(1, max_ind))
 
     @classmethod
