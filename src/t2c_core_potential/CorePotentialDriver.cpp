@@ -36,6 +36,7 @@
 #include "MatrixFunc.hpp"
 #include "OpenMPFunc.hpp"
 #include "T2CDistributor.hpp"
+#include "LocalCorePotentialFunc.hpp"
 
 auto
 CCorePotentialDriver::compute(const CMolecularBasis& basis, const CMolecularCorePotential& core_potential, const CMolecule& molecule) const -> CMatrix
@@ -94,9 +95,11 @@ CCorePotentialDriver::compute(const CMolecularBasis& basis, const CMolecularCore
                         
                         auto r_pot = ecp_potentials[ecp_indices[i]];
                         
+                    
+                        
                         // compute local potential contribution
                         
-                        //ecpfunc::compute(distributor,r_pot.get_local_potential(), r_xyz,   bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal);
+                        ecpfunc::compute(distributor, r_pot.get_local_potential(), r_xyz,   bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal);
                         
                         // compute projected potential contributions
                         

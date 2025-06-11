@@ -48,6 +48,21 @@ class TestGtoBlock:
             Point([0.000, -1.400, -2.100])
         ]
         assert a_coords == b_coords
+        
+    def test_coordinates_with_origin(self):
+
+        tol = 1.0e-12
+
+        mol_h2o, bas_svp = self.get_data()
+        gblock = GtoBlock(bas_svp, mol_h2o, 0, 1)
+        a_coords = gblock.coordinates(Point([1.0, -0.4, 2.0]))
+        b_coords = [
+            Point([-1.000, 0.400, -3.000]),
+            Point([-1.000, 0.400, -3.000]),
+            Point([-1.000, 1.800, -4.100]),
+            Point([-1.000, -1.000, -4.100])
+        ]
+        assert a_coords == b_coords
 
     def test_exponents(self):
 
