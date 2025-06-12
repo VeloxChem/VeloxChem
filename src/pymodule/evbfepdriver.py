@@ -386,7 +386,7 @@ class EvbFepDriver():
             self.ostream.print_info("Turning posres force off")
             simulation.context.setParameter('posres_k', 0)
 
-        return simulation.context.getState(
+        equil_state = simulation.context.getState(
             getPositions=True,
             getVelocities=True,
             getForces=True,
@@ -396,6 +396,12 @@ class EvbFepDriver():
             getIntegratorParameters=True,
             enforcePeriodicBox=True,
         )
+        self._save_state(
+            simulation,
+            f"equil_state_initial",
+            xml=False,
+        )
+        return equil_state
 
     def _equilibrate(self, system, l, positions, velocities=None):
         simulation = self._get_simulation(system, self.equil_step_size)
@@ -483,12 +489,11 @@ class EvbFepDriver():
             enforcePeriodicBox=True,
         )
 
-        if self.debug:
-            self._save_state(
-                simulation,
-                f"equil_state_{l:.3f}",
-                xml=False,
-            )
+        self._save_state(
+            simulation,
+            f"equil_state_{l:.3f}",
+            xml=False,
+        )
 
         return equil_state
 
@@ -514,12 +519,12 @@ class EvbFepDriver():
         ][0]
 
     def _sample(self, system, l, initial_state):
-        run_simulation = self._get_simulation(system, self.equil_step_size)
-        run_simulation.reporters.append(self.traj_roporter)
+        simulation = self._get_simulation(system, self.equil_step_size)
+        simulation.reporters.append(self.traj_roporter)
 
         sz = self.step_size * mmunit.picoseconds
-        run_simulation.integrator.setStepSize(sz)
-        run_simulation.context.setState(initial_state)
+        simulation.integrator.setStepSize(sz)
+        simulation.context.setState(initial_state)
         if l == 0:
             append = False
         else:
@@ -535,10 +540,12 @@ class EvbFepDriver():
             l,
             append=append,
         )
-        run_simulation.reporters.append(state_reporter)
-        run_simulation.reporters.append(evb_reporter)
+        simulation.reporters.append(state_reporter)
+        simulation.reporters.append(evb_reporter)
         self.ostream.flush()
-        states = self._safe_step(run_simulation, self.sample_steps, "sampling")
+        states = self._safe_step(simulation, self.sample_steps, "sampling")
+
+        self._save_state(simulation, f'sampled_{l:.3f}', xml=False)
         return states[-1]
 
     def _get_simulation(self, system, step_size):
@@ -761,7 +768,9 @@ class EvbFepDriver():
                     energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
                     energies[j, k + 4] = energy
             except:
-                self.ostream.print_warning("Encountered error while saving forcegroups, continuing without forcegroups")
+                self.ostream.print_warning(
+                    "Encountered error while saving forcegroups, continuing without forcegroups"
+                )
 
         # Combine all saved PDB files into one and remove the sigle ones
         if self.save_crash_pdb:
