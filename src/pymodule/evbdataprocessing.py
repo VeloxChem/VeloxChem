@@ -158,7 +158,7 @@ class EvbDataProcessing:
             xi = np.linspace(-10000, 10000, 20000)
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
-            dGevb_smooth, barrier, free_energy = self._get_free_energies(
+            dGevb_smooth, barrier, free_energy,_,_ = self._get_free_energies(
                 dGevb_ana, fitting=True)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
@@ -284,7 +284,7 @@ class EvbDataProcessing:
 
         return dGevb, pns, dGcor
 
-    def _get_free_energies(self, dGevb, fitting=False):
+    def _get_free_energies(self, dGevb, fitting=True):
 
         assert_msg_critical('scipy' in sys.modules,
                             'scipy is required for EvbDataProcessing.')
@@ -339,7 +339,7 @@ class EvbDataProcessing:
         free_energy = Epro - Erea
         dGevb_smooth -= Erea
         self.ostream.flush()
-        return dGevb_smooth, barrier, free_energy
+        return dGevb_smooth, barrier, free_energy,min_arg,max_arg
 
     def _get_FEP_and_EVB(self):
 
@@ -391,6 +391,8 @@ class EvbDataProcessing:
                     dGevb_discrete,
                     barrier_discretised,
                     reaction_free_energy_discretised,
+                    min_arg,
+                    max_arg,
                 ) = self._get_free_energies(dGevb_discrete)
 
                 result.update({
@@ -400,6 +402,8 @@ class EvbDataProcessing:
                         "barrier": barrier_discretised,
                         "pns": pns,
                         "dGcor": dGcor,
+                        "min_arg":min_arg,
+                        "max_arg":max_arg,
                     }
                 })
 
@@ -415,6 +419,8 @@ class EvbDataProcessing:
                     dGevb_analytical,
                     barrier_analytical,
                     reaction_free_energy_analytical,
+                    min_arg,
+                    max_arg,
                 ) = self._get_free_energies(dGevb_analytical)
 
                 result.update({
@@ -424,6 +430,8 @@ class EvbDataProcessing:
                         "fep": fepxi,
                         "free_energy": reaction_free_energy_analytical,
                         "barrier": barrier_analytical,
+                        "min_arg":min_arg,
+                        "max_arg":max_arg,
                     }
                 })
 
@@ -675,6 +683,62 @@ class EvbDataProcessing:
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
+                    #add zero-line
+                    zero_ind = result['analytical']['min_arg'][0]
+                    barrier = result['analytical']['barrier']
+                    barrier_ind = result['analytical']['max_arg'][0]
+                    free_energy = result['analytical']['free_energy']
+                    free_ind = result['analytical']['min_arg'][1]
+
+                    #mark the zero-point
+                    ax[1].plot(
+                        [bin_indicators[max(0,zero_ind-25)],
+                        bin_indicators[min(len(bin_indicators)-1,zero_ind+25)]],
+                        [0,0],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].plot(
+                        [bin_indicators[zero_ind]]*2,
+                        [-10,+10],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+
+                    ax[1].plot(
+                        [bin_indicators[max(0,barrier_ind-25)],
+                        bin_indicators[min(len(bin_indicators)-1,barrier_ind+25)]],
+                        [barrier,barrier],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].plot(
+                        [bin_indicators[barrier_ind]]*2,
+                        [barrier-10,barrier+10],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].text(bin_indicators[barrier_ind],barrier,f"{barrier:.0f}",ha='left', va='bottom')
+
+                    ax[1].plot(
+                        [bin_indicators[max(0,free_ind-25)],
+                        bin_indicators[min(len(bin_indicators)-1,free_ind+25)]],
+                        [free_energy,free_energy],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].plot(
+                        [bin_indicators[free_ind]]*2,
+                        [free_energy-10,free_energy+10],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].text(bin_indicators[free_ind],free_energy,f"{free_energy:.0f}",ha='left', va='bottom')
+                    # #Add barrier
+                    # ax[1].plot(
+
+                    # )
+                    # #add free energy
 
             ax[1].set_xlim(coordinate_bins[0], coordinate_bins[-1])
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
@@ -840,6 +904,7 @@ class EvbDataProcessing:
                         dp.H12,
                         bins,
                     )
+                    dGevb,_,_,min_arg,max_arg=dp._get_free_energies(dGevb)
                     evbs.append(dGevb)
                     ax1[0].plot(lam, dGfep)
 
@@ -849,8 +914,8 @@ class EvbDataProcessing:
                     ax2.plot(E2_fg - np.min(E2_fg), label=f'pro {name}')
                 for i, (name, evb) in enumerate(zip(config_results.keys(), evbs)):
                     if not i == dif_to:
-                        dif = evbs[dif_to] - evb
-                        ax1[2].plot(bins, dif, label=name)
+                        dif = evb-evbs[dif_to]
+                        ax1[2].plot(bins, dif, label=f"dif {name}")
 
                 fig1.legend()
                 fig2.legend()
