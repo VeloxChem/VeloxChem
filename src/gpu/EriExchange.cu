@@ -137,7 +137,7 @@ computeExchangeFockSSSS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ss[displ_k + l];
+            // const auto Q_kl = Q_K_ss[displ_k + l];
 
             const auto l_prim = D_inds_K_ss[displ_k + l];
 
@@ -321,7 +321,7 @@ computeExchangeFockSSSP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_sp[displ_k + l];
+            // const auto Q_kl = Q_K_sp[displ_k + l];
 
             const auto l_prim = D_inds_K_sp[displ_k + l];
 
@@ -534,7 +534,7 @@ computeExchangeFockSSSD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_sd[displ_k + l];
+            // const auto Q_kl = Q_K_sd[displ_k + l];
 
             const auto l_prim = D_inds_K_sd[displ_k + l];
 
@@ -754,7 +754,7 @@ computeExchangeFockSPSS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ss[displ_k + l];
+            // const auto Q_kl = Q_K_ss[displ_k + l];
 
             const auto l_prim = D_inds_K_ss[displ_k + l];
 
@@ -954,7 +954,7 @@ computeExchangeFockSPSP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_sp[displ_k + l];
+            // const auto Q_kl = Q_K_sp[displ_k + l];
 
             const auto l_prim = D_inds_K_sp[displ_k + l];
 
@@ -1191,7 +1191,7 @@ computeExchangeFockSPSD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_sd[displ_k + l];
+            // const auto Q_kl = Q_K_sd[displ_k + l];
 
             const auto l_prim = D_inds_K_sd[displ_k + l];
 
@@ -1459,7 +1459,7 @@ computeExchangeFockSDSS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ss[displ_k + l];
+            // const auto Q_kl = Q_K_ss[displ_k + l];
 
             const auto l_prim = D_inds_K_ss[displ_k + l];
 
@@ -1695,7 +1695,7 @@ computeExchangeFockSDSP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_sp[displ_k + l];
+            // const auto Q_kl = Q_K_sp[displ_k + l];
 
             const auto l_prim = D_inds_K_sp[displ_k + l];
 
@@ -1958,7 +1958,7 @@ computeExchangeFockSDSD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_sd[displ_k + l];
+            // const auto Q_kl = Q_K_sd[displ_k + l];
 
             const auto l_prim = D_inds_K_sd[displ_k + l];
 
@@ -2288,7 +2288,7 @@ computeExchangeFockSSPS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = Q_K_ps[displ_k + l];
 
             const auto l_prim = D_inds_K_ps[displ_k + l];
 
@@ -2492,7 +2492,7 @@ computeExchangeFockSSPP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = Q_K_pp[displ_k + l];
 
             const auto l_prim = D_inds_K_pp[displ_k + l];
 
@@ -2729,7 +2729,7 @@ computeExchangeFockSSPD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = Q_K_pd[displ_k + l];
 
             const auto l_prim = D_inds_K_pd[displ_k + l];
 
@@ -2979,7 +2979,7 @@ computeExchangeFockSPPS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = Q_K_ps[displ_k + l];
 
             const auto l_prim = D_inds_K_ps[displ_k + l];
 
@@ -3204,7 +3204,7 @@ computeExchangeFockSPPP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = Q_K_pp[displ_k + l];
 
             const auto l_prim = D_inds_K_pp[displ_k + l];
 
@@ -3476,7 +3476,7 @@ computeExchangeFockSPPD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = Q_K_pd[displ_k + l];
 
             const auto l_prim = D_inds_K_pd[displ_k + l];
 
@@ -3803,7 +3803,7 @@ computeExchangeFockSDPS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = Q_K_ps[displ_k + l];
 
             const auto l_prim = D_inds_K_ps[displ_k + l];
 
@@ -4073,7 +4073,7 @@ computeExchangeFockSDPP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = Q_K_pp[displ_k + l];
 
             const auto l_prim = D_inds_K_pp[displ_k + l];
 
@@ -4419,7 +4419,7 @@ computeExchangeFockSDPD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = Q_K_pd[displ_k + l];
 
             const auto l_prim = D_inds_K_pd[displ_k + l];
 
@@ -4880,7 +4880,7 @@ computeExchangeFockSSDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -5114,7 +5114,7 @@ computeExchangeFockSSDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -5372,7 +5372,7 @@ computeExchangeFockSSDD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -5682,7 +5682,7 @@ computeExchangeFockSPDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -5951,7 +5951,7 @@ computeExchangeFockSPDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -6278,7 +6278,7 @@ computeExchangeFockSPDD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -6704,7 +6704,7 @@ computeExchangeFockSDDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -7048,7 +7048,7 @@ computeExchangeFockSDDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -7509,7 +7509,7 @@ computeExchangeFockSDDD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -8220,7 +8220,7 @@ computeExchangeFockPSPS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = Q_K_ps[displ_k + l];
 
             const auto l_prim = D_inds_K_ps[displ_k + l];
 
@@ -8443,7 +8443,7 @@ computeExchangeFockPSPP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = Q_K_pp[displ_k + l];
 
             const auto l_prim = D_inds_K_pp[displ_k + l];
 
@@ -8714,7 +8714,7 @@ computeExchangeFockPSPD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = Q_K_pd[displ_k + l];
 
             const auto l_prim = D_inds_K_pd[displ_k + l];
 
@@ -9029,7 +9029,7 @@ computeExchangeFockPPPS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = Q_K_ps[displ_k + l];
 
             const auto l_prim = D_inds_K_ps[displ_k + l];
 
@@ -9280,7 +9280,7 @@ computeExchangeFockPPPP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = Q_K_pp[displ_k + l];
 
             const auto l_prim = D_inds_K_pp[displ_k + l];
 
@@ -9624,7 +9624,7 @@ computeExchangeFockPPPD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = Q_K_pd[displ_k + l];
 
             const auto l_prim = D_inds_K_pd[displ_k + l];
 
@@ -10087,7 +10087,7 @@ computeExchangeFockPDPS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = Q_K_ps[displ_k + l];
 
             const auto l_prim = D_inds_K_ps[displ_k + l];
 
@@ -10409,7 +10409,7 @@ computeExchangeFockPDPP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = Q_K_pp[displ_k + l];
 
             const auto l_prim = D_inds_K_pp[displ_k + l];
 
@@ -10865,7 +10865,7 @@ computeExchangeFockPDPD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = Q_K_pd[displ_k + l];
 
             const auto l_prim = D_inds_K_pd[displ_k + l];
 
@@ -11617,7 +11617,7 @@ computeExchangeFockPSDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -11883,7 +11883,7 @@ computeExchangeFockPSDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -12209,7 +12209,7 @@ computeExchangeFockPSDD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -12637,7 +12637,7 @@ computeExchangeFockPPDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -12977,7 +12977,7 @@ computeExchangeFockPPDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -13437,7 +13437,7 @@ computeExchangeFockPPDD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -14164,7 +14164,7 @@ computeExchangeFockPDDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -14622,7 +14622,7 @@ computeExchangeFockPDDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -15371,7 +15371,7 @@ computeExchangeFockPDDD0(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -15717,7 +15717,7 @@ computeExchangeFockPDDD1(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -16117,7 +16117,7 @@ computeExchangeFockPDDD2(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -16605,7 +16605,7 @@ computeExchangeFockPDDD3(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -16930,7 +16930,7 @@ computeExchangeFockPDDD4(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -17315,7 +17315,7 @@ computeExchangeFockPDDD5(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -17484,7 +17484,7 @@ computeExchangeFockPDDD6(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -17499,9 +17499,9 @@ computeExchangeFockPDDD6(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_pd[ik];
         k = pair_inds_k_for_K_pd[ik];
@@ -17569,7 +17569,7 @@ computeExchangeFockPDDD6(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -17801,7 +17801,7 @@ computeExchangeFockPDDD7(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -18174,7 +18174,7 @@ computeExchangeFockDSDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -18512,7 +18512,7 @@ computeExchangeFockDSDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -18971,7 +18971,7 @@ computeExchangeFockDSDD(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -19696,7 +19696,7 @@ computeExchangeFockDPDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -20148,7 +20148,7 @@ computeExchangeFockDPDP(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -20896,7 +20896,7 @@ computeExchangeFockDDDS(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = Q_K_ds[displ_k + l];
 
             const auto l_prim = D_inds_K_ds[displ_k + l];
 
@@ -21616,7 +21616,7 @@ computeExchangeFockDPDD0(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -21962,7 +21962,7 @@ computeExchangeFockDPDD1(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -22362,7 +22362,7 @@ computeExchangeFockDPDD2(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -22664,7 +22664,7 @@ computeExchangeFockDPDD3(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -23174,7 +23174,7 @@ computeExchangeFockDPDD4(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -23498,7 +23498,7 @@ computeExchangeFockDPDD5(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -23513,9 +23513,9 @@ computeExchangeFockDPDD5(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_dd[ik];
         k = pair_inds_k_for_K_dd[ik];
@@ -23583,7 +23583,7 @@ computeExchangeFockDPDD5(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -23834,7 +23834,7 @@ computeExchangeFockDPDD6(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -24212,7 +24212,7 @@ computeExchangeFockDDDP0(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -24490,7 +24490,7 @@ computeExchangeFockDDDP1(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -24864,7 +24864,7 @@ computeExchangeFockDDDP2(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -25260,7 +25260,7 @@ computeExchangeFockDDDP3(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -25731,7 +25731,7 @@ computeExchangeFockDDDP4(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -26097,7 +26097,7 @@ computeExchangeFockDDDP5(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -26437,7 +26437,7 @@ computeExchangeFockDDDP6(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = Q_K_dp[displ_k + l];
 
             const auto l_prim = D_inds_K_dp[displ_k + l];
 
@@ -26800,7 +26800,7 @@ computeExchangeFockDDDD0(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -27110,7 +27110,7 @@ computeExchangeFockDDDD1(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -27490,7 +27490,7 @@ computeExchangeFockDDDD2(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -27894,7 +27894,7 @@ computeExchangeFockDDDD3(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -28370,7 +28370,7 @@ computeExchangeFockDDDD4(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -28606,7 +28606,7 @@ computeExchangeFockDDDD5(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -28943,7 +28943,7 @@ computeExchangeFockDDDD6(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -29368,7 +29368,7 @@ computeExchangeFockDDDD7(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -29690,7 +29690,7 @@ computeExchangeFockDDDD8(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -29911,7 +29911,7 @@ computeExchangeFockDDDD9(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -29926,9 +29926,9 @@ computeExchangeFockDDDD9(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_dd[ik];
         k = pair_inds_k_for_K_dd[ik];
@@ -29996,7 +29996,7 @@ computeExchangeFockDDDD9(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -30261,7 +30261,7 @@ computeExchangeFockDDDD10(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -30700,7 +30700,7 @@ computeExchangeFockDDDD11(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -31154,7 +31154,7 @@ computeExchangeFockDDDD12(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -31390,7 +31390,7 @@ computeExchangeFockDDDD13(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -31576,7 +31576,7 @@ computeExchangeFockDDDD14(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -31591,9 +31591,9 @@ computeExchangeFockDDDD14(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_dd[ik];
         k = pair_inds_k_for_K_dd[ik];
@@ -31661,7 +31661,7 @@ computeExchangeFockDDDD14(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -31947,7 +31947,7 @@ computeExchangeFockDDDD15(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -32008,10 +32008,10 @@ computeExchangeFockDDDD15(double*         mat_K,
             const auto PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
             const auto PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
             const auto PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+            //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -32297,7 +32297,7 @@ computeExchangeFockDDDD16(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -32674,7 +32674,7 @@ computeExchangeFockDDDD17(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -32972,7 +32972,7 @@ computeExchangeFockDDDD18(double*         mat_K,
                 break;
             }
 
-            const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = Q_K_dd[displ_k + l];
 
             const auto l_prim = D_inds_K_dd[displ_k + l];
 
