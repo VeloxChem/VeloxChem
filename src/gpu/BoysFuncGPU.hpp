@@ -33,11 +33,13 @@
 #ifndef BoysFuncGPU_hpp
 #define BoysFuncGPU_hpp
 
+#include <cstdint>
+
 #include "GpuConstants.hpp"
 
 namespace gpu {  // gpu namespace
 
-__device__ void
+__device__ static void
 computeBoysFunction(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft)
 {
     // Note: 847 = 121 * 7
