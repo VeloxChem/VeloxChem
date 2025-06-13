@@ -191,7 +191,7 @@ def get_sigma_properties():
         ('C', 'C'): -72.95,
         ('O', 'C'): 68.69,
         ('N', 'C'): -48.22,
-        ('N', 'C(3)'): 84.10,  # TODO: sp3 carbon; identify from AtomTypeIdentifier
+        ('N', 'c3'): 84.10,  
         ('O', 'N'): 121.98,
         ('F',): 38.18,
         ('Cl',): 9.82,
@@ -218,7 +218,7 @@ def get_rzz_parameters():
         ('C', 'Br'): [2.3, 0.3],
         ('C', 'I'): [2.6, 0.3],
         ('N', 'C'): [1.84, 0.3],
-        ('N', 'C(3)'): [1.225, 0.065],  # TODO: fix to distinguish properly
+        ('N', 'c3'): [1.225, 0.065],  
         ('O', 'C'): [1.33, 0.1],
         ('O', 'N'): [1.5, 0.3],
         ('O', 'O'): [1.8, 0.3],

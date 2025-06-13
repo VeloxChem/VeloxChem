@@ -195,7 +195,7 @@ class SolvationFepDriver:
         """
         
         sol_builder = SolvationBuilder()
-        sol_builder.steps = 10000
+        sol_builder.steps = 50000
 
         sol_builder.solvate(solute=molecule, 
                             solvent=solvent,
@@ -257,7 +257,7 @@ class SolvationFepDriver:
             ffgen_solute.create_topology(molecule, resp=False)
 
             sol_builder = SolvationBuilder()
-            sol_builder.steps = 10000
+            sol_builder.steps = 50000
             sol_builder.write_pdb_only = True
 
             sol_builder.solvate(solute=molecule, 
@@ -630,7 +630,6 @@ class SolvationFepDriver:
         simulation.context.setPositions(positions)
 
         # Minimize energy
-        #TODO: Consider not minimizing energies for each lambda
         simulation.minimizeEnergy()
 
         # Equilibration
