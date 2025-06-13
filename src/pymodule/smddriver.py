@@ -120,18 +120,19 @@ class SMDDriver:
 
         self.ostream.print_info("Computing the ENP Contribution...")
         self.ostream.flush()
-        ENP_energy = self._get_ENP_contribution()
+        self.ENP_energy = self._get_ENP_contribution()
         
         self.ostream.print_info("Computing the CDS Contribution...")
         self.ostream.flush()
-        CDS_energy = self._get_CDS_contribution()
+        self.CDS_energy = self._get_CDS_contribution()
         
         # DG_conc = DG_conc(gas-phase) + DG_conc(solv-phase) (=0 if 1 mol/L, =1.89 kcal/mol if gas-phase std state of 1 atm)
 
         # DG_solv = DG_ENP + DG_CDS (+ DG_conc)
         # N contribution in ENP: diff in total gas phase energy between gas-equil.geometry and liq-equil.geometry
-        final_E = ENP_energy + CDS_energy 
-        
+        final_E = self.ENP_energy + self.CDS_energy 
+        self.ostream.print_info(f"Final SMD Solvation Energy: {final_E:.4f} kJ/mol")
+        self.ostream.flush()
 
         return final_E
     
