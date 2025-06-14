@@ -51,15 +51,21 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
     {
         const double w = fa - 0.1 * pnt;
 
-        values[N] = bf_data[pnt * 7 + 0] + w * (bf_data[pnt * 7 + 1] + w * (bf_data[pnt * 7 + 2] + w * (bf_data[pnt * 7 + 3]
+        const double w2 = w * w;
 
-                    + w * (bf_data[pnt * 7 + 4] + w * (bf_data[pnt * 7 + 5] + w * (bf_data[pnt * 7 + 6]))))));
+        const double w4 = w2 * w2;
+
+        values[N] = bf_data[pnt * 7 + 0] + bf_data[pnt * 7 + 1] * w + bf_data[pnt * 7 + 2] * w2 + bf_data[pnt * 7 + 3] * w2 * w
+
+                    + bf_data[pnt * 7 + 4] * w4 + bf_data[pnt * 7 + 5] * w4 * w + bf_data[pnt * 7 + 6] * w4 * w2;
+
+        const double f2a = fa + fa;
 
         const double fx = exp(-fa);
 
         for (uint32_t j = 0; j < N; j++)
         {
-            values[N - j - 1] = ft[N - j - 1] * (2.0 * fa * values[N - j] + fx);
+            values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j] + fx);
         }
     }
     else
@@ -72,9 +78,13 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         if (pnt < 921)
         {
+            const double fia2 = fia * fia;
+
+            const double f = 0.4999489092 * fia - 0.2473631686 * fia2 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+
             const double fx = exp(-fa);
 
-            values[0] -= fx * fia * (0.4999489092 + fia * (-0.2473631686 + fia * (0.3211809090 + fia * (-0.3811559346))));
+            values[0] -= f * fx;
 
             const double rterm = pf * fx;
 
