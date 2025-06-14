@@ -79,7 +79,7 @@ zeta(const double eRadius)
     return val;
 }
 
-__global__ void __launch_bounds__(TILE_SIZE)
+__global__ static void
 ssf(const double*   gridx,
     const double*   gridy,
     const double*   gridz,
@@ -91,38 +91,23 @@ ssf(const double*   gridx,
     const uint32_t  nAtoms,
     double*         pweights)
 {
-    __shared__ double pweights_local[TILE_DIM][TILE_DIM + 1];
-    __shared__ double pweights_sum[TILE_DIM][TILE_DIM + 1];
+    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x; // grid
 
-    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;  // grid
-
-    if (threadIdx.x == 0)
+    if (i < nGridPoints)
     {
-        pweights_local[threadIdx.y][TILE_DIM] = 0.0;
-        pweights_sum[threadIdx.y][TILE_DIM] = 0.0;
-    }
+        const uint32_t idAtomic = atomIdsOfGridPoints[i];
 
-    __syncthreads();
+        // grid coordinates
 
-    for (uint32_t m = 0; m < (nAtoms + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        pweights_local[threadIdx.y][threadIdx.x] = 0.0;
-        pweights_sum[threadIdx.y][threadIdx.x] = 0.0;
+        const double rgx = gridx[i];
+        const double rgy = gridy[i];
+        const double rgz = gridz[i];
 
-        __syncthreads();
+        double pweights_local = 0.0;
+        double pweights_sum = 0.0;
 
-        const uint32_t j = m * TILE_DIM + threadIdx.x;  // atom
-
-        if ((i < nGridPoints) && (j < nAtoms))
+        for (uint32_t j = 0; j < nAtoms; j++)
         {
-            const uint32_t idAtomic = atomIdsOfGridPoints[i];
-
-            // grid coordinates
-
-            const double rgx = gridx[i];
-            const double rgy = gridy[i];
-            const double rgz = gridz[i];
-
             const double rax = atomCoordinatesX[j];
             const double ray = atomCoordinatesY[j];
             const double raz = atomCoordinatesZ[j];
@@ -147,27 +132,11 @@ ssf(const double*   gridx,
                 pweight_j *= 0.5 * (1.0 - gpu::zeta(mab));
             }
 
-            pweights_local[threadIdx.y][threadIdx.x] += static_cast<double>(j == idAtomic) * pweight_j;
-            pweights_sum[threadIdx.y][threadIdx.x] += pweight_j;
+            pweights_local += static_cast<double>(j == idAtomic) * pweight_j;
+            pweights_sum += pweight_j;
         }
 
-        __syncthreads();
-
-        if (threadIdx.x == 0)
-        {
-            for (uint32_t n = 0; n < TILE_DIM; n++)
-            {
-                pweights_local[threadIdx.y][TILE_DIM] += pweights_local[threadIdx.y][n];
-                pweights_sum[threadIdx.y][TILE_DIM]   += pweights_sum[threadIdx.y][n];
-            }
-        }
-
-        __syncthreads();
-    }
-
-    if ((threadIdx.x == 0) && (i < nGridPoints))
-    {
-        pweights[i] = pweights_local[threadIdx.y][TILE_DIM] / pweights_sum[threadIdx.y][TILE_DIM];
+        pweights[i] = pweights_local / pweights_sum;
     }
 }
 
@@ -198,7 +167,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
     cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
@@ -228,7 +197,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
         atom_coords[2 * nAtoms * 2 + j + nAtoms] = atomCoordinates[j][2];
     }
 
-    std::vector<double> partial_weights(grid_batch_size);
+    std::vector<double> partial_weights(grid_batch_size, 1.0);
 
     // grid and atom data on device
 
@@ -266,9 +235,9 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 
     cudaSafe(cudaDeviceSynchronize());
 
-    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+    dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
-    dim3 num_blocks(1, (grid_batch_size + threads_per_block.x - 1) / threads_per_block.x);
+    dim3 num_blocks((grid_batch_size + threads_per_block.x - 1) / threads_per_block.x);
 
     gpu::ssf<<<num_blocks, threads_per_block>>>(
                        d_grid_x, d_grid_y, d_grid_z, d_atom_ids_of_points, static_cast<uint32_t>(grid_batch_size),
