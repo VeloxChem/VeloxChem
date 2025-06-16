@@ -95,10 +95,10 @@ class EvbDriver():
         self.name: str = None
         self.results = None
         self.system_confs: list[dict] = []
-        self.debug = False
         self.fast_run = False
 
         self.t_label = int(time.time())
+        self.water_model = 'spce'
 
     def build_and_run_default_water_EVB(
         self,
@@ -148,15 +148,11 @@ class EvbDriver():
         self.ostream.print_header("Running FEP")
         self.ostream.flush()
         self.run_FEP()
-        if not self.debug:
-            self.ostream.print_blank()
-            self.ostream.print_header("Computing energy profiles")
-            self.ostream.flush()
-            self.compute_energy_profiles(barrier, free_energy)
-        else:
-            self.ostream.print_info(
-                "Debugging option enabled. Skipping energy profile calculation because recalculation is necessary."
-            )
+
+        self.ostream.print_blank()
+        self.ostream.print_header("Computing energy profiles")
+        self.ostream.flush()
+        self.compute_energy_profiles(barrier, free_energy)
 
         self.ostream.flush()
 
@@ -166,13 +162,16 @@ class EvbDriver():
         product: Molecule | list[Molecule],
         reactant_partial_charges: list[float] | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
+        reactant_total_multiplicity: int = -1,
+        product_total_multiplicity: int =-1,
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] = [],
         name=None,
     ):
-        self.name = name
+        if self.name is None:
+            self.name = name
         cwd = Path().cwd()
         input_path = cwd / self.input_folder
         if not input_path.exists():
@@ -182,24 +181,28 @@ class EvbDriver():
             reactant,
             reactant_partial_charges,
         )
+        
         pro_input, product_total_charge = self._process_molecule_input(
             product,
             product_partial_charges,
         )
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
-        ffbuilder = EvbForceFieldBuilder()
+        ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
+        ffbuilder.water_model = self.water_model
         ffbuilder.reparameterize = reparameterize
         ffbuilder.optimize = optimize
 
         if isinstance(breaking_bonds, tuple):
             breaking_bonds = [breaking_bonds]
 
-        self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
-            rea_input,
-            pro_input,
-            ordered_input,
-            breaking_bonds,
+        self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
+            reactant_input=rea_input,
+            product_input=pro_input,
+            reactant_total_multiplicity=reactant_total_multiplicity,
+            product_total_multiplicity=product_total_multiplicity,
+            ordered_input=ordered_input,
+            breaking_bonds=breaking_bonds,
         )
 
     @staticmethod
@@ -249,12 +252,14 @@ class EvbDriver():
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] = [],
         save_output: bool = True,
+        force_recalculation: bool = False,
     ):
         if isinstance(reactant, list):
             combined_reactant_name = '_'.join(reactant)
         else:
             combined_reactant_name = reactant
-        self.name = combined_reactant_name
+        if self.name is None:
+            self.name = combined_reactant_name
         combined_rea_input = self._get_input_files(combined_reactant_name)
 
         if isinstance(product, list):
@@ -272,7 +277,7 @@ class EvbDriver():
         if (combined_rea_input['forcefield'] is not None
                 and combined_rea_input['molecule'] is not None
                 and combined_pro_input['forcefield'] is not None
-                and mapped_product_path.exists()):
+                and mapped_product_path.exists() and not force_recalculation):
             mapped_product_molecule = Molecule.read_xyz_file(
                 str(mapped_product_path))
             combined_pro_input['forcefield'].molecule = mapped_product_molecule
@@ -284,7 +289,6 @@ class EvbDriver():
             self.product = combined_pro_input["forcefield"]
             self.ostream.flush()
         else:
-
             rea_input = self._process_file_input(
                 reactant,
                 reactant_charge,
@@ -297,14 +301,23 @@ class EvbDriver():
                 product_multiplicity,
             )
 
-            ffbuilder = EvbForceFieldBuilder()
+            ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
+            ffbuilder.water_model = self.water_model
             ffbuilder.reparameterize = reparameterize
             ffbuilder.optimize = optimize
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
 
-            self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
+            if force_recalculation:
+                self.ostream.print_warning(
+                    f"Forcing recalculation of forcefields, even though they might all be present"
+                )
+                for rea in rea_input:
+                    rea['forcefield'] = None
+                for pro in pro_input:
+                    pro['forcefield'] = None
+            self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
                 ordered_input,
@@ -539,7 +552,6 @@ class EvbDriver():
         configurations: list[str] | list[dict],  # type: ignore
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
-        save_output=True,
     ):
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
@@ -555,18 +567,15 @@ class EvbDriver():
                             'openmm is required for EvbDriver.')
 
         if Lambda is None:
-            if not self.debug:
-                if self.fast_run:
-                    Lambda = np.linspace(0, 0.1, 6)
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
-                else:
-                    Lambda = np.linspace(0, 0.1, 11)
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
-                Lambda = np.round(Lambda, 3)
-            else:
+            if configurations[0] == "debug":
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+            else:
+                Lambda = np.linspace(0, 0.1, 11)
+                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
+                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
+                Lambda = np.round(Lambda, 3)
+                self.ostream.print_info(
+                    f"Using default lambda vector: {list(Lambda)}")
         assert (Lambda[0] == 0 and Lambda[-1]
                 == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(
@@ -593,20 +602,37 @@ class EvbDriver():
         #Per configuration
         for conf in self.configurations:
             #create folders,
-            if save_output:
+            data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
+            while Path(data_folder).exists():
+                self.t_label += 1
                 data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
-                conf["data_folder"] = data_folder
-                run_folder = str(Path(data_folder) / "run")
-                conf["run_folder"] = run_folder
-                cwd = Path().cwd()
-                data_folder_path = cwd / data_folder
-                run_folder_path = cwd / run_folder
 
-                data_folder_path.mkdir(parents=True, exist_ok=True)
-                run_folder_path.mkdir(parents=True, exist_ok=True)
+            run_folder = str(Path(data_folder) / "run")
+            conf["data_folder"] = data_folder
+            conf["run_folder"] = run_folder
 
+            cwd = Path().cwd()
+            data_folder_path = cwd / data_folder
+            run_folder_path = cwd / run_folder
+
+            data_folder_path.mkdir(parents=True)
+            run_folder_path.mkdir(parents=True)
+
+            #
+            self.reactant.molecule.write_xyz_file(
+                str(data_folder_path / "reactant_struct.xyz"))
+            self.product.molecule.write_xyz_file(
+                str(data_folder_path / "product_struct.xyz"))
+
+            if conf.get('solvent', None) is None and conf.get('pressure',
+                                                              -1) > 0:
+                self.ostream.print_warning(
+                    f"A pressure is defined for {conf['name']}, but no solvent is defined. Removing pressure definition."
+                )
+                conf.pop("pressure")
             # build the system
-            system_builder = EvbSystemBuilder()
+            system_builder = EvbSystemBuilder(ostream=self.ostream)
+            system_builder.water_model = self.water_model
             self.ostream.print_blank()
             self.ostream.print_header(f"Building systems for {conf['name']}")
             self.ostream.flush()
@@ -622,130 +648,38 @@ class EvbDriver():
             conf["topology"] = topology
             conf["initial_positions"] = initial_positions
 
-            if save_output:
-                self.ostream.print_info(f"Saving files to {data_folder_path}")
-                self.ostream.flush()
-                self.save_systems_as_xml(systems, conf["run_folder"])
+            self.ostream.print_info(f"Saving files to {data_folder_path}")
+            self.ostream.flush()
+            self.save_systems_as_xml(systems, conf["run_folder"])
 
-                top_path = cwd / data_folder / "topology.pdb"
+            top_path = cwd / data_folder / "topology.pdb"
 
-                mmapp.PDBFile.writeFile(
-                    topology,
-                    initial_positions *
-                    10,  # positions are handled in nanometers, but pdb's should be in angstroms
-                    open(top_path, "w"),
-                )
+            mmapp.PDBFile.writeFile(
+                topology,
+                initial_positions *
+                10,  # positions are handled in nanometers, but pdb's should be in angstroms
+                open(top_path, "w"),
+            )
 
-                dump_conf = copy.copy(conf)
-                dump_conf.pop('systems')
-                dump_conf.pop('topology')
-                dump_conf.pop('initial_positions')
-                self.update_options_json(dump_conf, conf)
-                self.update_options_json(
-                    {
-                        "Lambda":
-                        Lambda,
-                        "integration forcegroups":
-                        list(EvbForceGroup.integration_force_groups()),
-                        "pes forcegroups":
-                        list(EvbForceGroup.pes_force_groups()),
-                    },
-                    conf,
-                )
+            dump_conf = copy.copy(conf)
+            dump_conf.pop('systems')
+            dump_conf.pop('topology')
+            dump_conf.pop('initial_positions')
+            self.update_options_json(dump_conf, conf)
+            self.update_options_json(
+                {
+                    "Lambda":
+                    Lambda,
+                    "integration forcegroups":
+                    list(EvbForceGroup.integration_force_groups()),
+                    "pes forcegroups":
+                    list(EvbForceGroup.pes_force_groups()),
+                },
+                conf,
+            )
 
         self.system_confs = configurations
         self.ostream.flush()
-
-    def default_system_configurations(self, name: str) -> dict:
-        """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
-
-        Args:
-            name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
-        """
-        if name == "vacuum":
-            conf = {
-                "name": "vacuum",
-                "temperature": self.temperature,
-            }
-        elif name == "water":
-            conf = {
-                "name": "water",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-                "neutralize": False
-            }
-        # elif name == "CNT":
-        #     conf = {
-        #         "name": "water_CNT",
-        #         "solvent": "spce",
-        #         "temperature": self.temperature,
-        #         "NPT": True,
-        #         "pressure": 1,
-        #         "ion_count": 0,
-        #         "CNT": True,
-        #         "CNT_radius": 0.5,
-        #     }
-        # elif name == "graphene":
-        #     conf = {
-        #         "name": "water_graphene",
-        #         "solvent": "spce",
-        #         "temperature": self.temperature,
-        #         "NPT": True,
-        #         "pressure": 1,
-        #         "ion_count": 0,
-        #         "graphene": True,
-        #         "graphene_size": 2,
-        #     }
-        elif name == "E_field":
-            conf = {
-                "name": "water_E_field",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-                "E_field": [0, 0, 10],
-            }
-        elif name == "no_reactant":
-            conf = {
-                "name": "no_reactant",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-                "no_reactant": True,
-            }
-        elif name == "ts_guesser":
-            conf = {
-                "name": "vacuum",
-                "temperature": self.temperature,
-                "bonded_integration": True,
-                "soft_core_coulomb_pes": True,
-                "soft_core_lj_pes": True,
-                "soft_core_coulomb_int": False,
-                "soft_core_lj_int": False,
-            }
-        elif SolvationBuilder()._solvent_properties(name) is not None:
-            conf = {
-                "name": name,
-                "solvent": name,
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "padding": 1.5,
-                "ion_count": 0,
-            }
-        else:
-            raise ValueError(f"Unknown system configuration {name}")
-
-        return conf
 
     def load_initialisation(self,
                             data_folder: str,
@@ -844,15 +778,6 @@ class EvbDriver():
 
     def run_FEP(
         self,
-        equil_NVT_steps=5000,
-        equil_NPT_steps=5000,
-        sample_steps=100000,
-        write_step=1000,
-        initial_equil_NVT_steps=10000,
-        initial_equil_NPT_steps=10000,
-        step_size=0.001,
-        equil_step_size=0.001,
-        initial_equil_step_size=0.001,
         saved_frames_on_crash=None,
         platform=None,
     ):
@@ -867,57 +792,15 @@ class EvbDriver():
             equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
             initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
-        if self.debug:
-            self.ostream.print_warning(
-                "Debugging enabled, using low number of steps. Do not use for production"
-            )
-            self.ostream.flush()
-            equil_NVT_steps = 0
-            equil_NPT_steps = 100
-            sample_steps = 200
-            write_step = 1
-            initial_equil_NVT_steps = 0
-            initial_equil_NPT_steps = 100
-            step_size = 0.001
-            equil_step_size = 0.001
-            initial_equil_step_size = 0.001
-
-        if self.fast_run:
-            self.ostream.print_warning(
-                "Fast run enabled, using modest number of steps. Be careful with using results"
-            )
-            sample_steps = 25000
 
         for conf in self.system_confs:
-            self.update_options_json(
-                {
-                    "equil_steps_NVT": equil_NVT_steps,
-                    "equil_steps_NPT": equil_NPT_steps,
-                    "sample_steps": sample_steps,
-                    "write_step": write_step,
-                    "initial_equil_NVT_steps": initial_equil_NVT_steps,
-                    "initial_equil_NPT_steps": initial_equil_NPT_steps,
-                    "step_size": step_size,
-                    "equil_step_size": equil_step_size,
-                    "initial_equil_step_size": initial_equil_step_size,
-                }, conf)
-
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
-            FEP = EvbFepDriver()
-            FEP.debug = self.debug
+            FEP = EvbFepDriver(ostream=self.ostream)
             if saved_frames_on_crash is not None:
                 FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
-                equil_NVT_steps=equil_NVT_steps,
-                equil_NPT_steps=equil_NPT_steps,
-                total_sample_steps=sample_steps,
-                write_step=write_step,
-                initial_equil_NVT_steps=initial_equil_NVT_steps,
-                initial_equil_NPT_steps=initial_equil_NPT_steps,
-                step_size=step_size,
-                equil_step_size=equil_step_size,
                 Lambda=self.Lambda,
                 configuration=conf,
                 platform=platform,
@@ -959,7 +842,7 @@ class EvbDriver():
             lambda_sub_sample_ends (bool, optional): If set to False, the lambda frames up to 0.1 and from 0.9 will not be subsampled. Defaults to False.
             time_sub_sample (int, optional): Factor with which the time vector will be subsampled. Setting this to two will discard every other snapshot. Defaults to 1.
         """
-        dp = EvbDataProcessing()
+        dp = EvbDataProcessing(ostream=self.ostream)
         results = self._load_output_from_folders(lambda_sub_sample,
                                                  lambda_sub_sample_ends,
                                                  time_sub_sample)
@@ -1002,7 +885,8 @@ class EvbDriver():
 
     def plot_results(self,
                      results: dict = None,
-                     file_name: str = None, **kwargs):
+                     file_name: str = None,
+                     **kwargs):
         """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
 
         Args:
@@ -1021,9 +905,12 @@ class EvbDriver():
         dp.plot_results(self.results, **kwargs)
         self.ostream.flush()
 
-    def _load_output_from_folders(self, lambda_sub_sample,
-                                  lambda_sub_sample_ends,
-                                  time_sub_sample) -> dict:
+    def _load_output_from_folders(
+        self,
+        lambda_sub_sample,
+        lambda_sub_sample_ends,
+        time_sub_sample,
+    ) -> dict:
         reference_folder = self.system_confs[0]["data_folder"]
         target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
 
@@ -1040,11 +927,20 @@ class EvbDriver():
             E_file = str(cwd / folder / "Energies.csv")
             data_file = str(cwd / folder / "Data_combined.csv")
             options_file = str(cwd / folder / "options.json")
-            specific, common = self._load_output_files(E_file, data_file,
-                                                       options_file,
-                                                       lambda_sub_sample,
-                                                       lambda_sub_sample_ends,
-                                                       time_sub_sample)
+            fg_file = str(cwd / folder / "ForceGroups.csv")
+            rea_fg_file = str(cwd / folder / "ForceGroups_rea.csv")
+            pro_fg_file = str(cwd / folder / "ForceGroups_pro.csv")
+            specific, common = self._load_output_files(
+                E_file,
+                data_file,
+                options_file,
+                fg_file,
+                rea_fg_file,
+                pro_fg_file,
+                lambda_sub_sample,
+                lambda_sub_sample_ends,
+                time_sub_sample,
+            )
             specific_results.update({name: specific})
             common_results.append(common)
 
@@ -1064,13 +960,18 @@ class EvbDriver():
             results.update({key: val})
         return results
 
-    def _load_output_files(self,
-                           E_file,
-                           data_file,
-                           options_file,
-                           lambda_sub_sample=1,
-                           lambda_sub_sample_ends=False,
-                           time_sub_sample=1):
+    def _load_output_files(
+        self,
+        E_file,
+        data_file,
+        options_file,
+        fg_file=None,
+        fg_rea_file=None,
+        fg_pro_file=None,
+        lambda_sub_sample=1,
+        lambda_sub_sample_ends=False,
+        time_sub_sample=1,
+    ):
         with open(options_file, "r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
@@ -1131,10 +1032,15 @@ class EvbDriver():
             "Temp_set": Temp_set,
         }
 
-        if len(E_data) > 7:
-            E_m_pes = E_data[6, sub_indices]
-            E_m_int = E_data[7, sub_indices]
-            specific_result.update({"E_m_pes": E_m_pes, "E_m_int": E_m_int})
+        if fg_file is not None and Path(fg_file).is_file():
+            fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
+            specific_result.update({"E_m_fg": fg_data})
+        if fg_rea_file is not None and Path(fg_rea_file).is_file():
+            rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
+            specific_result.update({"E1_fg": rea_fg_data})
+        if fg_pro_file is not None and Path(fg_pro_file).is_file():
+            pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
+            specific_result.update({"E2_fg": pro_fg_data})
 
         lambda_indices = [
             np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame
@@ -1196,3 +1102,95 @@ class EvbDriver():
                         group[k] = v
 
             save_group(data, file)
+
+    def default_system_configurations(self, name: str) -> dict:
+        """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
+
+        Args:
+            name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
+        """
+        if name == "vacuum" or name == "vacuum_NVT":
+            conf = {
+                "name": name,
+                "temperature": self.temperature,
+            }
+        elif name == "vacuum_NVE":
+            conf = {
+                "name": "vacuum_NVE",
+            }
+        elif name == "debug":
+            conf = {
+                "name": "debug",
+                "temperature": self.temperature,
+                "pressure": 1,
+                "equil_NVT_steps": 100,
+                "equil_NPT_steps": 100,
+                "sample_steps": 1000,
+                "write_step": 1,
+                "initial_equil_NVT_steps": 0,
+                "initial_equil_NPT_steps": 0,
+            }
+        elif name == "water" or name == "water_NPT":
+            conf = {
+                "name": f"water_{self.water_model}_NPT",
+                "solvent": self.water_model,
+                "temperature": self.temperature,
+                "pressure": 1,
+                "padding": 1.5,
+                "ion_count": 0,
+                "neutralize": False
+            }
+        elif name == "water_NVT":
+            conf = {
+                "name": f"water_{self.water_model}_NVT",
+                "solvent": self.water_model,
+                "temperature": self.temperature,
+                "padding": 1.5,
+                "ion_count": 0,
+                "neutralize": False
+            }
+        elif name == "E_field":
+            conf = {
+                "name": f"water_E_field_{self.water_model}",
+                "solvent": self.water_model,
+                "temperature": self.temperature,
+                "pressure": 1,
+                "padding": 1.5,
+                "ion_count": 0,
+                "E_field": [0, 0, 10],
+            }
+        elif name == "no_reactant":
+            conf = {
+                "name": "no_reactant",
+                "solvent": self.water_model,
+                "temperature": self.temperature,
+                "pressure": 1,
+                "padding": 1.5,
+                "ion_count": 0,
+                "no_reactant": True,
+            }
+        elif name == "ts_guesser":
+            conf = {
+                "name": "vacuum",
+                "temperature": self.temperature,
+                "bonded_integration": True,
+                "soft_core_coulomb_pes": True,
+                "soft_core_lj_pes": True,
+                "soft_core_coulomb_int": False,
+                "soft_core_lj_int": False,
+            }
+        else:
+            try:
+                solvent = SolvationBuilder()._solvent_properties(name)
+                conf = {
+                    "name": name,
+                    "solvent": name,
+                    "temperature": self.temperature,
+                    "pressure": 1,
+                    "padding": 1.5,
+                    "ion_count": 0,
+                }
+            except:
+                raise ValueError(f"Unknown system configuration {name}")
+
+        return conf
