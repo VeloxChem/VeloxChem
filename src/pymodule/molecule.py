@@ -1496,6 +1496,22 @@ def _Molecule_get_all_conformer_data(mol_name):
         all_conformer_info.update({key: _Molecule_get_conformer_data(key)})
     return all_conformer_info
 
+def _Molecule_builder():
+    """Displays the PubChem molecule builder 
+    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
+    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+    """
+    
+    try:
+        from IPython.display import Image, display
+        from IPython.core.display import HTML
+        from IPython.display import IFrame
+        
+        display(IFrame('https://pubchem.ncbi.nlm.nih.gov//edit3/index.html', width='100%', height=500))
+    
+    except ImportError:
+        raise ImportError('Unable to import IPython.')
+
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
@@ -1545,6 +1561,7 @@ Molecule.Molecule_index_to_element = _Molecule_index_to_element
 Molecule.get_all_conformer_IDs = _Molecule_get_all_conformer_IDs
 Molecule.get_conformer_data = _Molecule_get_conformer_data
 Molecule.get_all_conformer_data = _Molecule_get_all_conformer_data
+Molecule.builder = _Molecule_builder
 
 # aliases for backward compatibility
 Molecule.read_xyz = _Molecule_read_xyz_file
