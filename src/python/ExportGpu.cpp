@@ -44,6 +44,7 @@
 #include "FockDriverGPU.hpp"
 #include "FockGradientDriverGPU.hpp"
 #include "GpuDevices.hpp"
+#include "LinearAlgebraGPU.hpp"
 #include "ScreeningData.hpp"
 #include "GradientScreeningData.hpp"
 #include "XCIntegratorGPU.hpp"

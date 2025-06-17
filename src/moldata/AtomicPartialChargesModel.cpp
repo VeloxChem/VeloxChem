@@ -27,7 +27,7 @@
 
 #include "Codata.hpp"
 #include "DenseMatrix.hpp"
-#include "FockDriverGPU.hpp"
+#include "LinearAlgebraGPU.hpp"
 #include "MathConst.hpp"
 #include "Molecule.hpp"
 

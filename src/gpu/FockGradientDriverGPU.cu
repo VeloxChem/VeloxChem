@@ -50,7 +50,6 @@
 #include "ScreeningData.hpp"
 #include "GradientScreeningData.hpp"
 #include "BoysFuncTable.hpp"
-#include "FockDriverGPU.hpp"
 #include "FockGradientDriverGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
