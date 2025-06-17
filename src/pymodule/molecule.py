@@ -1232,10 +1232,11 @@ def _Molecule_partition_atoms(self, comm):
 
     return list(list_atoms[rank::nnodes])
 
+
 def _Molecule_read_name(mol_name):
     """
-    Reads molecule from its name as a string.
-    Data from PubChem. 
+    Reads molecule from its name as a string
+    using PubChem data. 
     Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
     Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
 
@@ -1249,16 +1250,12 @@ def _Molecule_read_name(mol_name):
     smiles_str = Molecule.name_to_smiles(mol_name)
     mol = Molecule.read_smiles(smiles_str)
 
-    mol_chg = Molecule.smiles_formal_charge(smiles_str)
-    mol.set_charge(mol_chg)
-
     return mol
 
 
 def _Molecule_name_to_smiles(mol_name):
-    """Returns SMILES-string for a given molecule name
-    DISCLAIMER: Names may often refer to more than one record,
-    do double check to see if it is the correct compound
+    """Returns SMILES-string for a 
+    given molecule name using PubChem data.
 
     :param mol_name:
         The molecule name string.
@@ -1267,71 +1264,15 @@ def _Molecule_name_to_smiles(mol_name):
         The SMILES-string of the molecule
     """
 
-    # Not been limit tested yet, some inputs may break the program.
-
-    smiles_str, title, cid = _Molecule_get_data_from_name(mol_name)
+    from .pubchemfetcher import get_data_from_name
+    smiles_str, title, cid = get_data_from_name(mol_name)
 
     return smiles_str
 
 
-def _Molecule_get_data_from_name(mol_name):
-    """Accesses the PubChem database to retrieve data for a given molecule name
-    DISCLAIMER: Names may often refer to more than one record, 
-    do double check to see if it is the correct compound
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
-
-
-    Note: This is seperate to the previous function because other data could also be retrieved. 
-    Some examples are charge, volume and 3D properties.
-    At the time of implementation, which such properties are relevant are unknown,
-    but they are easily accessed by changing the url.
-    A good idea would then be to make the output a dictionary instead.
-
-    :param mol_name:
-        Molecule name string.
-
-    :return:
-        Accessed data
-        Current data includes:
-        SMILES-string.
-        Title-string.
-        CID-string.
-    """
-
-    mol_name = mol_name.strip()
-    mol_name = mol_name.replace(' ', '%20')
-
-    try:
-        from urllib.request import urlopen
-        from json import loads
-
-        url = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{compoundname}/property/title,SMILES/JSON'.format(
-            compoundname=mol_name.lower())
-
-        try:
-            page = urlopen(url)
-        except Exception:
-            raise Exception(
-                'The compound does not seem to exist. Check for any misspellings.'
-            )
-
-        data = page.read()
-        dic = loads(data)
-        smiles_str = dic['PropertyTable']['Properties'][0]['SMILES']
-        title = dic['PropertyTable']['Properties'][0]['Title']
-        cid = dic['PropertyTable']['Properties'][0]['CID']
-        return smiles_str, title, cid
-
-    except ImportError:
-        raise ImportError('Unable to import urllib.request and/or json.')
-
-
 def _Molecule_name_to_xyz(mol_name):
-    """Returns xyz-string for the first conformer of a given molecule name
-    DISCLAIMER: Names may often refer to more than one record, 
-    doubecheck to see if it is the correct compound
-    Data from PubChem. 
+    """Returns xyz-string for the first conformer
+    of a given molecule name using Pubchem data. 
     Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
     Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
 
@@ -1342,143 +1283,17 @@ def _Molecule_name_to_xyz(mol_name):
         xyz-string of molecule
     """
 
-    # Not been limit tested yet, some inputs may break the program.
+    from .pubchemfetcher import get_all_conformer_IDs, get_conformer_data
 
-    conformerID_list = _Molecule_get_all_conformer_IDs(mol_name)
+    conformerID_list = get_all_conformer_IDs(mol_name)
     conformer_ID = conformerID_list[0]
-
-    xyz = _Molecule_get_conformer_data(conformer_ID)
+    xyz = get_conformer_data(conformer_ID)
 
     return xyz
 
 
-def _Molecule_get_all_conformer_IDs(mol_name):
-    """ Gets all conformer IDs for the PubChem database for a compound
-    DISCLAIMER: Names may often refer to more than one record, 
-    do double check to see if it is the correct compound
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
-
-    :param mol_name:
-        The molecule name string.
-
-    :return conformerID_list:
-        List of conformer IDs
-    """
-
-    # spaces not allowed in url
-    mol_name = mol_name.strip()
-    mol_name = mol_name.replace(' ', '%20')
-
-    try:
-        from urllib.request import urlopen
-        from json import loads
-        url_conID = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{compoundname}/conformers/JSON'.format(
-            compoundname=mol_name.lower())
-
-        try:
-            page = urlopen(url_conID)
-        except Exception:
-            raise Exception(
-                'The compound does not seem to exist or does not have conformer data in the database. Check for any misspellings.'
-            )
-
-        data = page.read()
-        dic = loads(data)
-        conformerID_list = dic['InformationList']['Information'][0][
-            'ConformerID']
-
-        return conformerID_list
-
-    except ImportError:
-        raise ImportError('Unable to import urllib.request and/or json.')
-
-
-def _Molecule_get_conformer_data(conformer_ID):
-    """ Gets conformer coordinates from PubChem based on conformer ID.
-    DISCLAIMER: Names may often refer to more than one record,
-    do double check to see if it is the correct compound
-
-    :param conformer_ID:
-        Conformer ID for molecules compound
-
-    :return xyz:
-        The xyz-string of the molecule
-    """
-
-    # spaces not allowed in url
-    conformer_ID = conformer_ID.strip()
-    conformer_ID = conformer_ID.replace(' ', '%20')
-
-    try:
-        from urllib.request import urlopen
-        from json import loads
-
-        url = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/conformers/{conformerID}/JSON'.format(
-            conformerID=conformer_ID)
-
-        try:
-            page = urlopen(url)
-        except Exception:
-            raise Exception(
-                'The conformer ID does not seem to exist. Check for any misspellings.'
-            )
-
-        data = page.read()
-        dic = loads(data)
-
-        elements = dic['PC_Compounds'][0]['atoms']['element']
-        xcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['x']
-        ycoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['y']
-        zcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['z']
-
-        elements = _Molecule_index_to_element(elements)
-
-        xyz = '{numberofatoms}\n'.format(numberofatoms=len(elements))
-        for j in range(len(elements)):
-            newline = '\n{el}   {x}    {y}     {z}'.format(el=elements[j],
-                                                           x=xcoords[j],
-                                                           y=ycoords[j],
-                                                           z=zcoords[j])
-            xyz = xyz + newline
-        return xyz
-
-    except ImportError:
-        raise ImportError('Unable to import urllib.request and/or json.')
-
-
-def _Molecule_index_to_element(indices):
-    """Sends the numerical position of an element on the periodic table to their abbreviations
-
-    :param indicies
-        The numerical positions of a list of elements on the periodic table
-
-    :return elements:
-        The corresponding list of element abbreviations
-
-    """
-
-    periodic_table = [
-        "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al",
-        "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn",
-        "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb",
-        "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In",
-        "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm",
-        "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta",
-        "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At",
-        "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk",
-        "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt",
-        "Ds", "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"
-    ]
-
-    elements = []
-    for i in indices:
-        elements.append(periodic_table[i - 1])
-    return elements
-
-
 def _Molecule_get_all_conformer_data(mol_name):
-    """ Gets coordinates for all the conformers of a given compound
+    """Gets coordinates for all the conformers of a given compound
     Data from PubChem. 
     Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
     Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
@@ -1490,27 +1305,34 @@ def _Molecule_get_all_conformer_data(mol_name):
         The coordinates for all of the conformers of the molecule.
     """
 
-    conformerID_list = _Molecule_get_all_conformer_IDs(mol_name)
+    from .pubchemfetcher import get_all_conformer_IDs, get_conformer_data
+
+    conformerID_list = get_all_conformer_IDs(mol_name)
     all_conformer_info = {}
     for key in conformerID_list:
-        all_conformer_info.update({key: _Molecule_get_conformer_data(key)})
+        all_conformer_info.update({key: get_conformer_data(key)})
     return all_conformer_info
+
 
 def _Molecule_builder():
     """Displays the PubChem molecule builder 
     Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
     Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
     """
-    
+
     try:
         from IPython.display import Image, display
         from IPython.core.display import HTML
         from IPython.display import IFrame
-        
-        display(IFrame('https://pubchem.ncbi.nlm.nih.gov//edit3/index.html', width='100%', height=500))
-    
+
+        display(
+            IFrame('https://pubchem.ncbi.nlm.nih.gov//edit3/index.html',
+                   width=900,
+                   height=450))
+
     except ImportError:
         raise ImportError('Unable to import IPython.')
+
 
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 Molecule._find_connected_atoms = _Molecule_find_connected_atoms
@@ -1552,14 +1374,9 @@ Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
 Molecule.partition_atoms = _Molecule_partition_atoms
 
-
 Molecule.read_name = _Molecule_read_name
 Molecule.name_to_smiles = _Molecule_name_to_smiles
-Molecule.get_data_from_name = _Molecule_get_data_from_name
 Molecule.name_to_xyz = _Molecule_name_to_xyz
-Molecule.Molecule_index_to_element = _Molecule_index_to_element
-Molecule.get_all_conformer_IDs = _Molecule_get_all_conformer_IDs
-Molecule.get_conformer_data = _Molecule_get_conformer_data
 Molecule.get_all_conformer_data = _Molecule_get_all_conformer_data
 Molecule.builder = _Molecule_builder
 
