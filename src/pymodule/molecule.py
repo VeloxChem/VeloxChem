@@ -1235,6 +1235,9 @@ def _Molecule_partition_atoms(self, comm):
 def _Molecule_read_name(mol_name):
     """
     Reads molecule from its name as a string.
+    Data from PubChem. 
+    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
+    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
 
     :param mol_name:
         The molecule name string.
@@ -1275,6 +1278,10 @@ def _Molecule_get_data_from_name(mol_name):
     """Accesses the PubChem database to retrieve data for a given molecule name
     DISCLAIMER: Names may often refer to more than one record, 
     do double check to see if it is the correct compound
+    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
+    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+
+
     Note: This is seperate to the previous function because other data could also be retrieved. 
     Some examples are charge, volume and 3D properties.
     At the time of implementation, which such properties are relevant are unknown,
@@ -1324,6 +1331,9 @@ def _Molecule_name_to_xyz(mol_name):
     """Returns xyz-string for the first conformer of a given molecule name
     DISCLAIMER: Names may often refer to more than one record, 
     doubecheck to see if it is the correct compound
+    Data from PubChem. 
+    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
+    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
 
     :param mol_name:
         The molecule name string.
@@ -1331,8 +1341,6 @@ def _Molecule_name_to_xyz(mol_name):
     :return xyz:
         xyz-string of molecule
     """
-
-    # PubChem URL convention: https://pubchem.ncbi.nlm.nih.gov/rest/pug/<input specification>/<operation specification>/[<output specification>][?<operation_options>]
 
     # Not been limit tested yet, some inputs may break the program.
 
@@ -1348,6 +1356,8 @@ def _Molecule_get_all_conformer_IDs(mol_name):
     """ Gets all conformer IDs for the PubChem database for a compound
     DISCLAIMER: Names may often refer to more than one record, 
     do double check to see if it is the correct compound
+    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
+    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
 
     :param mol_name:
         The molecule name string.
@@ -1469,6 +1479,9 @@ def _Molecule_index_to_element(indices):
 
 def _Molecule_get_all_conformer_data(mol_name):
     """ Gets coordinates for all the conformers of a given compound
+    Data from PubChem. 
+    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
+    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
 
     :param mol_name:
         The molecule name string.
