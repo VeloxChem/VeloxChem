@@ -42,7 +42,7 @@ def get_data_from_name(mol_name):
 
     Note: This is seperate to the previous function because other data could also be retrieved. 
     Some examples are charge, volume and 3D properties.
-    At the time of implementation, which such properties are relevant are unknown,
+    At the time of implementation, relevant properties are unknown,
     but they are easily accessed by changing the url.
     A good idea would then be to make the output a dictionary instead.
 
@@ -70,6 +70,8 @@ def get_data_from_name(mol_name):
         raise ValueError("Compound name is too long.")
     mol_name = mol_name.strip()
     mol_name = mol_name.replace(' ', '%20')
+    mol_name = mol_name.replace(',', '_')
+
 
     try:
         from urllib.request import urlopen
@@ -83,25 +85,25 @@ def get_data_from_name(mol_name):
         try:
             with urlopen(url) as page:
                 data = page.read()
+                dic = loads(data)
+                smiles_str = dic['PropertyTable']['Properties'][0]['SMILES']
+                title = dic['PropertyTable']['Properties'][0]['Title']
+                cid = dic['PropertyTable']['Properties'][0]['CID']
+
+                print(
+                    "Reading molecule name accesses data from PubChem. " \
+                    "DISCLAIMER: Names may often refer to more than one record, " \
+                    "do double check the compound. " \
+                    "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
+                    "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
+                    )
+
+                return smiles_str, title, cid
+
         except HTTPError as e:
-            print(f"HTTP Error: {e.code}")
+            print(f"HTTP Error: {e.code}. The compound may not exist.")
         except URLError as e:
             print(f"URL Error: {e.reason}")
-
-        dic = loads(data)
-        smiles_str = dic['PropertyTable']['Properties'][0]['SMILES']
-        title = dic['PropertyTable']['Properties'][0]['Title']
-        cid = dic['PropertyTable']['Properties'][0]['CID']
-
-        print(
-            "Reading molecule name accesses data from PubChem. " \
-            "DISCLAIMER: Names may often refer to more than one record, " \
-            "do double check the compound. " \
-            "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
-            "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
-            )
-
-        return smiles_str, title, cid
 
     except ImportError:
         raise ImportError('Unable to import urllib.request and/or json.')
@@ -133,6 +135,7 @@ def get_all_conformer_IDs(mol_name):
         raise ValueError("Compound name is too long.")
     mol_name = mol_name.strip()
     mol_name = mol_name.replace(' ', '%20')
+    mol_name = mol_name.replace(',', '_')
 
     try:
         from urllib.request import urlopen
@@ -145,22 +148,23 @@ def get_all_conformer_IDs(mol_name):
         try:
             with urlopen(url_conID) as page:
                 data = page.read()
+                dic = loads(data)
+                conformerID_list = dic['InformationList']['Information'][0][
+                    'ConformerID']
+
+                print(
+                    "Reading molecule name accesses data from PubChem. " \
+                    "DISCLAIMER: Names may often refer to more than one record, " \
+                    "do double check the compound. " \
+                    "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
+                    "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
+                    )
+
+                return conformerID_list
         except HTTPError as e:
             print(f"HTTP Error: {e.code}")
         except URLError as e:
             print(f"URL Error: {e.reason}")
-
-        dic = loads(data)
-        conformerID_list = dic['InformationList']['Information'][0][
-            'ConformerID']
-        print(
-            "Reading molecule name accesses data from PubChem. " \
-            "DISCLAIMER: Names may often refer to more than one record, " \
-            "do double check the compound. " \
-            "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
-            "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
-            )
-        return conformerID_list
 
     except ImportError:
         raise ImportError('Unable to import urllib.request and/or json.')
@@ -189,6 +193,7 @@ def get_conformer_data(conformer_ID):
         raise ValueError("Compound name is too long.")
     conformer_ID = conformer_ID.strip()
     conformer_ID = conformer_ID.replace(' ', '%20')
+    mol_name = mol_name.replace(',', '_')
 
     try:
         from urllib.request import urlopen
@@ -202,29 +207,31 @@ def get_conformer_data(conformer_ID):
         try:
             with urlopen(url) as page:
                 data = page.read()
+                dic = loads(data)
+                elements = dic['PC_Compounds'][0]['atoms']['element']
+                xcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0][
+                    'x']
+                ycoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0][
+                    'y']
+                zcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0][
+                    'z']
+
+                elements = index_to_element(elements)
+
+                xyz = '{numberofatoms}\n'.format(numberofatoms=len(elements))
+                for j in range(len(elements)):
+                    newline = '\n{el}   {x}    {y}     {z}'.format(
+                        el=elements[j],
+                        x=xcoords[j],
+                        y=ycoords[j],
+                        z=zcoords[j])
+                    xyz = xyz + newline
+
+                return xyz
         except HTTPError as e:
             print(f"HTTP Error: {e.code}")
         except URLError as e:
             print(f"URL Error: {e.reason}")
-
-        dic = loads(data)
-
-        elements = dic['PC_Compounds'][0]['atoms']['element']
-        xcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['x']
-        ycoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['y']
-        zcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['z']
-
-        elements = index_to_element(elements)
-
-        xyz = '{numberofatoms}\n'.format(numberofatoms=len(elements))
-        for j in range(len(elements)):
-            newline = '\n{el}   {x}    {y}     {z}'.format(el=elements[j],
-                                                           x=xcoords[j],
-                                                           y=ycoords[j],
-                                                           z=zcoords[j])
-            xyz = xyz + newline
-
-        return xyz
 
     except ImportError:
         raise ImportError('Unable to import urllib.request and/or json.')
