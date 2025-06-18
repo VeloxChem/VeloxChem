@@ -31,21 +31,18 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from time import sleep
-import re
 from urllib.request import urlopen
 from urllib.error import HTTPError, URLError
-from json import loads
+import json
+import re
 
 
 def get_data_from_name(mol_name):
-    """Accesses the PubChem database to retrieve data for a given molecule name
-    
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+    """
+    Accesses the PubChem database to retrieve data for a given molecule name.
 
-
-    Note: This is seperate to the previous function because other data could also be retrieved. 
-    Some examples are charge, volume and 3D properties.
+    Note: This is seperate to the previous function because other data could
+    also be retrieved. Some examples are charge, volume and 3D properties.
     At the time of implementation, relevant properties are unknown,
     but they are easily accessed by changing the url.
     A good idea would then be to make the output a dictionary instead.
@@ -75,38 +72,33 @@ def get_data_from_name(mol_name):
     url = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{compoundname}/property/title,SMILES/JSON'.format(
         compoundname=mol_name.lower())
 
-    sleep(0.2)
     try:
         with urlopen(url) as page:
-            data = page.read()
-            dic = loads(data)
-            smiles_str = dic['PropertyTable']['Properties'][0]['SMILES']
-            title = dic['PropertyTable']['Properties'][0]['Title']
-            cid = dic['PropertyTable']['Properties'][0]['CID']
+            data = json.loads(page.read())
+            smiles_str = data['PropertyTable']['Properties'][0]['SMILES']
+            title = data['PropertyTable']['Properties'][0]['Title']
+            cid = data['PropertyTable']['Properties'][0]['CID']
 
-            print(
-                "Reading molecule name accesses data from PubChem. " \
-                "DISCLAIMER: Names may often refer to more than one record, " \
-                "do double-check the compound. " \
-                "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
-                "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
-                )
+            # avoid frequent request
+            sleep(0.2)
+
+            print("Reading molecule name accesses data from PubChem.\n")
+            print("Please double-check the compound since names may" +
+                  " often refer to more than one record.\n")
+            print("Reference: " + get_pubchem_reference() + "\n")
 
             return smiles_str, title, cid
 
     except HTTPError as e:
-        print(
-            f"HTTP Error: {e.code}. The compound may not exist, check spelling."
-        )
+        print(f"HTTP Error: {e.code}. The compound may not exist.")
+
     except URLError as e:
         print(f"URL Error: {e.reason}.")
 
 
 def get_all_conformer_IDs(mol_name):
-    """ Gets all conformer IDs for the PubChem database for a compound
-
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+    """
+    Gets all conformer IDs for the PubChem database for a compound
 
     :param mol_name:
         The molecule name string.
@@ -129,33 +121,32 @@ def get_all_conformer_IDs(mol_name):
     url_conID = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{compoundname}/conformers/JSON'.format(
         compoundname=mol_name.lower())
 
-    sleep(0.2)
     try:
         with urlopen(url_conID) as page:
-            data = page.read()
-            dic = loads(data)
-            conformerID_list = dic['InformationList']['Information'][0][
+            data = json.loads(page.read())
+            conformerID_list = data['InformationList']['Information'][0][
                 'ConformerID']
 
-            print(
-                "Reading molecule name accesses data from PubChem. " \
-                "DISCLAIMER: Names may often refer to more than one record, " \
-                "do double-check the compound. " \
-                "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
-                "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
-                )
+            # avoid frequent request
+            sleep(0.2)
+
+            print("Reading molecule name accesses data from PubChem.\n")
+            print("Please double-check the compound since names may" +
+                  " often refer to more than one record.\n")
+            print("Reference: " + get_pubchem_reference() + "\n")
 
             return conformerID_list
+
     except HTTPError as e:
-        print(
-            f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist, check input."
-        )
+        print(f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist.")
+
     except URLError as e:
         print(f"URL Error: {e.reason}")
 
 
 def get_conformer_data(conformer_ID):
-    """ Gets conformer coordinates from PubChem based on conformer ID.
+    """
+    Gets conformer coordinates from PubChem based on conformer ID.
 
     :param conformer_ID:
         Conformer ID for molecules compound
@@ -167,11 +158,11 @@ def get_conformer_data(conformer_ID):
     # sanity checks
 
     if not re.match(r'^[a-zA-Z0-9 \-(),\.]+$', conformer_ID):
-        raise ValueError("Compound name contains invalid characters.")
+        raise ValueError("Conformer ID contains invalid characters.")
     if not conformer_ID:
-        raise ValueError("Compound name cannot be empty.")
+        raise ValueError("Conformer ID cannot be empty.")
     if len(conformer_ID) > 100:
-        raise ValueError("Compound name is too long.")
+        raise ValueError("Conformer ID is too long.")
     conformer_ID = conformer_ID.strip()
     conformer_ID = conformer_ID.replace(' ', '%20')
     conformer_ID = conformer_ID.replace(',', '_')
@@ -179,15 +170,13 @@ def get_conformer_data(conformer_ID):
     url = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/conformers/{conformerID}/JSON'.format(
         conformerID=conformer_ID)
 
-    sleep(0.2)
     try:
         with urlopen(url) as page:
-            data = page.read()
-            dic = loads(data)
-            elements = dic['PC_Compounds'][0]['atoms']['element']
-            xcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['x']
-            ycoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['y']
-            zcoords = dic['PC_Compounds'][0]['coords'][0]['conformers'][0]['z']
+            data = json.loads(page.read())
+            elements = data['PC_Compounds'][0]['atoms']['element']
+            xcoords = data['PC_Compounds'][0]['coords'][0]['conformers'][0]['x']
+            ycoords = data['PC_Compounds'][0]['coords'][0]['conformers'][0]['y']
+            zcoords = data['PC_Compounds'][0]['coords'][0]['conformers'][0]['z']
 
             elements = index_to_element(elements)
 
@@ -199,9 +188,17 @@ def get_conformer_data(conformer_ID):
                                                                z=zcoords[j])
                 xyz = xyz + newline
 
+            # avoid frequent request
+            sleep(0.2)
+
+            print("Reading conformer ID accesses data from PubChem.\n")
+            print("Reference: " + get_pubchem_reference() + "\n")
+
             return xyz
+
     except HTTPError as e:
-        print(f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist, check input.")
+        print(f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist.")
+
     except URLError as e:
         print(f"URL Error: {e.reason}")
 
@@ -234,3 +231,19 @@ def index_to_element(indices):
     for i in indices:
         elements.append(periodic_table[i - 1])
     return elements
+
+
+def get_pubchem_reference(self):
+    """
+    Gets PubChem reference.
+
+    :return:
+        The reference.
+    """
+
+    pubchem_ref = 'S. Kim, J. Chen, T. Cheng, A. Gindulyte, J. He, S. He,'
+    pubchem_ref += ' Q. Li, B. A. Shoemaker, P. A. Thiessen, B. Yu,'
+    pubchem_ref += ' L. Zaslavsky, J. Zhang, E. E. Bolton,'
+    pubchem_ref += ' Nucleic Acids Res., 2025, 53, D1516-D1525.'
+
+    return pubchem_ref

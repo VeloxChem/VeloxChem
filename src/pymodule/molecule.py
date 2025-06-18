@@ -39,6 +39,8 @@ from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
+from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
+                             get_conformer_data, get_pubchem_reference)
 
 
 @staticmethod
@@ -1235,10 +1237,7 @@ def _Molecule_partition_atoms(self, comm):
 
 def _Molecule_read_name(mol_name):
     """
-    Reads molecule from its name as a string
-    using PubChem data. 
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+    Reads molecule from its name as a string using PubChem data.
 
     :param mol_name:
         The molecule name string.
@@ -1254,8 +1253,8 @@ def _Molecule_read_name(mol_name):
 
 
 def _Molecule_name_to_smiles(mol_name):
-    """Returns SMILES-string for a 
-    given molecule name using PubChem data.
+    """
+    Returns SMILES-string for a given molecule name using PubChem data.
 
     :param mol_name:
         The molecule name string.
@@ -1264,17 +1263,15 @@ def _Molecule_name_to_smiles(mol_name):
         The SMILES-string of the molecule
     """
 
-    from .pubchemfetcher import get_data_from_name
     smiles_str, title, cid = get_data_from_name(mol_name)
 
     return smiles_str
 
 
 def _Molecule_name_to_xyz(mol_name):
-    """Returns xyz-string for the first conformer
-    of a given molecule name using Pubchem data. 
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+    """
+    Returns xyz-string for the first conformer
+    of a given molecule name using Pubchem data.
 
     :param mol_name:
         The molecule name string.
@@ -1282,8 +1279,6 @@ def _Molecule_name_to_xyz(mol_name):
     :return xyz:
         xyz-string of molecule
     """
-
-    from .pubchemfetcher import get_all_conformer_IDs, get_conformer_data
 
     conformerID_list = get_all_conformer_IDs(mol_name)
     conformer_ID = conformerID_list[0]
@@ -1293,10 +1288,9 @@ def _Molecule_name_to_xyz(mol_name):
 
 
 def _Molecule_get_all_conformer_data(mol_name):
-    """Gets coordinates for all the conformers of a given compound
-    Data from PubChem. 
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+    """
+    Gets coordinates for all the conformers of a given compound
+    Data from PubChem.
 
     :param mol_name:
         The molecule name string.
@@ -1304,8 +1298,6 @@ def _Molecule_get_all_conformer_data(mol_name):
     :return all_conformer_info:
         The coordinates for all of the conformers of the molecule.
     """
-
-    from .pubchemfetcher import get_all_conformer_IDs, get_conformer_data
 
     conformerID_list = get_all_conformer_IDs(mol_name)
     all_conformer_info = {}
@@ -1315,24 +1307,22 @@ def _Molecule_get_all_conformer_data(mol_name):
 
 
 def _Molecule_builder():
-    """Displays the PubChem molecule builder 
-    Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. 
-    Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059
+    """
+    Displays the PubChem molecule builder.
     """
 
     try:
-        from IPython.display import Image, display
-        from IPython.core.display import HTML
-        from IPython.display import IFrame
-        print(
-                "The molecule builder uses the PubChem Sketcher. " \
-                "Direct link to the PubChem Sketcher: https://pubchem.ncbi.nlm.nih.gov/edit/ " \
-                "Documentation for the PubChem Sketcher: https://pubchem.ncbi.nlm.nih.gov/docs/sketcher-help " \
-                "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
-                "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
-                )
+        from IPython.display import display, IFrame
+
+        print("The molecule builder uses the PubChem Sketcher.\n")
+        print("Direct link to the PubChem Sketcher: " +
+              "https://pubchem.ncbi.nlm.nih.gov/edit/ \n")
+        print("Documentation for the PubChem Sketcher: " +
+              "https://pubchem.ncbi.nlm.nih.gov/docs/sketcher-help \n")
+        print("Reference: " + get_pubchem_reference() + "\n")
+
         display(
-            IFrame('https://pubchem.ncbi.nlm.nih.gov//edit3/index.html',
+            IFrame('https://pubchem.ncbi.nlm.nih.gov/edit/',
                    width=900,
                    height=450))
 
