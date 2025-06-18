@@ -97,8 +97,8 @@ class TransitionStateGuesser():
         product: Molecule | list[Molecule],
         reactant_partial_charges: list[float] | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
-        reactant_total_multiplicity = -1,
-        product_total_multiplicity = -1,
+        reactant_total_multiplicity=-1,
+        product_total_multiplicity=-1,
         breaking_bonds: list[tuple[int, int]] = [],
         scf=True,
         scf_drv=None,
@@ -126,6 +126,8 @@ class TransitionStateGuesser():
             product,
             reactant_partial_charges=reactant_partial_charges,
             product_partial_charges=product_partial_charges,
+            reactant_total_multiplicity=reactant_total_multiplicity,
+            product_total_multiplicity=product_total_multiplicity,
             breaking_bonds=breaking_bonds,
         )
         if self.mute_evb:
@@ -136,10 +138,6 @@ class TransitionStateGuesser():
             molecule_sanity_check(self.evb_drv.reactant.molecule)
 
         self.molecule = self.evb_drv.reactant.molecule
-        # if charge is not None:
-        #     self.molecule.set_charge(charge)
-        # if multiplicity is not None:
-        #     self.molecule.set_multiplicity(multiplicity)
         print(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
