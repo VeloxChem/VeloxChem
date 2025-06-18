@@ -82,10 +82,10 @@ def get_data_from_name(mol_name):
             # avoid frequent request
             sleep(0.2)
 
-            print("Reading molecule name accesses data from PubChem.\n")
-            print("Please double-check the compound since names may" +
-                  " often refer to more than one record.\n")
+            print(f"Reading {mol_name} from PubChem...\n")
             print("Reference: " + get_pubchem_reference() + "\n")
+            print("Please double-check the compound since names may" +
+                  " refer to more than one record.\n")
 
             return smiles_str, title, cid
 
@@ -130,10 +130,10 @@ def get_all_conformer_IDs(mol_name):
             # avoid frequent request
             sleep(0.2)
 
-            print("Reading molecule name accesses data from PubChem.\n")
-            print("Please double-check the compound since names may" +
-                  " often refer to more than one record.\n")
+            print(f"Reading {mol_name} from PubChem...\n")
             print("Reference: " + get_pubchem_reference() + "\n")
+            print("Please double-check the compound since names may" +
+                  " refer to more than one record.\n")
 
             return conformerID_list
 
@@ -191,8 +191,7 @@ def get_conformer_data(conformer_ID):
             # avoid frequent request
             sleep(0.2)
 
-            print("Reading conformer ID accesses data from PubChem.\n")
-            print("Reference: " + get_pubchem_reference() + "\n")
+            print(f"Reading conformer ID {conformer_ID} from PubChem...")
 
             return xyz
 
@@ -233,7 +232,7 @@ def index_to_element(indices):
     return elements
 
 
-def get_pubchem_reference(self):
+def get_pubchem_reference():
     """
     Gets PubChem reference.
 

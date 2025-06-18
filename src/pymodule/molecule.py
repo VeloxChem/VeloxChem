@@ -1235,6 +1235,7 @@ def _Molecule_partition_atoms(self, comm):
     return list(list_atoms[rank::nnodes])
 
 
+@staticmethod
 def _Molecule_read_name(mol_name):
     """
     Reads molecule from its name as a string using PubChem data.
@@ -1252,6 +1253,7 @@ def _Molecule_read_name(mol_name):
     return mol
 
 
+@staticmethod
 def _Molecule_name_to_smiles(mol_name):
     """
     Returns SMILES-string for a given molecule name using PubChem data.
@@ -1268,6 +1270,7 @@ def _Molecule_name_to_smiles(mol_name):
     return smiles_str
 
 
+@staticmethod
 def _Molecule_name_to_xyz(mol_name):
     """
     Returns xyz-string for the first conformer
@@ -1287,6 +1290,7 @@ def _Molecule_name_to_xyz(mol_name):
     return xyz
 
 
+@staticmethod
 def _Molecule_get_all_conformer_data(mol_name):
     """
     Gets coordinates for all the conformers of a given compound
@@ -1306,6 +1310,7 @@ def _Molecule_get_all_conformer_data(mol_name):
     return all_conformer_info
 
 
+@staticmethod
 def _Molecule_builder():
     """
     Displays the PubChem molecule builder.
