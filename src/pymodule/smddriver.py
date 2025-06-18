@@ -47,6 +47,7 @@ from .smdsolventproperties import get_smd_solvent_properties, get_sigma_properti
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .errorhandler import assert_msg_critical
 
 ## Note: Maybe adopt a keyword in scf_drv saying smd = True or similar, since then the only 
@@ -87,7 +88,7 @@ class _SmdDriver_WorkInProgress:
         self.ostream = ostream
 
         # theory settings
-        self.basis_set = '6-31G**'
+        self.basis_set = '6-31G*'
         self.xcfun = 'B3LYP'
         self.ri_coulomb = False
         
@@ -96,6 +97,9 @@ class _SmdDriver_WorkInProgress:
         self.atom_radii = None
         self.cpcm_grid_per_sphere = 194
         self.smd_solvent_parameters = get_smd_solvent_properties() 
+        # TODO: Extract the parameters in the compute_solvation function
+        # --> calculate the n,a,b within the script so that water doesn't have to be distinguished
+        # from other solvents in the sigma_k calculations! (just return one float from atom_dep_param in the smdsolventproperties)
         self.sigma_param, self.sigma_water = get_sigma_properties()
         self.r_zz_dict = get_rzz_parameters()
         self.calculate_tanh = False
@@ -113,22 +117,22 @@ class _SmdDriver_WorkInProgress:
             'Solvent {self.solvent} not available')
         
         self.smd_solvent_parameters = self.smd_solvent_parameters[solvent]
-        self._get_intrinsic_coulomb_radii() # or execute this within the ENP function (if not used elsewhere)
 
         self.ostream.print_info("Computing the ENP Contribution...")
         self.ostream.flush()
-        ENP_energy = self._get_ENP_contribution()
+        self.ENP_energy = self._get_ENP_contribution()
         
         self.ostream.print_info("Computing the CDS Contribution...")
         self.ostream.flush()
-        CDS_energy = self._get_CDS_contribution()
+        self.CDS_energy = self._get_CDS_contribution()
         
         # DG_conc = DG_conc(gas-phase) + DG_conc(solv-phase) (=0 if 1 mol/L, =1.89 kcal/mol if gas-phase std state of 1 atm)
 
         # DG_solv = DG_ENP + DG_CDS (+ DG_conc)
         # N contribution in ENP: diff in total gas phase energy between gas-equil.geometry and liq-equil.geometry
-        final_E = ENP_energy + CDS_energy 
-        
+        final_E = self.ENP_energy + self.CDS_energy 
+        self.ostream.print_info(f"Final SMD Solvation Energy: {final_E:.4f} kJ/mol")
+        self.ostream.flush()
 
         return final_E
     
@@ -139,9 +143,9 @@ class _SmdDriver_WorkInProgress:
         """
 
         atom_labels = self.solute.get_labels() 
-        bondi_radii = self.solute.vdw_radii_to_numpy()
+        bondi_radii = self.solute.vdw_radii_to_numpy() * bohr_in_angstrom()
 
-        # Table 3 in SMD paper. 
+        # Table 3 in SMD paper. (Å)
         # If not in smd_elements, use Bondi radius (default in vlx); if not in Bondi, use 2.0 Å (also default in vlx)
         smd_elements = {
             'H':1.20,'C':1.85,'N':1.89,
@@ -165,7 +169,7 @@ class _SmdDriver_WorkInProgress:
                 else:
                     atom_radii.append(smd_elements[atom])
                 
-        self.atom_radii = atom_radii
+        return atom_radii
 
     def _get_ENP_contribution(self):
         """
@@ -178,7 +182,8 @@ class _SmdDriver_WorkInProgress:
         
         # TODO: check the cpcm-implemented definition of the cavity (with Erik)
         # TODO: Add N contribution? --> E-diff in gasphase E between gas-phase and solv-phase-optimized geometries 
-
+        
+        atom_radii = self._get_intrinsic_coulomb_radii()
         basis_set = self.basis_set
         basis = MolecularBasis.read(self.solute, basis_set)
 
@@ -189,7 +194,7 @@ class _SmdDriver_WorkInProgress:
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_epsilon = self.smd_solvent_parameters['epsilon']
         scf_drv.cpcm_grid_per_sphere = self.cpcm_grid_per_sphere
-        scf_drv.cpcm_custom_vdw_radii = self.atom_radii
+        scf_drv.cpcm_custom_vdw_radii = atom_radii
         
         scf_drv.compute(self.solute, basis)
         ENP_energy = scf_drv.cpcm_epol * hartree_in_kjpermol()
@@ -198,51 +203,6 @@ class _SmdDriver_WorkInProgress:
         self.ostream.flush()
 
         return ENP_energy
-
-    #REMOVE:
-    def _get_atomic_surface_tension_parameters(self):
-        
-        # Table 4:  Any possible surface tension parameter that is not in this table is set equal to zero in SMD. 
-        # For example, there is no surface tension on P atoms in SMD. cal/molÅ^2
-        
-        param = self.smd_solvent_parameters
-        n, alpha, beta = param['n'], param['alpha'], param['beta']
-  
-        # Create a sigma_i (tilde) 
-        atoms = self.atom_radii[0::2]
-        sigma_params = self.sigma_water if self.solvent == 'water' else self.sigma_param
-
-        sigma_i = {}
-
-        # sigma_k (single atom contribution)
-        for atom in atoms:
-            params = sigma_params.get((atom,))
-            if params:
-                if self.solvent == 'water':
-                    sigma_i[atom] = params
-                else:
-                    s_n, s_alpha, s_beta = params
-                    sigma_i[atom] = n * s_n + alpha * s_alpha + beta * s_beta
-        
-        # sigma_kk' (pair contributions) 
-        for i, j in combinations(range(len(atoms)), 2):
-            pair = (atoms[i], atoms[j])
-            rev_pair = (atoms[j], atoms[i])
-            
-            if pair in sigma_params:
-                params = sigma_params[pair]
-            elif rev_pair in sigma_params:
-                params = sigma_params[rev_pair]
-            else:
-                continue
-            
-            if self.solvent == 'water':
-                sigma_i[pair] = params
-            else:
-                s_n, s_alpha, s_beta = params
-                sigma_i[pair] = n * s_n + alpha * s_alpha + beta * s_beta
-        
-        self.sigma_i = sigma_i
 
     def _calculate_sigma_k(self):        
         # Table 4:  Any possible surface tension parameter that is not in this table is set equal to zero in SMD. 
@@ -255,6 +215,12 @@ class _SmdDriver_WorkInProgress:
         distance_matrix = self.solute.get_distance_matrix_in_angstrom()
         atoms = self.solute.get_labels()
         num_atoms = len(atoms)
+        
+        # Check atom types since for k=N, sigma_k depends on sp3 carbon in the smd parameters
+        ffgen = MMForceFieldGenerator()
+        ffgen.ostream.mute()
+        ffgen.create_topology(self.solute, resp = False)
+        atom_types = ffgen.atom_types
 
         halogens = ['F', 'Si', 'S', 'Cl', 'Br'] #if Zk in [F, Si, S, Cl, Br], sigma_k = sigma_tilde_Z_k 
         all_smd_atoms = ['H', 'C', 'N', 'O'] + halogens #Z_k != H, C, N, O, F, Si, S, Cl, or Br: sigma_k = 0
@@ -302,7 +268,7 @@ class _SmdDriver_WorkInProgress:
                         continue
                     R = distance_matrix[k, k2]
                     r_zz, dr_zz = r_ZZ_param[key]            
-                    if R > r_zz + dr_zz:
+                    if R < r_zz + dr_zz:
                         tanh = np.exp(dr_zz / (R - dr_zz - r_zz))
                         if self.solvent == 'water':
                             sigma += sigma_params[key] * tanh
@@ -321,7 +287,7 @@ class _SmdDriver_WorkInProgress:
                         continue
                     R = distance_matrix[k, k2]
                     r_zz, dr_zz = r_ZZ_param[key]
-                    if R > r_zz + dr_zz:
+                    if R < r_zz + dr_zz:
                         tanh = np.exp(dr_zz / (R - dr_zz - r_zz))
                         if Zk2 == 'C':
                             if self.solvent == 'water':
@@ -333,26 +299,28 @@ class _SmdDriver_WorkInProgress:
                             tanh_sum += tanh
                 
                 if self.solvent == 'water':
-                    sigma += sigma_params.get(('C','N'), 0.0) * tanh_sum ** 2
+                    sigma += sigma_params.get(('C','N'), 0.0) * (tanh_sum ** 2)
                 else:
                     s_n, s_alpha, s_beta = sigma_params.get(('C','N'), 0.0)
-                    sigma += (n * s_n + alpha * s_alpha + beta * s_beta) * tanh_sum ** 2
+                    sigma += (n * s_n + alpha * s_alpha + beta * s_beta) * (tanh_sum ** 2)
 
             elif Zk == 'N':
+
                 nested_cn_sum = 0.0
                 nc3_sum = 0.0
                 
                 for k_prime in range(num_atoms):
                     if k_prime == k:
                         continue
+                    
                     Zk_prime = atoms[k_prime]
-                    key_k_kp = ('N', Zk_prime)
+                    atom_type = atom_types[k_prime]
 
-                    # NC(3) term
-                    if Zk_prime == 'C(3)' and key_k_kp in r_ZZ_param:
+                    # N(C3) term - only in water
+                    if atom_type == 'c3' and ('N', 'c3') in sigma_params:
                         R_k_kp = distance_matrix[k, k_prime]
-                        r_zz, dr_zz = r_ZZ_param[key_k_kp]
-                        if R_k_kp > r_zz + dr_zz:
+                        r_zz, dr_zz = r_ZZ_param[('N', 'c3')]
+                        if R_k_kp < r_zz + dr_zz:
                             tanh_k_kp = np.exp(dr_zz / (R_k_kp - dr_zz - r_zz))
                             nc3_sum += tanh_k_kp
                     
@@ -360,7 +328,7 @@ class _SmdDriver_WorkInProgress:
                     elif Zk_prime == 'C':
                         R_k_kp = distance_matrix[k,k_prime]
                         r_nc, dr_nc = r_ZZ_param[('N', 'C')]
-                        if R_k_kp <= r_nc + dr_nc:
+                        if R_k_kp >= r_nc + dr_nc:
                             continue
 
                         tanh_k_kp = np.exp(dr_nc / (R_k_kp - dr_nc - r_nc))
@@ -377,7 +345,7 @@ class _SmdDriver_WorkInProgress:
 
                             R_kp_kpp = distance_matrix[k_prime, k_pp]
                             r_ckpp, dr_ckpp = r_ZZ_param[key_kp_kpp]
-                            if R_kp_kpp > r_ckpp + dr_ckpp:
+                            if R_kp_kpp < r_ckpp + dr_ckpp:
                                 tanh_kp_kpp = np.exp(dr_ckpp / (R_kp_kpp - dr_ckpp - r_ckpp))
                                 inner_sum += tanh_kp_kpp
 
@@ -386,12 +354,10 @@ class _SmdDriver_WorkInProgress:
                 # Final sigma_k for nitrogen
                 if self.solvent == 'water':
                     sigma += sigma_params.get(('N', 'C'), 0.0) * (nested_cn_sum ** 1.3)
-                    sigma += sigma_params.get(('N', 'C(3)'), 0.0) * nc3_sum
+                    sigma += sigma_params.get(('N', 'c3'), 0.0) * nc3_sum
                 else:
-                    n_1, alpha_1, beta_1 = sigma_params.get(('N', 'C'), 0.0)
-                    sigma += (n * n_1 + alpha * alpha_1 + beta * beta_1) * (nested_cn_sum ** 1.3)
-                    n_2, alpha_2, beta_2 = sigma_params.get(('N', 'C(3)'), 0.0)
-                    sigma += (n * n_2 + alpha * alpha_2 + beta * beta_2) * nc3_sum
+                    s_n, s_alpha, s_beta = sigma_params.get(('N', 'C'), 0.0)
+                    sigma += (n * s_n + alpha * s_alpha + beta * s_beta) * (nested_cn_sum ** 1.3)
 
             elif Zk == 'O':
                 for k2 in range(num_atoms):
@@ -405,7 +371,7 @@ class _SmdDriver_WorkInProgress:
                         continue
                     R = distance_matrix[k, k2]
                     r_zz, dr_zz = r_ZZ_param[key]
-                    if R > r_zz + dr_zz:
+                    if R < r_zz + dr_zz:
                         tanh = np.exp(dr_zz / (R - dr_zz - r_zz))
                         if self.solvent == 'water':
                             sigma += sigma_params[key] * tanh
@@ -438,10 +404,10 @@ class _SmdDriver_WorkInProgress:
         vdw_radii = self.solute.vdw_radii_to_numpy() * bohr_in_angstrom()
 
         solute = Chem.MolFromXYZBlock(self.solute.get_xyz_string())
-        r_s = 1.4 # Å (0.4 Å according to SMD paper (1.4 Å according to e.g., SM6, Lee&Richards etc.))
+        r_s = 0.4
         
         opts = rdFreeSASA.SASAOpts(
-            rdFreeSASA.SASAAlgorithm.LeeRichards,
+            rdFreeSASA.SASAAlgorithm.LeeRichards, # In line with SMD paper
             rdFreeSASA.SASAClassifier.Protor,  # optimized for small molecules
             r_s
         )
@@ -478,20 +444,20 @@ class _SmdDriver_WorkInProgress:
         # Cavity-Dispersion-Solvent-Structure contribution: DG_CDS = see eq. 6 (simplified to only first term if water)
         
         CDS_energy = 0.0
-        kJ_per_mol = 0.004184
+        cal_to_kJ_per_mol = 0.004184
         
         SASA_list = self._get_SASA()
 
         sigma_k = self._calculate_sigma_k()
 
         for k in range(len(self.solute.get_labels())):
-            CDS_energy += sigma_k[k]*SASA_list[k]
+            CDS_energy += sigma_k[k] * SASA_list[k]
         
         if self.solvent != 'water': #sigma[M] = 0 for water
             self._get_molecular_surface_tension()
             CDS_energy += self.sigma_M * sum(SASA_list)
 
-        CDS_energy *= kJ_per_mol
+        CDS_energy *= cal_to_kJ_per_mol
         
         self.ostream.print_info(f"CDS Contribution: {CDS_energy:.4f} kJ/mol")
         self.ostream.flush()
