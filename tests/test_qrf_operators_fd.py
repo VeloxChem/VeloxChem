@@ -93,8 +93,9 @@ class TestQrfOperatorsFD:
                 rsp_func_minus = lrf_result_minus['response_functions'][(a, b,
                                                                          wb)]
 
-                rsp_func_fd = (rsp_func_plus - rsp_func_minus) / (2.0 *
-                                                                  delta_ef)
+                # the minus sign is to account for the -mu operator
+                rsp_func_fd = (-1.0) * (rsp_func_plus -
+                                        rsp_func_minus) / (2.0 * delta_ef)
 
                 # QRF
 

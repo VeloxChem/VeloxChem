@@ -38,6 +38,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import boltzmann_in_hartreeperkelvin, hartree_in_kjpermol
+from .evbsystembuilder import EvbForceGroup
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -342,7 +343,6 @@ class EvbDataProcessing:
     def _get_FEP_and_EVB(self):
 
         for result in self.results.values():
-            # Temp = result["Temp_step"]
             E1_ref = result["E1_pes"]
             E2_ref = result["E2_pes"]
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
@@ -482,6 +482,29 @@ class EvbDataProcessing:
                 dE_max = dE_max_new
 
         return np.arange(dE_min, dE_max, bin_size)
+
+    def _calculate_fg_profiles(self):
+        assert len(self.coordinate_bins) > 0, "Coordinate bins not set"
+        assert len(self.Lambda) > 0, "Lambda not set"
+
+        for result in self.results.values():
+            E1_fg = result["E1_fg"]
+            E2_fg = result["E2_fg"]
+            dGfep_fg = []
+            dGevb_fg = []
+            for i, fg in enumerate(EvbForceGroup):
+                E1 = E1_fg[i]
+                E2 = E2_fg[i]
+                E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
+                    E1, E2, self.alpha, self.H12)
+                dGfep = self._calculate_dGfep(dE, result["Temp_set"])
+                dGevb, shift, fepxi = self._dGevb_analytical(
+                    dGfep, self.Lambda, self.H12, self.coordinate_bins)
+                dGfep_fg.append(dGfep)
+                dGevb_fg.append(dGevb)
+
+            result.update({"dGfep_fg": np.array(dGfep_fg)})
+            result.update({"dGevb_fg": np.array(dGevb_fg)})
 
     @staticmethod
     def print_results(results, ostream):

@@ -53,10 +53,9 @@ class TestCrfOperators:
         crf_result = crf_drv.compute(molecule, basis, scf_results)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            crf_terms = crf_result['crf_terms']
 
             for key in ref_result:
-                val = crf_terms[(f'crf_{key}_term', wb, wc, wd)]
+                val = crf_result[(f'crf_{key}_term', wb, wc, wd)]
                 ref = ref_result[key]
 
                 real_diff = abs(val.real - ref.real)
@@ -215,27 +214,47 @@ class TestCrfOperators:
             495.69636664,
         ]
 
+        ref_sign_list = [
+            1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            -1.0,
+            1.0,
+            -1.0,
+            -1.0,
+            -1.0,
+        ]
+
         for (op_str, ref_T4_val, ref_E3_val, ref_X3_val, ref_X2_val, ref_A3_val,
-             ref_A2_val) in zip(op_str_list, ref_T4_val_list, ref_E3_val_list,
-                                ref_X3_val_list, ref_X2_val_list,
-                                ref_A3_val_list, ref_A2_val_list):
+             ref_A2_val, ref_sign) in zip(op_str_list, ref_T4_val_list,
+                                          ref_E3_val_list, ref_X3_val_list,
+                                          ref_X2_val_list, ref_A3_val_list,
+                                          ref_A2_val_list, ref_sign_list):
 
             operators = [operator_mapping[x] for x in op_str]
 
             if op_str.count('m') % 2 == 0:
-                rsp_ref_T4_val = ref_T4_val
-                rsp_ref_E3_val = ref_E3_val
-                rsp_ref_X3_val = ref_X3_val
-                rsp_ref_X2_val = ref_X2_val
-                rsp_ref_A3_val = ref_A3_val
-                rsp_ref_A2_val = ref_A2_val
+                rsp_ref_T4_val = ref_T4_val * ref_sign
+                rsp_ref_E3_val = ref_E3_val * ref_sign
+                rsp_ref_X3_val = ref_X3_val * ref_sign
+                rsp_ref_X2_val = ref_X2_val * ref_sign
+                rsp_ref_A3_val = ref_A3_val * ref_sign
+                rsp_ref_A2_val = ref_A2_val * ref_sign
             else:
-                rsp_ref_T4_val = ref_T4_val * 1j
-                rsp_ref_E3_val = ref_E3_val * 1j
-                rsp_ref_X3_val = ref_X3_val * 1j
-                rsp_ref_X2_val = ref_X2_val * 1j
-                rsp_ref_A3_val = ref_A3_val * 1j
-                rsp_ref_A2_val = ref_A2_val * 1j
+                rsp_ref_T4_val = ref_T4_val * ref_sign * 1j
+                rsp_ref_E3_val = ref_E3_val * ref_sign * 1j
+                rsp_ref_X3_val = ref_X3_val * ref_sign * 1j
+                rsp_ref_X2_val = ref_X2_val * ref_sign * 1j
+                rsp_ref_A3_val = ref_A3_val * ref_sign * 1j
+                rsp_ref_A2_val = ref_A2_val * ref_sign * 1j
 
             rsp_ref_result = {
                 'T4': rsp_ref_T4_val,
