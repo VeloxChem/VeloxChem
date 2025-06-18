@@ -148,7 +148,7 @@ def get_all_conformer_IDs(mol_name):
             return conformerID_list
     except HTTPError as e:
         print(
-            f"HTTP Error: {e.code}. The compound may not exist, check spelling."
+            f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist, check input."
         )
     except URLError as e:
         print(f"URL Error: {e.reason}")
@@ -201,7 +201,7 @@ def get_conformer_data(conformer_ID):
 
             return xyz
     except HTTPError as e:
-        print(f"HTTP Error: {e.code}. The compound may not exist, check input.")
+        print(f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist, check input.")
     except URLError as e:
         print(f"URL Error: {e.reason}")
 
