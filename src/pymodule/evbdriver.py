@@ -162,6 +162,8 @@ class EvbDriver():
         product: Molecule | list[Molecule],
         reactant_partial_charges: list[float] | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
+        reactant_total_multiplicity: int = -1,
+        product_total_multiplicity: int = -1,
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
@@ -179,6 +181,7 @@ class EvbDriver():
             reactant,
             reactant_partial_charges,
         )
+
         pro_input, product_total_charge = self._process_molecule_input(
             product,
             product_partial_charges,
@@ -194,10 +197,12 @@ class EvbDriver():
             breaking_bonds = [breaking_bonds]
 
         self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
-            rea_input,
-            pro_input,
-            ordered_input,
-            breaking_bonds,
+            reactant_input=rea_input,
+            product_input=pro_input,
+            reactant_total_multiplicity=reactant_total_multiplicity,
+            product_total_multiplicity=product_total_multiplicity,
+            ordered_input=ordered_input,
+            breaking_bonds=breaking_bonds,
         )
 
     @staticmethod
@@ -750,12 +755,12 @@ class EvbDriver():
         path = Path().cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
         self.ostream.flush()
-        for name,system in systems.items():
-            if isinstance(name,float) or isinstance(name,int):
+        for name, system in systems.items():
+            if isinstance(name, float) or isinstance(name, int):
                 filename = f"{name:.3f}_sys.xml"
             else:
                 filename = f"{name}_sys.xml"
-            with open(path/filename, mode="w", encoding="utf-8") as output:
+            with open(path / filename, mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(system))
 
     def load_systems_from_xml(self, folder: str):
@@ -931,11 +936,11 @@ class EvbDriver():
             pro_fg_file = str(cwd / folder / "ForceGroups_pro.csv")
             specific, common = self._load_output_files(
                 E_file,
+                data_file,
+                options_file,
                 fg_file,
                 rea_fg_file,
                 pro_fg_file,
-                data_file,
-                options_file,
                 lambda_sub_sample,
                 lambda_sub_sample_ends,
                 time_sub_sample,
@@ -962,11 +967,11 @@ class EvbDriver():
     def _load_output_files(
         self,
         E_file,
-        fg_file,
-        fg_rea_file,
-        fg_pro_file,
         data_file,
         options_file,
+        fg_file=None,
+        fg_rea_file=None,
+        fg_pro_file=None,
         lambda_sub_sample=1,
         lambda_sub_sample_ends=False,
         time_sub_sample=1,
@@ -1030,10 +1035,7 @@ class EvbDriver():
             "E1_int": E1_int,
             "E2_int": E2_int,
             "E_m_pes": E_m_pes,
-            # "E_m_int": E_m_int,
-            "E1_fg": rea_fg_data,
-            "E2_fg": pro_fg_data,
-            "E_m_fg": fg_data,
+            "E_m_int": E_m_int,
             "Ep": Ep,
             "Ek": Ek,
             "Temp_step": Temp,
@@ -1042,6 +1044,16 @@ class EvbDriver():
             "options": options,
             "Temp_set": Temp_set,
         }
+
+        if fg_file is not None and Path(fg_file).is_file():
+            fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
+            specific_result.update({"E_m_fg": fg_data})
+        if fg_rea_file is not None and Path(fg_rea_file).is_file():
+            rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
+            specific_result.update({"E1_fg": rea_fg_data})
+        if fg_pro_file is not None and Path(fg_pro_file).is_file():
+            pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
+            specific_result.update({"E2_fg": pro_fg_data})
 
         lambda_indices = [
             np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame

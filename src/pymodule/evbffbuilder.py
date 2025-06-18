@@ -37,6 +37,7 @@ import sys
 import os
 import copy
 from .veloxchemlib import mpi_master
+from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -96,6 +97,8 @@ class EvbForceFieldBuilder():
         self,
         reactant_input: list[dict],
         product_input: list[dict],
+        reactant_total_multiplicity: int,
+        product_total_multiplicity: int,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ):
@@ -107,8 +110,12 @@ class EvbForceFieldBuilder():
 
         self.ostream.print_info("Creating combined reactant force field")
         self.ostream.flush()
-        reamol = molecule = self._combine_molecule(
-            [rea['molecule'] for rea in reactant_input])
+        reamol = self._combine_molecule(
+            [rea['molecule'] for rea in reactant_input],
+            reactant_total_multiplicity)
+        self.ostream.print_info(
+            f"Combined reactant with total charge {reamol.get_charge()} and multiplicity {reamol.get_multiplicity()}"
+        )
         self.reactant = self._combine_forcefield(reactants)
         self.reactant.molecule = reamol
 
@@ -121,7 +128,11 @@ class EvbForceFieldBuilder():
         self.ostream.print_info("Creating combined product force field")
         self.ostream.flush()
         promol = self._combine_molecule(
-            [pro['molecule'] for pro in product_input], )
+            [pro['molecule'] for pro in product_input],
+            product_total_multiplicity)
+        self.ostream.print_info(
+            f"Combined product with total charge {promol.get_charge()} and multiplicity {promol.get_multiplicity()}"
+        )
         self.product = self._combine_forcefield(products)
         self.product.molecule = promol
 
@@ -153,21 +164,36 @@ class EvbForceFieldBuilder():
         return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products
 
     @staticmethod
-    def _combine_molecule(molecules):
+    def _combine_molecule(molecules, total_multiplicity):
 
-        combined_molecule = molecules[0]
+        combined_molecule = Molecule()
         # pos = []
-        for mol in molecules[1:]:
-
-            max_x = max(combined_molecule.get_coordinates_in_angstrom()[:, 0])
-            min_x = min(combined_molecule.get_coordinates_in_angstrom()[:, 0])
-            shift = max_x - min_x + 2
+        charge = 0
+        Sm1 = 0
+        for mol in molecules:
+            charge += mol.get_charge()
+            Sm1 += mol.get_multiplicity() - 1
+            if combined_molecule.number_of_atoms() > 0:
+                max_x = max(combined_molecule.get_coordinates_in_angstrom()[:,
+                                                                            0])
+                min_x = min(combined_molecule.get_coordinates_in_angstrom()[:,
+                                                                            0])
+                shift = max_x - min_x + 2
+            else:
+                shift = 0
 
             for elem, coord in zip(mol.get_element_ids(),
                                    mol.get_coordinates_in_angstrom()):
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
+        combined_molecule.set_charge(charge)
+        if total_multiplicity > -1:
+            combined_molecule.set_multiplicity(total_multiplicity)
+        else:
+            combined_molecule.set_multiplicity(Sm1 + 1)
+
+        molecule_sanity_check(combined_molecule)
         return combined_molecule
 
     def _optimize_molecule(self,
@@ -264,7 +290,8 @@ class EvbForceFieldBuilder():
         for i, elem in enumerate(elemental_ids):
             point = Point(pos[i])
             new_molecule.add_atom(int(elem), point, 'angstrom')
-
+        new_molecule.set_charge(forcefield.molecule.get_charge())
+        new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         return new_molecule
 
     def get_forcefield(
@@ -467,9 +494,9 @@ class EvbForceFieldBuilder():
             forcefield.angles.update(ff.angles)
             forcefield.dihedrals.update(ff.dihedrals)
             forcefield.impropers.update(ff.impropers)
-            if hasattr(ff,'unique_atom_types'):
+            if hasattr(ff, 'unique_atom_types'):
                 forcefield.unique_atom_types += ff.unique_atom_types
-            if hasattr(ff,'pairs'):
+            if hasattr(ff, 'pairs'):
                 forcefield.pairs.update(ff.pairs)
 
         return forcefield
