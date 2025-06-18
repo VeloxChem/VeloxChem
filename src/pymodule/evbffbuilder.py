@@ -158,16 +158,19 @@ class EvbForceFieldBuilder():
     @staticmethod
     def _combine_molecule(molecules, total_multiplicity):
         
-        combined_molecule = molecules[0]
+        combined_molecule = Molecule()
         # pos = []
         charge = 0
         Sm1 = 0
-        for mol in molecules[1:]:
+        for mol in molecules:
             charge += mol.get_charge()
             Sm1 += mol.get_multiplicity()-1
-            max_x = max(combined_molecule.get_coordinates_in_angstrom()[:, 0])
-            min_x = min(combined_molecule.get_coordinates_in_angstrom()[:, 0])
-            shift = max_x - min_x + 2
+            if combined_molecule.number_of_atoms() > 0:
+                max_x = max(combined_molecule.get_coordinates_in_angstrom()[:, 0])
+                min_x = min(combined_molecule.get_coordinates_in_angstrom()[:, 0])
+                shift = max_x - min_x + 2
+            else:
+                shift = 0
 
             for elem, coord in zip(mol.get_element_ids(),
                                    mol.get_coordinates_in_angstrom()):
