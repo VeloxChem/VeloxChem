@@ -1324,7 +1324,12 @@ def _Molecule_builder():
         from IPython.display import Image, display
         from IPython.core.display import HTML
         from IPython.display import IFrame
-
+        print(
+                "The molecule builder is property of Pubchem. " \
+                "It can be accessed directly through https://pubchem.ncbi.nlm.nih.gov//edit3/index.html. "
+                "Citation: Kim S, Chen J, Cheng T, et al. PubChem 2025 update. " \
+                "Nucleic Acids Res. 2025;53(D1):D1516-D1525. doi:10.1093/nar/gkae1059."
+                )
         display(
             IFrame('https://pubchem.ncbi.nlm.nih.gov//edit3/index.html',
                    width=900,
