@@ -534,8 +534,8 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
 
     magma_int_t info;
-    //magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, ldda, W, wA, n, work, lwork, iwork, liwork, &info);
-    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, W, wA, n, work, lwork, iwork, liwork, &info);
+    //magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, ldda, D, wA, n, work, lwork, iwork, liwork, &info);
+    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, D, wA, n, work, lwork, iwork, liwork, &info);
 
     if (info != 0)
     {
@@ -560,7 +560,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
 #if defined(USE_HIP)
 auto
-diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
+diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
 {
     // Note: Should only be called from MPI master rank
 
@@ -584,7 +584,7 @@ diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A, const int
     hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
 
     magma_int_t info;
-    magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, W, work, lwork, iwork, liwork, &info);
+    magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, D, work, lwork, iwork, liwork, &info);
 
     if (info != 0)
     {

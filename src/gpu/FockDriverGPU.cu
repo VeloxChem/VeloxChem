@@ -32,8 +32,19 @@
 
 #include "GpuRuntime.hpp"
 
+#if defined(USE_CUDA)
+
 #include <cublas_v2.h>
 #include <cusolverDn.h>
+
+#elif defined(USE_HIP)
+
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+//#include <hipsolver/hipsolver.h>
+#include <magma_v2.h>
+
+#endif
 
 #include <omp.h>
 
@@ -3874,6 +3885,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     const auto all_prim_count = mat_full.getNumberOfRows();
 
+#if defined(USE_CUDA)
+
     cublasHandle_t handle;
     cublasSafe(cublasCreate(&handle));
 
@@ -3884,13 +3897,35 @@ computeFockOnGPU(const              CMolecule& molecule,
     // compute A^T * (B^T * A^T) since cublas is column-major
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
 
-    gpuSafe(gpuDeviceSynchronize());
+    cudaSafe(cudaDeviceSynchronize());
 
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
 
-    gpuSafe(gpuMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), gpuMemcpyDeviceToHost));
+    cudaSafe(cudaMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), cudaMemcpyDeviceToHost));
 
     cublasSafe(cublasDestroy(handle));
+
+#elif defined(USE_HIP)
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto n = static_cast<int32_t>(all_prim_count);
+
+    // compute A^T * (B^T * A^T) since hipblas is column-major
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+
+    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+#endif
 
     gpuSafe(gpuFree(d_data_matrices_ABC));
 
