@@ -31,8 +31,19 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+#if defined(USE_CUDA)
+
 #include <cublas_v2.h>
 #include <cusolverDn.h>
+
+#elif defined(USE_HIP)
+
+#include <hip/hip_runtime.h>
+#include <hipblas/hipblas.h>
+//#include <hipsolver/hipsolver.h>
+#include <magma_v2.h>
+
+#endif
 
 #include <omp.h>
 
@@ -51,6 +62,7 @@
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuWrapper.hpp"
 #include "GpuDevices.hpp"
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
@@ -65,17 +77,19 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 {
     // Note: Should only be called from MPI master rank
 
-    cudaSafe(cudaSetDevice(0));
+    gpuSafe(gpuSetDevice(0));
 
     auto n = static_cast<int32_t>(size);
 
     double *d_A, *d_B;
 
-    cudaSafe(cudaMalloc(&d_A, n * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_B, n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_A, n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_B, n * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_A, A, n * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_B, B, n * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_A, A, n * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_B, B, n * sizeof(double), gpuMemcpyHostToDevice));
+
+#if defined(USE_CUDA)
 
     cublasHandle_t handle;
     cublasSafe(cublasCreate(&handle));
@@ -85,8 +99,20 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 
     cublasSafe(cublasDestroy(handle));
 
-    cudaSafe(cudaFree(d_A));
-    cudaSafe(cudaFree(d_B));
+#elif defined(USE_HIP)
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double dot_product;
+    hipblasSafe(hipblasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+#endif
+
+    gpuSafe(gpuFree(d_A));
+    gpuSafe(gpuFree(d_B));
 
     return dot_product;
 }
@@ -96,16 +122,18 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 {
     // Note: Should only be called from MPI master rank
 
-    cudaSafe(cudaSetDevice(0));
+    gpuSafe(gpuSetDevice(0));
 
     auto n = static_cast<int32_t>(size);
 
     double *d_X, *d_Y;
 
-    cudaSafe(cudaMalloc(&d_X, n * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_Y, n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_X, n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_Y, n * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_Y, weighted_data, n * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_Y, weighted_data, n * sizeof(double), gpuMemcpyHostToDevice));
+
+#if defined(USE_CUDA)
 
     cublasHandle_t handle;
     cublasSafe(cublasCreate(&handle));
@@ -121,10 +149,28 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
     cublasSafe(cublasDestroy(handle));
 
-    cudaSafe(cudaMemcpy(weighted_data, d_Y, n * sizeof(double), cudaMemcpyDeviceToHost));
+#elif defined(USE_HIP)
 
-    cudaSafe(cudaFree(d_X));
-    cudaSafe(cudaFree(d_Y));
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    for (size_t i = 0; i < data_pointers.size(); i++)
+    {
+        double alpha = weights[i];
+
+        hipSafe(hipMemcpy(d_X, data_pointers[i], n * sizeof(double), hipMemcpyHostToDevice));
+
+        hipblasSafe(hipblasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
+    }
+
+    hipblasSafe(hipblasDestroy(handle));
+
+#endif
+
+    gpuSafe(gpuMemcpy(weighted_data, d_Y, n * sizeof(double), gpuMemcpyDeviceToHost));
+
+    gpuSafe(gpuFree(d_X));
+    gpuSafe(gpuFree(d_Y));
 }
 
 auto
@@ -133,22 +179,24 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 {
     // Note: Should only be called from MPI master rank
 
-    cudaSafe(cudaSetDevice(0));
-
-    cublasHandle_t handle;
-    cublasSafe(cublasCreate(&handle));
+    gpuSafe(gpuSetDevice(0));
 
     auto nmo = static_cast<int32_t>(nmo_inp);
     auto nao = static_cast<int32_t>(nao_inp);
 
     double *d_A, *d_B, *d_C;
 
-    cudaSafe(cudaMalloc(&d_A, nao * nao * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_B, nao * nao * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_C, nao * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_A, nao * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_B, nao * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_C, nao * nao * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_A, F, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_B, D, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_A, F, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_B, D, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
+
+#if defined(USE_CUDA)
+
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
 
@@ -197,9 +245,63 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
     cublasSafe(cublasDestroy(handle));
 
-    cudaSafe(cudaFree(d_A));
-    cudaSafe(cudaFree(d_B));
-    cudaSafe(cudaFree(d_C));
+#elif defined(USE_HIP)
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+
+    // D^T F^T (=> FD)
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
+
+    // S^T(FD)^T (=> FDS)
+    hipSafe(hipMemcpy(d_A, S, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
+
+    hipSafe(hipDeviceSynchronize());
+
+    // FDS - (FDS)^T
+    beta = -1.0;
+
+    hipblasSafe(hipblasDgeam(handle, HIPBLAS_OP_N, HIPBLAS_OP_T, nao, nao, &alpha, d_B, nao, &beta, d_B, nao, d_C, nao));
+
+    // X^T (FDS - (FDS)^T) X
+    double* d_X = d_A;  // note: nao >= nmo
+    double* d_Y = d_B;  // note: nao >= nmo
+
+    hipSafe(hipMemcpy(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
+
+    auto op_X  = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+    auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+
+    auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
+
+    beta = 0.0;
+
+    // TODO: double check basis set with linear dependency
+
+    // let E == (FDS - SDF)
+    // X^T E^T (=> EX)
+    hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_C, nao, &beta, d_Y, nmo));
+
+    hipSafe(hipDeviceSynchronize());
+
+    // (EX)^T X (=> X^T(E)X)
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
+
+    hipSafe(hipMemcpy(errvec, d_C, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+#endif
+
+    gpuSafe(gpuFree(d_A));
+    gpuSafe(gpuFree(d_B));
+    gpuSafe(gpuFree(d_C));
 }
 
 auto
@@ -208,22 +310,24 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
 {
     // Note: Should only be called from MPI master rank
 
-    cudaSafe(cudaSetDevice(0));
-
-    cublasHandle_t handle;
-    cublasSafe(cublasCreate(&handle));
+    gpuSafe(gpuSetDevice(0));
 
     auto nmo = static_cast<int32_t>(nmo_inp);
     auto nao = static_cast<int32_t>(nao_inp);
 
     double *d_F, *d_X, *d_Y;
 
-    cudaSafe(cudaMalloc(&d_F, nao * nao * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_X, nmo * nao * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_Y, nmo * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_F, nao * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_X, nmo * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_Y, nmo * nao * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_F, F, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_X, X, nmo * nao * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_F, F, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_X, X, nmo * nao * sizeof(double), gpuMemcpyHostToDevice));
+
+#if defined(USE_CUDA)
+
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     double alpha = 1.0, beta = 0.0;
 
@@ -247,9 +351,38 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
 
     cublasSafe(cublasDestroy(handle));
 
-    cudaSafe(cudaFree(d_F));
-    cudaSafe(cudaFree(d_X));
-    cudaSafe(cudaFree(d_Y));
+#elif defined(USE_HIP)
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto op_X = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+    auto lda_X = (trans_X == std::string("N")) ? nmo : nao;
+
+    auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
+    auto lda_XT = (trans_X == std::string("N")) ? nao : nmo;
+
+    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+
+    // X^T F^T (=> FX)
+    hipblasSafe(hipblasDgemm(handle, op_X, HIPBLAS_OP_N, nmo, nao, nao, &alpha, d_X, lda_X, d_F, nao, &beta, d_Y, nmo));
+
+    hipSafe(hipDeviceSynchronize());
+
+    // (FX)^T X (=> X^T(F)X)
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
+
+    hipSafe(hipMemcpy(transformed_F, d_F, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+#endif
+
+    gpuSafe(gpuFree(d_F));
+    gpuSafe(gpuFree(d_X));
+    gpuSafe(gpuFree(d_Y));
 }
 
 auto
@@ -262,7 +395,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     // TODO: matmul on multiple GPUs
 
-    cudaSafe(cudaSetDevice(0));
+    gpuSafe(gpuSetDevice(0));
 
     auto m = static_cast<int32_t>(m_inp);
     auto k = static_cast<int32_t>(k_inp);
@@ -270,12 +403,14 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     double *d_A, *d_B, *d_C;
 
-    cudaSafe(cudaMalloc(&d_A, m * k * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_B, k * n * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_C, m * n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_A, m * k * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_B, k * n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_C, m * n * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_A, A, m * k * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_B, B, k * n * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_A, A, m * k * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_B, B, k * n * sizeof(double), gpuMemcpyHostToDevice));
+
+#if defined(USE_CUDA)
 
     cublasHandle_t handle;
     cublasSafe(cublasCreate(&handle));
@@ -297,9 +432,33 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     cublasSafe(cublasDestroy(handle));
 
-    cudaSafe(cudaFree(d_A));
-    cudaSafe(cudaFree(d_B));
-    cudaSafe(cudaFree(d_C));
+#elif defined(USE_HIP)
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto op_A = (trans_A == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+    auto op_B = (trans_B == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
+
+    // Note: we compute C^T = B^T * A^T since hipblas is column-major
+    // Also need to adjust lda accordingly
+
+    auto lda_A = (trans_A == std::string("N")) ? k : m;
+    auto lda_B = (trans_B == std::string("N")) ? n : k;
+
+    hipblasSafe(hipblasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
+
+    hipSafe(hipMemcpy(C, d_C, m * n * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+#endif
+
+    gpuSafe(gpuFree(d_A));
+    gpuSafe(gpuFree(d_B));
+    gpuSafe(gpuFree(d_C));
 }
 
 auto
@@ -309,7 +468,9 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     // TODO: allow diagonalizeMatrix on non-master MPI rank
 
-    cudaSafe(cudaSetDevice(0));
+    gpuSafe(gpuSetDevice(0));
+
+#if defined(USE_CUDA)
 
     auto n = static_cast<int32_t>(nrows_A);
     int32_t lwork, info;
@@ -344,6 +505,99 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     cudaSafe(cudaFree(d_D));
     cudaSafe(cudaFree(d_info));
     cudaSafe(cudaFree(d_work));
+
+#elif defined(USE_HIP)
+
+    magmaSafe(magma_init());
+
+    magma_setdevice(0);
+
+    magma_int_t n = static_cast<magma_int_t>(nrows_A);
+    //magma_int_t ldda = magma_roundup(n, 32);
+
+    double *d_A;
+    //hipSafe(hipMalloc(&d_A, n * ldda * sizeof(double)));
+    //hipblasSafe(hipblasSetMatrix(n, n, sizeof(double), A, n, d_A, ldda));
+    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
+    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
+
+    auto nb = magma_get_dsytrd_nb(n);
+    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
+    auto liwork = 3 + 5*n;
+
+    double *wA, *work;
+    magma_int_t *iwork;
+
+    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
+    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
+    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
+
+    magma_int_t info;
+    //magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, ldda, W, wA, n, work, lwork, iwork, liwork, &info);
+    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, W, wA, n, work, lwork, iwork, liwork, &info);
+
+    if (info != 0)
+    {
+        std::stringstream ss;
+        ss << "gpu::diagonalizeMatrix: (magma error) " << magma_strerror(info);
+        errors::assertMsgCritical(false, ss.str());
+    }
+
+    //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
+    hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_A));
+
+    hipSafe(hipHostFree(wA));
+    hipSafe(hipHostFree(work));
+    hipSafe(hipHostFree(iwork));
+
+    magmaSafe(magma_finalize());
+
+#endif
 }
+
+#if defined(USE_HIP)
+auto
+diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
+{
+    // Note: Should only be called from MPI master rank
+
+    // TODO: allow diagonalizeMatrix on non-master MPI rank
+
+    magmaSafe(magma_init());
+
+    magma_int_t n = static_cast<magma_int_t>(nrows_A);
+
+    magma_int_t ngpu = static_cast<magma_int_t>(num_gpus_per_node);
+
+    auto nb = magma_get_dsytrd_nb(n);
+    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
+    auto liwork = 3 + 5*n;
+
+    double *wA, *work;
+    magma_int_t *iwork;
+
+    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
+    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
+    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
+
+    magma_int_t info;
+    magma_dsyevd_m(ngpu, MagmaVec, MagmaUpper, n, A, n, W, work, lwork, iwork, liwork, &info);
+
+    if (info != 0)
+    {
+        std::stringstream ss;
+        ss << "gpu::diagonalizeMatrixMultiGPU: (magma error) " << magma_strerror(info);
+        errors::assertMsgCritical(false, ss.str());
+    }
+
+    hipSafe(hipHostFree(wA));
+    hipSafe(hipHostFree(work));
+    hipSafe(hipHostFree(iwork));
+
+    magmaSafe(magma_finalize());
+}
+#endif
 
 }  // namespace gpu

@@ -30,38 +30,47 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#ifndef GpuWrapper_hpp
+#define GpuWrapper_hpp
 
+#if defined(USE_CUDA)
 
-#include "DeviceProp.hpp"
-#include "GpuSafeChecks.hpp"
-#include "GpuWrapper.hpp"
+    #include <cuda_runtime.h>
 
-namespace gpu {  // gpu namespace
+    #define gpuSafe(e)                          cudaSafe(e)
 
-void
-getDevicesProperty(std::vector<std::string>& namesOfDevices,
-                   std::vector<int64_t>&     globalMemoryOfDevices,
-                   std::vector<int64_t>&     computeMajorCapabilityOfDevices,
-                   std::vector<int64_t>&     computeMinorCapabilityOfDevices)
-{
-    int device_count = 0;
+    #define gpuDeviceProp                       cudaDeviceProp
+    #define gpuGetDeviceCount(ptr)              cudaGetDeviceCount(ptr)
+    #define gpuGetDeviceProperties(ptr, idx)    cudaGetDeviceProperties(ptr, idx)
+    #define gpuSetDevice(idx)                   cudaSetDevice(idx)
+    #define gpuMalloc(ptr, size)                cudaMalloc(ptr, size)
+    #define gpuFree(ptr)                        cudaFree(ptr)
+    #define gpuDeviceSynchronize()              cudaDeviceSynchronize()
+    #define gpuMemcpy(dst, src, size, kind)     cudaMemcpy(dst, src, size, kind)
+    #define gpuMemcpyHostToDevice               cudaMemcpyHostToDevice
+    #define gpuMemcpyDeviceToHost               cudaMemcpyDeviceToHost
 
-    gpuSafe(gpuGetDeviceCount(&device_count));
+#elif defined(USE_HIP)
 
-    for (int i = 0; i < device_count; i++)
-    {
-        gpuDeviceProp prop;
+    #include <hip/hip_runtime.h>
 
-        gpuSafe(gpuGetDeviceProperties(&prop, i));
+    #define gpuSafe(e)                          hipSafe(e)
 
-        namesOfDevices.push_back(std::string(prop.name));
+    #define gpuDeviceProp                       hipDeviceProp_t
+    #define gpuGetDeviceCount(ptr)              hipGetDeviceCount(ptr)
+    #define gpuGetDeviceProperties(ptr, idx)    hipGetDeviceProperties(ptr, idx)
+    #define gpuSetDevice(idx)                   hipSetDevice(idx)
+    #define gpuMalloc(ptr, size)                hipMalloc(ptr, size)
+    #define gpuFree(ptr)                        hipFree(ptr)
+    #define gpuDeviceSynchronize()              hipDeviceSynchronize()
+    #define gpuMemcpy(dst, src, size, kind)     hipMemcpy(dst, src, size, kind)
+    #define gpuMemcpyHostToDevice               hipMemcpyHostToDevice
+    #define gpuMemcpyDeviceToHost               hipMemcpyDeviceToHost
 
-        globalMemoryOfDevices.push_back(static_cast<int64_t>(prop.totalGlobalMem));
+#else
 
-        computeMajorCapabilityOfDevices.push_back(static_cast<int64_t>(prop.major));
+  #error "Please define either USE_CUDA or USE_HIP"
 
-        computeMinorCapabilityOfDevices.push_back(static_cast<int64_t>(prop.minor));
-    }
-}
+#endif
 
-}  // namespace gpu
+#endif /* GpuWrapper_hpp */

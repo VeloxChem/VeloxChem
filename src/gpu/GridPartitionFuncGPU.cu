@@ -39,6 +39,7 @@
 #include "GridPartitionFuncGPU.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuWrapper.hpp"
 #include "GpuDevices.hpp"
 #include "MathFunc.hpp"
 
@@ -169,7 +170,7 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     // auto gpu_count = nnodes * num_gpus_per_node;
 
-    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     // grid and atom data
 
@@ -203,37 +204,37 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
 
     double *d_grid_x, *d_grid_y, *d_grid_z;
 
-    cudaSafe(cudaMalloc(&d_grid_x, grid_batch_size * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, grid_batch_size * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, grid_batch_size * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, grid_batch_size * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, grid_batch_size * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, grid_batch_size * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, gridx, grid_batch_size * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, gridy, grid_batch_size * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, gridz, grid_batch_size * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, gridx, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, gridy, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, gridz, grid_batch_size * sizeof(double), gpuMemcpyHostToDevice));
 
     uint32_t *d_atom_ids_of_points;
 
-    cudaSafe(cudaMalloc(&d_atom_ids_of_points, grid_batch_size * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_atom_ids_of_points, grid_batch_size * sizeof(uint32_t)));
 
-    cudaSafe(cudaMemcpy(d_atom_ids_of_points, atom_ids, grid_batch_size * sizeof(uint32_t), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_atom_ids_of_points, atom_ids, grid_batch_size * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
     double *d_partial_weights;
 
-    cudaSafe(cudaMalloc(&d_partial_weights, grid_batch_size * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_partial_weights, grid_batch_size * sizeof(double)));
 
     double *d_atom_x, *d_atom_y, *d_atom_z;
 
-    cudaSafe(cudaMalloc(&d_atom_x, nAtoms * 2 * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_atom_y, nAtoms * 2 * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_atom_z, nAtoms * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_atom_x, nAtoms * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_atom_y, nAtoms * 2 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_atom_z, nAtoms * 2 * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_atom_x, atom_coords.data() + 0 * nAtoms * 2, nAtoms * 2 * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_atom_y, atom_coords.data() + 1 * nAtoms * 2, nAtoms * 2 * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_atom_z, atom_coords.data() + 2 * nAtoms * 2, nAtoms * 2 * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_atom_x, atom_coords.data() + 0 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_atom_y, atom_coords.data() + 1 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_atom_z, atom_coords.data() + 2 * nAtoms * 2, nAtoms * 2 * sizeof(double), gpuMemcpyHostToDevice));
 
     // update weights using GPU
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
@@ -244,21 +245,21 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
                        d_atom_x, d_atom_y, d_atom_z, static_cast<uint32_t>(nAtoms),
                        d_partial_weights);
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
-    cudaSafe(cudaMemcpy(partial_weights.data(), d_partial_weights, grid_batch_size * sizeof(double), cudaMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(partial_weights.data(), d_partial_weights, grid_batch_size * sizeof(double), gpuMemcpyDeviceToHost));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
 
-    cudaSafe(cudaFree(d_atom_ids_of_points));
+    gpuSafe(gpuFree(d_atom_ids_of_points));
 
-    cudaSafe(cudaFree(d_partial_weights));
+    gpuSafe(gpuFree(d_partial_weights));
 
-    cudaSafe(cudaFree(d_atom_x));
-    cudaSafe(cudaFree(d_atom_y));
-    cudaSafe(cudaFree(d_atom_z));
+    gpuSafe(gpuFree(d_atom_x));
+    gpuSafe(gpuFree(d_atom_y));
+    gpuSafe(gpuFree(d_atom_z));
 
     for (int64_t i = 0; i < grid_batch_size; i++)
     {

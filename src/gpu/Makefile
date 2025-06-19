@@ -47,7 +47,12 @@ LOCAL_DEV_OPT := $(subst .cu,.optrpt,$(LOCAL_DEV_SCR))
 include ../Makefile.setup
 
 # Add device objects
-ifeq ($(USE_GPU),true)
+ifeq ($(USE_CUDA),true)
+LOCAL_SCR += $(LOCAL_DEV_SCR)
+LOCAL_OBJ += $(LOCAL_DEV_OBJ)
+LOCAL_DEP += $(LOCAL_DEV_DEP)
+LOCAL_OPT += $(LOCAL_DEV_OPT)
+else ifeq ($(USE_HIP),true)
 LOCAL_SCR += $(LOCAL_DEV_SCR)
 LOCAL_OBJ += $(LOCAL_DEV_OBJ)
 LOCAL_DEP += $(LOCAL_DEV_DEP)

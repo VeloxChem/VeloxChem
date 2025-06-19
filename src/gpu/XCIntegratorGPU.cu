@@ -46,6 +46,7 @@
 #include "FunctionalParser.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
+#include "GpuWrapper.hpp"
 #include "GpuDevices.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
@@ -1007,7 +1008,7 @@ getGtoValuesForLda(double*                     d_gto_values,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    cudaSafe(cudaMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice));
 
     // evaluate GTO values on grid points
 
@@ -1098,7 +1099,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    cudaSafe(cudaMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice));
 
     // evaluate GTO values on grid points
 
@@ -1204,7 +1205,7 @@ getGtoValuesForMgga(double*                     d_gto_values_0,
 
     auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
-    cudaSafe(cudaMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), gpuMemcpyHostToDevice));
 
     // evaluate GTO values on grid points
 
@@ -1316,7 +1317,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     // GTO values on grid points
 
@@ -1326,7 +1327,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double* d_gaos;
 
-    cudaSafe(cudaMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
 
     // coordinates of grid points
 
@@ -1338,13 +1339,13 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double *d_grid_x, *d_grid_y, *d_grid_z;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
     // counts and displacements of grid points in boxes
 
@@ -1419,7 +1420,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        cudaSafe(cudaMemcpy(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         for (int64_t nu = 0; nu < aocount; nu++)
         {
@@ -1427,11 +1428,11 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
         }
     }
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_gaos));
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_gaos));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
 
     return allgtovalues;
 }
@@ -1459,7 +1460,7 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     // GTO values on grid points
 
@@ -1472,10 +1473,10 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     double *d_gaos, *d_gaox, *d_gaoy, *d_gaoz;
 
-    cudaSafe(cudaMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gaox, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gaoy, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gaoz, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gaox, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gaoy, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gaoz, naos * max_npoints_per_box * sizeof(double)));
 
     // coordinates of grid points
 
@@ -1487,13 +1488,13 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     double *d_grid_x, *d_grid_y, *d_grid_z;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
     // counts and displacements of grid points in boxes
 
@@ -1572,10 +1573,10 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        cudaSafe(cudaMemcpy(mat_chi_0.values(), d_gaos, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(mat_chi_x.values(), d_gaox, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(mat_chi_y.values(), d_gaoy, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(mat_chi_z.values(), d_gaoz, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(mat_chi_0.values(), d_gaos, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(mat_chi_x.values(), d_gaox, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(mat_chi_y.values(), d_gaoy, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(mat_chi_z.values(), d_gaoz, aocount * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         for (int64_t nu = 0; nu < aocount; nu++)
         {
@@ -1586,14 +1587,14 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
         }
     }
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_gaos));
-    cudaSafe(cudaFree(d_gaox));
-    cudaSafe(cudaFree(d_gaoy));
-    cudaSafe(cudaFree(d_gaoz));
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_gaos));
+    gpuSafe(gpuFree(d_gaox));
+    gpuSafe(gpuFree(d_gaoy));
+    gpuSafe(gpuFree(d_gaoz));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
 
     return std::vector<CDenseMatrix>({allgtovalues_0, allgtovalues_x, allgtovalues_y, allgtovalues_z});
 }
@@ -1662,19 +1663,19 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     uint32_t* d_ao_inds;
 
-    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     // Kohn-Sham matrix
 
@@ -1684,13 +1685,13 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     double *d_mat_Vxc_full, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_mat_F;
 
-    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1717,9 +1718,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     double *d_rho, *d_exc, *d_vrho;
 
-    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
 
     // initial values for XC energy and number of electrons
 
@@ -1737,17 +1738,17 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // counts and displacements of grid points in boxes
 
@@ -1821,7 +1822,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
         // sub density matrix for ground-state rho
 
@@ -1863,12 +1864,12 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         // functional evaluation
 
-        cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rho, d_rho, 2 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        cudaSafe(cudaMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -1914,27 +1915,27 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         }
     }
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
-    cudaSafe(cudaMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_ao_inds));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_ao_inds));
 
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_gto_values));
-    cudaSafe(cudaFree(d_mat_F));
-    cudaSafe(cudaFree(d_den_mat_full));
-    cudaSafe(cudaFree(d_mat_Vxc_full));
+    gpuSafe(gpuFree(d_den_mat));
+    gpuSafe(gpuFree(d_gto_values));
+    gpuSafe(gpuFree(d_mat_F));
+    gpuSafe(gpuFree(d_den_mat_full));
+    gpuSafe(gpuFree(d_mat_Vxc_full));
 
-    cudaSafe(cudaFree(d_rho));
-    cudaSafe(cudaFree(d_exc));
-    cudaSafe(cudaFree(d_vrho));
+    gpuSafe(gpuFree(d_rho));
+    gpuSafe(gpuFree(d_exc));
+    gpuSafe(gpuFree(d_vrho));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
-    cudaSafe(cudaFree(d_grid_w));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_w));
 
     mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
 
@@ -2032,19 +2033,19 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     uint32_t* d_ao_inds;
 
-    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     // Kohn-Sham matrix
 
@@ -2054,17 +2055,17 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     double *d_mat_Vxc_full, *d_mat_Vxc, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z, *d_mat_F;
 
-    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_Vxc, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Vxc, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -2097,13 +2098,13 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     double *d_rho, *d_rhograd, *d_sigma, *d_exc, *d_vrho, *d_vsigma;
 
-    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
 
     // initial values for XC energy and number of electrons
 
@@ -2121,17 +2122,17 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // counts and displacements of grid points in boxes
 
@@ -2217,7 +2218,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
         // sub density matrix for groud-state rho
 
@@ -2264,15 +2265,15 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        cudaSafe(cudaMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         xcfun_copy.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
-        cudaSafe(cudaMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -2323,38 +2324,38 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         }
     }
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
-    cudaSafe(cudaMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(mat_Vxc_omp[gpu_id].getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
 
     // Note: symmetrize mat_Vxc
 
     mat_Vxc_omp[gpu_id].symmetrizeAndScale(0.5);
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_ao_inds));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_ao_inds));
 
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_gto_values));
-    cudaSafe(cudaFree(d_gto_values_x));
-    cudaSafe(cudaFree(d_gto_values_y));
-    cudaSafe(cudaFree(d_gto_values_z));
-    cudaSafe(cudaFree(d_mat_F));
-    cudaSafe(cudaFree(d_den_mat_full));
-    cudaSafe(cudaFree(d_mat_Vxc_full));
-    cudaSafe(cudaFree(d_mat_Vxc));
+    gpuSafe(gpuFree(d_den_mat));
+    gpuSafe(gpuFree(d_gto_values));
+    gpuSafe(gpuFree(d_gto_values_x));
+    gpuSafe(gpuFree(d_gto_values_y));
+    gpuSafe(gpuFree(d_gto_values_z));
+    gpuSafe(gpuFree(d_mat_F));
+    gpuSafe(gpuFree(d_den_mat_full));
+    gpuSafe(gpuFree(d_mat_Vxc_full));
+    gpuSafe(gpuFree(d_mat_Vxc));
 
-    cudaSafe(cudaFree(d_rho));
-    cudaSafe(cudaFree(d_rhograd));
-    cudaSafe(cudaFree(d_sigma));
-    cudaSafe(cudaFree(d_exc));
-    cudaSafe(cudaFree(d_vrho));
-    cudaSafe(cudaFree(d_vsigma));
+    gpuSafe(gpuFree(d_rho));
+    gpuSafe(gpuFree(d_rhograd));
+    gpuSafe(gpuFree(d_sigma));
+    gpuSafe(gpuFree(d_exc));
+    gpuSafe(gpuFree(d_vrho));
+    gpuSafe(gpuFree(d_vsigma));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
-    cudaSafe(cudaFree(d_grid_w));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_w));
 
     mat_Vxc_omp[gpu_id].setNumberOfElectrons(nele);
 
@@ -2491,19 +2492,19 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     uint32_t* d_ao_inds;
 
-    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     // Fxc matrix
 
@@ -2513,15 +2514,15 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
     double *d_mat_Fxc_full, *d_gs_den_mat_full, *d_rw_den_mat_full, *d_den_mat, *d_gto_values, *d_mat_F;
 
-    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_Fxc_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Fxc_full, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -2548,10 +2549,10 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
     double *d_rho, *d_rhow, *d_v2rho2;
 
-    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rhow, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rhow, dim->rho * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_v2rho2, dim->v2rho2 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_v2rho2, dim->v2rho2 * max_npoints_per_box * sizeof(double)));
 
     // coordinates and weights of grid points
 
@@ -2565,17 +2566,17 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // counts and displacements of grid points in boxes
 
@@ -2649,7 +2650,7 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
         // sub density matrix for ground-state rho
 
@@ -2691,11 +2692,11 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
 
         // functional evaluation
 
-        cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rho, d_rho, 2 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         xcfun_copy.compute_fxc_for_lda(npoints, rho, v2rho2);
 
-        cudaSafe(cudaMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice));
 
         // compute partial contribution to Fxc matrix and distribute partial
 
@@ -2774,28 +2775,28 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
                            static_cast<uint32_t>(npoints));
     }
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
-    cudaSafe(cudaMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_ao_inds));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_ao_inds));
 
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_gto_values));
-    cudaSafe(cudaFree(d_mat_F));
-    cudaSafe(cudaFree(d_gs_den_mat_full));
-    cudaSafe(cudaFree(d_rw_den_mat_full));
-    cudaSafe(cudaFree(d_mat_Fxc_full));
+    gpuSafe(gpuFree(d_den_mat));
+    gpuSafe(gpuFree(d_gto_values));
+    gpuSafe(gpuFree(d_mat_F));
+    gpuSafe(gpuFree(d_gs_den_mat_full));
+    gpuSafe(gpuFree(d_rw_den_mat_full));
+    gpuSafe(gpuFree(d_mat_Fxc_full));
 
-    cudaSafe(cudaFree(d_rho));
-    cudaSafe(cudaFree(d_rhow));
-    cudaSafe(cudaFree(d_v2rho2));
+    gpuSafe(gpuFree(d_rho));
+    gpuSafe(gpuFree(d_rhow));
+    gpuSafe(gpuFree(d_v2rho2));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
-    cudaSafe(cudaFree(d_grid_w));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_w));
 
     }
     }
@@ -2874,19 +2875,19 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     uint32_t* d_ao_inds;
 
-    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     // Fxc matrix
 
@@ -2901,25 +2902,25 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     // TODO: use smaller size for sub matrices such as d_den_mat, d_mat_Fxc, d_mat_Fxc_gga
 
-    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_G_gga, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_G_gga, naos * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_mat_Fxc, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_Fxc_gga, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Fxc, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Fxc_gga, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_Fxc_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_Fxc_full, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -2965,18 +2966,18 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     double *d_rho, *d_rhograd, *d_sigma, *d_rhow, *d_rhowgrad;
     double *d_vsigma, *d_v2rho2, *d_v2rhosigma, *d_v2sigma2;
 
-    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_rhow, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rhowgrad, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rhow, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rhowgrad, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_v2rho2, dim->v2rho2 * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_v2rhosigma, dim->v2rhosigma * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_v2sigma2, dim->v2sigma2 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_v2rho2, dim->v2rho2 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_v2rhosigma, dim->v2rhosigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_v2sigma2, dim->v2sigma2 * max_npoints_per_box * sizeof(double)));
 
     // coordinates and weights of grid points
 
@@ -2990,17 +2991,17 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // counts and displacements of grid points in boxes
 
@@ -3086,7 +3087,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
         // sub density matrix for ground-state rho
 
@@ -3134,19 +3135,19 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         // functional evaluation
 
-        cudaSafe(cudaMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
         xcfun_copy.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        cudaSafe(cudaMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
 
-        cudaSafe(cudaMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints * sizeof(double), gpuMemcpyHostToDevice));
 
         // compute partial contribution to Fxc matrix and distribute partial
 
@@ -3256,41 +3257,41 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
                            static_cast<uint32_t>(aocount));
     }
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
-    cudaSafe(cudaMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_ao_inds));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_ao_inds));
 
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_gto_values));
-    cudaSafe(cudaFree(d_gto_values_x));
-    cudaSafe(cudaFree(d_gto_values_y));
-    cudaSafe(cudaFree(d_gto_values_z));
-    cudaSafe(cudaFree(d_mat_F));
-    cudaSafe(cudaFree(d_mat_G_gga));
-    cudaSafe(cudaFree(d_mat_Fxc));
-    cudaSafe(cudaFree(d_mat_Fxc_gga));
-    cudaSafe(cudaFree(d_gs_den_mat_full));
-    cudaSafe(cudaFree(d_rw_den_mat_full));
-    cudaSafe(cudaFree(d_mat_Fxc_full));
+    gpuSafe(gpuFree(d_den_mat));
+    gpuSafe(gpuFree(d_gto_values));
+    gpuSafe(gpuFree(d_gto_values_x));
+    gpuSafe(gpuFree(d_gto_values_y));
+    gpuSafe(gpuFree(d_gto_values_z));
+    gpuSafe(gpuFree(d_mat_F));
+    gpuSafe(gpuFree(d_mat_G_gga));
+    gpuSafe(gpuFree(d_mat_Fxc));
+    gpuSafe(gpuFree(d_mat_Fxc_gga));
+    gpuSafe(gpuFree(d_gs_den_mat_full));
+    gpuSafe(gpuFree(d_rw_den_mat_full));
+    gpuSafe(gpuFree(d_mat_Fxc_full));
 
-    cudaSafe(cudaFree(d_rho));
-    cudaSafe(cudaFree(d_rhograd));
-    cudaSafe(cudaFree(d_rhow));
-    cudaSafe(cudaFree(d_rhowgrad));
-    cudaSafe(cudaFree(d_sigma));
+    gpuSafe(gpuFree(d_rho));
+    gpuSafe(gpuFree(d_rhograd));
+    gpuSafe(gpuFree(d_rhow));
+    gpuSafe(gpuFree(d_rhowgrad));
+    gpuSafe(gpuFree(d_sigma));
 
-    cudaSafe(cudaFree(d_vsigma));
-    cudaSafe(cudaFree(d_v2rho2));
-    cudaSafe(cudaFree(d_v2rhosigma));
-    cudaSafe(cudaFree(d_v2sigma2));
+    gpuSafe(gpuFree(d_vsigma));
+    gpuSafe(gpuFree(d_v2rho2));
+    gpuSafe(gpuFree(d_v2rhosigma));
+    gpuSafe(gpuFree(d_v2sigma2));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
-    cudaSafe(cudaFree(d_grid_w));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_w));
 
     }
     }
@@ -3423,23 +3424,23 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     uint32_t* d_ao_inds;
 
-    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     uint32_t* d_ao_to_atom_ids;
 
-    cudaSafe(cudaMalloc(&d_ao_to_atom_ids, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_to_atom_ids, naos * sizeof(uint32_t)));
 
     // GTOs on grid points
 
@@ -3447,23 +3448,23 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
     double *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z;
     double *d_dengrad_x, *d_dengrad_y, *d_dengrad_z;
 
-    cudaSafe(cudaMalloc(&d_mol_grad, natoms * 3 * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mol_grad, natoms * 3 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_dengrad_x, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_y, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_z, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_x, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_y, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_z, natoms * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
 
     dim3 threads_per_block(1, TILE_DIM);
 
@@ -3491,9 +3492,9 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
     double *d_rho, *d_exc, *d_vrho;
 
-    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
 
     // coordinates and weights of grid points
 
@@ -3507,17 +3508,17 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // counts and displacements of grid points in boxes
 
@@ -3607,9 +3608,9 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
-        cudaSafe(cudaMemcpy(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
         // sub density matrix for ground-state rho
 
@@ -3692,12 +3693,12 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
         // functional evaluation
 
-        cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rho, d_rho, 2 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         xcfun_copy.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        cudaSafe(cudaMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
 
         // accumulate partial contribution to Vxc gradient
 
@@ -3717,38 +3718,38 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
                            d_vrho);
     }
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // copy final gradient back
-    cudaSafe(cudaMemcpy(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), cudaMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost));
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_ao_inds));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_ao_inds));
 
-    cudaSafe(cudaFree(d_mol_grad));
+    gpuSafe(gpuFree(d_mol_grad));
 
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_mat_F));
-    cudaSafe(cudaFree(d_rw_den_mat_full));
-    cudaSafe(cudaFree(d_gs_den_mat_full));
+    gpuSafe(gpuFree(d_den_mat));
+    gpuSafe(gpuFree(d_mat_F));
+    gpuSafe(gpuFree(d_rw_den_mat_full));
+    gpuSafe(gpuFree(d_gs_den_mat_full));
 
-    cudaSafe(cudaFree(d_gto_values));
-    cudaSafe(cudaFree(d_gto_values_x));
-    cudaSafe(cudaFree(d_gto_values_y));
-    cudaSafe(cudaFree(d_gto_values_z));
+    gpuSafe(gpuFree(d_gto_values));
+    gpuSafe(gpuFree(d_gto_values_x));
+    gpuSafe(gpuFree(d_gto_values_y));
+    gpuSafe(gpuFree(d_gto_values_z));
 
-    cudaSafe(cudaFree(d_dengrad_x));
-    cudaSafe(cudaFree(d_dengrad_y));
-    cudaSafe(cudaFree(d_dengrad_z));
+    gpuSafe(gpuFree(d_dengrad_x));
+    gpuSafe(gpuFree(d_dengrad_y));
+    gpuSafe(gpuFree(d_dengrad_z));
 
-    cudaSafe(cudaFree(d_rho));
-    cudaSafe(cudaFree(d_exc));
-    cudaSafe(cudaFree(d_vrho));
+    gpuSafe(gpuFree(d_rho));
+    gpuSafe(gpuFree(d_exc));
+    gpuSafe(gpuFree(d_vrho));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
-    cudaSafe(cudaFree(d_grid_w));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_w));
 
     }
     }
@@ -3841,23 +3842,23 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    auto gpu_count = nnodes * num_gpus_per_node;
+    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    cudaSafe(cudaSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     uint32_t* d_ao_inds;
 
-    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     uint32_t* d_ao_to_atom_ids;
 
-    cudaSafe(cudaMalloc(&d_ao_to_atom_ids, naos * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ao_to_atom_ids, naos * sizeof(uint32_t)));
 
     // GTOs on grid points
 
@@ -3871,46 +3872,46 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     double *d_dengrad_yx, *d_dengrad_yy, *d_dengrad_yz;
     double *d_dengrad_zx, *d_dengrad_zy, *d_dengrad_zz;
 
-    cudaSafe(cudaMalloc(&d_mol_grad, natoms * 3 * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mol_grad, natoms * 3 * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F_x, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F_y, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F_z, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F_x, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F_y, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_mat_F_z, naos * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_gto_values_xx, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_xy, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_xz, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_yy, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_yz, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values_zz, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_xx, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_xy, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_xz, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_yy, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_yz, naos * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_gto_values_zz, naos * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_dengrad_x, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_y, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_z, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_x, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_y, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_z, natoms * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_dengrad_xx, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_xy, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_xz, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_xx, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_xy, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_xz, natoms * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_dengrad_yx, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_yy, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_yz, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_yx, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_yy, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_yz, natoms * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_dengrad_zx, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_zy, natoms * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_dengrad_zz, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_zx, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_zy, natoms * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_dengrad_zz, natoms * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
 
     dim3 threads_per_block(1, TILE_DIM);
 
@@ -3942,12 +3943,12 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
     double *d_rho, *d_rhograd, *d_sigma, *d_vrho, *d_vsigma;
 
-    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
 
-    cudaSafe(cudaMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
 
     // coordinates and weights of grid points
 
@@ -3961,17 +3962,17 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // counts and displacements of grid points in boxes
 
@@ -4067,9 +4068,9 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
             ao_to_atom_ids_int32[ind] = static_cast<uint32_t>(ao_to_atom_ids[aoinds[ind]]);
         }
 
-        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
-        cudaSafe(cudaMemcpy(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_ao_to_atom_ids, ao_to_atom_ids_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
         // sub density matrix for groud-state rho
 
@@ -4196,14 +4197,14 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
 
         // funtional evaluation
 
-        cudaSafe(cudaMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-        cudaSafe(cudaMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost));
 
         xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpuSafe(gpuMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
 
         // accumulate partial contribution to Vxc gradient
 
@@ -4234,46 +4235,46 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
                            d_rhograd);
     }
 
-    cudaSafe(cudaDeviceSynchronize());
+    gpuSafe(gpuDeviceSynchronize());
 
     // copy final gradient back
-    cudaSafe(cudaMemcpy(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), cudaMemcpyDeviceToHost));
+    gpuSafe(gpuMemcpy(molgrad_omp.row(gpu_id), d_mol_grad, natoms * 3 * sizeof(double), gpuMemcpyDeviceToHost));
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_ao_inds));
-    cudaSafe(cudaFree(d_ao_to_atom_ids));
+    gpuSafe(gpuFree(d_gto_info));
+    gpuSafe(gpuFree(d_ao_inds));
+    gpuSafe(gpuFree(d_ao_to_atom_ids));
 
-    cudaSafe(cudaFree(d_gto_values));
-    cudaSafe(cudaFree(d_gto_values_x));
-    cudaSafe(cudaFree(d_gto_values_y));
-    cudaSafe(cudaFree(d_gto_values_z));
+    gpuSafe(gpuFree(d_gto_values));
+    gpuSafe(gpuFree(d_gto_values_x));
+    gpuSafe(gpuFree(d_gto_values_y));
+    gpuSafe(gpuFree(d_gto_values_z));
 
-    cudaSafe(cudaFree(d_gto_values_xx));
-    cudaSafe(cudaFree(d_gto_values_xy));
-    cudaSafe(cudaFree(d_gto_values_xz));
-    cudaSafe(cudaFree(d_gto_values_yy));
-    cudaSafe(cudaFree(d_gto_values_yz));
-    cudaSafe(cudaFree(d_gto_values_zz));
+    gpuSafe(gpuFree(d_gto_values_xx));
+    gpuSafe(gpuFree(d_gto_values_xy));
+    gpuSafe(gpuFree(d_gto_values_xz));
+    gpuSafe(gpuFree(d_gto_values_yy));
+    gpuSafe(gpuFree(d_gto_values_yz));
+    gpuSafe(gpuFree(d_gto_values_zz));
 
-    cudaSafe(cudaFree(d_mat_F));
-    cudaSafe(cudaFree(d_mat_F_x));
-    cudaSafe(cudaFree(d_mat_F_y));
-    cudaSafe(cudaFree(d_mat_F_z));
+    gpuSafe(gpuFree(d_mat_F));
+    gpuSafe(gpuFree(d_mat_F_x));
+    gpuSafe(gpuFree(d_mat_F_y));
+    gpuSafe(gpuFree(d_mat_F_z));
 
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_rw_den_mat_full));
-    cudaSafe(cudaFree(d_gs_den_mat_full));
+    gpuSafe(gpuFree(d_den_mat));
+    gpuSafe(gpuFree(d_rw_den_mat_full));
+    gpuSafe(gpuFree(d_gs_den_mat_full));
 
-    cudaSafe(cudaFree(d_rho));
-    cudaSafe(cudaFree(d_rhograd));
-    cudaSafe(cudaFree(d_sigma));
-    cudaSafe(cudaFree(d_vrho));
-    cudaSafe(cudaFree(d_vsigma));
+    gpuSafe(gpuFree(d_rho));
+    gpuSafe(gpuFree(d_rhograd));
+    gpuSafe(gpuFree(d_sigma));
+    gpuSafe(gpuFree(d_vrho));
+    gpuSafe(gpuFree(d_vsigma));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
-    cudaSafe(cudaFree(d_grid_w));
+    gpuSafe(gpuFree(d_grid_x));
+    gpuSafe(gpuFree(d_grid_y));
+    gpuSafe(gpuFree(d_grid_z));
+    gpuSafe(gpuFree(d_grid_w));
 
     }
     }
