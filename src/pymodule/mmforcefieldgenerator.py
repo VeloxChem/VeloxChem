@@ -819,6 +819,14 @@ class MMForceFieldGenerator:
 
         self.ostream.print_info('Dihedral MM parameters have been reparameterized and updated in the topology.')
         self.ostream.flush()
+
+        return {
+            'dihedral_angles': np.array(fitted_dihedral_results['dihedral_angles']),
+            'qm_scan_kJpermol': np.array(fitted_dihedral_results['qm_scan_kJpermol']),
+            'mm_scan_kJpermol': np.array(fitted_dihedral_results['mm_scan_kJpermol']),
+            'maximum_difference': self.fitting_summary['maximum_difference'],
+            'standard_deviation': self.fitting_summary['standard_deviation'],
+        }
    
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
