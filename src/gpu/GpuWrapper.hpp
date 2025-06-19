@@ -35,8 +35,6 @@
 
 #if defined(USE_CUDA)
 
-    #include <cuda_runtime.h>
-
     #define gpuSafe(e)                          cudaSafe(e)
 
     #define gpuDeviceProp                       cudaDeviceProp
@@ -51,8 +49,6 @@
     #define gpuMemcpyDeviceToHost               cudaMemcpyDeviceToHost
 
 #elif defined(USE_HIP)
-
-    #include <hip/hip_runtime.h>
 
     #define gpuSafe(e)                          hipSafe(e)
 
