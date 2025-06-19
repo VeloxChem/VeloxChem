@@ -39,7 +39,7 @@
 
 #include "BatchFunc.hpp"
 #include "GtoBlock.hpp"
-#include "OverlapPrimRecSS.hpp"
+#include "LocalCorePotentialPrimRecSS.hpp"
 #include "SimdArray.hpp"
 #include "T2CTransform.hpp"
 #include "T2CUtils.hpp"
@@ -154,7 +154,9 @@ comp_local_core_potential_ss(T&                  distributor,
                     
                     const auto c_fact = pot_facts[l];
                     
-                    ovlrec::comp_prim_overlap_ss(pbuffer, 0, factors, a_exp, a_norm);
+                    t2cfunc::comp_coordinates_r(factors, 5, 2, r_a, a_exp, c_exp);
+                    
+                    ecprec::comp_prim_local_core_potential_ss(pbuffer, 0, factors, 5, r_a, a_exp, a_norm, c_exp, c_fact);
 
                     t2cfunc::reduce(cbuffer, pbuffer, 0, ket_width, ket_npgtos);
                 }

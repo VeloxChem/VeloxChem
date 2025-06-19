@@ -135,6 +135,56 @@ comp_coordinates_p(CSimdArray<double>& buffer, const size_t index_p, const size_
 }
 
 auto
+comp_coordinates_r(CSimdArray<double>& buffer, const size_t index_r, const size_t index_b, const TPoint<double>& r_a, const double a_exp, const double c_exp) -> void
+{
+    // Set up exponents
+
+    auto b_exps = buffer.data(0);
+
+    // set up Cartesian R coordinates
+
+    auto r_x = buffer.data(index_r);
+
+    auto r_y = buffer.data(index_r + 1);
+
+    auto r_z = buffer.data(index_r + 2);
+
+    // set up Cartesian B coordinates
+
+    auto b_x = buffer.data(index_b);
+
+    auto b_y = buffer.data(index_b + 1);
+
+    auto b_z = buffer.data(index_b + 2);
+
+    // set up Cartesian A coordinates
+
+    const auto xyz = r_a.coordinates();
+
+    const auto a_x = xyz[0];
+
+    const auto a_y = xyz[1];
+
+    const auto a_z = xyz[2];
+
+    // compute R(AB) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(r_x, r_y, r_z, b_x, b_y, b_z, b_exps : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        double fact = 1.0 / (a_exp + b_exps[i] + c_exp);
+
+        r_x[i] = fact * (a_x * a_exp + b_x[i] * b_exps[i]);
+
+        r_y[i] = fact * (a_y * a_exp + b_y[i] * b_exps[i]);
+
+        r_z[i] = fact * (a_z * a_exp + b_z[i] * b_exps[i]);
+    }
+}
+
+auto
 comp_distances_pb(CSimdArray<double>& buffer, const size_t index_pb, const size_t index_ab, const double a_exp) -> void
 {
     // Set up exponents
@@ -297,6 +347,50 @@ comp_distances_pa_from_p(CSimdArray<double>& buffer, const size_t index_pa, cons
         pa_y[i] = p_y[i] - a_y;
 
         pa_z[i] = p_z[i] - a_z;
+    }
+}
+
+auto
+comp_distances_ra(CSimdArray<double>& buffer, const size_t index_ra, const size_t index_r, const TPoint<double>& r_a) -> void
+{
+    // set up R(RA) distances
+
+    auto ra_x = buffer.data(index_ra);
+
+    auto ra_y = buffer.data(index_ra + 1);
+
+    auto ra_z = buffer.data(index_ra + 2);
+
+    // set up Cartesian R coordinates
+
+    auto r_x = buffer.data(index_r);
+
+    auto r_y = buffer.data(index_r + 1);
+
+    auto r_z = buffer.data(index_r + 2);
+
+    // set up Cartesian A coordinates
+
+    const auto xyz = r_a.coordinates();
+
+    const auto a_x = xyz[0];
+
+    const auto a_y = xyz[1];
+
+    const auto a_z = xyz[2];
+
+    // compute R(PA) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(ra_x, ra_y, ra_z, r_x, r_y, r_z : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        ra_x[i] = r_x[i] - a_x;
+
+        ra_y[i] = r_y[i] - a_y;
+
+        ra_z[i] = r_z[i] - a_z;
     }
 }
 

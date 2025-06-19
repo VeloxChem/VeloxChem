@@ -95,8 +95,6 @@ CCorePotentialDriver::compute(const CMolecularBasis& basis, const CMolecularCore
                         
                         auto r_pot = ecp_potentials[ecp_indices[i]];
                         
-                    
-                        
                         // compute local potential contribution
                         
                         ecpfunc::compute(distributor, r_pot.get_local_potential(), r_xyz,   bra_gtos, ket_gtos, bra_indices, ket_indices, bkequal);

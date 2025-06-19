@@ -59,6 +59,16 @@ auto comp_distances_ab(CSimdArray<double>& buffer, const size_t index_ab, const 
 auto comp_coordinates_p(CSimdArray<double>& buffer, const size_t index_p, const size_t index_b, const TPoint<double>& r_a, const double a_exp)
     -> void;
 
+/// @brief Computes R center coordinates.
+/// @param buffer The SIMD array containing R(AB) distances and Cartesian A, B coordinates.
+/// @param index_r The primary row index of  Cartesian R points coordinates in SIMD array.
+/// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+/// @param a_exp The exponent on A center.
+/// @param c_exp The exponent on A center.
+auto comp_coordinates_r(CSimdArray<double>& buffer, const size_t index_r, const size_t index_b, const TPoint<double>& r_a, const double a_exp, const double c_exp)
+    -> void;
+
 /// @brief Computes R(PB) = P - B distances.
 /// @param buffer The SIMD array containing R(PB) distances.
 /// @param index_pb The primary row index of R(PB) distances in SIMD array.
@@ -86,6 +96,13 @@ auto comp_distances_pb_from_p(CSimdArray<double>& buffer, const size_t index_pb,
 /// @param index_p The primary row index of  Cartesian P points coordinates in SIMD array.
 /// @param r_a The Cartesian A point coordinates.
 auto comp_distances_pa_from_p(CSimdArray<double>& buffer, const size_t index_pa, const size_t index_p, const TPoint<double>& r_a) -> void;
+
+/// @brief Computes R(RA) = R - A distances.
+/// @param buffer The SIMD array containing R(RA) distances.
+/// @param index_ra The primary row index of R(RA) distances in SIMD array.
+/// @param index_r The primary row index of  Cartesian R points coordinates in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+auto comp_distances_pa_from_p(CSimdArray<double>& buffer, const size_t index_ra, const size_t index_r, const TPoint<double>& r_a) -> void;
 
 /// @brief Computes R(PC) = P - C distances.
 /// @param buffer The SIMD array containing R(PC) distances.
