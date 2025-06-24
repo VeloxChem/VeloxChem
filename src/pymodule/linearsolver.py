@@ -518,35 +518,22 @@ class LinearSolver:
 
         # C-PCM setup
         if self._cpcm:
-            cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
-            self.ostream.print_info(cpcm_info)
-            self.ostream.print_blank()
-            iswig_ref = 'A. W. Lange, J. M. Herbert,'
-            iswig_ref += ' J. Chem. Phys. 2010, 133, 244111.'
-            self.ostream.print_reference(iswig_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
 
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
+            self.cpcm_drv.print_info()
 
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.optical_epsilon = self.cpcm_optical_epsilon
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
 
             cpcm_grid_t0 = tm.time()
 
-            (self._cpcm_grid,
-             self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
-
-            cpcm_local_precond = self.cpcm_drv.form_local_precond(
-                self._cpcm_grid, self._cpcm_sw_func)
-
-            self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
-            self._cpcm_precond = np.hstack(self._cpcm_precond)
+            self.cpcm_drv.init(molecule, do_nuclear = False)
 
             self.ostream.print_info(
-                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
+                f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
                 + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1502,28 +1489,10 @@ class LinearSolver:
             t0 = tm.time()
 
             for idx in range(num_densities):
-                Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
-                                                   self._cpcm_grid,
-                                                   dens[idx] * 2.0)
-                if comm_rank == mpi_master():
-                    if self.non_equilibrium_solv:
-                        scale_f = -(self.cpcm_optical_epsilon - 1) / (
-                            self.cpcm_optical_epsilon + self.cpcm_drv.x)
-                    else:
-                        scale_f = -(self.cpcm_drv.epsilon - 1) / (
-                            self.cpcm_drv.epsilon + self.cpcm_drv.x)
-                    rhs = scale_f * (Cvec)
-                else:
-                    rhs = None
-
-                rhs = self.comm.bcast(rhs, root=mpi_master())
-
-                cpcm_rsp_q = self.cpcm_drv.cg_solve_parallel_direct(
-                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, None, self.cpcm_cg_thresh)
-
-                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
-                    molecule, basis, self._cpcm_grid, cpcm_rsp_q)
+                Fock_sol = self.cpcm_drv.compute_response_fock(
+                    molecule, basis, dens[idx] * 2.0,
+                    self.cpcm_cg_thresh, self.non_equilibrium_solv
+                )
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol

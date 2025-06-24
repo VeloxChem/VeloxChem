@@ -94,6 +94,7 @@ class CpcmDriver:
         # model settings
         # standard value for dielectric const. is for that of water
         self.epsilon         = 78.39 
+        self.optical_epsilon = 1.777849
         self.grid_per_sphere = (194, 110)
         self.x               = 0
 
@@ -108,6 +109,158 @@ class CpcmDriver:
                 'x': ('float', 'parameter for scaling function'),
             },
         }
+
+    def print_info(self):
+        """
+        Print information and reference.
+        """
+        cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
+        self.ostream.print_info(cpcm_info)
+        self.ostream.print_blank()
+        iswig_ref = 'A. W. Lange, J. M. Herbert,'
+        iswig_ref += ' J. Chem. Phys. 2010, 133, 244111.'
+        self.ostream.print_reference(iswig_ref)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def init(self, molecule, do_nuclear = True):
+        """
+        Initialize the driver for energy calculations.
+
+        :param molecule:
+            The molecule.
+        :param do_nuclear:
+            Flag to compute or not the nuclear contribution.
+        """
+
+        (self._cpcm_grid,
+             self._cpcm_sw_func) = self.generate_cpcm_grid(molecule)
+
+        cpcm_local_precond = self.form_local_precond(
+                self._cpcm_grid, self._cpcm_sw_func)
+
+        self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
+        self._cpcm_precond = np.hstack(self._cpcm_precond)
+
+        if do_nuclear:
+            self._cpcm_Bzvec = self.form_vector_Bz(
+                    self._cpcm_grid, molecule)
+
+        self._cpcm_q = None
+
+    def compute_fock(self, molecule, basis, density, cpcm_cg_thresh):
+        """
+        Compute the energy and Fock matrix contribution.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The atomic basis.
+        :param density:
+            The AO density matrix.
+        :param cpcm_cg_thresh:
+            threshold for solving charges.
+
+        :return:
+            The energy and Fock matrix contributions
+        """
+        Cvec = self.form_vector_C(molecule, basis, self._cpcm_grid, density)
+
+        if self.rank == mpi_master():
+            scale_f = -(self.epsilon - 1) / (
+                self.epsilon + self.x)
+            rhs = scale_f * (self._cpcm_Bzvec + Cvec)
+        else:
+            rhs = None
+        rhs = self.comm.bcast(rhs, root=mpi_master())
+
+        # in case number of C-PCM grid points do not match between
+        # cpcm_q and rhs, such as between previous and current
+        # geometries during an optimization, reset cpcm_q
+
+        if self._cpcm_q is not None and self._cpcm_q.size != rhs.size:
+            self._cpcm_q = None
+
+        self._cpcm_q = self.cg_solve_parallel_direct(
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
+                    rhs, self._cpcm_q, cpcm_cg_thresh)
+
+        if self.rank == mpi_master():
+            e_sol = self.compute_solv_energy(
+                self._cpcm_Bzvec, Cvec, self._cpcm_q)
+            self.cpcm_epol = e_sol
+        else:
+            self.cpcm_epol = None
+
+        Fock_sol = self.get_contribution_to_Fock(
+                    molecule, basis, self._cpcm_grid, self._cpcm_q)
+
+        return self.cpcm_epol, Fock_sol
+
+    def compute_response_fock(self, molecule, basis, density, cpcm_cg_thresh, non_equilibrium):
+        """
+        Compute the Fock matrix contribution to response calculations.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The atomic basis.
+        :param density:
+            The AO density matrix.
+        :param cpcm_cg_thresh:
+            threshold for solving charges.
+        :param non_equilibrium:
+            flag to activate the use of non-equilibrium epsilon.
+
+        :return:
+            The Fock matrix contribution.
+        """
+        Cvec = self.form_vector_C(molecule, basis, self._cpcm_grid, density)
+
+        if self.rank == mpi_master():
+            if non_equilibrium:
+                scale_f = -(self.optical_epsilon - 1) / (
+                    self.optical_epsilon + self.x)
+            else:
+                scale_f = -(self.epsilon - 1) / (
+                    self.epsilon + self.x)
+            rhs = scale_f * (Cvec)
+        else:
+            rhs = None
+
+        rhs = self.comm.bcast(rhs, root=mpi_master())
+
+        cpcm_rsp_q = self.cg_solve_parallel_direct(
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
+                    rhs, None, cpcm_cg_thresh)
+
+        return self.get_contribution_to_Fock(
+                    molecule, basis, self._cpcm_grid, cpcm_rsp_q)
+
+
+    def compute_gradient(self, molecule, basis, density):
+        """
+        Compute geometric gradient contribution.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The atomic basis.
+        :param density:
+            The AO density matrix.
+
+        :return:
+            The gradient contributions
+        """
+        gradA = self.grad_Aij(molecule, self._cpcm_grid, self._cpcm_q, self.epsilon, self.x)
+
+        gradA += self.grad_Aii(molecule, self._cpcm_grid, self._cpcm_sw_func, self._cpcm_q, self.epsilon, self.x)
+
+        gradB = self.grad_B(molecule, self._cpcm_grid, self._cpcm_q)
+
+        gradC = self.grad_C(molecule, basis, self._cpcm_grid, self._cpcm_q, density)
+
+        return gradA + gradB + gradC
 
     @staticmethod
     def erf_array(array):
@@ -147,12 +300,12 @@ class CpcmDriver:
         Computes (electrostatic component of) C-PCM energy.
         TODO: add other components of the energy
 
-        :param molecule:
-            The molecule.
         :param Bzvec:
             The nuclear potential on the grid.
         :param Cvec:
             The electronic potential on the grid.
+        :param molecule:
+            The molecule.
 
         :return:
             The C-PCM energy.
@@ -676,21 +829,6 @@ class CpcmDriver:
 
         return compute_nuclear_potential_erf_gradient(
             molecule, basis, grid_coords, q[start:end], DM, zeta, atom_indices)
-
-    def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D):
-        """
-        Collects the CPCM gradient contribution.
-        """
-
-        gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x)
-
-        gradA += self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
-
-        gradB = self.grad_B(molecule, grid, q)
-
-        gradC = self.grad_C(molecule, basis, grid, q, D)
-
-        return gradA + gradB + gradC
 
     def cg_solve_parallel_direct(self,
                                  grid,
