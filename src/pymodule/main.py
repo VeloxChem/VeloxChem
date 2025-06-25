@@ -58,6 +58,7 @@ from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
 from .rspthreepatransition import ThreePATransition
+from .imagpolarizability import ImaginaryPolarizability
 
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver

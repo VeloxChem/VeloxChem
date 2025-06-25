@@ -142,6 +142,7 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
+from .imagpolarizability import ImaginaryPolarizability
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
 from .shgdriver import ShgDriver
