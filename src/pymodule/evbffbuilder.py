@@ -34,8 +34,10 @@ from mpi4py import MPI
 import numpy as np
 import networkx as nx
 import sys
-
+import os
+import copy
 from .veloxchemlib import mpi_master
+from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -48,6 +50,7 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionmatcher import ReactionMatcher
 from .outputstream import OutputStream
 from .veloxchemlib import Point
+from .waterparameters import get_water_parameters
 
 try:
     import openmm as mm
@@ -85,12 +88,17 @@ class EvbForceFieldBuilder():
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
 
+        self.mute_scf: bool = True
+
         self.optimize_ff: bool = True
+        self.water_model: str
 
     def build_forcefields(
         self,
         reactant_input: list[dict],
         product_input: list[dict],
+        reactant_total_multiplicity: int,
+        product_total_multiplicity: int,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ):
@@ -102,8 +110,9 @@ class EvbForceFieldBuilder():
 
         self.ostream.print_info("Creating combined reactant force field")
         self.ostream.flush()
-        reamol = molecule = self._combine_molecule(
-            [rea['molecule'] for rea in reactant_input])
+        reamol = self._combine_molecule(
+            [rea['molecule'] for rea in reactant_input],reactant_total_multiplicity)
+        self.ostream.print_info(f"Combined reactant with total charge {reamol.get_charge()} and multiplicity {reamol.get_multiplicity()}")
         self.reactant = self._combine_forcefield(reactants)
         self.reactant.molecule = reamol
 
@@ -115,7 +124,8 @@ class EvbForceFieldBuilder():
 
         self.ostream.print_info("Creating combined product force field")
         self.ostream.flush()
-        promol = self._combine_molecule([pro['molecule'] for pro in product_input],)
+        promol = self._combine_molecule([pro['molecule'] for pro in product_input],product_total_multiplicity)
+        self.ostream.print_info(f"Combined product with total charge {promol.get_charge()} and multiplicity {promol.get_multiplicity()}")
         self.product = self._combine_forcefield(products)
         self.product.molecule = promol
 
@@ -141,25 +151,39 @@ class EvbForceFieldBuilder():
                 self.product, 
                 broken_bonds,note='product',
             )
+        
 
-        return self.reactant, self.product, formed_bonds, broken_bonds
+        return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products
 
     @staticmethod
-    def _combine_molecule(molecules):
+    def _combine_molecule(molecules, total_multiplicity):
         
-        combined_molecule = molecules[0]
+        combined_molecule = Molecule()
         # pos = []
-        for mol in molecules[1:]:
-
-            max_x = max(combined_molecule.get_coordinates_in_angstrom()[:, 0])
-            min_x = min(combined_molecule.get_coordinates_in_angstrom()[:, 0])
-            shift = max_x - min_x + 2
+        charge = 0
+        Sm1 = 0
+        for mol in molecules:
+            charge += mol.get_charge()
+            Sm1 += mol.get_multiplicity()-1
+            if combined_molecule.number_of_atoms() > 0:
+                max_x = max(combined_molecule.get_coordinates_in_angstrom()[:, 0])
+                min_x = min(combined_molecule.get_coordinates_in_angstrom()[:, 0])
+                shift = max_x - min_x + 2
+            else:
+                shift = 0
 
             for elem, coord in zip(mol.get_element_ids(),
                                    mol.get_coordinates_in_angstrom()):
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
+        combined_molecule.set_charge(charge)
+        if total_multiplicity > -1:
+            combined_molecule.set_multiplicity(total_multiplicity)
+        else:
+            combined_molecule.set_multiplicity(Sm1+1)
+
+        molecule_sanity_check(combined_molecule)
         return combined_molecule
 
     def _optimize_molecule(self, elemental_ids, forcefield, changing_bonds, name='MOL',note=None):
@@ -191,12 +215,13 @@ class EvbForceFieldBuilder():
             forcefield.bonds.pop(bond)
 
         pdb = mmapp.PDBFile(f'{name}.pdb')
+        ff = mmapp.ForceField(f'{name}.xml')
+
         modeller = mmapp.Modeller(pdb.topology,pdb.positions)
             
         top = modeller.getTopology()
         pos = modeller.getPositions()
 
-        ff = mmapp.ForceField(f'{name}.xml')
 
         mmsys = ff.createSystem(
             top,
@@ -223,6 +248,9 @@ class EvbForceFieldBuilder():
                         nbforce.addException(i, j,0,1,0)
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
+        os.unlink(f'{name}.xml')
+        os.unlink(f'{name}.pdb')
+        os.unlink(f'{name}_sys.xml')
         integrator = mm.VerletIntegrator(0.001)
         sim = mmapp.Simulation(top, mmsys, integrator)
         sim.context.setPositions(pos)
@@ -238,7 +266,9 @@ class EvbForceFieldBuilder():
         for i,elem in enumerate(elemental_ids):
             point = Point(pos[i])
             new_molecule.add_atom(int(elem), point, 'angstrom')
-
+        new_molecule.set_charge(forcefield.molecule.get_charge())
+        new_molecule.set_multiplicity(
+            forcefield.molecule.get_multiplicity())
         return new_molecule
 
     def get_forcefield(
@@ -259,15 +289,20 @@ class EvbForceFieldBuilder():
             forcefield.molecule = molecule
         else:
             if input["optimize"] and optimize:
-                self.ostream.print_info("Optimising the geometry with xtb.")
-                scf_drv = XtbDriver()
+                scf_drv = XtbDriver(ostream=self.ostream)
                 opt_drv = OptimizationDriver(scf_drv)
                 opt_drv.hessian = "last"
+                if self.mute_scf:
+                    self.ostream.print_info("Optimising the geometry with xtb.")
+                    self.ostream.mute()
                 opt_results = opt_drv.compute(molecule)
+                self.ostream.unmute()
                 molecule = Molecule.from_xyz_string(
                     opt_results["final_geometry"])
 
-            forcefield = MMForceFieldGenerator()
+
+            forcefield = MMForceFieldGenerator(ostream=self.ostream)
+            
             forcefield.eq_param = False
             #Load or calculate the charges
 
@@ -282,7 +317,7 @@ class EvbForceFieldBuilder():
                 forcefield.partial_charges = input["charges"]
                 self.ostream.print_info("Creating topology")
                 self.ostream.flush()
-                forcefield.create_topology(molecule)
+                forcefield.create_topology(molecule,water_model = self.water_model)
             else:
                 if max(molecule.get_masses()) > 84:
                     basis = MolecularBasis.read(molecule,
@@ -296,45 +331,48 @@ class EvbForceFieldBuilder():
                                                 "6-31G*",
                                                 ostream=None)
                 if molecule.get_multiplicity() == 1:
-                    scf_drv = ScfRestrictedDriver()
+                    scf_drv = ScfRestrictedDriver(ostream=self.ostream)
                 else:
-                    scf_drv = ScfUnrestrictedDriver()
-                self.ostream.flush()
+                    scf_drv = ScfUnrestrictedDriver(ostream=self.ostream)
+                
+                if self.mute_scf:
+                    self.ostream.print_info("Calculating SCF for RESP charges")
+                    self.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
                     scf_drv.conv_thresh = 1.0e-4
                     scf_drv.max_iter = 200
                     scf_results = scf_drv.compute(molecule, basis)
+                self.ostream.unmute()
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
-
-                resp_drv = RespChargesDriver()
-                self.ostream.print_info("Calculating RESP charges")
+                resp_drv = RespChargesDriver(ostream=self.ostream)
                 self.ostream.flush()
+                if self.mute_scf:
+                    self.ostream.print_info("Calculating RESP charges")
+                    self.ostream.mute()
                 forcefield.partial_charges = resp_drv.compute(
                     molecule, basis, scf_results, 'resp')
+                
+                self.ostream.unmute()
                 self.ostream.flush()
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule,
                                            basis,
-                                           scf_results=scf_results)
+                                           scf_results=scf_results,
+                                           water_model = self.water_model,)
 
             # The atomtypeidentifier returns water with no Lennard-Jones on the hydrogens, which leads to unstable simulations
-            for atom in forcefield.atoms.values():
-                if atom['type'] == 'ow':
-                    sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0930 * 4.184
-                    atom['type'] = 'oh'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water oxygen"
-                elif atom['type'] == 'hw':
+            atom_types = [atom['type'] for atom in forcefield.atoms.values()]
+            if 'ow' in atom_types and 'hw' in atom_types and len(atom_types)==3:
+                water_model = get_water_parameters()[self.water_model]
+                for atom_id, atom in forcefield.atoms.items():
+                    forcefield.atoms[atom_id] = copy.copy(water_model[atom['type']])
+                    forcefield.atoms[atom_id]['name'] = forcefield.atoms[atom_id]['name'][0] + str(atom_id)
+                for bond_id in forcefield.bonds.keys():
+                    forcefield.bonds[bond_id] = water_model['bonds']
+                for ang_id in forcefield.angles.keys():
+                    forcefield.angles[ang_id] = water_model['angles']
 
-                    sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
-                    epsilon = 0.0047 * 4.184
-                    atom['type'] = 'ho'
-                    atom['sigma'] = sigma
-                    atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water hydrogen"
 
             #Reparameterize the forcefield if necessary and requested
             unknowns_params = 'Guessed' in [
@@ -389,7 +427,7 @@ class EvbForceFieldBuilder():
         for i, elem in enumerate(pro_elems):
             pro_graph.nodes[i]['elem'] = elem
 
-        rm = ReactionMatcher()
+        rm = ReactionMatcher(ostream=self.ostream)
         total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
@@ -413,6 +451,8 @@ class EvbForceFieldBuilder():
         forcefield.dihedrals = {}
         forcefield.impropers = {}
         atom_count = 0
+        forcefield.unique_atom_types = []
+        forcefield.pairs = {}
         
         for i, ff in enumerate(forcefields):
             # Shift all atom keys by the current atom count so that every atom has a unique ID
@@ -431,6 +471,9 @@ class EvbForceFieldBuilder():
             forcefield.angles.update(ff.angles)
             forcefield.dihedrals.update(ff.dihedrals)
             forcefield.impropers.update(ff.impropers)
+
+            forcefield.unique_atom_types += ff.unique_atom_types
+            forcefield.pairs.update(ff.pairs)
 
         return forcefield
 

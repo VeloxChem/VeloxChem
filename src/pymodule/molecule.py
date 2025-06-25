@@ -39,6 +39,8 @@ from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
+from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
+                             get_conformer_data, get_pubchem_reference)
 
 
 @staticmethod
@@ -1233,6 +1235,106 @@ def _Molecule_partition_atoms(self, comm):
     return list(list_atoms[rank::nnodes])
 
 
+@staticmethod
+def _Molecule_read_name(mol_name):
+    """
+    Reads molecule from its name as a string using PubChem data.
+
+    :param mol_name:
+        The molecule name string.
+
+    :return:
+        The molecule.
+    """
+
+    smiles_str = Molecule.name_to_smiles(mol_name)
+    mol = Molecule.read_smiles(smiles_str)
+
+    return mol
+
+
+@staticmethod
+def _Molecule_name_to_smiles(mol_name):
+    """
+    Returns SMILES-string for a given molecule name using PubChem data.
+
+    :param mol_name:
+        The molecule name string.
+
+    :return smiles_str:
+        The SMILES-string of the molecule
+    """
+
+    smiles_str, title, cid = get_data_from_name(mol_name)
+
+    return smiles_str
+
+
+@staticmethod
+def _Molecule_name_to_xyz(mol_name):
+    """
+    Returns xyz-string for the first conformer
+    of a given molecule name using Pubchem data.
+
+    :param mol_name:
+        The molecule name string.
+
+    :return xyz:
+        xyz-string of molecule
+    """
+
+    conformerID_list = get_all_conformer_IDs(mol_name)
+    conformer_ID = conformerID_list[0]
+    xyz = get_conformer_data(conformer_ID)
+
+    return xyz
+
+
+@staticmethod
+def _Molecule_get_all_conformer_data(mol_name):
+    """
+    Gets coordinates for all the conformers of a given compound
+    Data from PubChem.
+
+    :param mol_name:
+        The molecule name string.
+
+    :return all_conformer_info:
+        The coordinates for all of the conformers of the molecule.
+    """
+
+    conformerID_list = get_all_conformer_IDs(mol_name)
+    all_conformer_info = {}
+    for key in conformerID_list:
+        all_conformer_info.update({key: get_conformer_data(key)})
+    return all_conformer_info
+
+
+@staticmethod
+def _Molecule_builder():
+    """
+    Displays the PubChem molecule builder.
+    """
+
+    try:
+        from IPython.display import display, IFrame
+
+        print("The molecule builder uses the PubChem Sketcher.\n")
+        print("Direct link to the PubChem Sketcher: " +
+              "https://pubchem.ncbi.nlm.nih.gov/edit/ \n")
+        print("Documentation for the PubChem Sketcher: " +
+              "https://pubchem.ncbi.nlm.nih.gov/docs/sketcher-help \n")
+        print("Reference: " + get_pubchem_reference() + "\n")
+
+        display(
+            IFrame('https://pubchem.ncbi.nlm.nih.gov/edit/',
+                   width=900,
+                   height=450))
+
+    except ImportError:
+        raise ImportError('Unable to import IPython.')
+
+
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
@@ -1272,6 +1374,12 @@ Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
 Molecule.partition_atoms = _Molecule_partition_atoms
+
+Molecule.read_name = _Molecule_read_name
+Molecule.name_to_smiles = _Molecule_name_to_smiles
+Molecule.name_to_xyz = _Molecule_name_to_xyz
+Molecule.get_all_conformer_data = _Molecule_get_all_conformer_data
+Molecule.builder = _Molecule_builder
 
 # aliases for backward compatibility
 Molecule.read_xyz = _Molecule_read_xyz_file

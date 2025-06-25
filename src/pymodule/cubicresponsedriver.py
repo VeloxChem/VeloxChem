@@ -716,18 +716,27 @@ class CubicResponseDriver(NonlinearSolver):
                         val_A3 *= -1.0
                         val_A2 *= -1.0
 
-                # Cubic response function
-                crf_rsp_func = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
+                extra_sign = 1.0
 
                 # flip sign for response function
                 if op_a_type == 'real':
                     if (op_b_type != op_c_type) or (op_c_type != op_d_type):
-                        crf_rsp_func *= -1.0
+                        extra_sign *= -1.0
                 elif op_a_type == 'imag':
                     if (op_b_type != op_c_type) and (op_c_type == op_d_type):
-                        crf_rsp_func *= -1.0
+                        extra_sign *= -1.0
                     if op_b_type == 'imag':
-                        crf_rsp_func *= -1.0
+                        extra_sign *= -1.0
+
+                val_T4 *= extra_sign
+                val_E3 *= extra_sign
+                val_X3 *= extra_sign
+                val_A3 *= extra_sign
+                val_X2 *= extra_sign
+                val_A2 *= extra_sign
+
+                # cubic response function
+                crf_rsp_func = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
 
                 self.ostream.print_blank()
                 w_str = 'Cubic response function: << {};{},{},{} >>  ({},{},{})'.format(
@@ -746,14 +755,12 @@ class CubicResponseDriver(NonlinearSolver):
 
                 result[('crf', wb, wc, wd)] = crf_rsp_func
 
-                result['crf_terms'] = {
-                    ('crf_T4_term', wb, wc, wd): val_T4,
-                    ('crf_E3_term', wb, wc, wd): val_E3,
-                    ('crf_X3_term', wb, wc, wd): val_X3,
-                    ('crf_X2_term', wb, wc, wd): val_X2,
-                    ('crf_A3_term', wb, wc, wd): val_A3,
-                    ('crf_A2_term', wb, wc, wd): val_A2,
-                }
+                result[('crf_T4_term', wb, wc, wd)] = val_T4
+                result[('crf_E3_term', wb, wc, wd)] = val_E3
+                result[('crf_X3_term', wb, wc, wd)] = val_X3
+                result[('crf_X2_term', wb, wc, wd)] = val_X2
+                result[('crf_A3_term', wb, wc, wd)] = val_A3
+                result[('crf_A2_term', wb, wc, wd)] = val_A2
 
         profiler.check_memory_usage('End of CRF')
 
