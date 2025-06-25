@@ -651,12 +651,10 @@ class ImaginaryPolarizability(C6Driver):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        for iw in imagfreqs:
-            title = '{:>10s} {:>15s}'.format(
-                'Frequency', 'Alpha')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
-
+        title = '{:>10s} {:>15s}'.format('Frequency', 'Alpha')
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
+        for iw in printfreqs:
             alpha_val = iso_aver[iw]
             output = '{:10.4f} {:15.8f}'.format(
                 iw, alpha_val)
