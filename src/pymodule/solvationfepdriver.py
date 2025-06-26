@@ -37,7 +37,6 @@ from pathlib import Path
 import numpy as np
 import sys
 import time
-import h5py # Can be removed if we skip the option of writing trajectory completely
 
 from .veloxchemlib import mpi_master
 from .solvationbuilder import SolvationBuilder
@@ -196,7 +195,7 @@ class SolvationFepDriver:
         """
         
         sol_builder = SolvationBuilder()
-        sol_builder.steps = 10000
+        sol_builder.steps = 50000
 
         sol_builder.solvate(solute=molecule, 
                             solvent=solvent,
@@ -259,7 +258,7 @@ class SolvationFepDriver:
             ffgen_solute.create_topology(molecule, resp=False)
 
             sol_builder = SolvationBuilder()
-            sol_builder.steps = 10000
+            sol_builder.steps = 50000
             sol_builder.write_pdb_only = True
 
             sol_builder.solvate(solute=molecule, 
@@ -637,6 +636,7 @@ class SolvationFepDriver:
         simulation.minimizeEnergy()
 
         # Equilibration
+        # TODO: Consider running longer equilibration (evaluate whether it is necessary)
         simulation.step(self.num_equil_steps)
 
         # Calculate production run time and interval

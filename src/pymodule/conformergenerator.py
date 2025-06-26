@@ -82,6 +82,7 @@ class ConformerGenerator:
         self.top_file_name = None
         self.partial_charges = None
         self.resp_charges = True
+        self.resp_charges_driver = RespChargesDriver()
         self.dihedral_candidates = None
 
         self.save_xyz_files = False
@@ -459,10 +460,11 @@ class ConformerGenerator:
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
-        #default partial charges are RESP charges: self.resp_charges is True as default
-        if self.resp_charges is True:
+        #default partial charges are RESP charges: self.resp_charges is True and partial_charges is None as default 
+        #if the user provides partial charges, then skip RESP charges calculation
+        if self.resp_charges and (self.partial_charges is None):
             basis = MolecularBasis.read(molecule, "6-31g*")
-            self.partial_charges = RespChargesDriver().compute(
+            self.partial_charges =self.resp_charges_driver.compute(
                 molecule, basis, 'resp')
 
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
