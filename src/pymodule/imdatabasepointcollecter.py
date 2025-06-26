@@ -1645,7 +1645,7 @@ class IMDatabasePointCollecter:
                 break
 
 
-    def cartesian_just_distance(self, coordinate_1, coordinate_2):
+    def cartesian_just_distance(self, coordinate_1, coordinate_2, non_core_atoms):
         """Calculates and returns the cartesian distance between
            self.coordinates and data_point coordinates.
            Besides the distance, it also returns the weight gradient,
@@ -1653,10 +1653,12 @@ class IMDatabasePointCollecter:
            :param data_point:
                 InterpolationDatapoint object
         """
+        target_coordinates_core = np.delete(coordinate_1, non_core_atoms, axis=0)
+        reference_coordinates_core = np.delete(coordinate_2, non_core_atoms, axis=0)
         # First, translate the cartesian coordinates to zero
-        target_coordinates = self.calculate_translation_coordinates(coordinate_1)
+        target_coordinates = self.calculate_translation_coordinates(target_coordinates_core)
         reference_coordinates = (
-            self.calculate_translation_coordinates(coordinate_2))
+            self.calculate_translation_coordinates(reference_coordinates_core))
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
         # to self.impes_coordinate (reference_coordinates)

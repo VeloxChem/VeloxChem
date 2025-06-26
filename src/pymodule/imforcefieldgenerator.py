@@ -1724,12 +1724,7 @@ class IMForceFieldGenerator:
                 for label_counter, mol_basis in enumerate(entries):
 
                     energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
-
-                    print(scf_results)
                     gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
-                    
-                    exit()
-
                     hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
 
                     masses = molecule.get_masses().copy()
