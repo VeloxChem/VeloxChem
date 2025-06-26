@@ -288,6 +288,66 @@ class IMForceFieldGenerator:
             
         """
 
+
+        def normalize_symmetry_pairs(symmetry_input):
+            from itertools import combinations
+            symmetry_pairs = []
+            for entry in symmetry_input:
+                if isinstance(entry, (list, tuple)) and len(entry) > 2:
+                    symmetry_pairs.extend(combinations(entry, 2))
+                else:
+                    symmetry_pairs.append(tuple(entry))
+            return symmetry_pairs
+
+        def build_fragments_from_symmetry_pairs(adj, symmetry_pairs):
+            # Convert to dictionary for fast lookup of equivalent atoms
+            equiv_dict = {}
+            for a, b in (pair for pair in symmetry_pairs if len(pair) == 2):
+                equiv_dict.setdefault(a, []).append(b)
+                equiv_dict.setdefault(b, []).append(a)
+
+            print('symmetery pairs', equiv_dict)
+            exit()
+            # Keep track of visited atom pairs
+            visited_pairs = set()
+            fragments = []
+
+            for a, b in (pair for pair in symmetry_pairs if len(pair) == 2):
+                if (a, b) in visited_pairs or (b, a) in visited_pairs:
+                    continue
+
+                # Start new fragment with seed pair
+                fragment_a = set()
+                fragment_b = set()
+                queue = [(a, b)]
+
+                while queue:
+                    x, y = queue.pop()
+                    if (x, y) in visited_pairs or (y, x) in visited_pairs:
+                        continue
+                    visited_pairs.add((x, y))
+                    fragment_a.add(x)
+                    fragment_b.add(y)
+
+                    # Find neighbors
+                    neighbors_x = set(np.nonzero(adj[x])[0])
+                    neighbors_y = set(np.nonzero(adj[y])[0])
+
+                    # Try matching neighbors via equivalence pairs
+                    for nx in neighbors_x:
+                        for ny in neighbors_y:
+                            # They are equivalent?
+                            if nx in equiv_dict and ny in equiv_dict[nx]:
+                                if (nx, ny) not in visited_pairs and (ny, nx) not in visited_pairs:
+                                    queue.append((nx, ny))
+
+                fragments.append((sorted(fragment_a), sorted(fragment_b)))
+                
+            # bigger_fragments
+
+            return fragments
+
+
         def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
             new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
             rot_groups = {'gs': [], 'es': []}
@@ -358,6 +418,14 @@ class IMForceFieldGenerator:
         atom_mapper = AtomMapper(molecule, molecule)
         symmetry_groups = atom_mapper.determine_symmetry_group()
 
+        # print(f"Symmetry groups: {symmetry_groups[1]}")
+
+        # # symmetry_pairs = normalize_symmetry_pairs(symmetry_groups[1])
+        # frags = build_fragments_from_symmetry_pairs(molecule.get_connectivity_matrix(), symmetry_groups[1])
+        # print(f"Class fragments: {frags}")
+        
+        # exit()
+
         if not self.use_symmetry:
             symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
         ff_gen = MMForceFieldGenerator()
@@ -395,6 +463,7 @@ class IMForceFieldGenerator:
 
             if root == 1:
                 non_core_atoms = [element for group in regrouped['es'] for element in group]
+                core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
                 angles_to_set, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups['es'], rotatable_bonds_zero_based)
                 dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
@@ -407,76 +476,78 @@ class IMForceFieldGenerator:
 
                 self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
 
-        rotatable_dihedrals_dict = {}
-        
-        conformer_generator = ConformerGenerator()
-        conformal_structures = conformer_generator.generate(molecule)
-        dihedral_canditates = conformer_generator.dihedral_candidates
-        
-        
-        conf_molecule_xyz = conformal_structures['molecules'][0].get_xyz_string()
+        if self.add_conformal_structures:
 
-        for entries in dihedral_canditates:
+            rotatable_dihedrals_dict = {}
+        
+            conformer_generator = ConformerGenerator()
+            conformal_structures = conformer_generator.generate(molecule)
+            dihedral_canditates = conformer_generator.dihedral_candidates
             
-            dihedral = entries[0]
-            periodicity = len(entries[1])
-
-            for i in range(len(entries[1])):
-                current_molecule = Molecule.from_xyz_string(conf_molecule_xyz)
-                if i + 1 < len(entries[1]):
-                    new_angle = entries[1][i] - (entries[1][i + 1]/periodicity)
-                    current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
-                    conformal_structures['molecules'].append(current_molecule)
-                    print(new_angle)
-                else:
-                    new_angle = entries[1][i] - (entries[1][i]/2)
-                    current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
-                    conformal_structures['molecules'].append(current_molecule)
-                    print(new_angle)
-        # def get_max_periodicity(periodicity):
-        #     if isinstance(periodicity, list):
-        #         return max([abs(p) for p in periodicity])
-        #     else:
-        #         return periodicity
-
-        # # only pick one dihedral for each rotatable bond
-        # for (i, j, k, l), dih in dihedrals_dict.items():
-
-        #     sorted_bond = tuple(sorted([j, k]))
-        #     max_periodicity = get_max_periodicity(dih["periodicity"])
-        #     print('sortted bond', sorted_bond, dih["periodicity"], rotatable_dihedrals_dict)
-
-        #     if sorted_bond in rotatable_bonds_zero_based:
-        #         if sorted_bond not in rotatable_dihedrals_dict:
-      
-        #             rotatable_dihedrals_dict[sorted_bond] = deepcopy(dih)
-        #             rotatable_dihedrals_dict[sorted_bond]["dihedral_indices"] = (i, j, k, l)
-        #             rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max_periodicity
-        #         else:
-        #             curr_periodicity = rotatable_dihedrals_dict[sorted_bond]["max_periodicity"]
-        #             rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max(
-        #                 curr_periodicity, max_periodicity)          
-        
-        # target_dihedrals = []
-
-        # for key in rotatable_dihedrals_dict.keys():
             
-        #     dihedral = rotatable_dihedrals_dict[key]['dihedral_indices']
-        #     perodicity = rotatable_dihedrals_dict[key]['max_periodicity']
-        #     n_sampling = 6
-        #     print('key', key, perodicity)
-        #     if perodicity == 2:
-        #         continue
-        #     elif perodicity == 3:
+            conf_molecule_xyz = conformal_structures['molecules'][0].get_xyz_string()
+
+            for entries in dihedral_canditates:
                 
-        #         continue            
-        #     else:
-        #         target_dihedrals.append((dihedral, perodicity, n_sampling))
-       
-        # print(target_dihedrals)
-        # self.conformal_structures = self.determine_conformal_structures(molecule, specific_dihedrals=target_dihedrals)
+                dihedral = entries[0]
+                periodicity = len(entries[1])
 
-        self.conformal_structures = {None : conformal_structures['molecules']}
+                for i in range(len(entries[1])):
+                    current_molecule = Molecule.from_xyz_string(conf_molecule_xyz)
+                    if i + 1 < len(entries[1]):
+                        new_angle = entries[1][i] - (entries[1][i + 1]/periodicity)
+                        current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
+                        conformal_structures['molecules'].append(current_molecule)
+                        print(new_angle)
+                    else:
+                        new_angle = entries[1][i] - (entries[1][i]/2)
+                        current_molecule.set_dihedral_in_degrees([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], new_angle)
+                        conformal_structures['molecules'].append(current_molecule)
+                        print(new_angle)
+            # def get_max_periodicity(periodicity):
+            #     if isinstance(periodicity, list):
+            #         return max([abs(p) for p in periodicity])
+            #     else:
+            #         return periodicity
+
+            # # only pick one dihedral for each rotatable bond
+            # for (i, j, k, l), dih in dihedrals_dict.items():
+
+            #     sorted_bond = tuple(sorted([j, k]))
+            #     max_periodicity = get_max_periodicity(dih["periodicity"])
+            #     print('sortted bond', sorted_bond, dih["periodicity"], rotatable_dihedrals_dict)
+
+            #     if sorted_bond in rotatable_bonds_zero_based:
+            #         if sorted_bond not in rotatable_dihedrals_dict:
+        
+            #             rotatable_dihedrals_dict[sorted_bond] = deepcopy(dih)
+            #             rotatable_dihedrals_dict[sorted_bond]["dihedral_indices"] = (i, j, k, l)
+            #             rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max_periodicity
+            #         else:
+            #             curr_periodicity = rotatable_dihedrals_dict[sorted_bond]["max_periodicity"]
+            #             rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max(
+            #                 curr_periodicity, max_periodicity)          
+            
+            # target_dihedrals = []
+
+            # for key in rotatable_dihedrals_dict.keys():
+                
+            #     dihedral = rotatable_dihedrals_dict[key]['dihedral_indices']
+            #     perodicity = rotatable_dihedrals_dict[key]['max_periodicity']
+            #     n_sampling = 6
+            #     print('key', key, perodicity)
+            #     if perodicity == 2:
+            #         continue
+            #     elif perodicity == 3:
+                    
+            #         continue            
+            #     else:
+            #         target_dihedrals.append((dihedral, perodicity, n_sampling))
+        
+            # print(target_dihedrals)
+            # self.conformal_structures = self.determine_conformal_structures(molecule, specific_dihedrals=target_dihedrals)
+
+            self.conformal_structures = {None : conformal_structures['molecules']}
 
 
     def compute(self, molecule, basis):
@@ -594,77 +665,73 @@ class IMForceFieldGenerator:
             self.states_data_point_density = density_of_datapoints
             
             
-            for counter, entry in enumerate(self.molecules_along_rp.items()):
-
-                state = entry[0]
-
-                (key, mol_info), = entry[1].items()
-                molecules, start = mol_info[0], mol_info[1]
-                current_dihedral_angle = list(self.allowed_deviation[key].keys())[0]
-                for i, mol in enumerate(molecules):
-                    
-                    if i < start:
-                        continue
-                    forcefield_generator = MMForceFieldGenerator()
-                    self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}_{i}.pdb'
-                    
-                    forcefield_generator.create_topology(mol)
+            for counter, (state, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
+                for key, mol_info in dihedral_dict.items():
+                    molecules, start = mol_info
+                    print(f"State: {state}, Dihedral: {key}, Molecules: {molecules}, Start: {start}")
+                    for i, mol in enumerate(molecules):
                         
-                    im_database_driver = IMDatabasePointCollecter()
-                    im_database_driver.distance_thrsh = self.distance_thrsh
-                    im_database_driver.non_core_symmetry_groups = self.symmetry_information
-                    im_database_driver.starting_state = state
-                    im_database_driver.platform = 'CUDA'
+                        if i < start:
+                            continue
+                        current_dihedral_angle = list(self.allowed_deviation[state][key].keys())[i]
+                        forcefield_generator = MMForceFieldGenerator()
+                        self.dynamics_settings['trajectory_file'] = f'trajectory_{state}_{key}_{i}.pdb'
+                        
+                        forcefield_generator.create_topology(mol)
+                            
+                        im_database_driver = IMDatabasePointCollecter()
+                        im_database_driver.distance_thrsh = self.distance_thrsh
+                        im_database_driver.non_core_symmetry_groups = self.symmetry_information
+                        im_database_driver.starting_state = state
+                        im_database_driver.platform = 'CUDA'
 
-                    im_database_driver.identfy_relevant_int_coordinates = self.identfy_relevant_int_coordinates
-                    im_database_driver.use_symmetry = self.use_symmetry
-                    im_database_driver.ghost_atom = self.ghost_atom
+                        im_database_driver.identfy_relevant_int_coordinates = self.identfy_relevant_int_coordinates
+                        im_database_driver.use_symmetry = self.use_symmetry
+                        im_database_driver.ghost_atom = self.ghost_atom
 
-                    im_database_driver.add_bayes_model = self.add_bayes_model
+                        im_database_driver.add_bayes_model = self.add_bayes_model
 
-                    im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
-    
-                    im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
+                        im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
+        
+                        im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
 
-                    desired_density = False
-                    current_structure_density = {}
+                        desired_density = False
+                        current_structure_density = {}
+                        
+                        desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
+                        density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
+                        self.density_of_datapoints = density_of_datapoints
+                        print('density of points', self.states_data_point_density)
+                        for root in density_of_datapoints.keys():
+
+                            current_structure_density[root] = density_of_datapoints[root][key][current_dihedral_angle]
+                            if density_of_datapoints[root][key][current_dihedral_angle] >= desiered_point_density:
+                                print('database is already converged for state:', root)
+                                break
+                        print('density of points', self.states_data_point_density)
+
+                        if desired_density is False:
+                            im_database_driver.density_around_data_point = [current_structure_density, key, state, current_dihedral_angle]
+                            print(im_database_driver.density_around_data_point)
+                            if key is None:
+                                im_database_driver.allowed_molecule_deviation = self.allowed_deviation
+                            else:
+                                im_database_driver.allowed_molecule_deviation = self.allowed_deviation
+
+                            im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings)
+                            im_database_driver.run_qmmm()
+                            self.density_of_datapoints[key] = im_database_driver.density_around_data_point
+                            # individual impes run objects
+                            self.qm_energies.append(im_database_driver.qm_potentials)
+                            self.total_energies.append(im_database_driver.total_energies)
+                            self.kinetic_energies.append(im_database_driver.kinetic_energies)
+                            self.state_specific_molecules = im_database_driver.state_specific_molecules
+                            self.point_added_molecules.append(im_database_driver.point_adding_molecule)
+                            self.unique_molecules.append(im_database_driver.allowed_molecules)
                     
-                    density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
-                    self.density_of_datapoints = density_of_datapoints
-                    for root in density_of_datapoints.keys():
-
-                        self.states_data_point_density[root] = density_of_datapoints
-                        current_structure_density[root] = density_of_datapoints[root][key][current_dihedral_angle]
-                        if density_of_datapoints[root][key][current_dihedral_angle] >= desiered_point_density:
-                            desiered_point_density = True
-                            print('database is already converged for state:', root)
-                            break
-                    print('density of points', self.states_data_point_density)
-
-                    if desired_density is False:
-                        im_database_driver.density_around_data_point = [current_structure_density, key, state, current_dihedral_angle]
-                        print(im_database_driver.density_around_data_point)
-                        if key is None:
-                            im_database_driver.allowed_molecule_deviation = self.allowed_deviation
-                        else:
-                            im_database_driver.allowed_molecule_deviation = self.allowed_deviation
-
-                        im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings)
-                        im_database_driver.run_qmmm()
-                        self.density_of_datapoints[key] = im_database_driver.density_around_data_point
-                        # individual impes run objects
-                        self.qm_energies.append(im_database_driver.qm_potentials)
-                        self.total_energies.append(im_database_driver.total_energies)
-                        self.kinetic_energies.append(im_database_driver.kinetic_energies)
-                        self.state_specific_molecules = im_database_driver.state_specific_molecules
-                        self.point_added_molecules.append(im_database_driver.point_adding_molecule)
-                        self.unique_molecules.append(im_database_driver.allowed_molecules)
+                    entries = list(self.molecules_along_rp.values())
+                    self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
                 
-                entries = list(self.molecules_along_rp.values())
-                self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
-    
-                counter += 1
-            
             for root in self.roots_to_follow:
                 density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density[root], self.molecules_along_rp, self.states_interpolation_settings[root]['imforcefield_file'], self.dihedrals)
                 self.states_data_point_density[root] = density_of_datapoints
@@ -744,79 +811,77 @@ class IMForceFieldGenerator:
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
             self.states_data_point_density = density_of_datapoints
 
-            for counter, entry in enumerate(self.molecules_along_rp.items()):
-                state = entry[0]
-
-                (key, mol_info), = entry[1].items()
-                molecules, start = mol_info[0], mol_info[1]
-                for i, mol in enumerate(molecules):
-                    
-                    if i < start:
-                        continue
-
-                    current_dihedral_angle = list(self.allowed_deviation[state][key].keys())[i]
-
-                    forcefield_generator = MMForceFieldGenerator()
-                    self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}_{i}.pdb'
-                    forcefield_generator.partial_charges = mol.get_partial_charges(mol.get_charge())
-                    
-                    forcefield_generator.create_topology(mol)
-   
-                    im_database_driver = IMDatabasePointCollecter()
-                    im_database_driver.distance_thrsh = self.distance_thrsh
-                    im_database_driver.non_core_symmetry_groups = self.symmetry_information
-                    im_database_driver.platform = 'CUDA'
-                    
-                    # set optimization features in the construction run
-
-                    im_database_driver.identfy_relevant_int_coordinates = self.identfy_relevant_int_coordinates
-                    im_database_driver.use_symmetry = self.use_symmetry
-
-                    im_database_driver.add_bayes_model = self.add_bayes_model
-                    im_database_driver.ghost_atom = self.ghost_atom
-                    im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
-                    
-                    
-                    im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
-                    desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
-
-                    desired_density = False
-                    current_structure_density = {}
-                    
-                    desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
-                    density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density, self.states_interpolation_settings)
-                    self.density_of_datapoints = density_of_datapoints
-                    for root in density_of_datapoints.keys():
-
-                        current_structure_density[root] = density_of_datapoints[root][key][current_dihedral_angle]
-                        if density_of_datapoints[root][key][current_dihedral_angle] >= desiered_point_density:
-                            desiered_point_density = True
-                            print('database is already converged for state:', root)
+            for counter, (state, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
+                for key, mol_info in dihedral_dict.items():
+                    molecules, start = mol_info
+                    print(f"State: {state}, Dihedral: {key}, Molecules: {molecules}, Start: {start}")
+                    # Do your processing here
+                    for i, mol in enumerate(molecules):
+                        
+                        if i < start:
                             continue
-                    print('density of points', self.states_data_point_density)
-     
-                    if desired_density is False:
-                        im_database_driver.density_around_data_point = [current_structure_density, key, state, current_dihedral_angle]
-                        if key is None:
-                            im_database_driver.allowed_molecule_deviation = self.allowed_deviation
-                        else:
-                            im_database_driver.allowed_molecule_deviation = self.allowed_deviation
 
-                        im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings)
-                        im_database_driver.run_qmmm()
-                        self.density_of_datapoints[key] = im_database_driver.density_around_data_point
-                        # individual impes run objects
-                        self.qm_energies.append(im_database_driver.qm_potentials)
-                        self.total_energies.append(im_database_driver.total_energies)
-                        self.kinetic_energies.append(im_database_driver.kinetic_energies)
-                        self.state_specific_molecules = im_database_driver.state_specific_molecules
-                        self.point_added_molecules.append(im_database_driver.point_adding_molecule)
-                        self.unique_molecules.append(im_database_driver.allowed_molecules)
-                    
-                    entries = list(self.molecules_along_rp.values())
-                    # self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
+                        current_dihedral_angle = list(self.allowed_deviation[state][key].keys())[i]
+
+                        forcefield_generator = MMForceFieldGenerator()
+                        self.dynamics_settings['trajectory_file'] = f'trajectory_{state}_{key}_{i}.pdb'
+                        forcefield_generator.partial_charges = mol.get_partial_charges(mol.get_charge())
+                        
+                        forcefield_generator.create_topology(mol)
+    
+                        im_database_driver = IMDatabasePointCollecter()
+                        im_database_driver.distance_thrsh = self.distance_thrsh
+                        im_database_driver.non_core_symmetry_groups = self.symmetry_information
+                        im_database_driver.platform = 'CUDA'
+                        
+                        # set optimization features in the construction run
+
+                        im_database_driver.identfy_relevant_int_coordinates = self.identfy_relevant_int_coordinates
+                        im_database_driver.use_symmetry = self.use_symmetry
+
+                        im_database_driver.add_bayes_model = self.add_bayes_model
+                        im_database_driver.ghost_atom = self.ghost_atom
+                        im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
+                        
+                        
+                        im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
+
+                        desired_density = False
+                        current_structure_density = {}
+                        
+                        desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
+                        density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density, self.states_interpolation_settings)
+                        self.density_of_datapoints = density_of_datapoints
+                        print('density of points', self.states_data_point_density)
+                        for root in density_of_datapoints.keys():
+
+                            current_structure_density[root] = density_of_datapoints[root][key][current_dihedral_angle]
+                            if density_of_datapoints[root][key][current_dihedral_angle] >= desiered_point_density:
+                                desiered_point_density = True
+                                print('database is already converged for state:', root)
+                                continue
+                        
         
-                    counter += 1
+                        if desired_density is False:
+                            im_database_driver.density_around_data_point = [current_structure_density, key, state, current_dihedral_angle]
+                            if key is None:
+                                im_database_driver.allowed_molecule_deviation = self.allowed_deviation
+                            else:
+                                im_database_driver.allowed_molecule_deviation = self.allowed_deviation
+
+                            im_database_driver.update_settings(self.dynamics_settings, self.states_interpolation_settings)
+                            im_database_driver.run_qmmm()
+                            self.density_of_datapoints[key] = im_database_driver.density_around_data_point
+                            # individual impes run objects
+                            self.qm_energies.append(im_database_driver.qm_potentials)
+                            self.total_energies.append(im_database_driver.total_energies)
+                            self.kinetic_energies.append(im_database_driver.kinetic_energies)
+                            self.state_specific_molecules = im_database_driver.state_specific_molecules
+                            self.point_added_molecules.append(im_database_driver.point_adding_molecule)
+                            self.unique_molecules.append(im_database_driver.allowed_molecules)
+                        
+                        entries = list(self.molecules_along_rp.values())
+                        # self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
 
             
             # for root in self.roots_to_follow:
@@ -890,10 +955,11 @@ class IMForceFieldGenerator:
         
 
         else:
-            sampled_molecules[0][None] = ([molecule], 0)
-            point_densities[0][None] = {360: 0}
-            
-            allowed_deviation[0][None] = {360: (0.0, 360.0)}
+            for root in roots_to_follow:
+                sampled_molecules[root][None] = ([molecule], 0)
+                point_densities[root][None] = {360: 0}
+                
+                allowed_deviation[root][None] = {360: (0.0, 360.0)}
 
         return point_densities, sampled_molecules, allowed_deviation
     
@@ -1379,7 +1445,7 @@ class IMForceFieldGenerator:
                             print('CONSTRAINTS', constraints)
 
                             opt_constraint_list = []
-                            for constraint in constraints[:1]:
+                            for constraint in constraints[:]:
                                 if len(constraint) == 2:
                                     opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
                                     opt_constraint_list.append(opt_constraint)
@@ -1658,7 +1724,11 @@ class IMForceFieldGenerator:
 
                     energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
 
+                    print(scf_results)
                     gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
+                    
+                    exit()
+
                     hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
 
                     masses = molecule.get_masses().copy()
@@ -1680,8 +1750,30 @@ class IMForceFieldGenerator:
                             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
                 
                         label = None
-                        grad_mw = gradients[number] / np.sqrt(masses)[:, None]
-                        H_mw = hessians[number] * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
+                        grad = gradients[number].copy()
+                        hess = hessians[number].copy()
+
+
+                        if self.ghost_atom[0]:
+
+                            # All DOFs: 0 to 17
+                            n_atoms = len(molecule.get_labels()) + 1
+                            full_cart_indices = np.arange(3 * n_atoms)
+
+                            # Cartesian indices to remove: 3 * ghost_atom_index + [0, 1, 2]
+                            ghost_cartesian_indices = np.arange(3 * self.ghost_atom[1], 3 * self.ghost_atom[1] + 3)
+
+                            # Remaining indices
+                            indices = np.setdiff1d(full_cart_indices, ghost_cartesian_indices)
+
+                            grad = grad.reshape(-1)  # if it's (6, 3), flatten to (18,)
+                            grad = grad[indices].reshape(-1, 3) 
+                            hess = hess[np.ix_(indices, indices)]  # shape will now be (15, 15)
+
+                           
+
+                        grad_mw = grad / np.sqrt(masses)[:, None]
+                        H_mw = hess * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
                         
         
                         if label_counter == 0:
@@ -1778,7 +1870,6 @@ class IMForceFieldGenerator:
                                     for i, element in enumerate(impes_coordinate.z_matrix):
                                         # Otherwise, reorder the element
                                         reordered_element = [inverse_mapping.get(x, x) for x in element]
-                                        print(element, reordered_element)
                                         key = tuple(sorted(reordered_element))
                                         z_mat_index = z_matrix_dict.get(key)
                                         mask.append(z_mat_index)

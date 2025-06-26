@@ -478,7 +478,7 @@ class InterpolationDriver():
         self.time_step_reducer = False
         
 
-        if not self.use_symmetry and 1==2:
+        if not self.use_symmetry:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
                 distance, denominator, weight_gradient, distance_vector, dihedral_dist = self.cartesian_distance(data_point)
@@ -562,11 +562,10 @@ class InterpolationDriver():
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
         # ∇U = Σ Wᵢ ∇Uᵢ  +  Σ Uᵢ ∇Wᵢ
-        if len(self.symmetry_information[3]) != natms:
+        if len(self.symmetry_information[4]) != natms:
             self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
             # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
             # Add contributions only to the selected rows
-            
             self.impes_coordinate.gradient[self.symmetry_information[3]] += np.tensordot(potentials, grad_W_i, axes=1)
         else:
 

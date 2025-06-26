@@ -416,7 +416,7 @@ class OpenMMIMDynamics:
         self.z_matrix = z_matrix
 
         if self.use_symmetry:
-            self.set_up_the_system(molecule, z_matrix)
+            self.set_up_the_system(molecule)
 
         # Options for the QM region if it's required.
         # TODO: Take this if else tree to a separate method.
@@ -1286,7 +1286,7 @@ class OpenMMIMDynamics:
 
                     else:
                         symmetry_data_point = InterpolationDatapoint(self.z_matrix)
-                        symmetry_data_point.read_hdf5(self.interpolation_settings[root]['imforcefield_file'], label)
+                        symmetry_data_point.read_hdf5(self.interpolation_settings_dict[root]['imforcefield_file'], label)
                         
                         driver_object.qm_symmetry_data_points[old_label].append(symmetry_data_point)
                         self.qm_symmetry_datapoint_dict[root][old_label].append(symmetry_data_point)
@@ -2694,7 +2694,7 @@ class OpenMMIMDynamics:
             with open(structure_filename, 'a') as file:
                 file.write(f"{updated_xyz_string}\n\n")
 
-    def set_up_the_system(self, molecule, z_matrix):
+    def set_up_the_system(self, molecule):
 
         """
         Assign the neccessary variables with respected values. 
@@ -2736,15 +2736,22 @@ class OpenMMIMDynamics:
 
             for group in groups:
                 connected_subgroups = {}  # key: (state, atom in bond), value: atoms in group connected to it
-
+                connected_rotatable_bonds = set()
                 for atom in group:
                     for a1, a2 in rotatable_bonds:
                         state = determine_state(a1, a2)
+
+                        if conn[atom, a1] or conn[atom, a2]:
+                            connected_rotatable_bonds.add((a1, a2))
 
                         if conn[atom, a1]:
                             connected_subgroups.setdefault((state, a1), []).append(atom)
                         if conn[atom, a2]:
                             connected_subgroups.setdefault((state, a2), []).append(atom)
+                
+                if len(connected_rotatable_bonds) > 1:
+                    new_groups['non_rotatable'].append(group)
+                    continue
 
                 if not connected_subgroups:
                     new_groups['non_rotatable'].append(group)
@@ -2756,11 +2763,13 @@ class OpenMMIMDynamics:
                                 print(molecule.get_labels()[atom], sum(conn[atom]))
                             rot_groups[state].append(sorted(subgroup))
                             new_groups[state].append(sorted(subgroup))
-
+  
             return new_groups, rot_groups
 
-        angle_index = next(i for i, x in enumerate(z_matrix) if len(x) == 3)
-        dihedral_index = next(i for i, x in enumerate(z_matrix) if len(x) == 4)
+        
+        self.z_matrix = self.define_z_matrix(molecule)
+        angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), 0)
+        dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), 0)
 
         self.qm_data_points = None
         self.molecule = molecule
@@ -2768,10 +2777,13 @@ class OpenMMIMDynamics:
         atom_mapper = AtomMapper(molecule, molecule)
         symmetry_groups = atom_mapper.determine_symmetry_group()
 
+        if not self.use_symmetry:
+            symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
         ff_gen = MMForceFieldGenerator()
         ff_gen.create_topology(molecule)
 
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+        dihedrals_dict = deepcopy(ff_gen.dihedrals)
 
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
@@ -2781,42 +2793,94 @@ class OpenMMIMDynamics:
         regrouped, rot_groups = regroup_by_rotatable_connection(molecule, symmetry_groups_ref, rotatable_bonds_zero_based, molecule.get_connectivity_matrix())
 
         
-        self.symmetry_information = {}
-        for root in range(2):
+        self.symmetry_information = {'gs': (), 'es': ()}
+        for root in self.roots_to_follow:
             if root == 0:
         
                 non_core_atoms = [element for group in regrouped['gs'] for element in group]
-                _, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(z_matrix, rot_groups['gs'], rotatable_bonds_zero_based)
-        
+                core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
+                angles_to_set, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups['gs'], rotatable_bonds_zero_based)
+                dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
                 for key, dihedral_list in self.symmetry_dihedral_lists.items():
                 
-                    for i, element in enumerate(z_matrix[dihedral_index:], start=dihedral_index):
+                    for i, element in enumerate(self.z_matrix[dihedral_index:], start=dihedral_index):
 
                         if tuple(sorted(element)) in dihedral_list:
                             indices_list.append(i)
 
-                self.symmetry_information['gs'] = (symmetry_groups[0], rot_groups['gs'], regrouped['gs'], non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [angle_index, dihedral_index])
+                self.symmetry_information['gs'] = (symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
 
 
             if root == 1:
                 non_core_atoms = [element for group in regrouped['es'] for element in group]
-                _, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(z_matrix, rot_groups['es'], rotatable_bonds_zero_based)
-        
+                core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
+                angles_to_set, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups['es'], rotatable_bonds_zero_based)
+                dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
                 for key, dihedral_list in self.symmetry_dihedral_lists.items():
                 
-                    for i, element in enumerate(z_matrix[dihedral_index:], start=dihedral_index):
+                    for i, element in enumerate(self.z_matrix[dihedral_index:], start=dihedral_index):
 
                         if tuple(sorted(element)) in dihedral_list:
                             indices_list.append(i)
 
-                self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [angle_index, dihedral_index])
+                self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
 
 
+    def define_z_matrix(self, molecule):
+        """
+        Creates the z-matrix of redundant internal coordinates based on the
+        topology from geomeTRIC.
 
+        :return:
+            a list of 2-tuples, 3-tuples, and 4-tuples corresponding to all bonds,
+            bond agles, and respectively dihedral angles in the molecule.
+        """
 
-    def adjust_symmetry_dihedrals(self, z_matrix, symmetry_groups, rot_bonds):
+        g_molecule = geometric.molecule.Molecule()
+        g_molecule.elem = molecule.get_labels()
+        g_molecule.xyzs = [molecule.get_coordinates_in_bohr() * geometric.nifty.bohr2ang]
+
+        g_molecule.build_topology()
+        g_molecule.build_bonds()
+
+        bonds = g_molecule.Data['bonds']
+        angles = g_molecule.find_angles()
+        dihedrals = g_molecule.find_dihedrals()
+
+        z_matrix = []
+        for bond in bonds:
+            z_matrix.append(bond)
+        for angle in angles:
+            z_matrix.append(angle)
+        for dihedral in dihedrals:
+            z_matrix.append(dihedral)
+
+        return z_matrix
+        
+    def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
+        """ Performs the atom mapping. """
+        from scipy.optimize import linear_sum_assignment
+        new_map = np.array(atom_map.copy())
+        mapping_dict = {}
+        # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
+        cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
+        row, col = linear_sum_assignment(cost)
+        assigned = False
+        if not np.equal(row, col).all():
+            assigned = True
+            
+            # atom_maps = self.linear_assignment_solver(cost)
+
+            reordred_arr = np.array(sym_group)[col]
+            new_map[sym_group] = new_map[reordred_arr]
+
+            mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
+        
+        return mapping_dict
+
+    def adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds):
         
         def symmetry_group_dihedral(reference_set, dihedrals, rot_bonds):
             rot_bond_set = {frozenset(bond) for bond in rot_bonds}
@@ -2831,7 +2895,7 @@ class OpenMMIMDynamics:
                         filtered_dihedrals.append(d)
             return filtered_dihedrals
         
-
+        z_matrix = self.define_z_matrix(molecule)
         all_dihedrals = [element for element in z_matrix if len(element) == 4]
 
         symmetry_group_dihedral_dict = {} 
@@ -2850,7 +2914,7 @@ class OpenMMIMDynamics:
                 angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
 
                 periodicities[symmetry_group_dihedral_list[0]] = 3
-                dihedral_groups[3].extend([tuple(sorted(element)) for element in symmetry_group_dihedral_list])
+                dihedral_groups[3].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
 
             elif len(symmetry_group) == 2:
 
@@ -2858,6 +2922,6 @@ class OpenMMIMDynamics:
                 angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/2.0])
 
                 periodicities[symmetry_group_dihedral_list[0]] = 2
-                dihedral_groups[2].extend([tuple(sorted(element)) for element in symmetry_group_dihedral_list])
+                dihedral_groups[2].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
 
         return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups
