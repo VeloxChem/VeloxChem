@@ -48,7 +48,6 @@ from .veloxchemlib import parse_xc_func
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .molecularbasis import MolecularBasis
 from .matrices import Matrices
-from .profiler import Profiler
 from .outputstream import OutputStream
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
@@ -354,7 +353,8 @@ class ScfGradientDriver(GradientDriver):
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(den_mat_for_fock)
+            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
+                den_mat_for_fock)
 
             ri_grad_drv = RIFockGradDriver()
 
@@ -445,8 +445,7 @@ class ScfGradientDriver(GradientDriver):
         if self.scf_driver._cpcm:
             self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
                 molecule, basis, self.scf_driver._cpcm_grid,
-                self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
-                2.0 * D)
+                self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q, 2.0 * D)
 
             grad_timing['CPCM_grad'] += time.time() - t0
 
@@ -463,7 +462,9 @@ class ScfGradientDriver(GradientDriver):
 
             t0 = time.time()
 
-            if self.dispersion:
+            if self.dispersion or (
+                    self.scf_driver._dft and
+                    'D4' in self.scf_driver.xcfun.get_func_label().upper()):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
@@ -816,8 +817,7 @@ class ScfGradientDriver(GradientDriver):
         if self.scf_driver._cpcm:
             self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
                 molecule, basis, self.scf_driver._cpcm_grid,
-                self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
-                Da + Db)
+                self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q, Da + Db)
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -826,7 +826,9 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
-            if self.dispersion:
+            if self.dispersion or (
+                    self.scf_driver._dft and
+                    'D4' in self.scf_driver.xcfun.get_func_label().upper()):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()

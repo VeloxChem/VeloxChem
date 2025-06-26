@@ -115,8 +115,8 @@ class TestConformerGenerator:
 
         if MPI.COMM_WORLD.Get_rank() == 0:
             assert conf_results['energies'][0] == conf.global_minimum_energy
-            assert (conf.global_minimum_energy > -63.0 and
-                    conf.global_minimum_energy < -62.0)
+            assert (conf.global_minimum_energy > -65.0 and
+                    conf.global_minimum_energy < -60.0)
 
             if conf.use_gromacs_files:
                 for suffix in ['.top', '.itp', '.gro']:

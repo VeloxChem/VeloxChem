@@ -39,10 +39,13 @@ class TestOptimizeXTB:
             inpfile = Path(inpfile)
             optfile = Path(str(inpfile.with_name(inpfile.stem)) + '_optim.xyz')
             logfile = inpfile.with_suffix('.log')
-            if optfile.is_file():
-                optfile.unlink()
-            if logfile.is_file():
-                logfile.unlink()
+            try:
+                if optfile.is_file():
+                    optfile.unlink()
+                if logfile.is_file():
+                    logfile.unlink()
+            except PermissionError:
+                pass
 
     @pytest.mark.skipif(not XtbDriver.is_available(),
                         reason='xtb-python not available')

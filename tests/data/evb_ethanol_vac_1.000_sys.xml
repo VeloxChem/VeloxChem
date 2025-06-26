@@ -30,9 +30,9 @@
 				<Particle eps=".0673624" q=".170175" sig=".262547852235958"/>
 				<Particle eps=".0673624" q=".173394" sig=".262547852235958"/>
 				<Particle eps=".0673624" q=".172551" sig=".262547852235958"/>
-				<Particle eps=".389112" q="-.813698" sig=".3242871334030835"/>
-				<Particle eps=".019664800000000003" q=".406024" sig=".053792464601313685"/>
-				<Particle eps=".019664800000000003" q=".407674" sig=".053792464601313685"/>
+				<Particle eps=".649775" q="-.8476" sig=".31658"/>
+				<Particle eps=".064978" q=".4238" sig=".11658"/>
+				<Particle eps=".064978" q=".4238" sig=".11658"/>
 			</Particles>
 			<Exceptions>
 				<Exception eps="0" p1="0" p2="1" q="0" sig="1"/>
@@ -77,7 +77,7 @@
 			<Bonds>
 				<Bond d=".13340000000000002" k="403170.23999999993" p1="0" p2="1"/>
 				<Bond d=".10880000000000001" k="328192.9599999999" p1="1" p2="5"/>
-				<Bond d=".09572000000000001" k="462750.3999999999" p1="6" p2="8"/>
+				<Bond d=".1" k="345000" p1="6" p2="8"/>
 				<Bond d=".10880000000000001" k="328192.9599999999" p1="0" p2="3"/>
 				<Bond d=".10880000000000001" k="328192.9599999999" p1="1" p2="4"/>
 				<Bond d=".10880000000000001" k="328192.9599999999" p1="0" p2="2"/>
@@ -88,7 +88,7 @@
 				<Angle a="2.1019000181767713" k="421.7472" p1="1" p2="0" p3="3"/>
 				<Angle a="2.0402898955813713" k="315.47360000000003" p1="2" p2="0" p3="3"/>
 				<Angle a="2.0402898955813713" k="315.47360000000003" p1="4" p2="1" p3="5"/>
-				<Angle a="1.8242181341844732" k="836.8000000000001" p1="7" p2="6" p3="8"/>
+				<Angle a="1.9106119321581925" k="383" p1="7" p2="6" p3="8"/>
 				<Angle a="2.1019000181767713" k="421.7472" p1="0" p2="1" p3="4"/>
 				<Angle a="2.1019000181767713" k="421.7472" p1="0" p2="1" p3="5"/>
 				<Angle a="2.1019000181767713" k="421.7472" p1="1" p2="0" p3="2"/>
@@ -104,11 +104,11 @@
 		</Force>
 		<Force forceGroup="11" name="Reaction improper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
 			<Torsions>
-				<Torsion k="4.6024" p1="0" p2="1" p3="4" p4="5" periodicity="2" phase="3.141592653589793"/>
-				<Torsion k="4.6024" p1="1" p2="0" p3="2" p4="3" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="4.6024" p1="0" p2="1" p3="2" p4="3" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="4.6024" p1="1" p2="0" p3="4" p4="5" periodicity="2" phase="3.141592653589793"/>
 			</Torsions>
 		</Force>
-		<Force energy=" (1-l) * LjtotA   + l  * LjtotB; LjtotA     = A12 / r^12 - A6 / r^6;LjtotB     = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; " forceGroup="2" name="Reaction internal lennard-jones" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy=" (1-l) * LjtotA + l * LjtotB; LjtotA     = (step(r - rljA) * LjA + step(rljA - r) * LjlinA);LjtotB     = (step(r - rljB) * LjB + step(rljB - r) * LjlinB);LjlinA     = ( (78*A12) / (rljAdiv^14) - (21*A6) / (rljAdiv^8) )*r^2 - ( (168*A12) / (rljAdiv^13) - (48*A6) / (rljAdiv^7) )*r + ( (91*A12) / (rljAdiv^12) - (28*A6) / (rljAdiv^6) );LjlinB     = ( (78*B12) / (rljBdiv^14) - (21*B6) / (rljBdiv^8) )*r^2 - ( (168*B12) / (rljBdiv^13) - (48*B6) / (rljBdiv^7) )*r + ( (91*B12) / (rljBdiv^12) - (28*B6) / (rljBdiv^6) );rljAdiv    = select(rljA,rljA,1);rljBdiv    = select(rljB,rljB,1);rljA       = alphalj * ( (26/7 ) * A6  * 1 ) ^ pow;rljB       = alphalj * ( (26/7 ) * B6  * 1 ) ^ pow;LjA        = A12 / r^12 - A6 / r^6;LjB        = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; alphalj   = 0.7;alphaq    = 0.3;sigmaq    = 1.0;pow       = 0.16666666666666666;" forceGroup="2" name="Reaction internal lennard-jones soft-core(int)" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="sigmaA"/>
 				<Parameter name="sigmaB"/>
@@ -120,22 +120,33 @@
 			</GlobalParameters>
 			<EnergyParameterDerivatives/>
 			<Bonds>
-				<Bond p1="0" p2="8" param1=".19678170886283816" param2=".1926568477978484" param3=".04708905658685466" param4=".04508053707577141"/>
+				<Bond p1="0" p2="6" param1=".3240506154971915" param2=".3240506154971915" param3="0" param4=".518269688174024"/>
+				<Bond p1="0" p2="7" param1=".22405061549719155" param2=".22405061549719155" param3="0" param4=".1638918962535976"/>
+				<Bond p1="0" p2="8" param1=".19678170886283816" param2=".22405061549719155" param3=".04708905658685466" param4=".1638918962535976"/>
+				<Bond p1="1" p2="6" param1=".3240506154971915" param2=".3240506154971915" param3="0" param4=".518269688174024"/>
+				<Bond p1="1" p2="7" param1=".22405061549719155" param2=".22405061549719155" param3="0" param4=".1638918962535976"/>
+				<Bond p1="1" p2="8" param1=".22405061549719155" param2=".22405061549719155" param3="0" param4=".1638918962535976"/>
 				<Bond p1="2" p2="4" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
 				<Bond p1="2" p2="5" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
-				<Bond p1="2" p2="6" param1=".29215241663976144" param2=".2934174928195208" param3=".09200995577436172" param4=".080949858228412"/>
-				<Bond p1="2" p2="8" param1=".15690508223887656" param2=".15817015841863585" param3=".04136873798606866" param4=".03639599048686545"/>
+				<Bond p1="2" p2="6" param1=".29215241663976144" param2=".289563926117979" param3=".09200995577436172" param4=".209213774546515"/>
+				<Bond p1="2" p2="7" param1=".189563926117979" param2=".189563926117979" param3="0" param4=".06615945909089645"/>
+				<Bond p1="2" p2="8" param1=".15690508223887656" param2=".189563926117979" param3=".04136873798606866" param4=".06615945909089645"/>
 				<Bond p1="3" p2="4" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
 				<Bond p1="3" p2="5" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
-				<Bond p1="3" p2="6" param1=".29215241663976144" param2=".2934174928195208" param3=".09200995577436172" param4=".080949858228412"/>
-				<Bond p1="3" p2="8" param1=".15690508223887656" param2=".15817015841863585" param3=".04136873798606866" param4=".03639599048686545"/>
-				<Bond p1="4" p2="7" param1=".25110871269503604" param2=".15817015841863585" param3=".0435136" param4=".018197995243432723"/>
-				<Bond p1="4" p2="8" param1=".1479960950574732" param2=".15817015841863585" param3=".02068436899303433" param4=".018197995243432723"/>
-				<Bond p1="5" p2="7" param1=".25110871269503604" param2=".15817015841863585" param3=".0435136" param4=".018197995243432723"/>
-				<Bond p1="5" p2="8" param1=".1479960950574732" param2=".15817015841863585" param3=".02068436899303433" param4=".018197995243432723"/>
+				<Bond p1="3" p2="6" param1=".29215241663976144" param2=".289563926117979" param3=".09200995577436172" param4=".209213774546515"/>
+				<Bond p1="3" p2="7" param1=".189563926117979" param2=".189563926117979" param3="0" param4=".06615945909089645"/>
+				<Bond p1="3" p2="8" param1=".15690508223887656" param2=".189563926117979" param3=".04136873798606866" param4=".06615945909089645"/>
+				<Bond p1="4" p2="6" param1=".289563926117979" param2=".289563926117979" param3="0" param4=".209213774546515"/>
+				<Bond p1="4" p2="7" param1=".25110871269503604" param2=".189563926117979" param3=".0435136" param4=".06615945909089645"/>
+				<Bond p1="4" p2="8" param1=".1479960950574732" param2=".189563926117979" param3=".02068436899303433" param4=".06615945909089645"/>
+				<Bond p1="5" p2="6" param1=".289563926117979" param2=".289563926117979" param3="0" param4=".209213774546515"/>
+				<Bond p1="5" p2="7" param1=".25110871269503604" param2=".189563926117979" param3=".0435136" param4=".06615945909089645"/>
+				<Bond p1="5" p2="8" param1=".1479960950574732" param2=".189563926117979" param3=".02068436899303433" param4=".06615945909089645"/>
+				<Bond p1="6" p2="7" param1=".29215241663976144" param2=".29215241663976144" param3=".09200995577436172" param4="0"/>
+				<Bond p1="7" p2="8" param1=".15690508223887656" param2=".15690508223887656" param3=".04136873798606866" param4="0"/>
 			</Bonds>
 		</Force>
-		<Force energy=" (1-l) * k*qqA/r + l * k*qqB/r; k         = 138.93545764466424;" forceGroup="3" name="Reaction internal coulomb" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy=" (1-l) * k*qqA/r + l * k*qqB/r; k         = 138.93545764466424;" forceGroup="3" name="Reaction internal coulomb(int)" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="qqA"/>
 				<Parameter name="qqB"/>
@@ -145,22 +156,33 @@
 			</GlobalParameters>
 			<EnergyParameterDerivatives/>
 			<Bonds>
-				<Bond p1="0" p2="8" param1="-.024898113775864" param2="-.114733683676794"/>
+				<Bond p1="0" p2="6" param1="0" param2=".28636759320000005"/>
+				<Bond p1="0" p2="7" param1="0" param2="-.14318379660000002"/>
+				<Bond p1="0" p2="8" param1="-.024898113775864" param2="-.14318379660000002"/>
+				<Bond p1="1" p2="6" param1="0" param2=".29546064599999994"/>
+				<Bond p1="1" p2="7" param1="0" param2="-.14773032299999997"/>
+				<Bond p1="1" p2="8" param1="0" param2="-.14773032299999997"/>
 				<Bond p1="2" p2="4" param1="-.0011389836292380001" param2=".024600833119044"/>
 				<Bond p1="2" p2="5" param1="-.0011389836292380001" param2=".024481229774526"/>
-				<Bond p1="2" p2="6" param1="-.012015792369756003" param2="-.115446028739748"/>
-				<Bond p1="2" p2="8" param1=".008556972316" param2=".069435851028"/>
+				<Bond p1="2" p2="6" param1="-.012015792369756003" param2="-.1443649272"/>
+				<Bond p1="2" p2="7" param1="0" param2=".0721824636"/>
+				<Bond p1="2" p2="8" param1=".008556972316" param2=".0721824636"/>
 				<Bond p1="3" p2="4" param1="-.0011389836292380001" param2=".02457960085035"/>
 				<Bond p1="3" p2="5" param1="-.0011389836292380001" param2=".024460100732025"/>
-				<Bond p1="3" p2="6" param1="-.012015792369756003" param2="-.11534639060595"/>
-				<Bond p1="3" p2="8" param1=".008556972316" param2=".06937592294999999"/>
-				<Bond p1="4" p2="7" param1="-.0011389836292380001" param2=".058644970504847994"/>
-				<Bond p1="4" p2="8" param1="-.020273035895658" param2=".05888329188814799"/>
-				<Bond p1="5" p2="7" param1="-.0011389836292380001" param2=".058359852737592005"/>
-				<Bond p1="5" p2="8" param1="-.020273035895658" param2=".058597015459542004"/>
+				<Bond p1="3" p2="6" param1="-.012015792369756003" param2="-.14424033"/>
+				<Bond p1="3" p2="7" param1="0" param2=".072120165"/>
+				<Bond p1="3" p2="8" param1=".008556972316" param2=".072120165"/>
+				<Bond p1="4" p2="6" param1="0" param2="-.14696875439999998"/>
+				<Bond p1="4" p2="7" param1="-.0011389836292380001" param2=".07348437719999999"/>
+				<Bond p1="4" p2="8" param1="-.020273035895658" param2=".07348437719999999"/>
+				<Bond p1="5" p2="6" param1="0" param2="-.1462542276"/>
+				<Bond p1="5" p2="7" param1="-.0011389836292380001" param2=".0731271138"/>
+				<Bond p1="5" p2="8" param1="-.020273035895658" param2=".0731271138"/>
+				<Bond p1="6" p2="7" param1="-.012015792369756001" param2="0"/>
+				<Bond p1="7" p2="8" param1=".008556972316" param2="0"/>
 			</Bonds>
 		</Force>
-		<Force energy=" (1-l) * LjtotA + l * LjtotB; LjtotA     = (step(r - rljA) * LjA + step(rljA - r) * LjlinA);LjtotB     = (step(r - rljB) * LjB + step(rljB - r) * LjlinB);LjlinA     = ( (78*A12) / (rljAdiv^14) - (21*A6) / (rljAdiv^8) )*r^2 - ( (168*A12) / (rljAdiv^13) - (48*A6) / (rljAdiv^7) )*r + ( (91*A12) / (rljAdiv^12) - (28*A6) / (rljAdiv^6) );LjlinB     = ( (78*B12) / (rljBdiv^14) - (21*B6) / (rljBdiv^8) )*r^2 - ( (168*B12) / (rljBdiv^13) - (48*B6) / (rljBdiv^7) )*r + ( (91*B12) / (rljBdiv^12) - (28*B6) / (rljBdiv^6) );rljAdiv    = select(rljA,rljA,1);rljBdiv    = select(rljB,rljB,1);rljA       = alphalj * ( (26/7 ) * A6  * 1 ) ^ pow;rljB       = alphalj * ( (26/7 ) * B6  * 1 ) ^ pow;LjA        = A12 / r^12 - A6 / r^6;LjB        = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; alphalj   = 0.7;alphaq    = 0.3;sigmaq    = 1.0;pow       = 0.16666666666666666;" forceGroup="4" name="Reaction internal lennard-jones soft-core" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy=" (1-l) * LjtotA + l * LjtotB; LjtotA     = (step(r - rljA) * LjA + step(rljA - r) * LjlinA);LjtotB     = (step(r - rljB) * LjB + step(rljB - r) * LjlinB);LjlinA     = ( (78*A12) / (rljAdiv^14) - (21*A6) / (rljAdiv^8) )*r^2 - ( (168*A12) / (rljAdiv^13) - (48*A6) / (rljAdiv^7) )*r + ( (91*A12) / (rljAdiv^12) - (28*A6) / (rljAdiv^6) );LjlinB     = ( (78*B12) / (rljBdiv^14) - (21*B6) / (rljBdiv^8) )*r^2 - ( (168*B12) / (rljBdiv^13) - (48*B6) / (rljBdiv^7) )*r + ( (91*B12) / (rljBdiv^12) - (28*B6) / (rljBdiv^6) );rljAdiv    = select(rljA,rljA,1);rljBdiv    = select(rljB,rljB,1);rljA       = alphalj * ( (26/7 ) * A6  * 1 ) ^ pow;rljB       = alphalj * ( (26/7 ) * B6  * 1 ) ^ pow;LjA        = A12 / r^12 - A6 / r^6;LjB        = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; alphalj   = 0.7;alphaq    = 0.3;sigmaq    = 1.0;pow       = 0.16666666666666666;" forceGroup="4" name="Reaction internal lennard-jones soft-core(pes)" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="sigmaA"/>
 				<Parameter name="sigmaB"/>
@@ -172,28 +194,28 @@
 			</GlobalParameters>
 			<EnergyParameterDerivatives/>
 			<Bonds>
-				<Bond p1="0" p2="6" param1=".3279041821987333" param2=".3279041821987333" param3="0" param4=".40106209902008944"/>
-				<Bond p1="0" p2="7" param1=".1926568477978484" param2=".1926568477978484" param3="0" param4=".09016107415154281"/>
-				<Bond p1="0" p2="8" param1=".19678170886283816" param2=".1926568477978484" param3=".04708905658685466" param4=".09016107415154281"/>
-				<Bond p1="1" p2="6" param1=".3279041821987333" param2=".3279041821987333" param3="0" param4=".40106209902008944"/>
-				<Bond p1="1" p2="7" param1=".1926568477978484" param2=".1926568477978484" param3="0" param4=".09016107415154281"/>
-				<Bond p1="1" p2="8" param1=".1926568477978484" param2=".1926568477978484" param3="0" param4=".09016107415154281"/>
+				<Bond p1="0" p2="6" param1=".3240506154971915" param2=".3240506154971915" param3="0" param4=".518269688174024"/>
+				<Bond p1="0" p2="7" param1=".22405061549719155" param2=".22405061549719155" param3="0" param4=".1638918962535976"/>
+				<Bond p1="0" p2="8" param1=".19678170886283816" param2=".22405061549719155" param3=".04708905658685466" param4=".1638918962535976"/>
+				<Bond p1="1" p2="6" param1=".3240506154971915" param2=".3240506154971915" param3="0" param4=".518269688174024"/>
+				<Bond p1="1" p2="7" param1=".22405061549719155" param2=".22405061549719155" param3="0" param4=".1638918962535976"/>
+				<Bond p1="1" p2="8" param1=".22405061549719155" param2=".22405061549719155" param3="0" param4=".1638918962535976"/>
 				<Bond p1="2" p2="4" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
 				<Bond p1="2" p2="5" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
-				<Bond p1="2" p2="6" param1=".29215241663976144" param2=".2934174928195208" param3=".09200995577436172" param4=".161899716456824"/>
-				<Bond p1="2" p2="7" param1=".15817015841863585" param2=".15817015841863585" param3="0" param4=".03639599048686545"/>
-				<Bond p1="2" p2="8" param1=".15690508223887656" param2=".15817015841863585" param3=".04136873798606866" param4=".03639599048686545"/>
+				<Bond p1="2" p2="6" param1=".29215241663976144" param2=".289563926117979" param3=".09200995577436172" param4=".209213774546515"/>
+				<Bond p1="2" p2="7" param1=".189563926117979" param2=".189563926117979" param3="0" param4=".06615945909089645"/>
+				<Bond p1="2" p2="8" param1=".15690508223887656" param2=".189563926117979" param3=".04136873798606866" param4=".06615945909089645"/>
 				<Bond p1="3" p2="4" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
 				<Bond p1="3" p2="5" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
-				<Bond p1="3" p2="6" param1=".29215241663976144" param2=".2934174928195208" param3=".09200995577436172" param4=".161899716456824"/>
-				<Bond p1="3" p2="7" param1=".15817015841863585" param2=".15817015841863585" param3="0" param4=".03639599048686545"/>
-				<Bond p1="3" p2="8" param1=".15690508223887656" param2=".15817015841863585" param3=".04136873798606866" param4=".03639599048686545"/>
-				<Bond p1="4" p2="6" param1=".2934174928195208" param2=".2934174928195208" param3="0" param4=".161899716456824"/>
-				<Bond p1="4" p2="7" param1=".25110871269503604" param2=".15817015841863585" param3=".0435136" param4=".03639599048686545"/>
-				<Bond p1="4" p2="8" param1=".1479960950574732" param2=".15817015841863585" param3=".02068436899303433" param4=".03639599048686545"/>
-				<Bond p1="5" p2="6" param1=".2934174928195208" param2=".2934174928195208" param3="0" param4=".161899716456824"/>
-				<Bond p1="5" p2="7" param1=".25110871269503604" param2=".15817015841863585" param3=".0435136" param4=".03639599048686545"/>
-				<Bond p1="5" p2="8" param1=".1479960950574732" param2=".15817015841863585" param3=".02068436899303433" param4=".03639599048686545"/>
+				<Bond p1="3" p2="6" param1=".29215241663976144" param2=".289563926117979" param3=".09200995577436172" param4=".209213774546515"/>
+				<Bond p1="3" p2="7" param1=".189563926117979" param2=".189563926117979" param3="0" param4=".06615945909089645"/>
+				<Bond p1="3" p2="8" param1=".15690508223887656" param2=".189563926117979" param3=".04136873798606866" param4=".06615945909089645"/>
+				<Bond p1="4" p2="6" param1=".289563926117979" param2=".289563926117979" param3="0" param4=".209213774546515"/>
+				<Bond p1="4" p2="7" param1=".25110871269503604" param2=".189563926117979" param3=".0435136" param4=".06615945909089645"/>
+				<Bond p1="4" p2="8" param1=".1479960950574732" param2=".189563926117979" param3=".02068436899303433" param4=".06615945909089645"/>
+				<Bond p1="5" p2="6" param1=".289563926117979" param2=".289563926117979" param3="0" param4=".209213774546515"/>
+				<Bond p1="5" p2="7" param1=".25110871269503604" param2=".189563926117979" param3=".0435136" param4=".06615945909089645"/>
+				<Bond p1="5" p2="8" param1=".1479960950574732" param2=".189563926117979" param3=".02068436899303433" param4=".06615945909089645"/>
 				<Bond p1="6" p2="7" param1=".29215241663976144" param2=".29215241663976144" param3=".09200995577436172" param4="0"/>
 				<Bond p1="7" p2="8" param1=".15690508223887656" param2=".15690508223887656" param3=".04136873798606866" param4="0"/>
 			</Bonds>
@@ -208,28 +230,28 @@
 			</GlobalParameters>
 			<EnergyParameterDerivatives/>
 			<Bonds>
-				<Bond p1="0" p2="6" param1="0" param2=".274913565186"/>
-				<Bond p1="0" p2="7" param1="0" param2="-.137178050568"/>
-				<Bond p1="0" p2="8" param1="-.024898113775864" param2="-.137735514618"/>
-				<Bond p1="1" p2="6" param1="0" param2=".28364291732999997"/>
-				<Bond p1="1" p2="7" param1="0" param2="-.14153387603999998"/>
-				<Bond p1="1" p2="8" param1="0" param2="-.14210904128999996"/>
+				<Bond p1="0" p2="6" param1="0" param2=".28636759320000005"/>
+				<Bond p1="0" p2="7" param1="0" param2="-.14318379660000002"/>
+				<Bond p1="0" p2="8" param1="-.024898113775864" param2="-.14318379660000002"/>
+				<Bond p1="1" p2="6" param1="0" param2=".29546064599999994"/>
+				<Bond p1="1" p2="7" param1="0" param2="-.14773032299999997"/>
+				<Bond p1="1" p2="8" param1="0" param2="-.14773032299999997"/>
 				<Bond p1="2" p2="4" param1="-.0011389836292380001" param2=".024600833119044"/>
 				<Bond p1="2" p2="5" param1="-.0011389836292380001" param2=".024481229774526"/>
-				<Bond p1="2" p2="6" param1="-.012015792369756003" param2="-.138590670756"/>
-				<Bond p1="2" p2="7" param1="0" param2=".069154819728"/>
-				<Bond p1="2" p2="8" param1=".008556972316" param2=".069435851028"/>
+				<Bond p1="2" p2="6" param1="-.012015792369756003" param2="-.1443649272"/>
+				<Bond p1="2" p2="7" param1="0" param2=".0721824636"/>
+				<Bond p1="2" p2="8" param1=".008556972316" param2=".0721824636"/>
 				<Bond p1="3" p2="4" param1="-.0011389836292380001" param2=".02457960085035"/>
 				<Bond p1="3" p2="5" param1="-.0011389836292380001" param2=".024460100732025"/>
-				<Bond p1="3" p2="6" param1="-.012015792369756003" param2="-.13847105715"/>
-				<Bond p1="3" p2="7" param1="0" param2=".06909513419999999"/>
-				<Bond p1="3" p2="8" param1=".008556972316" param2=".06937592294999999"/>
-				<Bond p1="4" p2="6" param1="0" param2="-.141090351012"/>
-				<Bond p1="4" p2="7" param1="-.0011389836292380001" param2=".070402125456"/>
-				<Bond p1="4" p2="8" param1="-.020273035895658" param2=".07068822555599999"/>
-				<Bond p1="5" p2="6" param1="0" param2="-.14040440359800002"/>
-				<Bond p1="5" p2="7" param1="-.0011389836292380001" param2=".07005984722400001"/>
-				<Bond p1="5" p2="8" param1="-.020273035895658" param2=".070344556374"/>
+				<Bond p1="3" p2="6" param1="-.012015792369756003" param2="-.14424033"/>
+				<Bond p1="3" p2="7" param1="0" param2=".072120165"/>
+				<Bond p1="3" p2="8" param1=".008556972316" param2=".072120165"/>
+				<Bond p1="4" p2="6" param1="0" param2="-.14696875439999998"/>
+				<Bond p1="4" p2="7" param1="-.0011389836292380001" param2=".07348437719999999"/>
+				<Bond p1="4" p2="8" param1="-.020273035895658" param2=".07348437719999999"/>
+				<Bond p1="5" p2="6" param1="0" param2="-.1462542276"/>
+				<Bond p1="5" p2="7" param1="-.0011389836292380001" param2=".0731271138"/>
+				<Bond p1="5" p2="8" param1="-.020273035895658" param2=".0731271138"/>
 				<Bond p1="6" p2="7" param1="-.012015792369756001" param2="0"/>
 				<Bond p1="7" p2="8" param1=".008556972316" param2="0"/>
 			</Bonds>
@@ -259,20 +281,20 @@
 		</Force>
 		<Force forceGroup="16" name="Integration reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
-				<Bond d=".19274062990465413" k="314553.11999999994" p1="0" p2="7"/>
-				<Bond d=".09572000000000001" k="462750.3999999999" p1="6" p2="7"/>
-				<Bond d=".3279081925840962" k="245517.11999999994" p1="1" p2="6"/>
+				<Bond d=".22410371324682146" k="314553.11999999994" p1="0" p2="7"/>
+				<Bond d=".1" k="310500" p1="6" p2="7"/>
+				<Bond d=".3240717010488172" k="245517.11999999994" p1="1" p2="6"/>
 			</Bonds>
 		</Force>
 		<Force forceGroup="16" name="Integration reaction angle" type="HarmonicAngleForce" usesPeriodic="0" version="2">
 			<Angles>
-				<Angle a="1.880567455079428" k="523" p1="5" p2="1" p3="6"/>
-				<Angle a="1.3995922431471504" k="326.35200000000003" p1="3" p2="0" p3="7"/>
-				<Angle a=".9676505375757813" k="707.9327999999999" p1="0" p2="1" p3="6"/>
-				<Angle a="1.9765449264607338" k="391.62239999999997" p1="1" p2="0" p3="7"/>
-				<Angle a="1.372249930702642" k="326.35200000000003" p1="2" p2="0" p3="7"/>
-				<Angle a="1.877863791325237" k="523" p1="4" p2="1" p3="6"/>
-				<Angle a="2.695471954047174" k="410.03200000000004" p1="1" p2="6" p3="8"/>
+				<Angle a="1.7343264211004519" k="52.300000000000004" p1="5" p2="1" p3="6"/>
+				<Angle a="1.501849514606258" k="32.635200000000005" p1="3" p2="0" p3="7"/>
+				<Angle a="1.2485882959932812" k="70.79328" p1="0" p2="1" p3="6"/>
+				<Angle a="1.6713236393808277" k="39.16224" p1="1" p2="0" p3="7"/>
+				<Angle a="1.568982555378857" k="32.635200000000005" p1="2" p2="0" p3="7"/>
+				<Angle a="1.7603522865319807" k="52.300000000000004" p1="4" p2="1" p3="6"/>
+				<Angle a="2.8188508197138598" k="41.00320000000001" p1="1" p2="6" p3="8"/>
 			</Angles>
 		</Force>
 		<Force energy="D*(1-exp(-a*(r-re)))^2;" forceGroup="17" name="Reaction morse bond" type="CustomBondForce" usesPeriodic="0" version="3">
@@ -284,7 +306,7 @@
 			<GlobalParameters/>
 			<EnergyParameterDerivatives/>
 			<Bonds>
-				<Bond p1="6" p2="7" param1="10000" param2="4.810147606882765" param3=".09572000000000001"/>
+				<Bond p1="6" p2="7" param1="10000" param2="4.153311931459037" param3=".1"/>
 			</Bonds>
 		</Force>
 	</Forces>

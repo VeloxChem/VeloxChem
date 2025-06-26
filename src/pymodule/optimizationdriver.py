@@ -41,6 +41,7 @@ import h5py
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -266,6 +267,22 @@ class OptimizationDriver:
         hessian_exit = False
         final_mol = None
 
+        # inherit filename from scf results
+
+        # check that the args contain molecular basis and scf_results
+        # note that we only check the type of scf_results on the master rank
+        if (len(args) >= 2) and isinstance(args[0], MolecularBasis):
+            args_filename = None
+            if self.rank == mpi_master():
+                # read filename from scf_results
+                if isinstance(args[1], dict) and ('filename' in args[1]) and (
+                        args[1]['filename'] is not None):
+                    args_filename = args[1]['filename']
+            args_filename = self.comm.bcast(args_filename, root=mpi_master())
+            # update filename
+            if args_filename is not None:
+                self.filename = args_filename
+
         # run within temp_dir since geomeTRIC will generate intermediate files
 
         try:
@@ -466,7 +483,9 @@ class OptimizationDriver:
                 self.ostream.flush()
 
                 # Write opt results to final hdf5 file
-                final_h5_fname = filename + ".h5"
+                # Note: use base_fname so that the final h5 file is kept even
+                # when keep_files is False
+                final_h5_fname = base_fname + ".h5"
                 self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
@@ -516,7 +535,10 @@ class OptimizationDriver:
         """
 
         if extfile.is_file():
-            extfile.unlink()
+            try:
+                extfile.unlink()
+            except PermissionError:
+                pass
 
     @staticmethod
     def get_ic_rmsd(opt_mol, ref_mol):

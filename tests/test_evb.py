@@ -27,8 +27,9 @@ class TestEvb:
     @pytest.mark.timeconsuming
     def test_forcefield_builder(self):
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
-        ffbuilder = EvbForceFieldBuilder()
 
+        ffbuilder = EvbForceFieldBuilder()
+        ffbuilder.water_model = 'spce'
         ethanol_xyz = """
         9
 
@@ -83,10 +84,8 @@ class TestEvb:
             "charges": None,
         }]
 
-        reactant, product, formed_bonds, broken_bonds = ffbuilder.build_forcefields(
-            [reactant_input],
-            product_input,
-        )
+        reactant, product, formed_bonds, broken_bonds, reactants, products = ffbuilder.build_forcefields(
+            [reactant_input], product_input, 1, 1)
 
         here = Path(__file__).parent
         reapath = str(here / 'data' / 'evb_ethanol_ff_data.json')
@@ -165,6 +164,7 @@ class TestEvb:
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
         system_builder = EvbSystemBuilder()
+        system_builder.water_model = EVB.water_model
         vac_systems, vac_topology, vac_positions = system_builder.build_systems(
             reactant,
             product,
