@@ -478,7 +478,7 @@ class InterpolationDriver():
         self.time_step_reducer = False
         
 
-        if not self.use_symmetry:
+        if not self.use_symmetry and 1==2:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
                 distance, denominator, weight_gradient, distance_vector, dihedral_dist = self.cartesian_distance(data_point)
@@ -548,8 +548,8 @@ class InterpolationDriver():
 
         S            = w_i.sum()                         # Σ wᵢ
         sum_grad_w   = grad_w_i.sum(axis=0)              # Σ ∇wᵢ      shape (natms, 3)
-        for lbl, wi in zip(used_labels, w_i):
-            self.weights[lbl] = wi
+        # for lbl, wi in zip(used_labels, w_i):
+        #     self.weights[lbl] = wi
         self.sum_of_weights = S
         # --- 2.  normalised weights and their gradients ------------------------------
         W_i          = w_i / S
@@ -562,10 +562,11 @@ class InterpolationDriver():
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
         # ∇U = Σ Wᵢ ∇Uᵢ  +  Σ Uᵢ ∇Wᵢ
-        if len(self.symmetry_information[4]) != natms:
+        if len(self.symmetry_information[3]) != natms:
             self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
             # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
             # Add contributions only to the selected rows
+            
             self.impes_coordinate.gradient[self.symmetry_information[3]] += np.tensordot(potentials, grad_W_i, axes=1)
         else:
 
@@ -573,8 +574,8 @@ class InterpolationDriver():
 
 
         # --- 4.  book-keeping (optional) ---------------------------------------------
-        # for lbl, Wi in zip(used_labels, W_i):
-        #     self.weights[lbl] = Wi
+        for lbl, Wi in zip(used_labels, W_i):
+            self.weights[lbl] = Wi
 
         # self.sum_of_weights      = W_i.sum()          # if you really need it later
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
@@ -1954,7 +1955,7 @@ class InterpolationDriver():
                     constraints.append(tuple(int(x) for x in coord))
                 elif len(coord) == 4 and ind_weight > max(weights) * 0.7 and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
                     constraints.append(tuple(int(x) for x in coord))
-                print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()}')
+                print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error * hartree_in_kcalpermol()} kcal/mol')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
             print('Sum of Weights', sum(weights), sum(single_energy_error) * hartree_in_kcalpermol())
             
 

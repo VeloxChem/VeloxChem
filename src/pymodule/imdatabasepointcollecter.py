@@ -59,6 +59,7 @@ from .externalhessiandriver import ExternalHessianDriver
 from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
 from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
+from .externaloptimdriver import ExternalOptimDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -1777,12 +1778,16 @@ class IMDatabasePointCollecter:
                 positions_ang[atom1] = positions_ang[atom2] - direction * self.linking_atom_distance
 
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            new_molecule.set_charge(self.molecule.get_charge())
+            new_molecule.set_multiplicity(self.molecule.get_multiplicity())
 
         else:
             # Atom labels for the QM region
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            new_molecule.set_charge(self.molecule.get_charge())
+            new_molecule.set_multiplicity(self.molecule.get_multiplicity())
             self.unique_molecules.append(new_molecule)
         
         for root in self.roots_to_follow:
@@ -1871,6 +1876,8 @@ class IMDatabasePointCollecter:
         qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
 
         new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+        new_molecule.set_charge(self.molecule.get_charge())
+        new_molecule.set_multiplicity(self.molecule.get_multiplicity())
 
         force = -np.array(gradient) * conversion_factor
 
@@ -2025,6 +2032,8 @@ class IMDatabasePointCollecter:
                 atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
                 qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
                 new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+                new_molecule.set_charge(self.molecule.get_charge())
+                new_molecule.set_multiplicity(self.molecule.get_multiplicity())
                 gradient_2 = self.update_gradient(qm_positions)
                 force = -np.array(gradient_2) * conversion_factor
             
@@ -2066,6 +2075,8 @@ class IMDatabasePointCollecter:
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            new_molecule.set_charge(self.molecule.get_charge())
+            new_molecule.set_multiplicity(self.molecule.get_multiplicity())
             gradient_2 = self.update_gradient(qm_positions)
             force = -np.array(gradient_2) * conversion_factor
             
@@ -2220,13 +2231,7 @@ class IMDatabasePointCollecter:
 
                 ############# Implement constraint optimization ############
 
-                if self.identfy_relevant_int_coordinates:
-                    opt_qm_driver = ScfRestrictedDriver()
-                    opt_qm_driver.xcfun = 'b3lyp'
-                    _, scf_tensors = self.compute_energy(opt_qm_driver, molecule, current_basis)
-                    opt_drv = OptimizationDriver(opt_qm_driver)
-                    opt_drv.ostream.mute()
-                    
+                if self.identfy_relevant_int_coordinates:                    
                     # interpolation_driver = InterpolationDriver(self.z_matrix)
                     # interpolation_driver.update_settings(self.interpolation_settings[self.current_state])
                     # if self.current_state == 0:
@@ -2260,26 +2265,45 @@ class IMDatabasePointCollecter:
                     print('FINAL WIEGHTS', current_weights)
                     print('CONSTRAINTS', constraints)
 
-                    opt_constraint_list = []
-                    for constraint in constraints:
-                        if len(constraint) == 2:
-                            opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                            opt_constraint_list.append(opt_constraint)
+                    
+                    if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+
+                        opt_qm_driver = ScfRestrictedDriver()
+                        opt_qm_driver.xcfun = 'b3lyp'
+                        _, scf_tensors = self.compute_energy(opt_qm_driver, molecule, current_basis)
+                        opt_drv = OptimizationDriver(opt_qm_driver)
+                        opt_drv.ostream.mute()
                         
-                        elif len(constraint) == 3:
-                            opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                            opt_constraint_list.append(opt_constraint)
+                        opt_constraint_list = []
+                        for constraint in constraints:
+                            if len(constraint) == 2:
+                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                            
+                            elif len(constraint) == 3:
+                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                        
+                            else:
+                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                        opt_drv.constraints = opt_constraint_list
+                        opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
+                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                        optimized_molecule.set_charge(molecule.get_charge())
+                        optimized_molecule.set_multiplicity(molecule.get_multiplicity())
+                        current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
+                        # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
+                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                     
-                        else:
-                            opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                            opt_constraint_list.append(opt_constraint)
-                    opt_drv.constraints = opt_constraint_list
-                    opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
-                    optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                    opt_current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
-                    qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
-                    print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                    
+                    elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
+
+                        optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                        optim_driver.constraints = constraints
+                        optim_driver.optimize(molecule)
+
+                        exit()
+
                     label = f"point_{len(self.sorted_state_spec_im_labels[self.current_state]) + 1}"
                     self.add_point(optimized_molecule, label, current_basis, self.non_core_symmetry_groups)
                     self.last_point_added = self.point_checker - 1
@@ -2333,6 +2357,9 @@ class IMDatabasePointCollecter:
                     print('MOlecule configs', molecule_configs)
                     for i, molecule_config in enumerate(molecule_configs):
                         cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                        cur_molecule.set_charge(molecule.get_charge())
+                        cur_molecule.set_multiplicity(molecule.get_multiplicity())
+
                         dihedral_to_change = []
                         for dihedral, angle in molecule_config.items():
                             cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], angle, 'radian')
@@ -2355,6 +2382,8 @@ class IMDatabasePointCollecter:
 
                     for i, molecule_config in enumerate(molecule_configs):
                         cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                        cur_molecule.set_charge(molecule.get_charge())
+                        cur_molecule.set_multiplicity(molecule.get_multiplicity())
                         dihedral_to_change = []
                         for dihedral, angle in molecule_config.items():
                             cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], angle, 'radian')

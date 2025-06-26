@@ -1073,7 +1073,7 @@ class MMForceFieldGenerator:
 
         coords = self.molecule.get_coordinates_in_angstrom()
         n_atoms = self.molecule.number_of_atoms()
-
+        
         atomtypeidentifier = AtomTypeIdentifier(self.comm)
         atomtypeidentifier.ostream.mute()
         # set GAFF version

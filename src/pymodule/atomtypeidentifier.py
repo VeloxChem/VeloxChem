@@ -410,6 +410,7 @@ class AtomTypeIdentifier:
 
             self.atom_info_dict[i + 1] = info
 
+
     def decide_atom_type(self):
         """
         Analyzes the molecular structure information to assign atom types to
@@ -1761,7 +1762,14 @@ class AtomTypeIdentifier:
                         info['ConnectedAtoms'].index('H')]
                     self.atom_types_dict[f'H{atom_num}'] = hydrogen_type
                     self.bad_hydrogen = True
+            
+            elif (info['AtomicSymbol'] == 'H' and
+                info['NumConnectedAtoms'] == 1 and
+                self.atom_info_dict[info['ConnectedAtomsNumbers'][0]]['AtomicSymbol'] == 'H'):
 
+                hydrogen_type = {'opls': 'opls_H2', 'gaff': 'h2'}
+                self.atom_types_dict[f"H{info['AtomNumber']}"] = hydrogen_type
+                continue  # Skip the rest of the loop for this atom
             # Decision for Transition Metals
 
             elif info['AtomicSymbol'] not in [

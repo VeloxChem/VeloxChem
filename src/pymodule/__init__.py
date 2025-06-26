@@ -204,6 +204,7 @@ from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDrive
 from .externalscfdriver import ExternalScfDriver
 from .externalgradientdriver import ExternalGradientDriver
 from .externalhessiandriver import ExternalHessianDriver
+from .externaloptimdriver import ExternalOptimDriver
 from .localbayesresidual import LocalBayesResidual
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator

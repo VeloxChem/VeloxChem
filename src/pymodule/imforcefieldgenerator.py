@@ -228,6 +228,8 @@ class IMForceFieldGenerator:
         self.confidence_radius = '0.5'
         self.imforcefieldfiles = None
 
+        self.reaction_coordinates = None
+
         # variables for the forcefield generation and database expansion
         self.dynamics_settings = None
         self.duration = 2000
@@ -408,7 +410,8 @@ class IMForceFieldGenerator:
             return new_groups, rot_groups
 
         
-        self.z_matrix = self.define_z_matrix(molecule)
+        self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
+
         angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), len(self.z_matrix))
         dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), len(self.z_matrix))
 
@@ -429,6 +432,7 @@ class IMForceFieldGenerator:
         if not self.use_symmetry:
             symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
         ff_gen = MMForceFieldGenerator()
+        ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         ff_gen.create_topology(molecule)
 
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
@@ -581,6 +585,7 @@ class IMForceFieldGenerator:
 
         self.set_up_the_system(molecule)
 
+        print('Set up the system is here')
         if len(self.roots_to_follow) > 1:
             print('The molecule that is used for the database construction is minimized always based on the ground state Energy -> to find the local minimum based on the '
             'potential energy surface of the ground state!')
@@ -636,7 +641,7 @@ class IMForceFieldGenerator:
                         
                         current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
                         self.add_point(mol, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
-                        self.z_matrix = self.define_z_matrix(molecule)
+                        self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
                         print('Molecule added to the database',  self.density_of_datapoints)
 
             elif not self.add_conformal_structures and len(files_to_add_conf) != 0:
@@ -656,7 +661,7 @@ class IMForceFieldGenerator:
                 current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
                 self.add_point(molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
                 print(molecule.get_xyz_string())
-                self.z_matrix = self.define_z_matrix(molecule)
+                self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
                 print('Molecule added to the database',  self.density_of_datapoints)
             
 
@@ -805,7 +810,7 @@ class IMForceFieldGenerator:
                 current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
                 self.add_point(molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
                 print(molecule.get_xyz_string())
-                self.z_matrix = self.define_z_matrix(molecule)
+                self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
                 print('Molecule added to the database',  self.density_of_datapoints)
 
             self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_reaction_path_molecules(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
@@ -1560,7 +1565,7 @@ class IMForceFieldGenerator:
                 file.write(f"{updated_xyz_string}\n\n")
         
     
-    def define_z_matrix(self, molecule):
+    def define_z_matrix(self, molecule, add_coordinates=None):
         """
         Creates the z-matrix of redundant internal coordinates based on the
         topology from geomeTRIC.
@@ -1583,11 +1588,24 @@ class IMForceFieldGenerator:
 
         z_matrix = []
         for bond in bonds:
-            z_matrix.append(bond)
+            z_matrix.append(bond)        
+        if add_coordinates is not None:
+            for coord in add_coordinates:
+                if len(coord) == 2:
+                    z_matrix.append(coord)
         for angle in angles:
             z_matrix.append(angle)
+        if add_coordinates is not None:
+            for coord in add_coordinates:
+                if len(coord) == 3:
+                    z_matrix.append(coord)
         for dihedral in dihedrals:
             z_matrix.append(dihedral)
+        if add_coordinates is not None:
+            for coord in add_coordinates:
+                if len(coord) == 4:
+                    z_matrix.append(coord)
+
 
         return z_matrix
     
@@ -1724,6 +1742,7 @@ class IMForceFieldGenerator:
                 for label_counter, mol_basis in enumerate(entries):
 
                     energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
+                    print(scf_results)
                     gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
                     hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
 
@@ -1738,7 +1757,7 @@ class IMForceFieldGenerator:
                         interpolation_driver = InterpolationDriver()
                         interpolation_driver.update_settings(interpolation_settings[state + self.roots_to_follow[number]])
                         interpolation_driver.imforcefield_file = interpolation_settings[state + self.roots_to_follow[number]]['imforcefield_file']
-                        z_matrix = self.define_z_matrix(molecule)
+                        z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
                         sorted_labels = []
                         if interpolation_settings[state + self.roots_to_follow[number]]['imforcefield_file'] in os.listdir(os.getcwd()):
                             org_labels, z_matrix = interpolation_driver.read_labels()
@@ -1954,7 +1973,7 @@ class IMForceFieldGenerator:
                         filtered_dihedrals.append(d)
             return filtered_dihedrals
         
-        z_matrix = self.define_z_matrix(molecule)
+        z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
         all_dihedrals = [element for element in z_matrix if len(element) == 4]
 
         symmetry_group_dihedral_dict = {} 
@@ -2016,7 +2035,8 @@ class IMForceFieldGenerator:
             scf_tensors = qm_driver.compute(molecule, basis)
             qm_energy = np.array([qm_driver.scf_energy])
             qm_driver.ostream.unmute()
-            print('qm_energy', qm_energy)
+
+            print('qm_energy in SCF driver', qm_energy, qm_driver.scf_results)
 
         elif isinstance(qm_driver, ExternalScfDriver):
             qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())
@@ -2030,6 +2050,7 @@ class IMForceFieldGenerator:
             error_txt += "Please define a QM driver."
             raise ValueError(error_txt)
 
+        print(scf_tensors)
         return qm_energy, scf_tensors
 
     def compute_gradient(self, grad_driver, molecule, basis=None, scf_results=None):

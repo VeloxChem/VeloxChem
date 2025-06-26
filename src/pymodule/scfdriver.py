@@ -914,6 +914,7 @@ class ScfDriver:
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
             self._comp_diis(molecule, ao_basis, val_basis, den_mat, profiler)
 
+        
         self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
         self._fock_matrices_proj.clear()
@@ -922,7 +923,7 @@ class ScfDriver:
         self._density_matrices_beta.clear()
 
         profiler.end(self.ostream, scf_flag=True)
-
+        print('self converged variable: ', self._is_converged)
         if not self.is_converged:
             self.ostream.print_header(
                 '*** Warning: SCF is not converged!'.ljust(92))
@@ -3025,6 +3026,8 @@ class ScfDriver:
         else:
             potfile_text = ''
 
+        print('Writing SCF results to file: ' + final_h5_fname)
+        exit()
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
         write_scf_results_to_hdf5(final_h5_fname, self.scf_results,
                                   self.history)
