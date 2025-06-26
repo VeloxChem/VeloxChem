@@ -409,8 +409,8 @@ class IMForceFieldGenerator:
 
         
         self.z_matrix = self.define_z_matrix(molecule)
-        angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), 0)
-        dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), 0)
+        angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), len(self.z_matrix))
+        dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), len(self.z_matrix))
 
         self.qm_data_points = None
         self.molecule = molecule
@@ -475,6 +475,7 @@ class IMForceFieldGenerator:
                             indices_list.append(i)
 
                 self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
+
 
         if self.add_conformal_structures:
 

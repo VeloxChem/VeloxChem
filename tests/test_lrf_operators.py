@@ -76,3 +76,13 @@ class TestLrfOperators:
         prefac = -1.0 * (-1j * (-1.0) / freq)
 
         self.run_lrf('daug-cc-pvdz', freq, operators, 'zz', prefac, ref_val)
+
+    def test_lrf_quadrupole(self):
+
+        freq = 0.0656
+
+        operators = ['quadrupole', 'quadrupole']
+
+        self.run_lrf('daug-cc-pvdz', freq, operators, ['xx', 'zz'], -1.0, 1.527)
+        self.run_lrf('daug-cc-pvdz', freq, operators, ['xy', 'xy'], -1.0, 1.031)
+        self.run_lrf('daug-cc-pvdz', freq, operators, ['zz', 'zz'], -1.0, 3.590)

@@ -36,14 +36,6 @@ OPENMP_LD  := -L /opt/homebrew/Cellar/libomp/18.1.8/lib -lomp
 CXX_REL_FLG += $(OPENMP_INC)
 CXX_DEB_FLG += $(OPENMP_INC)
 
-# OpenBLAS interface
-
-MATH_INC := -I /opt/homebrew/opt/openblas/include
-MATH_LD  := -L /opt/homebrew/opt/openblas/lib -lopenblas
-
-CXX_REL_FLG += $(MATH_INC)
-CXX_DEB_FLG += $(MATH_INC)
-
 # LibXC interface
 
 LIBXC_INC := -I /Users/rinkevic/Development/Frameworks/libxc6.0.0/include

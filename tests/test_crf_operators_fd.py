@@ -12,7 +12,7 @@ from veloxchem.cubicresponsedriver import CubicResponseDriver
 @pytest.mark.timeconsuming
 class TestCrfOperatorsFD:
 
-    def test_crf_op_fd(self):
+    def run_crf_op_fd(self, op_comp_pairs, tol):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -28,12 +28,8 @@ class TestCrfOperatorsFD:
 
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
-        ops = ['linear momentum', 'electric dipole']
-
         wb, wc, wd = (0.0656, 0.0445, 0.0)
         wa = -(wb + wc + wd)
-
-        a, b, c, d = 'zzzz'
 
         # SCF
 
@@ -62,13 +58,12 @@ class TestCrfOperatorsFD:
 
         crf = CubicResponseDriver(comm, ostream)
 
-        tol = 1.0e-3
-
-        for op_a in ops:
-            for op_b in ops:
-                for op_c in ops:
+        for op_a, a in op_comp_pairs:
+            for op_b, b in op_comp_pairs:
+                for op_c, c in op_comp_pairs:
 
                     op_d = 'electric dipole'
+                    d = 'z'
 
                     # finite difference
 
@@ -103,8 +98,9 @@ class TestCrfOperatorsFD:
                     rsp_func_plus = qrf_result_plus[('qrf', wb, wc)]
                     rsp_func_minus = qrf_result_minus[('qrf', wb, wc)]
 
-                    rsp_func_fd = (rsp_func_plus - rsp_func_minus) / (2.0 *
-                                                                      delta_ef)
+                    # the minus sign is to account for the -mu operator
+                    rsp_func_fd = (-1.0) * (rsp_func_plus -
+                                            rsp_func_minus) / (2.0 * delta_ef)
 
                     # CRF
 
@@ -285,3 +281,25 @@ class TestCrfOperatorsFD:
                                rsp_func_fd.real) < tol
                     assert abs(crf_result[('crf', wb, wd, wc)].imag -
                                rsp_func_fd.imag) < tol
+
+    def test_crf_op_fd_lmom_edip(self):
+
+        op_comp_pairs = [
+            ('linear momentum', 'z'),
+            ('electric dipole', 'z'),
+        ]
+
+        tol = 1.0e-3
+
+        self.run_crf_op_fd(op_comp_pairs, tol)
+
+    def test_crf_op_fd_lmom_quad(self):
+
+        op_comp_pairs = [
+            ('linear momentum', 'z'),
+            ('electric quadrupole', 'zz'),
+        ]
+
+        tol = 5.0e-3
+
+        self.run_crf_op_fd(op_comp_pairs, tol)

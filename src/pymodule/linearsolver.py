@@ -50,6 +50,7 @@ from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .oneeints import (compute_electric_dipole_integrals,
+                       compute_quadrupole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import (dft_sanity_check, pe_sanity_check,
@@ -58,7 +59,7 @@ from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
-from .checkpoint import write_rsp_hdf5, write_cpcm_charges, read_cpcm_charges
+from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .cpcmdriver import CpcmDriver
@@ -213,6 +214,9 @@ class LinearSolver:
         # serial ratio as in Amdahl's law for estimating parallel efficiency
         self.serial_ratio = 0.05
         self.use_subcomms = False
+
+        # group label used to save the response results in a checkpoint file
+        self.group_label = 'rsp'
 
         # input keywords
         self._input_keywords = {
@@ -1912,59 +1916,72 @@ class LinearSolver:
 
         assert_msg_critical(
             operator in [
-                'dipole', 'electric dipole', 'electric_dipole',
-                'linear_momentum', 'linear momentum', 'angular_momentum',
-                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
+                'dipole', 'electric dipole', 'electric_dipole', 'quadrupole',
+                'electric quadrupole', 'electric_quadrupole', 'linear_momentum',
+                'linear momentum', 'angular_momentum', 'angular momentum',
+                'magnetic dipole', 'magnetic_dipole'
             ], f'LinearSolver.get_prop_grad: unsupported operator {operator}')
+
+        integrals = None
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             if self.rank == mpi_master():
                 dipole_mats = compute_electric_dipole_integrals(
                     molecule, basis, [0.0, 0.0, 0.0])
-                integrals = tuple(dipole_mats)
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': dipole_mats[0],
+                    'y': dipole_mats[1],
+                    'z': dipole_mats[2],
+                }
+
+        elif operator in [
+                'quadrupole', 'electric quadrupole', 'electric_quadrupole'
+        ]:
+            if self.rank == mpi_master():
+                quadrupole_mats = compute_quadrupole_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = {
+                    'xx': quadrupole_mats[0],
+                    'xy': quadrupole_mats[1],
+                    'xz': quadrupole_mats[2],
+                    'yy': quadrupole_mats[3],
+                    'yz': quadrupole_mats[4],
+                    'zz': quadrupole_mats[5],
+                }
 
         elif operator in ['linear_momentum', 'linear momentum']:
             if self.rank == mpi_master():
                 linmom_mats = compute_linear_momentum_integrals(molecule, basis)
-                integrals = (
-                    -1.0 * linmom_mats[0],
-                    -1.0 * linmom_mats[1],
-                    -1.0 * linmom_mats[2],
-                )
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': -1.0 * linmom_mats[0],
+                    'y': -1.0 * linmom_mats[1],
+                    'z': -1.0 * linmom_mats[2],
+                }
 
         elif operator in ['angular_momentum', 'angular momentum']:
             if self.rank == mpi_master():
                 angmom_mats = compute_angular_momentum_integrals(
                     molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    -1.0 * angmom_mats[0],
-                    -1.0 * angmom_mats[1],
-                    -1.0 * angmom_mats[2],
-                )
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': -1.0 * angmom_mats[0],
+                    'y': -1.0 * angmom_mats[1],
+                    'z': -1.0 * angmom_mats[2],
+                }
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             if self.rank == mpi_master():
                 angmom_mats = compute_angular_momentum_integrals(
                     molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    0.5 * angmom_mats[0],
-                    0.5 * angmom_mats[1],
-                    0.5 * angmom_mats[2],
-                )
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': 0.5 * angmom_mats[0],
+                    'y': 0.5 * angmom_mats[1],
+                    'z': 0.5 * angmom_mats[2],
+                }
 
         # compute right-hand side
 
         if self.rank == mpi_master():
-            indices = {'x': 0, 'y': 1, 'z': 2}
-            integral_comps = [integrals[indices[p]] for p in components]
+            integral_comps = [integrals[p] for p in components]
 
             mo = scf_tensors['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
@@ -2022,65 +2039,74 @@ class LinearSolver:
 
         assert_msg_critical(
             operator in [
-                'dipole', 'electric dipole', 'electric_dipole',
-                'linear_momentum', 'linear momentum', 'angular_momentum',
-                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
+                'dipole', 'electric dipole', 'electric_dipole', 'quadrupole',
+                'electric quadrupole', 'electric_quadrupole', 'linear_momentum',
+                'linear momentum', 'angular_momentum', 'angular momentum',
+                'magnetic dipole', 'magnetic_dipole'
             ],
             f'LinearSolver.get_complex_prop_grad: unsupported operator {operator}'
         )
+
+        integrals = None
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             if self.rank == mpi_master():
                 dipole_mats = compute_electric_dipole_integrals(
                     molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    dipole_mats[0] + 0j,
-                    dipole_mats[1] + 0j,
-                    dipole_mats[2] + 0j,
-                )
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': dipole_mats[0] + 0j,
+                    'y': dipole_mats[1] + 0j,
+                    'z': dipole_mats[2] + 0j,
+                }
+
+        elif operator in [
+                'quadrupole', 'electric quadrupole', 'electric_quadrupole'
+        ]:
+            if self.rank == mpi_master():
+                quadrupole_mats = compute_quadrupole_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = {
+                    'xx': quadrupole_mats[0] + 0j,
+                    'xy': quadrupole_mats[1] + 0j,
+                    'xz': quadrupole_mats[2] + 0j,
+                    'yy': quadrupole_mats[3] + 0j,
+                    'yz': quadrupole_mats[4] + 0j,
+                    'zz': quadrupole_mats[5] + 0j,
+                }
 
         elif operator in ['linear_momentum', 'linear momentum']:
             if self.rank == mpi_master():
                 linmom_mats = compute_linear_momentum_integrals(molecule, basis)
-                integrals = (
-                    -1j * linmom_mats[0],
-                    -1j * linmom_mats[1],
-                    -1j * linmom_mats[2],
-                )
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': -1j * linmom_mats[0],
+                    'y': -1j * linmom_mats[1],
+                    'z': -1j * linmom_mats[2],
+                }
 
         elif operator in ['angular_momentum', 'angular momentum']:
             if self.rank == mpi_master():
                 angmom_mats = compute_angular_momentum_integrals(
                     molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    -1j * angmom_mats[0],
-                    -1j * angmom_mats[1],
-                    -1j * angmom_mats[2],
-                )
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': -1j * angmom_mats[0],
+                    'y': -1j * angmom_mats[1],
+                    'z': -1j * angmom_mats[2],
+                }
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             if self.rank == mpi_master():
                 angmom_mats = compute_angular_momentum_integrals(
                     molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    0.5j * angmom_mats[0],
-                    0.5j * angmom_mats[1],
-                    0.5j * angmom_mats[2],
-                )
-            else:
-                integrals = tuple()
+                integrals = {
+                    'x': 0.5j * angmom_mats[0],
+                    'y': 0.5j * angmom_mats[1],
+                    'z': 0.5j * angmom_mats[2],
+                }
 
         # compute right-hand side
 
         if self.rank == mpi_master():
-            indices = {'x': 0, 'y': 1, 'z': 2}
-            integral_comps = [integrals[indices[p]] for p in components]
+            integral_comps = [integrals[p] for p in components]
 
             mo = scf_tensors['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
@@ -2823,3 +2849,39 @@ class LinearSolver:
             'magnetic dipole',
             'magnetic_dipole',
         ]
+
+    @staticmethod
+    def is_quadrupole(op):
+        """
+        Checks if an operator is quadrupole.
+
+        :param op:
+            The operator.
+
+        :return:
+            True if operator is quadrupole, False otherwise
+        """
+
+        return op in [
+            'quadrupole',
+            'electric quadrupole',
+            'electric_quadrupole',
+        ]
+
+    def is_valid_component(self, comp, op):
+        """
+        Checks if a component is valid.
+
+        :param comp:
+            The component.
+        :param op:
+            The operator.
+
+        :return:
+            True if component is valid, False otherwise
+        """
+
+        if self.is_quadrupole(op):
+            return comp in ['xx', 'xy', 'xz', 'yy', 'yz', 'zz']
+        else:
+            return comp in ['x', 'y', 'z']
