@@ -46,7 +46,7 @@ from .errorhandler import assert_msg_critical
 
 class ExternalOptimDriver:
 
-    def __init__(self, qm_driver):
+    def __init__(self, qm_driver, comm=None, ostream=None):
         """
         Initializes the class with default simulation parameters.
         """
@@ -87,8 +87,9 @@ class ExternalOptimDriver:
         self.input_files = []
         self.output_files = []
         self.xyz_structures = 'xyz_structures'
-        self.input_filename = 'current_input'
-        self.output_structure_filename = 'current_input.xyz'
+        self.input_filename = 'current_input_opt'
+        self.output_structure_filename = 'current_output_opt'
+        self.final_opt_structure_filename = 'current_input_opt.xyz'
         self.input_files.append(self.input_filename)
         self.output_files.append(self.output_structure_filename)
         
@@ -96,6 +97,7 @@ class ExternalOptimDriver:
         self.program = qm_driver.program
         self.cluster_manager = None
         self.job_ids = None
+        self.path_on_cluster = qm_driver.path_on_cluster
 
     
     def prepare_job_script(self, template_path, input_file, output_file):
@@ -302,8 +304,8 @@ conda activate vlxenv_simd_master
                         energies.append(None)
             
             elif self.program == 'ORCA':
-                print('Here is the file that is being opend', self.output_files[0])
-                with open(self.output_files[0], 'r') as file:
+                print('Here is the file that is being opend', self.final_opt_structure_filename)
+                with open(self.final_opt_structure_filename, 'r') as file:
                     content = file.read()
                     xyz_structure = content
         
@@ -396,17 +398,17 @@ conda activate vlxenv_simd_master
 
                     # If constraints exist
                     if hasattr(self, 'constraints') and self.constraints:
-                        file.write('%geom\n')
-                        file.write('  Constraints\n')
+                        file.write('%geom Constraints\n')
+                        
                         for constraint in self.constraints:
                             if len(constraint) == 2:
-                                file.write(f'    B {constraint[0]} {constraint[1]} F\n')
+                                file.write("   {{ B {0} {1} C }} \n".format(constraint[0], constraint[1]))
                             elif len(constraint) == 3:
-                                file.write(f'    A {constraint[0]} {constraint[1]} {constraint[2]} F\n')
+                                file.write("   {{ A {0} {1} {2} C }} \n".format(constraint[0], constraint[1], constraint[2]))
                             elif len(constraint) == 4:
-                                file.write(f'    D {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]} F\n')
-                        file.write('  end\n')
-                        file.write('end\n')
+                                file.write("   {{ D {0} {1} {2} {3} C }} \n".format(constraint[0], constraint[1], constraint[2], constraint[3]))
+                        file.write('    end\n')
+                        file.write('   end\n')
 
                     file.write(f'* xyz {self.charge} {self.spin}\n')
 
