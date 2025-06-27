@@ -194,7 +194,7 @@ class ScfHessianDriver(HessianDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_numerical(self, molecule, ao_basis):
+    def compute_numerical_with_analytical_gradient(self, molecule, ao_basis):
         """
         Performs the calculation of a numerical Hessian based only
         on the energy.
@@ -997,3 +997,71 @@ class ScfHessianDriver(HessianDriver):
 
         # Solve the CPHF equations
         cphf_solver.compute(molecule, ao_basis, scf_tensors, self.scf_driver)
+
+    def compute_energy(self, molecule, basis):
+        """
+        Computes the energy at the current molecular geometry.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+
+        self.scf_driver.restart = False
+        self.scf_driver.ostream.mute()
+        scf_results = self.scf_driver.compute(molecule, basis)
+        self.scf_driver.ostream.unmute()
+        assert_msg_critical(self.scf_driver.is_converged,
+                            'ScfHessianDriver: SCF did not converge')
+        if self.rank == mpi_master():
+            energy = self.scf_driver.get_scf_energy()
+            return energy
+        else:
+            return None
+
+    def compute_gradient(self, molecule, basis):
+        """
+        Computes the gradient at the current molecular geometry.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The SCF tensors.
+        """
+
+        self.scf_driver.restart = False
+        scf_results = self.scf_driver.compute(molecule, basis)
+        assert_msg_critical(self.scf_driver.is_converged,
+                            'ScfHessianDriver: SCF did not converge')
+
+        grad_drv = ScfGradientDriver(self.scf_driver)
+        grad_drv.compute(molecule, basis, self.scf_driver.scf_tensors)
+        gradient = grad_drv.get_gradient()
+
+        #print("COMPUTE GRADIENT!")
+        #print(molecule.get_xyz_string())
+        #print(gradient)
+        return gradient
+
+    def compute_electric_dipole_moment(self, molecule, basis):
+        """
+        Computes the electric dipole moment at the current molecular geometry.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        """
+
+        prop = FirstOrderProperties(self.comm, self.ostream)
+        prop.compute_scf_prop(molecule, basis, self.scf_driver.scf_tensors)
+        if self.rank == mpi_master():
+            mu = prop.get_property('dipole moment')
+            return mu
+        else:
+            return None
+
+
