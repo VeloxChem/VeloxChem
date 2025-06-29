@@ -921,7 +921,6 @@ class IMForceFieldGenerator:
 
                                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             
-                            exit()
                             current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
                             
                             if self.roots_to_follow[0] == 0 and energy is None:
