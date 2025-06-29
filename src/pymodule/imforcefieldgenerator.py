@@ -881,45 +881,43 @@ class IMForceFieldGenerator:
                         # Do your processing here
                         for i, mol in enumerate(molecules):
                             optimized_molecule = mol
-                            if self.use_minimized_structures[0]:       
-                                    self.use_minimized_structures[1].append(key)
-
-                                    if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                            if self.use_minimized_structures[0]:   
+                                energy = None
+                                self.use_minimized_structures[1].append(key)
+                                if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                                
+                                    opt_qm_driver = ScfRestrictedDriver()
+                                    opt_qm_driver.xcfun = 'b3lyp'
+                                    opt_drv = OptimizationDriver(opt_qm_driver)
+                                    current_basis = MolecularBasis.read(mol, 'def2-svp')
+                                    _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
+                                    opt_drv.ostream.mute()
                                     
-                                        opt_qm_driver = ScfRestrictedDriver()
-                                        opt_qm_driver.xcfun = 'b3lyp'
-                                        opt_drv = OptimizationDriver(opt_qm_driver)
-                                        current_basis = MolecularBasis.read(mol, 'def2-svp')
-                                        _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
-                                        opt_drv.ostream.mute()
+                                    opt_constraint_list = []
+                                    for constraint in self.use_minimized_structures[1]:
+                                        if len(constraint) == 2:
+                                            opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
+                                            opt_constraint_list.append(opt_constraint)
                                         
-                                        opt_constraint_list = []
-                                        for constraint in self.use_minimized_structures[1]:
-                                            if len(constraint) == 2:
-                                                opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
-                                                opt_constraint_list.append(opt_constraint)
-                                            
-                                            elif len(constraint) == 3:
-                                                opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
-                                                opt_constraint_list.append(opt_constraint)
-                                        
-                                            else:
-                                                opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
-                                                opt_constraint_list.append(opt_constraint)
-                                        opt_drv.constraints = opt_constraint_list
-                                        
-                                        opt_results = opt_drv.compute(mol, current_basis, scf_results)
-                                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                        print(optimized_molecule.get_xyz_string())
-
-                                    elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
-
-                                        optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
-                                        optim_driver.constraints = self.use_minimized_structures[1]
-                                        opt_mol_string, energy = optim_driver.optimize(mol)
-                                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-
-                                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                                        elif len(constraint) == 3:
+                                            opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
+                                            opt_constraint_list.append(opt_constraint)
+                                    
+                                        else:
+                                            opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
+                                            opt_constraint_list.append(opt_constraint)
+                                    opt_drv.constraints = opt_constraint_list
+                                    
+                                    opt_results = opt_drv.compute(mol, current_basis, scf_results)
+                                    optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                                    energy = opt_results['scan_energies'][-1]
+                                    print(optimized_molecule.get_xyz_string())
+                                elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
+                                    optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                                    optim_driver.constraints = self.use_minimized_structures[1]
+                                    opt_mol_string, energy = optim_driver.optimize(mol)
+                                    optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                                    print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             
                             current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
                             
