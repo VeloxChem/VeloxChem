@@ -896,15 +896,15 @@ class IMForceFieldGenerator:
                                         opt_constraint_list = []
                                         for constraint in self.use_minimized_structures[1]:
                                             if len(constraint) == 2:
-                                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                                opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
                                                 opt_constraint_list.append(opt_constraint)
                                             
                                             elif len(constraint) == 3:
-                                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                                opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
                                                 opt_constraint_list.append(opt_constraint)
                                         
                                             else:
-                                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                                opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
                                                 opt_constraint_list.append(opt_constraint)
                                         opt_drv.constraints = opt_constraint_list
                                         

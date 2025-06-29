@@ -2303,7 +2303,7 @@ class IMDatabasePointCollecter:
 
                         optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
                         optim_driver.constraints = constraints
-                        opt_mol_string = optim_driver.optimize(molecule)
+                        opt_mol_string, energy = optim_driver.optimize(molecule)
                         optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
 
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
