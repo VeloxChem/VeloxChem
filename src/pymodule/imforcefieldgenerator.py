@@ -56,6 +56,7 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .conformergenerator import ConformerGenerator
 from .optimizationdriver import OptimizationDriver
+from .externaloptimdriver import ExternalOptimDriver
 from .atommapper import AtomMapper
 import openmm as mm
 import openmm.app as app
@@ -229,6 +230,7 @@ class IMForceFieldGenerator:
         self.imforcefieldfiles = None
 
         self.reaction_coordinates = None
+        self.optim_constraints = None
 
         # variables for the forcefield generation and database expansion
         self.dynamics_settings = None
@@ -269,8 +271,9 @@ class IMForceFieldGenerator:
         
         # set boolean for the optimization features of the method
         self.ghost_atom = (False, None)
-        self.use_minimized_structures = True
+        self.use_minimized_structures = [True, []],
         self.add_conformal_structures = True
+        self.add_structures_along_rcs = False
         self.use_symmetry = True
         self.identfy_relevant_int_coordinates = True
         self.add_bayes_model = True
@@ -620,7 +623,7 @@ class IMForceFieldGenerator:
                     for i, mol in enumerate(molecules):
                     
                         key = key_old
-                        if self.use_minimized_structures:
+                        if self.use_minimized_structures[0]:
                             
                             opt_qm_driver = ScfRestrictedDriver()
                             opt_qm_driver.xcfun = 'b3lyp'
@@ -646,7 +649,7 @@ class IMForceFieldGenerator:
 
             elif not self.add_conformal_structures and len(files_to_add_conf) != 0:
                 
-                if self.use_minimized_structures:       
+                if self.use_minimized_structures[0]:       
                     opt_qm_driver = ScfRestrictedDriver()
                     opt_qm_driver.xcfun = 'b3lyp'
                     opt_drv = OptimizationDriver(opt_qm_driver)
@@ -772,50 +775,190 @@ class IMForceFieldGenerator:
                     key, molecules = entry
                     for i, mol in enumerate(molecules):
 
-                        if self.use_minimized_structures:
+                        if self.use_minimized_structures[0]:       
+                    
+                            if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
                             
-                            opt_qm_driver = ScfRestrictedDriver()
-                            opt_qm_driver.xcfun = 'b3lyp'
+                                opt_qm_driver = ScfRestrictedDriver()
+                                opt_qm_driver.xcfun = 'b3lyp'
+                                opt_drv = OptimizationDriver(opt_qm_driver)
+                                current_basis = MolecularBasis.read(molecule, 'def2-svp')
+                                _, scf_results = self.compute_energy(opt_qm_driver, molecule, current_basis)
+                                opt_drv.ostream.mute()
+                                
+                                opt_constraint_list = []
+                                for constraint in self.use_minimized_structures[1]:
+                                    if len(constraint) == 2:
+                                        opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                        opt_constraint_list.append(opt_constraint)
+                                    
+                                    elif len(constraint) == 3:
+                                        opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                        opt_constraint_list.append(opt_constraint)
+                                
+                                    else:
+                                        opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                        opt_constraint_list.append(opt_constraint)
+                                opt_drv.constraints = opt_constraint_list
+                                
+                                opt_results = opt_drv.compute(molecule, current_basis, scf_results)
+                                optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                                molecule = optimized_molecule
+                                print(optimized_molecule.get_xyz_string())
 
-                            reference_dih = key
-                            opt_drv = OptimizationDriver(opt_qm_driver)
-                            current_basis = MolecularBasis.read(mol, 'def2-svp')
-                            _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
-                            opt_drv.ostream.mute()
-                            # if key is not None:
-                            #     constraint = f"freeze dihedral {reference_dih[0] + 1} {reference_dih[1] + 1} {reference_dih[2] + 1} {reference_dih[3] + 1}"
-                            #     opt_drv.constraints = [constraint]
-                            opt_results = opt_drv.compute(mol, current_basis, scf_results)
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            mol = optimized_molecule
-                            print(optimized_molecule.get_xyz_string())
+                            elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
+
+                                optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                                optim_driver.constraints = self.use_minimized_structures[1]
+                                opt_mol_string = optim_driver.optimize(molecule)
+                                optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+
+                                print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                     
                         current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
                         self.add_point(mol, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
             
             elif not self.add_conformal_structures and not os.path.exists(imforcefieldfile):
                 
-                if self.use_minimized_structures:       
-                    opt_qm_driver = ScfRestrictedDriver()
-                    opt_qm_driver.xcfun = 'b3lyp'
-                    opt_drv = OptimizationDriver(opt_qm_driver)
-                    current_basis = MolecularBasis.read(molecule, 'def2-svp')
-                    _, scf_results = self.compute_energy(opt_qm_driver, molecule, current_basis)
-                    opt_drv.ostream.mute()
-                    opt_results = opt_drv.compute(molecule, current_basis, scf_results)
-                    optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                    molecule = optimized_molecule
-                    print(optimized_molecule.get_xyz_string())
+                if self.use_minimized_structures[0]:       
+                    
+                    if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                    
+                        opt_qm_driver = ScfRestrictedDriver()
+                        opt_qm_driver.xcfun = 'b3lyp'
+                        opt_drv = OptimizationDriver(opt_qm_driver)
+                        current_basis = MolecularBasis.read(molecule, 'def2-svp')
+                        _, scf_results = self.compute_energy(opt_qm_driver, molecule, current_basis)
+                        opt_drv.ostream.mute()
                         
+                        opt_constraint_list = []
+                        for constraint in self.use_minimized_structures[1]:
+                            if len(constraint) == 2:
+                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                            
+                            elif len(constraint) == 3:
+                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                        
+                            else:
+                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                opt_constraint_list.append(opt_constraint)
+                        opt_drv.constraints = opt_constraint_list
+                        
+                        opt_results = opt_drv.compute(molecule, current_basis, scf_results)
+                        energy = opt_results['final_energy']
+                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                        molecule = optimized_molecule
+                        print(optimized_molecule.get_xyz_string())
+
+                    elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
+
+                        optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                        optim_driver.constraints = self.use_minimized_structures[1]
+                        opt_mol_string, energy = optim_driver.optimize(molecule)
+                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                        molecule = optimized_molecule
+                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+
                 current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
                 self.add_point(molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
                 print(molecule.get_xyz_string())
                 self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
                 print('Molecule added to the database',  self.density_of_datapoints)
 
+
             self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_reaction_path_molecules(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
             self.states_data_point_density = density_of_datapoints
+            
+            if self.add_structures_along_rcs:
+                
+                for counter, (state, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
+                    for key, mol_info in dihedral_dict.items():
+                        molecules, start = mol_info
+                        print(f"State: {state}, Dihedral: {key}, Molecules: {molecules}, Start: {start}")
+                        # Do your processing here
+                        for i, mol in enumerate(molecules):
+                            optimized_molecule = mol
+                            if self.use_minimized_structures[0]:       
+                                    self.use_minimized_structures[1].append(key)
+
+                                    if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                                    
+                                        opt_qm_driver = ScfRestrictedDriver()
+                                        opt_qm_driver.xcfun = 'b3lyp'
+                                        opt_drv = OptimizationDriver(opt_qm_driver)
+                                        current_basis = MolecularBasis.read(mol, 'def2-svp')
+                                        _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
+                                        opt_drv.ostream.mute()
+                                        
+                                        opt_constraint_list = []
+                                        for constraint in self.use_minimized_structures[1]:
+                                            if len(constraint) == 2:
+                                                opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                                opt_constraint_list.append(opt_constraint)
+                                            
+                                            elif len(constraint) == 3:
+                                                opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                                opt_constraint_list.append(opt_constraint)
+                                        
+                                            else:
+                                                opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                                opt_constraint_list.append(opt_constraint)
+                                        opt_drv.constraints = opt_constraint_list
+                                        
+                                        opt_results = opt_drv.compute(mol, current_basis, scf_results)
+                                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                                        print(optimized_molecule.get_xyz_string())
+
+                                    elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
+
+                                        optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                                        optim_driver.constraints = self.use_minimized_structures[1]
+                                        opt_mol_string, energy = optim_driver.optimize(mol)
+                                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+
+                                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                            
+                            exit()
+                            current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
+                            
+                            if self.roots_to_follow[0] == 0 and energy is None:
+                                energy, scf_results = self.compute_energy(self.drivers['ground_state'][0], optimized_molecule, current_basis)
+                            elif self.roots_to_follow[0] > 0 and energy is None:
+                                energy, scf_results = self.compute_energy(self.drivers['excited_state'][0], optimized_molecule, current_basis)
+                            impes_driver = InterpolationDriver(self.z_matrix)
+                            impes_driver.update_settings(self.states_interpolation_settings[self.roots_to_follow[0]])
+                            if self.roots_to_follow[0] == 0:
+                                impes_driver.symmetry_information = self.symmetry_information['gs']
+                            else:
+                                impes_driver.symmetry_information = self.symmetry_information['es']
+                            
+                            old_label = None
+
+                            for label in im_labels:
+                                if '_symmetry' not in label:
+                                    qm_data_point = InterpolationDatapoint(self.z_matrix)
+                                    qm_data_point.read_hdf5(self.states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'], label)
+                                    
+                                    old_label = qm_data_point.point_label
+                                    impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
+                                    self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
+
+                                else:
+                                    symmetry_data_point = InterpolationDatapoint(self.z_matrix)
+                                    symmetry_data_point.read_hdf5(self.states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'], label)
+                                    
+                                    impes_driver.qm_symmetry_data_points[old_label].append(symmetry_data_point)
+
+                            impes_driver.compute(optimized_molecule)
+                            energy_difference = (abs(energy - impes_drivers.impes_coordinate.energy))
+
+                            if energy_difference * vlx.hartree_in_kcalpermol() > self.energy_threshold:
+                                print(f'Energy difference {energy_difference} is larger than the threshold {self.energy_threshold}, adding point to the database')
+
+                                self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
             for counter, (state, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
                 for key, mol_info in dihedral_dict.items():
@@ -890,9 +1033,10 @@ class IMForceFieldGenerator:
                         # self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
 
             
-            # for root in self.roots_to_follow:
-            #     density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density[root], self.states_interpolation_settings[root]['imforcefield_file'])
-            #     self.states_data_point_density[root] = density_of_datapoints
+            desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
+            density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density, self.states_interpolation_settings)
+            self.states_data_point_density = density_of_datapoints
+            
             print('The construction of the database was sucessfull', self.states_data_point_density)
             self.im_results['n_datapoints'] = self.states_data_point_density
 

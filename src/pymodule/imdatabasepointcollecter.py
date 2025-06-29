@@ -2189,7 +2189,7 @@ class IMDatabasePointCollecter:
                 
                 
                 
-                if self.use_opt_confidence_radius[0] and len(self.sampled_molecules[self.current_state]['molecules']) > 20:
+                if self.use_opt_confidence_radius[0] and len(self.sampled_molecules[self.current_state]['molecules']) > 20 and 1 == 2:
                     self.add_a_point = True
                     if not self.expansion:
                         length_vectors = (self.impes_drivers[-1].impes_coordinate.cartesian_distance_vector(self.qm_data_points[0]))
@@ -2198,7 +2198,7 @@ class IMDatabasePointCollecter:
                         self.last_point_added = self.point_checker - 1
                         self.point_checker = 0
                 
-                elif energy_difference * hartree_in_kcalpermol() > self.energy_threshold and len(self.sampled_molecules[self.current_state]['molecules']) < 100 and self.use_opt_confidence_radius[0]:
+                elif energy_difference * hartree_in_kcalpermol() > self.energy_threshold and len(self.sampled_molecules[self.current_state]['molecules']) < 100 and self.use_opt_confidence_radius[0] and 1==2:
   
                     self.sampled_molecules[self.current_state]['molecules'].append(molecule)
                     self.sampled_molecules[self.current_state]['im_energies'].append(self.impes_drivers[self.current_state].impes_coordinate.energy)
@@ -2249,20 +2249,23 @@ class IMDatabasePointCollecter:
 
                     weights = [value for _, value in current_weights.items()]
                     used_labels = [label_idx for label_idx, _ in current_weights.items()]
+
+                    # Sort labels and weights by descending weight
+                    sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
+
+                    total_weight = sum(weights)
+                    cumulative_weight = 0.0
                     internal_coordinate_datapoints = []
-                    for i, weight in enumerate(weights):
-                        
-                        if weight >= max(weights) - 0.2:
-                            
-                            internal_coordinate_datapoints.append(self.qm_data_point_dict[self.current_state][used_labels[i]])
-                        else:
+
+                    for label, weight in sorted_items:
+                        cumulative_weight += weight
+                        internal_coordinate_datapoints.append(self.qm_data_point_dict[self.current_state][label])
+                        if cumulative_weight >= 0.8 * total_weight:
                             break
 
                     # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
                     constraints = self.impes_drivers[self.current_state].determine_important_internal_coordinates(qm_energy, molecule, self.z_matrix, internal_coordinate_datapoints)
-                    
-                    
-                    print('FINAL WIEGHTS', current_weights)
+
                     print('CONSTRAINTS', constraints)
 
                     
@@ -2300,9 +2303,11 @@ class IMDatabasePointCollecter:
 
                         optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
                         optim_driver.constraints = constraints
-                        optim_driver.optimize(molecule)
+                        opt_mol_string = optim_driver.optimize(molecule)
+                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
 
-                        exit()
+                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+
 
                     label = f"point_{len(self.sorted_state_spec_im_labels[self.current_state]) + 1}"
                     self.add_point(optimized_molecule, label, current_basis, self.non_core_symmetry_groups)
@@ -2658,7 +2663,7 @@ class IMDatabasePointCollecter:
                         #         exit()  
                         impes_coordinate.write_hdf5(self.interpolation_settings[state + number]['imforcefield_file'], new_label)
                         if label_counter == 0:
-                            if self.use_opt_confidence_radius[0]:
+                            if self.use_opt_confidence_radius[0] and len(self.sampled_molecules[self.current_state]['molecules']) > 20:
                                 
                                 trust_radius = None
                                 if self.use_opt_confidence_radius[1] == 'single':

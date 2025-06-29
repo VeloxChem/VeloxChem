@@ -65,7 +65,7 @@ class ExternalOptimDriver:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-        self.nprocs = qm_driver.nprocs
+        self.nprocs = qm_driver.nprocs * 3
         # output stream
         self.ostream = ostream
         self.constraints = []
@@ -289,6 +289,7 @@ conda activate vlxenv_simd_master
         Extract energy values for the given number of roots from the output file.
         """
         xyz_structure = None
+        energy = None
         try:
             if self.program == 'MOLCAS':
                 with open(self.output_filename, 'r') as file:
@@ -308,6 +309,14 @@ conda activate vlxenv_simd_master
                 with open(self.final_opt_structure_filename, 'r') as file:
                     content = file.read()
                     xyz_structure = content
+                    lines = content.splitlines()
+                    second_line = lines[1] 
+                    match = re.search(r'E\s+(-?\d+\.\d+)', second_line)
+                    if match:
+                        energy = float(match.group(1))
+                        print("Extracted energy:", energy)
+                    else:
+                        print("Energy value not found in second line.")
         
             elif self.program == 'QCHEM':
                 energies = []
@@ -342,7 +351,7 @@ conda activate vlxenv_simd_master
             # reordered_energies = energies
             # print('Here are the enegies', energies, reordered_energies, self.tracked_roots)
 
-            return xyz_structure
+            return xyz_structure, energy
         except Exception as e:
             print(f"Error extracting energies: {e}")
             return None

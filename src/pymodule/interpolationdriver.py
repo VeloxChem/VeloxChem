@@ -492,7 +492,6 @@ class InterpolationDriver():
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec = self.cartesian_distance_symmetry(data_point)
-
                 if abs(distance) < min_distance:
                     min_distance = abs(distance)
 
@@ -503,7 +502,7 @@ class InterpolationDriver():
         close_distances = [
             (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index) 
             for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients 
-            if abs(distance) <= min_distance + self.distance_thrsh + 10000]
+            if abs(distance) <= min_distance + self.distance_thrsh]
         # distances_from_points = [] 
         # internal_distance_dict = []
         for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
@@ -732,7 +731,7 @@ class InterpolationDriver():
             pot_gradients = []
             symmetry_weight_gradients = []
             hessian_error = []
-
+            
             for i, symmetry_data_point in enumerate(symmetry_data_points):
                 # if i == 0:
                 #     symmetry_data_point.confidence_radius = 1.5
@@ -1890,7 +1889,6 @@ class InterpolationDriver():
         """
         constraints = []
         for datapoint in datapoints:
-
             internal_coord_elem_distance = []
             for elem_idx, element in enumerate(self.z_matrix): 
                 if len(element) == 4 and tuple(sorted(element)) in self.symmetry_information[7][3]: 
@@ -1947,18 +1945,19 @@ class InterpolationDriver():
             sorted_contributions = sorted(contributions, key=lambda x: x[1], reverse=True)
 
             # Print the sorted contributions with internal coordinates
-            print('Delta E:', delta_E * hartree_in_kcalpermol())
-            for contrib, error, ind_weight, coord in sorted_contributions[:]:
-                if len(coord) == 2 and ind_weight == max(weights):
+            print('Delta E:', delta_E * hartree_in_kcalpermol(), constraints)
+            for contrib, error, ind_weight, coord in sorted_contributions[:]:        
+                print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
+                if tuple(int(x) for x in coord) in constraints:
+                    continue
+                if len(coord) == 2 and abs(ind_weight - max(weights)) < 1e-8:
                     constraints.append(tuple(int(x) for x in coord))
-                elif len(coord) == 3 and ind_weight == max(weights):
+                elif len(coord) == 3 and abs(ind_weight - max(weights)) < 1e-8:
                     constraints.append(tuple(int(x) for x in coord))
                 elif len(coord) == 4 and ind_weight > max(weights) * 0.7 and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
                     constraints.append(tuple(int(x) for x in coord))
                 print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error * hartree_in_kcalpermol()} kcal/mol')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
             print('Sum of Weights', sum(weights), sum(single_energy_error) * hartree_in_kcalpermol())
-            
-
 
         return constraints
 
