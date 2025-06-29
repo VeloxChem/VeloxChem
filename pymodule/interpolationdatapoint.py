@@ -1,0 +1,1147 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
+from contextlib import redirect_stderr
+from io import StringIO
+import numpy as np
+import h5py
+import sys
+import scipy
+from .profiler import Profiler
+import multiprocessing as mp
+from mpi4py import MPI
+
+
+from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
+from .inputparser import (parse_input, print_keywords, print_attributes)
+
+from .mmforcefieldgenerator import MMForceFieldGenerator
+
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
+
+
+class InterpolationDatapoint:
+    """
+    Implements routines for the coordinates required for potential energy
+    surface interpolation.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
+
+    Instance variables
+        - hessian: The Cartesian Hessian in Hartree per Bohr**2.
+        - energy: the total energy of the groound or excited state in Hartree
+        - gradient: The Cartesian gradient in Hartree per Bohr
+        - z_matrix: The Z-matrix (a list of tuples with indices of the atoms
+          which define bonds, bond angles and dihedral angles).
+        - internal_gradient: The gradient in internal coordinates.
+        - internal_hessian: The Hessian in internal coordinates.
+        - b_matrix: The Wilson B-matrix.
+        - b2_matrix: The matrix of second order deriatives of
+          internal coordinates with respect to Cartesian coordinates.
+        - use_inverse_bond_length: Flag for using the inverse bond length
+          instead of the bond length.
+        - use_cosine_dihedral: Flag for using the cosine of the dihedral angle
+          rather than the angle itself.
+        - internal_coordinates: A list of geomeTRIC internal coordinate objects.
+        - internal_coordinates_values: A numpy array with the values of the
+          internal coordinates: in angstroms (bond lengths), 1/angstroms
+          (if inverse bond lengths are used), radians (bond angles), radians or
+          cosine of radians (dihedral angles).
+    """
+
+    def __init__(self, z_matrix=None, atom_labels=None, comm=None, ostream=None):
+        """
+        Initializes the InterpolationDatapoint object.
+
+        :param z_matrix: a list of tuples with atom indices (starting at 0)
+        that define bonds, bond angles, and dihedral angles.
+        """
+        # if comm is None:
+        #     comm = MPI.COMM_WORLD
+
+        # if ostream is None:
+        #     ostream = OutputStream(sys.stdout)
+
+        # self.comm = None
+        # self.ostream = ostream
+
+        self.point_label = None
+
+        self.energy = None
+        self.gradient = None
+        self.hessian = None
+
+        self.z_matrix = z_matrix
+        self.atom_labels = atom_labels
+        self.internal_gradient = None
+        self.internal_hessian = None
+        self.inv_sqrt_masses = None
+
+        self.b_matrix = None
+
+        # copy of Willson B matrix in r and phi
+        # (needed for converting the b2_matrix in 1/r and/or cos(phi)).
+        self.original_b_matrix = None
+        self.b2_matrix = None
+
+        self.confidence_radius = None
+        self.use_inverse_bond_length = True
+        self.use_cosine_dihedral = False
+        self.NAC = False
+        
+        # internal_coordinates is a list of geomeTRIC objects which represent
+        # different types of internal coordinates (distances, angles, dihedrals)
+        self.internal_coordinates = None
+        self.mapping_masks = None
+
+        # internal_coordinates_values is a numpy array with the values of the
+        # geomeTRIC internal coordinates. It is used in InterpolationDriver to
+        # determine the distance in internal coordinates between two
+        # InterpolationDatapoint objects.
+        self.internal_coordinates_values = None
+        self.cartesian_coordinates = None
+
+        # baysian block
+        self.prec_matrix = None
+        self.low_trig_chol_prec_matrix = None
+        self.rhs = None
+        self.post_mean = None
+        self.sigma2 = None
+        self.lambda_inv = None
+
+        self._input_keywords = {
+            'im_settings': {
+                'use_inverse_bond_length':
+                    ('bool',
+                     'use the inverse bond lengths'),
+                'use_cosine_dihedral':
+                    ('bool', 'use the cosine of dihedrals'
+                     ),
+            }
+        }
+
+    def print_keywords(self):
+        """
+        Prints the input keywords of the InterpolationDatapoint.
+        """
+
+        print_keywords(self._input_keywords, self.ostream)
+
+    def print_attributes(self):
+        """
+        Prints the attributes of the InterpolationDatapoint.
+        """
+
+        print_attributes(self._input_keywords, self.ostream)
+
+    def update_settings(self, impes_dict=None):
+        """
+        Updates settings for InterpolationDatapoint.
+
+        :param impes_dict:
+            The input dictionary of settings for interpolated mechanics.
+        """
+
+        if impes_dict is None:
+            impes_dict = {}
+
+        im_keywords = {
+            key: val[0]
+            for key, val in self._input_keywords['im_settings'].items()
+        }
+
+        parse_input(self, im_keywords, impes_dict)
+
+    def define_internal_coordinates(self):
+        """
+        Defines the internal coordinates from the Z-matrix.
+        """
+
+        assert_msg_critical(self.z_matrix is not None, 'InterpolationDatapoint: No Z-matrix defined.')
+        self.internal_coordinates = []
+
+        for z in self.z_matrix:
+            
+            if len(z) == 2:
+                q = geometric.internal.Distance(*z)
+            elif len(z) == 3:
+                q = geometric.internal.Angle(*z)
+            elif len(z) == 4:
+                q = geometric.internal.Dihedral(*z)
+            else:
+                assert_msg_critical(False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
+            self.internal_coordinates.append(q)
+
+    def calculate_b_matrix(self):
+        """
+        Calculates the Wilson B-matrix.
+        """
+        assert_msg_critical(self.internal_coordinates is not None, 'InterpolationDatapoint: No internal coordinates are defined.')
+        assert_msg_critical(self.cartesian_coordinates is not None, 'InterpolationDatapoint: No cartesian coordinates are defined.')
+
+        n_atoms = self.cartesian_coordinates.shape[0]
+        coords = self.cartesian_coordinates.reshape((n_atoms * 3))
+
+        self.b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
+        if self.use_inverse_bond_length or self.use_cosine_dihedral:
+            self.original_b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
+
+        for i, z in enumerate(self.z_matrix):
+            q = self.internal_coordinates[i]
+            derivative = q.derivative(coords).reshape(-1)
+
+            if len(z) == 2 and self.use_inverse_bond_length:
+                r = q.value(coords)
+                r_inv_2 = 1.0 / (r * r)
+                self.b_matrix[i, :derivative.shape[0]] = -r_inv_2 * derivative
+                
+                self.original_b_matrix[i, :derivative.shape[0]] = derivative
+            else:
+                self.b_matrix[i, :derivative.shape[0]] = derivative
+
+            # self.b_matrix[i] = derivative
+            self.original_b_matrix[i] = derivative
+
+
+    def calculate_b2_matrix(self):
+        """
+        Calculates the second derivative matrix of the internal coordinates
+        """
+
+        assert_msg_critical(self.internal_coordinates is not None, 'InterpolationDatapoint: No internal coordinates are defined.')
+        assert_msg_critical(self.cartesian_coordinates is not None, 'InterpolationDatapoint: No cartesian coordinates are defined.')
+
+        n_atoms = self.cartesian_coordinates.shape[0]
+        coords = self.cartesian_coordinates.reshape((n_atoms * 3))
+
+        self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
+        
+
+        for i, z in enumerate(self.z_matrix):
+            q = self.internal_coordinates[i]
+            second_derivative = q.second_derivative(coords).reshape(-1, n_atoms * 3)
+
+            if len(z) == 2 and self.use_inverse_bond_length:
+                r = q.value(coords)
+                r_inv_2 = 1.0 / (r * r)
+                r_inv_3 = r_inv_2 / r
+                self.b2_matrix[i] = -r_inv_2 * second_derivative
+
+                for m in range(n_atoms):
+                    for n in range(n_atoms):
+                        self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+                # self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
+
+            else:
+                self.b2_matrix[i] = second_derivative
+
+            # self.b2_matrix[i] = second_derivative
+               
+    def transform_gradient_to_internal_coordinates(self, tol=1e-6):
+        """
+        Transforms the gradient from Cartesian to internal coordinates.
+
+        :param tol:
+            Tolerance for the singular values of the B matrix.
+
+        """
+        
+        dimension = self.gradient.shape[0] * 3 - 6
+        if self.gradient.shape[0] == 2:
+            dimension += 1
+
+        if self.b_matrix is None:
+            self.calculate_b_matrix()
+        
+        self.b_matrix = self.b_matrix * self.inv_sqrt_masses
+
+        assert_msg_critical(self.gradient is not None, 'InterpolationDatapoint: No gradient is defined.')
+
+        g_matrix = np.dot(self.b_matrix, self.b_matrix.T)
+        
+        U, s, Vt = np.linalg.svd(g_matrix)
+        
+        print('eigenvalues', s)
+        # Make zero the values of s_inv that are smaller than tol
+        s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
+        
+        # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
+        number_of_positive_values = np.count_nonzero(s_inv)
+        
+        # If more elements are zero than allowed, restore the largest ones
+        if number_of_positive_values > dimension:
+            print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
+            # Get indices of elements originally set to zero
+            zero_indices = np.where(s_inv == 0.0)[0]
+            
+            # Sort these indices based on their corresponding values in 's' (descending order)
+            sorted_zero_indices = zero_indices[np.argsort(s[zero_indices])[::-1]]
+            
+            # Calculate how many elements need to be restored
+            num_to_restore = abs(number_of_positive_values - dimension)
+            
+            # Restore the largest elements among those set to zero
+            for idx in sorted_zero_indices[:num_to_restore]:
+                s_inv[idx] = 1 / s[idx]
+
+        g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
+
+        gradient_flat = self.gradient.flatten()
+        self.internal_gradient = np.dot(g_minus_matrix, np.dot(self.b_matrix, gradient_flat))
+
+    def transform_hessian_to_internal_coordinates(self, tol=1e-6):
+        """
+        Transforms the Hessian from Cartesian to internal coordinates.
+
+        :param tol:
+            Tolerance for the singular values of the B matrix.
+
+        """
+
+        if self.internal_gradient is None:
+            self.transform_gradient_to_internal_coordinates()
+
+        if self.b2_matrix is None:
+            self.calculate_b2_matrix()
+
+        dimension = self.gradient.shape[0] * 3 - 6
+        if self.gradient.shape[0] == 2:
+            dimension += 1
+        
+        self.b2_matrix = (self.b2_matrix *
+            self.inv_sqrt_masses.reshape(1, -1, 1) *
+            self.inv_sqrt_masses.reshape(1,  1, -1))
+
+        g_matrix = np.dot(self.b_matrix, self.b_matrix.T)
+
+        U, s, Vt = np.linalg.svd(g_matrix)
+
+        # Make zero the values of s_inv that are smaller than tol
+        s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
+
+        number_of_positive_values = np.count_nonzero(s_inv)
+
+        # If more elements are zero than allowed, restore the largest ones
+        if number_of_positive_values > dimension:
+            print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
+            # Get indices of elements originally set to zero
+            zero_indices = np.where(s_inv == 0.0)[0]
+            
+            # Sort these indices based on their corresponding values in 's' (descending order)
+            sorted_zero_indices = zero_indices[np.argsort(s[zero_indices])[::-1]]
+            
+            # Calculate how many elements need to be restored
+            num_to_restore = abs(number_of_positive_values - dimension)
+            
+            # Restore the largest elements among those set to zero
+            for idx in sorted_zero_indices[:num_to_restore]:
+                s_inv[idx] = 1 / s[idx]
+    
+        g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
+
+        b2_gradient = np.einsum("qxy,q->xy", self.b2_matrix, self.internal_gradient)
+        self.b2_gradient = b2_gradient
+        intermediate_matrix = np.dot(self.b_matrix, self.hessian - b2_gradient)
+
+        self.internal_hessian = np.linalg.multi_dot([
+            g_minus_matrix, intermediate_matrix, self.b_matrix.T, g_minus_matrix.T
+        ])
+        self.internal_hessian = 0.5 * (self.internal_hessian + self.internal_hessian.T)
+    
+    def backtransform_internal_gradient_to_cartesian_coordinates(self):
+        '''
+        Performs the back-transformation of the internal gradient to the
+        Cartesian space.
+
+        :returns:
+            The gradient in Cartesian coordinates.
+        '''
+        
+        cartesian_gradient = np.linalg.multi_dot([self.b_matrix.T, self.internal_gradient]).reshape(self.cartesian_coordinates.shape[0], 3)
+
+        return cartesian_gradient
+
+    def backtransform_internal_hessian_to_cartesian_coordinates(self):
+        '''
+        Performs the back-transformation of the internal hessian to the
+        Cartesian space.
+
+        :returns:
+            The hessian in Cartesian coordinates.
+
+        '''
+
+        
+        cartesian_hessian = np.linalg.multi_dot([self.b_matrix.T, self.internal_hessian, self.b_matrix]) + self.b2_gradient
+
+        return cartesian_hessian
+
+    def backtransform_gradient_and_hessian(self):
+        """
+        Performs all steps required to transform from internal coordinates
+        to the Cartesian coordinates.
+
+        """
+        assert_msg_critical(self.internal_gradient is not None, 'InterpolationDatapoint: No internal gradient is defined.')
+        assert_msg_critical(self.internal_hessian is not None, 'InterpolationDatapoint: No internal hessian is defined.')
+
+        # Transform the gradient and Hessian to internal coordinates
+        self.backtransform_internal_gradient_to_cartesian_coordinates()
+        self.backtransform_internal_hessian_to_cartesian_coordinates()
+
+    def transform_gradient(self):
+        """
+        Performs all steps required to transform from Cartesian coordinates
+        to the internal coordinates defined in the Z-matrix.
+
+        """
+
+        # Create the internal coordinates through geomeTRIC
+        if self.internal_coordinates is None:
+            self.define_internal_coordinates()
+
+        # Transform the gradient and Hessian to internal coordinates
+        self.transform_gradient_to_internal_coordinates()
+
+        # Save the values of the internal coordinates as a numpy array
+        self.compute_internal_coordinates_values()
+
+    def transform_gradient_and_hessian(self):
+        """
+        Performs all steps required to transform from Cartesian coordinates
+        to the internal coordinates defined in the Z-matrix.
+
+        """
+
+        # Create the internal coordinates through geomeTRIC
+        if self.internal_coordinates is None:
+            self.define_internal_coordinates()
+
+        # Transform the gradient and Hessian to internal coordinates
+        self.transform_gradient_to_internal_coordinates()
+        self.transform_hessian_to_internal_coordinates()
+
+        # Save the values of the internal coordinates as a numpy array
+        self.compute_internal_coordinates_values()
+
+    def reset_coordinates_impes_driver(self, cartesian_coordinates):
+        """
+        Resets the Cartesian coordinates for the InterpolationDriver.
+
+        :param cartesian_coordinates:
+                a numpy array of the new Cartesian coordinates.
+        """
+        self.cartesian_coordinates = cartesian_coordinates
+
+        # Since the Cartesian coordinates have been reset,
+        # the internal coordinates and transformation matrices
+        # must be redifined.
+        self.internal_coordinates_values = None
+        self.b_matrix = None
+        self.b2_matrix = None
+        self.g_minus = None
+      
+        if self.internal_coordinates is None:
+            self.define_internal_coordinates()
+
+        # The B matrix is required for the transformation of the
+        # gradient, while B2 is required for the transformation of
+        # the Hessian from Cartesian to internal coordinates and
+        # vice-versa.
+        self.calculate_b_matrix() 
+
+        self.compute_internal_coordinates_values()
+
+        # The gradient and Hessian are reset to None.
+        # The gradient of the new configuration will be
+        # calculated by interpolation.
+        self.internal_gradient = None
+        self.internal_hessian = None
+
+    def reset_coordinates(self, cartesian_coordinates):
+        """
+        Resets the Cartesian coordinates.
+
+        :param cartesian_coordinates:
+                a numpy array of the new Cartesian coordinates.
+        """
+
+        self.cartesian_coordinates = cartesian_coordinates
+
+        # Since the Cartesian coordinates have been reset,
+        # the internal coordinates and transformation matrices
+        # must be redifined.
+        self.internal_coordinates_values = None
+        self.b_matrix = None
+        self.b2_matrix = None
+        self.g_minus = None
+
+        if self.internal_coordinates is None:
+            self.define_internal_coordinates()
+        # The B matrix is required for the transformation of the
+        # gradient, while B2 is required for the transformation of
+        # the Hessian from Cartesian to internal coordinates and
+        # vice-versa.
+        self.calculate_b_matrix()
+        self.calculate_b2_matrix()
+        self.compute_internal_coordinates_values()
+
+        # The gradient and Hessian are reset to None.
+        # The gradient of the new configuration will be
+        # calculated by interpolation.
+        self.internal_gradient = None
+        self.internal_hessian = None
+
+    def compute_internal_coordinates_values(self):
+        """
+        Creates an array with the values of the internal coordinates
+        and saves it in self.
+        """
+
+        assert_msg_critical(
+            self.internal_coordinates is not None,
+            'InterpolationDatapoint: No internal coordinates are defined.')
+
+        assert_msg_critical(
+            self.cartesian_coordinates is not None,
+            'InterpolationDatapoint: No cartesian coordinates are defined.')
+
+        n_atoms = self.cartesian_coordinates.shape[0]
+        coords = self.cartesian_coordinates.reshape((n_atoms * 3))
+
+        int_coords = []
+
+        for q in self.internal_coordinates:
+            if (isinstance(q, geometric.internal.Distance) and
+                    self.use_inverse_bond_length):
+                int_coords.append(1.0 / q.value(coords))
+            elif (isinstance(q, geometric.internal.Dihedral) and
+                  self.use_cosine_dihedral):
+                int_coords.append(np.cos(q.value(coords)))
+            else:
+                int_coords.append((q.value(coords)))
+
+        # internal_coordinates_values contains the values of the
+        # internal_coordinates geomeTRIC objects
+        self.internal_coordinates_values = np.array(int_coords)
+
+    def get_z_matrix_as_np_arrays(self):
+        """
+        Returns a dictionary with the numpy arrays corresponding to the bonds,
+        bond angles, and dihedral angles defined by the Z-matrix.
+        """
+        assert_msg_critical(self.z_matrix is not None,
+                            'InterpolationDatapoint: No Z-matrix is defined.')
+
+        bonds = []
+        angles = []
+        dihedrals = []
+
+        for z in self.z_matrix:
+            if len(z) == 2:
+                bonds.append(z)
+            elif len(z) == 3:
+                angles.append(z)
+            elif len(z) == 4:
+                dihedrals.append(z)
+            else:
+                assert_msg_critical(
+                    False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
+
+        return {
+            'bonds': np.array(bonds),
+            'angles': np.array(angles),
+            'dihedrals': np.array(dihedrals)
+        }
+
+    def calculate_translation_coordinates(self):
+        """Center the molecule by translating its geometric center to (0, 0, 0)."""
+        center = np.mean(self.cartesian_coordinates, axis=0)
+        translated_coordinates = self.cartesian_coordinates - center
+
+        return translated_coordinates
+        
+
+    def write_hdf5(self, fname, label):
+        """
+        Writes the energy, internal coordinates, internal gradient, and
+        internal Hessian to a checkpoint file.
+
+        :param fname:
+            Name of the checkpoint file to be written.
+        :param label:
+            A string describing the coordinate.
+        :param write_zmat:
+            flag to determine if the Z-matrix should be writen to the
+            checkpoint file. False by default.
+        """
+        valid_checkpoint = (fname and isinstance(fname, str))
+
+        if valid_checkpoint:
+            try:
+                h5f = h5py.File(fname, 'a')
+            except IOError:
+                h5f = h5py.File(fname, 'w')
+
+            if self.use_inverse_bond_length:
+                label += "_rinv"
+            else:
+                label += "_r"
+
+            if self.use_cosine_dihedral:
+                label += "_cosine"
+            else:
+                label += "_dihedral"
+
+            assert_msg_critical(self.energy is not None,
+                                'InterpolationDatapoint: No energy is defined.')
+
+            assert_msg_critical(
+                self.internal_gradient is not None,
+                'InterpolationDatapoint: No internal gradient is defined.')
+
+            assert_msg_critical(
+                self.internal_hessian is not None,
+                'InterpolationDatapoint: No internal Hessian is defined.')
+            
+            if self.atom_labels is not None:
+                full_label = label + '_atom_labels'
+                string_type = h5py.string_dtype(encoding='utf-8')
+                h5f.create_dataset(full_label, data=self.atom_labels, dtype=string_type)
+
+            full_label = label + "_energy"
+            h5f.create_dataset(full_label, data=np.float64(self.energy))
+
+            # write gradient in internal coordinates
+            full_label = label + "_gradient"
+            h5f.create_dataset(full_label,
+                               data=self.internal_gradient,
+                               compression='gzip')
+
+            # write Hessian in internal coordinates
+            full_label = label + "_hessian"
+            h5f.create_dataset(full_label,
+                               data=self.internal_hessian,
+                               compression='gzip')
+
+            if self.internal_coordinates is None:
+                assert_msg_critical(
+                    self.internal_coordinates_values is not None,
+                    'InterpolationDatapoint: No internal coordinates are defined.')
+
+                # write internal coordinates
+                full_label = label + "_internal_coordinates"
+                h5f.create_dataset(full_label,
+                                   data=self.internal_coordinates_values,
+                                   compression='gzip')
+            else:
+                # write internal coordinates
+                full_label = label + "_internal_coordinates"
+                self.compute_internal_coordinates_values()
+                h5f.create_dataset(full_label,
+                                   data=self.internal_coordinates_values,
+                                   compression='gzip')
+
+            assert_msg_critical(
+                self.confidence_radius is not None,
+                'InterpolationDatapoint: No confidence radius is defined.')
+            # write internal coordinates
+            full_label = label + "_confidence_radius"
+            h5f.create_dataset(full_label, data=np.float64(self.confidence_radius))
+
+            assert_msg_critical(
+                self.cartesian_coordinates is not None,
+                'InterpolationDatapoint: No Cartesian coordinates are defined.')
+            # write Cartesian coordinates
+            full_label = label + "_cartesian_coordinates"
+            h5f.create_dataset(full_label,
+                               data=self.cartesian_coordinates,
+                               compression='gzip')
+            
+            assert_msg_critical(
+                self.z_matrix is not None,
+                'InterpolationDatapoint: No Z-matrix is defined.')
+            # Write the bonds, angles and dihedrals defined in the Z-matrix.
+            # Bonds are saved in an array with two atoms indices per row.
+            # Angles are saved in an array with three atom indices per row.
+            # Dihedrals are saved in an array with four atom indices per row.
+            zmat_dict = self.get_z_matrix_as_np_arrays()
+            for key in zmat_dict.keys():
+                h5f.create_dataset(label + '_' + key,
+                                   data=zmat_dict[key],
+                                   compression='gzip')
+                
+            full_label = label + "_masks"
+            h5f.create_dataset(full_label,
+                               data=self.mapping_masks,
+                               compression='gzip')
+            
+
+            
+            h5f.close()
+
+
+    def read_hdf5(self, fname, label):
+        """
+        Reads the energy, internal coordinates, gradient, and Hessian from
+        a checkpoint file,
+
+        :param fname:
+            Name of the checkpoint file.
+            The file must exist before calling this routine.
+        :param label:
+            The label of the selected coordinates.
+        """
+        valid_checkpoint = (fname and isinstance(fname, str))
+
+        if valid_checkpoint:
+            h5f = h5py.File(fname, 'r')
+
+            if self.use_inverse_bond_length:
+                label += "_rinv"
+            else:
+                label += "_r"
+
+            if self.use_cosine_dihedral:
+                label += "_cosine"
+            else:
+                label += "_dihedral"
+
+            energy_label = label + "_energy"
+            gradient_label = label + "_gradient"
+            hessian_label = label + "_hessian"
+            coords_label = label + "_internal_coordinates"
+            cart_coords_label = label + "_cartesian_coordinates"
+            mapping_masks_label = label + "_masks"
+            confidence_radius_label = label + "_confidence_radius"
+
+            z_matrix_bonds = label + '_bonds'
+            z_matrix_angles = label + '_angles'
+            z_matrix_dihedral = label + '_dihedrals'
+
+            z_matrix_labels = [z_matrix_bonds, z_matrix_angles, z_matrix_dihedral]
+            
+            self.point_label = label
+            self.energy = np.array(h5f.get(energy_label))
+            self.internal_gradient = np.array(h5f.get(gradient_label))
+            self.internal_hessian = np.array(h5f.get(hessian_label))
+            self.internal_coordinates_values = np.array(h5f.get(coords_label))
+            self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
+            self.confidence_radius = np.array(h5f.get(confidence_radius_label))
+            self.mapping_masks = np.array(h5f.get(mapping_masks_label))
+
+
+            z_matrix = []
+            
+            for label_obj in z_matrix_labels:
+                current_z_list = [z_list.tolist() for z_list in list(h5f.get(label_obj))]
+                z_matrix.extend(current_z_list)
+                
+            h5f.close()
+
+    def cartesian_distance_vector(self, data_point):
+        """Calculates and returns the cartesian distance between
+           self and data_point.
+
+           :param data_point:
+                InterpolationDatapoint object
+        """
+        # First, translate the cartesian coordinates to zero
+        target_coordinates = data_point.calculate_translation_coordinates()
+        reference_coordinates = self.calculate_translation_coordinates()
+
+        # Then, determine the rotation matrix which
+        # aligns data_point (target_coordinates)
+        # to self (reference_coordinates)
+        rotation_matrix = geometric.rotate.get_rot(target_coordinates,
+                                                   reference_coordinates)
+
+        # Rotate the data point:
+        rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+
+        # Calculate the distance:
+        distance_vector = (reference_coordinates - rotated_coordinates)
+
+        return distance_vector
+    
+    def determine_trust_radius(self, molecule, interpolation_settings, dynamics_settings, label, key, allowed_deviation, symmetry_groups=[]):
+        from .imdatabasepointcollecter import IMDatabasePointCollecter
+        from scipy.stats import pearsonr
+        forcefield_generator = MMForceFieldGenerator()
+        dynamics_settings['trajectory_file'] = f'trajectory_single_point.pdb'
+        
+        forcefield_generator.create_topology(molecule)
+            
+        im_database_driver = IMDatabasePointCollecter()
+        im_database_driver.distance_thrsh = 0.1
+        im_database_driver.platform = 'CUDA'
+        im_database_driver.optimize = False
+        im_database_driver.system_from_molecule(molecule, self.z_matrix, forcefield_generator, solvent=dynamics_settings['solvent'], qm_atoms='all', trust_radius=True)  
+        desiered_point_density = 100
+
+        im_database_driver.density_around_data_point = [desiered_point_density, key]
+
+        im_database_driver.allowed_molecule_deviation = allowed_deviation
+       
+        im_database_driver.update_settings(dynamics_settings, interpolation_settings)
+        im_database_driver.expansion = False
+        im_database_driver.qm_data_points = [self]
+        im_database_driver.im_labels = [label]
+        im_database_driver.non_core_symmetry_groups = symmetry_groups
+        im_database_driver.run_qmmm()
+
+        # individual impes run objects
+        
+        self.molecules = im_database_driver.molecules
+
+        expansion_molecules = im_database_driver.expansion_molecules
+        
+        sorted_expansion_list = sorted(expansion_molecules, key=lambda x: x[1], reverse=True)
+        # Printing neatly
+        # Renaming molecules to "Molecule 1", "Molecule 2", etc.
+        sorted_data_with_labels = [(f"Molecule {i+1}", v1, v2, v3) for i, (mol, v1, v2, v3) in enumerate(sorted_expansion_list)]
+
+        # Printing neatly
+        print(f"{'Molecule':<15} {'delta E':<10} {'RMSD (distance)':<10} {'|r|':<10}")
+        print("="*50)
+        for molecule, value1, value2, value3 in sorted_data_with_labels:
+            print(f"{molecule:<15} {value1:<10.6f} {value2:<10.6f} {value3:<10.6f}")
+
+        # Extract the delta E (energy difference) and norm (|r|) values from the data
+        deltaE = [value1 for _, value1, _, _ in sorted_data_with_labels]
+        norm_distance = [value3 for _, _, _, value3 in sorted_data_with_labels]
+        if len(deltaE) > 1:
+            # Calculate Pearson correlation using scipy
+            corr_coef_scipy, p_value = pearsonr(deltaE, norm_distance)
+            print("Pearson correlation coefficient (scipy):", corr_coef_scipy)
+            print("p-value:", p_value)
+            
+            trust_radius = 0.5
+            if corr_coef_scipy <= 0:
+                trust_radius = 0.01
+            # Define boundaries:
+            else:
+                min_trust = 0.01  # trust radius when r=0
+                max_trust = 0.5   # trust radius when r=1
+                # Linear interpolation:
+                trust_radius = min_trust + corr_coef_scipy * (max_trust - min_trust)
+        else:
+            trust_radius = 0.5
+
+        print('Trust Radius', trust_radius)
+                
+        return trust_radius
+
+    def remove_point_from_hdf5(fname, label, use_inverse_bond_length=False, use_cosine_dihedral=False):
+        """
+        Removes a point (i.e., corresponding datasets) from an HDF5 file based on label and internal settings.
+        
+        :param fname: HDF5 filename
+        :param label: base label for the data
+        :param use_inverse_bond_length: whether to append '_rinv' or '_r'
+        :param use_cosine_dihedral: whether to append '_cosine' or '_dihedral'
+        """
+        if use_inverse_bond_length:
+            label += "_rinv"
+        else:
+            label += "_r"
+
+        if use_cosine_dihedral:
+            label += "_cosine"
+        else:
+            label += "_dihedral"
+
+        keys_to_remove = [
+            label + "_energy",
+            label + "_gradient",
+            label + "_hessian",
+            label + "_internal_coordinates",
+            label + "_cartesian_coordinates",
+            label + "_confidence_radius",
+            label + "_bonds",
+            label + "_angles",
+            label + "_dihedrals"
+        ]
+
+        with h5py.File(fname, 'r+') as h5f:
+            for key in keys_to_remove:
+                if key in h5f:
+                    del h5f[key]
+                    print(f"Deleted: {key}")
+                else:
+                    print(f"Key not found (skipped): {key}")
+
+
+    def update_confidence_radius(self, fname, label, new_confidence_radius):
+        """
+        Updates the confidence radius in the HDF5 file.
+
+        :param fname: HDF5 filename
+        :param label: base label for dataset lookup
+        :param new_confidence_radius: new value(s) to store
+        """
+        with h5py.File(fname, 'r+') as h5f:
+            if self.use_inverse_bond_length:
+                label += "_rinv"
+            else:
+                label += "_r"
+
+            if self.use_cosine_dihedral:
+                label += "_cosine"
+            else:
+                label += "_dihedral"
+
+            confidence_radius_label = label + "_confidence_radius"
+
+            if confidence_radius_label in h5f:
+                dataset = h5f[confidence_radius_label]
+
+                # Check if shape matches before replacing
+                if np.shape(dataset) == np.shape(new_confidence_radius):
+                    dataset[...] = new_confidence_radius
+                else:
+                    raise ValueError(f"Shape mismatch: existing {dataset.shape}, new {np.shape(new_confidence_radius)}")
+            else:
+                raise KeyError(f"{confidence_radius_label} not found in file.")
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    # def init_bayesian(
+    #         self,
+    #         sigma2      = 1.0e-6,          # observation variance for E and g   (Eh²)
+    #         sigma2_H    = 1.0e-4,          # observation variance for Hessian  (Eh²)
+    #         lambda_E    = 200 * 0.0015936, # prior variance (E)    ~100 kcal
+    #         lambda_g    =  50 * 0.0015936, # prior variance (∂E/∂q)~ 50 kcal
+    #         lambda_H    =  10 * 0.0015936  # prior variance (∂²E)  ~ 10 kcal
+    # ):
+    #     """
+    #     Allocate Bayesian containers for *this* centre and insert the centre’s own
+    #     energy, gradient **and Hessian** as the very first observation block.
+
+    #     All quantities must already be stored in
+    #         self.energy                 (float, Eh)
+    #         self.internal_gradient      (1-D array, length m, Eh)
+    #         self.internal_hessian       (2-D symmetric, shape m×m, Eh)
+    #         self.internal_coordinates_values
+    #     """
+
+    #     # ---------- dimensions ---------------------------------------------------
+    #     m = len(self.internal_coordinates_values)          # # internal DOFs
+    #     d = 1 + m + m*(m+1)//2                             # length of coeff vector
+    #     n_H = m*(m+1)//2                                   # # Hessian elements
+    #     n_rows = 1 + m + n_H                               # total rows in Φ, y
+
+    #     # ---------- prior precision  Λ₀⁻¹  (diagonal) ----------------------------
+    #     prior_E = np.full(1,          1.0 / lambda_E)
+    #     prior_g = np.full(m,          1.0 / lambda_g)
+    #     prior_H = np.full(n_H,        1.0 / lambda_H)
+    #     self.lambda_inv = np.diag(np.concatenate((prior_E, prior_g, prior_H)))
+
+    #     # ---------- containers ----------------------------------------------------
+    #     self.prec_matrix               = self.lambda_inv.copy()   # A  (d×d)
+    #     self.rhs                       = np.zeros(d)              # b  (d)
+    #     self.low_trig_chol_prec_matrix = None                     # L  (built later)
+    #     self.post_mean                 = np.zeros(d)              # c
+    #     self.sigma2                    = sigma2                   # store for updates
+
+    #     # ---------- build Φ  and  y  ---------------------------------------------
+    #     # feature-row matrix
+    #     Phi = np.zeros((n_rows, d))
+
+    #     # 1) energy row  picks coefficient c₀
+    #     Phi[0, 0] = 1.0
+    #     y_E = np.array([self.energy])
+
+    #     # 2) gradient rows  pick the linear coefficients c_i
+    #     Phi[1:1+m, 1:1+m] = np.eye(m)
+    #     y_g = self.internal_gradient.ravel()        # already  ∂E/∂q   (no minus)
+
+    #     # 3) Hessian rows  pick the quadratic coefficients c_{ij}  (upper tri only)
+    #     tri_i, tri_j = np.triu_indices(m)
+    #     offset = 1 + m                               # where Hessian block starts
+    #     for k, (i, j) in enumerate(zip(tri_i, tri_j)):
+    #         Phi[1+m+k, offset+k] = 1.0
+    #     y_H = self.internal_hessian[tri_i, tri_j]
+
+    #     # stack right-hand side
+    #     y_obs = np.concatenate((y_E, y_g, y_H))
+
+    #     # ---------- per-row weights  W^(1/2) Φ  and  W^(1/2) y -------------------
+    #     W_diag = np.concatenate((
+    #         np.full(1,      1.0 / sigma2     ),      # energy
+    #         np.full(m,      1.0 / sigma2     ),      # gradient
+    #         np.full(n_H,    1.0 / sigma2_H   )       # Hessian (looser)
+    #     ))
+    #     sqrtW  = np.sqrt(W_diag)                     # length n_rows
+
+    #     Phi_w  = sqrtW[:, None] * Phi                # broadcast rows
+    #     y_w    = sqrtW * y_obs
+
+    #     # ---------- assemble Bayesian matrices -----------------------------------
+    #     self.prec_matrix += Phi_w.T @ Phi_w          # A = Λ₀⁻¹ + ΦᵀWΦ
+    #     self.rhs         += Phi_w.T @ y_w            # b = ΦᵀW y
+
+    #     self.low_trig_chol_prec_matrix = np.linalg.cholesky(self.prec_matrix)
+    #     self.post_mean = scipy.linalg.cho_solve(
+    #                         (self.low_trig_chol_prec_matrix, True),
+    #                         self.rhs)
+
+    # # -------------- 2.  add a *new* energy/gradient row block -------------
+    # def bayes_update(self, x_obs, E_int, E_obs, g_obs, w_shep):
+    #     """Low-rank update with a ghost observation or a neighbour’s point."""
+        
+    #     dE = E_obs - E_int
+    #     v_target   = dE**2
+    #     w_diag = self._block_precisions(dE, w_shep, kappa=1.0)
+    #     w_scalar = self._target_weight(x_obs, v_target)
+    #     print('Scalar weight', w_scalar)
+
+    #     # --- feature rows --------------------------------------------------
+    #     dx_phi  = self._phi(x_obs)          # helper below
+    #     Gmat    = self._G  (x_obs)          # (m,d)
+    #     Phi     = np.vstack((dx_phi, -Gmat))
+    #     y       = np.concatenate(([E_obs], g_obs.ravel()))
+
+    #     # --- weighting -----------------------------------------------------
+    #     m          = len(self.internal_coordinates_values)
+    #     W_diag     = np.concatenate((
+    #             np.full(1 + m, w_scalar),          # E + grads
+    #             # if you have Hessian rows:
+    #             # np.full(n_H, w_scalar)
+    #          ))
+
+    #     sqrtW      = np.sqrt(W_diag)
+    #     Phi_w      = sqrtW[:, None] * Phi
+    #     y_w        = sqrtW * y
+        
+        
+    #     # sqrt_w  = np.sqrt(w_diag)
+    #     # Phi_w   = sqrt_w[:, None] * Phi
+    #     # y_w     = sqrt_w * y
+
+    #     # Bey Error 0.0665165716615336
+    #     # w_obs   = w_shep / self.sigma2
+    #     # Phi_w   = np.sqrt(w_obs) * Phi
+    #     # y_w     = np.sqrt(w_obs) * y
+
+    #     # --- rank-k downdate/update ---------------------------------------
+    #     self.prec_matrix += Phi_w.T @ Phi_w
+    #     self.rhs         += Phi_w.T @ y_w
+
+    #     # refresh Cholesky + mean
+    #     self.low_trig_chol_prec_matrix = np.linalg.cholesky(self.prec_matrix)
+    #     self.post_mean = scipy.linalg.cho_solve(
+    #                         (self.low_trig_chol_prec_matrix, True),
+    #                         self.rhs)
+
+    # # -------------- 3.  predict μ and σ² at any query point ---------------
+    # def bayes_predict(self, x_query):
+    #     dx_phi = self._phi(x_query)
+    #     mu     = dx_phi @ self.post_mean
+
+    #     # local variance  φᵀΛφ + σ²
+    #     v      = scipy.linalg.cho_solve(
+    #                 (self.low_trig_chol_prec_matrix, True), dx_phi)
+    #     var    = dx_phi @ v + self.sigma2
+    #     return mu, var
+
+    # # ------------- helpers that live inside the class --------------------
+    # def _phi(self, x):
+    #     """feature vector  [1, Δq, ½ vec(ΔqΔqᵀ)]   in *internal coordinates*"""
+    #     dx   = x - self.internal_coordinates_values           # Δq
+        
+    #     for i, element in enumerate(self.z_matrix):
+    #         if len(element) == 4:
+    #             dx[i] = np.sin(dx[i])
+    #     quad = np.outer(dx, dx)[np.triu_indices_from(
+    #                             np.empty((len(dx),)*2))]       # upper tri
+    #     return np.concatenate(([1.0], dx, 0.5*quad))
+
+    # def _G(self, x):
+    #     """Jacobian ∂φ/∂x   size (m,d)   in internal coordinates."""
+    #     dx   = x - self.internal_coordinates_values
+    #     for i, element in enumerate(self.z_matrix):
+    #         if len(element) == 4:
+    #             dx[i] = np.sin(dx[i])
+    #     m    = len(dx)
+    #     d    = 1 + m + m*(m+1)//2
+    #     Gmat = np.zeros((m, d))
+    #     Gmat[:, 1:1+m] = -np.eye(m)
+    #     col  = 1 + m
+    #     for i in range(m):
+    #         for j in range(i, m):
+    #             Gmat[i, col] += -0.5 * dx[j]
+    #             Gmat[j, col] += -0.5 * dx[i]
+    #             col += 1
+    #     return Gmat
+    
+    # def _block_precisions(self, residual_E, w_shep, kappa=0.5):
+    #     """Return per-row precisions for energy + gradient (+ Hessian)."""
+    #     s       = self.sigma2 / (self.sigma2 + kappa * residual_E**2)
+    #     w_E     = w_shep * s / self.sigma2
+    #     m       = len(self.internal_coordinates_values)
+    #     w_g     = np.full(m, w_shep * s / self.sigma2)
+    #     # If you ever add Hessian rows, include them here too:
+    #     # n_H   = m*(m+1)//2
+    #     # w_H   = np.full(n_H, w_shep * s / self.sigma2_H)
+    #     return np.concatenate(([w_E], w_g))
+    
+    # def _target_weight(self, x_obs, v_target):
+    #     """
+    #     Return the scalar precision w that makes the posterior variance
+    #     at x_obs equal to v_target (Hartree**2).
+    #     """
+    #     phi        = self._phi(x_obs)
+    #     s          = phi @ scipy.linalg.cho_solve(
+    #                     (self.low_trig_chol_prec_matrix, True), phi)
+    #     v0         = s + self.sigma2
+
+    #     if v_target >= v0:
+    #         print('#####################')
+    #         v_target = v0
+    #         # raise ValueError("Target variance not smaller than current variance")
+    #     return (v0 - v_target) / (s * v_target)
+
