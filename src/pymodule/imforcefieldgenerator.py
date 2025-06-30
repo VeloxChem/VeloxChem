@@ -933,6 +933,7 @@ class IMForceFieldGenerator:
                                 impes_driver.symmetry_information = self.symmetry_information['es']
                             
                             old_label = None
+                            im_labels, _ = impes_driver.read_labels()
 
                             for label in im_labels:
                                 if '_symmetry' not in label:
@@ -941,7 +942,6 @@ class IMForceFieldGenerator:
                                     
                                     old_label = qm_data_point.point_label
                                     impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
-                                    self.qm_symmetry_datapoint_dict[root][old_label] = [qm_data_point]
 
                                 else:
                                     symmetry_data_point = InterpolationDatapoint(self.z_matrix)
@@ -950,9 +950,9 @@ class IMForceFieldGenerator:
                                     impes_driver.qm_symmetry_data_points[old_label].append(symmetry_data_point)
 
                             impes_driver.compute(optimized_molecule)
-                            energy_difference = (abs(energy - impes_drivers.impes_coordinate.energy))
+                            energy_difference = (abs(energy - impes_driver.impes_coordinate.energy))
 
-                            if energy_difference * vlx.hartree_in_kcalpermol() > self.energy_threshold:
+                            if energy_difference * hartree_in_kcalpermol() > self.energy_threshold:
                                 print(f'Energy difference {energy_difference} is larger than the threshold {self.energy_threshold}, adding point to the database')
 
                                 self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
