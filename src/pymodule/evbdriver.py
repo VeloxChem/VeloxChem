@@ -247,6 +247,8 @@ class EvbDriver():
         product_charge: int | list[int] = 0,
         reactant_multiplicity: int | list[int] = 1,
         product_multiplicity: int | list[int] = 1,
+        reactant_total_multiplicity: int = -1,
+        product_total_multiplicity: int =-1,
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
@@ -267,10 +269,6 @@ class EvbDriver():
         else:
             combined_product_name = product
         combined_pro_input = self._get_input_files(combined_product_name)
-        # combined_pro_input = self._process_file_input(
-        #     combined_product_name,
-        #     product_charge,product_multiplicity,
-        # )[0]
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
@@ -320,6 +318,8 @@ class EvbDriver():
             self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
+                reactant_total_multiplicity,
+                product_total_multiplicity,
                 ordered_input,
                 breaking_bonds,
             )
