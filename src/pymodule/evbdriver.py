@@ -247,8 +247,6 @@ class EvbDriver():
         product_charge: int | list[int] = 0,
         reactant_multiplicity: int | list[int] = 1,
         product_multiplicity: int | list[int] = 1,
-        reactant_total_multiplicity: int = -1,
-        product_total_multiplicity: int =-1,
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
@@ -269,6 +267,10 @@ class EvbDriver():
         else:
             combined_product_name = product
         combined_pro_input = self._get_input_files(combined_product_name)
+        # combined_pro_input = self._process_file_input(
+        #     combined_product_name,
+        #     product_charge,product_multiplicity,
+        # )[0]
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
@@ -318,8 +320,6 @@ class EvbDriver():
             self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
-                reactant_total_multiplicity,
-                product_total_multiplicity,
                 ordered_input,
                 breaking_bonds,
             )
@@ -682,6 +682,8 @@ class EvbDriver():
             )
 
         self.system_confs = configurations
+
+        self.create_viamd_environment_files()
         self.ostream.flush()
 
     def load_initialisation(self,
@@ -1115,6 +1117,101 @@ class EvbDriver():
                         group[k] = v
 
             save_group(data, file)
+
+    def create_viamd_environment_files(self):
+        for conf in self.system_confs:
+            base = (
+                "[Files]\n"
+                "MoleculeFile=./topology.pdb\n"
+                "TrajectoryFile=./trajectory.xtc\n"
+                "CoarseGrained=0\n"
+                "\n"
+                "[RenderSettings]\n"
+                "SsaoEnabled=0\n"
+                "DofEnabled=0\n"
+                "\n"
+                "[Representation]\n"
+                "Name=Reaction\n"
+                'Filter=resname("REA")\n'
+                "Enabled=1\n"
+                "Type=2\n"
+                "ColorMapping=1\n"
+                "Saturation=1.000000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n")
+
+            script = (
+            "[Script]\n"
+            'Text="""\n'
+            'rea = resname("REA");\n')
+            if conf.get("solvent", None) is not None:
+                script+=(
+                    'sol = resname("SOL");\n'
+                    'close_sol = (within(5, rea) and resname("SOL"));\n')
+            if conf.get('pdb', None) is not None:
+                script+="pocket = residue(protein and within(3,rea)) and not element('H');\n"
+
+            script+= '"""'
+
+            solvent_rep = (
+                "[Representation]\n"
+                "Name=Solvent\n"
+                "Filter=close_sol\n"
+                "Enabled=1\n"
+                "Type=1\n"
+                "ColorMapping=1\n"
+                "Saturation=1.000000\n"
+                "Param=0.354000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=1\n")
+
+            protein_rep = (
+                "[Representation]\n"
+                "Name=Protein\n"
+                "Filter=protein\n"
+                "Enabled=1\n"
+                "Type=4\n"
+                "ColorMapping=8\n"
+                "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
+                "Saturation=1.000000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n"
+                "\n"
+                "[Representation]\n"
+                "Name=pocket\n"
+                "Filter=pocket\n"
+                "Enabled=1\n"
+                "Type=0\n"
+                "ColorMapping=1\n"
+                "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
+                "Saturation=0.570000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n")
+            
+            carbon_rep = (
+                "[Representation]\n"
+                "Name=Carbon\n"
+                'Filter=resname("CCC")\n'
+                "Enabled=1\n"
+                "Type=2\n"
+                "ColorMapping=1\n"
+                "Saturation=1.000000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n")
+
+            string = base + "\n" 
+            if conf.get("solvent", None) is not None:
+                string += solvent_rep + "\n"
+            if conf.get('pdb', None) is not None:
+                string += protein_rep + "\n"
+            if conf.get('CNT', False) or conf.get('graphene', False):
+                string += carbon_rep + "\n"
+
+            string += script + "\n"
+
+            with open(f"{conf['data_folder']}/workspace.via", "w") as file:
+                file.write(string)
+            
+
 
     def default_system_configurations(self, name: str) -> dict:
         """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.

@@ -515,7 +515,7 @@ class EvbFepDriver():
         return [
             force for force in simulation.system.getForces()
             if isinstance(force, mm.MonteCarloBarostat)
-            or isinstance(force, mm.MonteCarloAnisotropicBarostat)
+            or isinstance(force, mm.MonteCarloFlexibleBarostat)
         ][0]
 
     def _sample(self, system, l, initial_state):

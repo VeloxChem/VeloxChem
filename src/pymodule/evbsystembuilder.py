@@ -500,10 +500,9 @@ class EvbSystemBuilder():
                 index = atom.index
                 position = self.positions[index]
                 posres_force.addParticle(index, position * 0.1)
-                count+=1
+                count += 1
 
-        self.ostream.print_info(
-            f"Adding {count} particles to posres force")
+        self.ostream.print_info(f"Adding {count} particles to posres force")
         self.ostream.flush()
         system.addForce(posres_force)
 
@@ -1065,7 +1064,7 @@ class EvbSystemBuilder():
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
         else:
-            barostat = mm.MonteCarloAnisotropicBarostat(
+            barostat = mm.MonteCarloFlexibleBarostat(
                 self.pressure * mmunit.bar,  # type: ignore
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
