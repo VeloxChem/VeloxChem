@@ -2179,7 +2179,7 @@ class IMForceFieldGenerator:
             qm_energy = np.array([qm_driver.scf_energy])
             qm_driver.ostream.unmute()
 
-            print('qm_energy in SCF driver', qm_energy, qm_driver.scf_results)
+            print('qm_energy in SCF driver', qm_energy)
 
         elif isinstance(qm_driver, ExternalScfDriver):
             qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())

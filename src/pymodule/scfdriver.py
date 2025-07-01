@@ -923,7 +923,7 @@ class ScfDriver:
         self._density_matrices_beta.clear()
 
         profiler.end(self.ostream, scf_flag=True)
-        print('self converged variable: ', self._is_converged)
+
         if not self.is_converged:
             self.ostream.print_header(
                 '*** Warning: SCF is not converged!'.ljust(92))
