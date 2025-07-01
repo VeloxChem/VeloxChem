@@ -1028,8 +1028,6 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The SCF tensors.
         """
 
         self.scf_driver.restart = False
@@ -1041,9 +1039,6 @@ class ScfHessianDriver(HessianDriver):
         grad_drv.compute(molecule, basis, self.scf_driver.scf_tensors)
         gradient = grad_drv.get_gradient()
 
-        #print("COMPUTE GRADIENT!")
-        #print(molecule.get_xyz_string())
-        #print(gradient)
         return gradient
 
     def compute_electric_dipole_moment(self, molecule, basis):
