@@ -934,7 +934,7 @@ class IMForceFieldGenerator:
                             
                             old_label = None
                             im_labels, _ = impes_driver.read_labels()
-
+                            impes_driver.qm_data_points = []
                             for label in im_labels:
                                 if '_symmetry' not in label:
                                     qm_data_point = InterpolationDatapoint(self.z_matrix)
@@ -942,6 +942,7 @@ class IMForceFieldGenerator:
                                     
                                     old_label = qm_data_point.point_label
                                     impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
+                                    impes_driver.qm_data_points.append(qm_data_point)
 
                                 else:
                                     symmetry_data_point = InterpolationDatapoint(self.z_matrix)
@@ -1096,7 +1097,8 @@ class IMForceFieldGenerator:
                                                         for i in range(len(rotation_values))}
                 point_densities[state][specific_dihedral] = {rotation_values[i]: 0 for i in range(len(rotation_values))}
                 for theta in rotation_values:
-                    molecule.set_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]], theta)
+                    dihedral_in_deg = molecule.get_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]])
+                    molecule.set_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]], dihedral_in_deg + theta)
                     new_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
                     sampled_molecules[state][specific_dihedral][0].append(new_molecule)
         
