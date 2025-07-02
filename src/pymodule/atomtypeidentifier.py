@@ -1770,6 +1770,12 @@ class AtomTypeIdentifier:
                 hydrogen_type = {'opls': 'opls_H2', 'gaff': 'h2'}
                 self.atom_types_dict[f"H{info['AtomNumber']}"] = hydrogen_type
                 continue  # Skip the rest of the loop for this atom
+            
+            elif (info['AtomicSymbol'] == 'H' and info['NumConnectedAtoms'] == 0):
+                hydrogen_type = {'opls': 'opls_H', 'gaff': 'hx'}  # or 'h_free'
+                self.atom_types_dict[f"H{info['AtomNumber']}"] = hydrogen_type
+                continue
+            
             # Decision for Transition Metals
 
             elif info['AtomicSymbol'] not in [
