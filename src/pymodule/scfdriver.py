@@ -3027,7 +3027,6 @@ class ScfDriver:
             potfile_text = ''
 
         print('Writing SCF results to file: ' + final_h5_fname)
-        exit()
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
         write_scf_results_to_hdf5(final_h5_fname, self.scf_results,
                                   self.history)
