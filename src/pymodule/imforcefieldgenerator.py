@@ -1089,17 +1089,18 @@ class IMForceFieldGenerator:
 
                 sampled_molecules[state][specific_dihedral] = ([], start)
                 normalized_angle = (360) / (2 * n_sampling)
-
-                allowed_deviation[state][specific_dihedral] = {rotation_values[i]: (
-                                                        (rotation_values[i] - normalized_angle)%360.0,
-                                                        (rotation_values[i] + normalized_angle)%360.0
+                dihedral_in_deg = molecule.get_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]])
+                
+                allowed_deviation[state][specific_dihedral] = {int(rotation_values[i] + dihedral_in_deg): (
+                                                        ((rotation_values[i] + dihedral_in_deg) - normalized_angle)%360.0,
+                                                        ((rotation_values[i] + dihedral_in_deg) + normalized_angle)%360.0
                                                         )
                                                         for i in range(len(rotation_values))}
-                point_densities[state][specific_dihedral] = {rotation_values[i]: 0 for i in range(len(rotation_values))}
+                point_densities[state][specific_dihedral] = {int(rotation_values[i] + dihedral_in_deg): 0 for i in range(len(rotation_values))}
                 for theta in rotation_values:
-                    dihedral_in_deg = molecule.get_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]])
-                    molecule.set_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]], dihedral_in_deg + theta)
-                    new_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                    rotation_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                    rotation_molecule.set_dihedral_in_degrees([specific_dihedral[0], specific_dihedral[1], specific_dihedral[2], specific_dihedral[3]], dihedral_in_deg + theta)
+                    new_molecule = Molecule.from_xyz_string(rotation_molecule.get_xyz_string())
                     sampled_molecules[state][specific_dihedral][0].append(new_molecule)
         
 
