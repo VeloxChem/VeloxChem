@@ -212,9 +212,15 @@ class EvbDriver():
 
         if partial_charges is None:
             partial_charges = [None] * len(molecules)
-        elif isinstance(partial_charges[0], float) or isinstance(
-                partial_charges[0], int):
+        elif isinstance(partial_charges[0], float) or isinstance(partial_charges[0], int):
             partial_charges = [partial_charges]
+        
+        # Casting to float is necessary for json serialization
+        for charge_list in partial_charges:
+            if charge_list is not None:
+                for i in range(len(charge_list)):
+                    if isinstance(charge_list[i], int):
+                        charge_list[i] = float(charge_list[i])
 
         assert len(molecules) == len(
             partial_charges
@@ -267,10 +273,6 @@ class EvbDriver():
         else:
             combined_product_name = product
         combined_pro_input = self._get_input_files(combined_product_name)
-        # combined_pro_input = self._process_file_input(
-        #     combined_product_name,
-        #     product_charge,product_multiplicity,
-        # )[0]
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"

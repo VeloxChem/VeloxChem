@@ -223,7 +223,7 @@ class EvbForceFieldBuilder():
                     'force_constant': 2500000
                 }})
             self.ostream.print_info(
-                f"Adding bond {bond} with r {s} for equilibration {note}, s1={s1}, s2={s2}"
+                f"Adding bond {bond} with r {s:.3f} for equilibration of {note}"
             )
 
         self.ostream.flush()
@@ -564,7 +564,7 @@ class EvbForceFieldBuilder():
         self.ostream.print_info(f"{len(formed_bonds)} forming bonds:")
         if len(formed_bonds) > 0:
             self.ostream.print_info(
-                "ReaType, ProType, ID\t - ReaType, ProType, ID")
+                "ReaType, ProType, ID - ReaType, ProType, ID")
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]

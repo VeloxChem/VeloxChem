@@ -99,10 +99,11 @@ class TransitionStateGuesser():
         product_partial_charges: list[float] | list[list[float]] = None,
         reactant_total_multiplicity=-1,
         product_total_multiplicity=-1,
-        breaking_bonds: list[tuple[int, int]] = [],
+        breaking_bonds: set[tuple[int, int]] = set(),
         scf=True,
         scf_drv=None,
         constraints=None,
+        reparameterize=True,
     ):
         """Find a guess for the transition state using a force field scan.
 
@@ -129,6 +130,7 @@ class TransitionStateGuesser():
             reactant_total_multiplicity=reactant_total_multiplicity,
             product_total_multiplicity=product_total_multiplicity,
             breaking_bonds=breaking_bonds,
+            reparameterize=reparameterize,
         )
         if self.mute_evb:
             evb_drv.ostream.mute()

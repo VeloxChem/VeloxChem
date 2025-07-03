@@ -76,11 +76,10 @@ class ReactionMatcher:
             pro_elems,
             breaking_bonds,
         )
-        maps, breaking_edges, forming_edges = self._find_mapping(rea_graph, pro_graph,
+        map, breaking_edges, forming_edges = self._find_mapping(rea_graph, pro_graph,
                                               breaking_bonds)
-        if maps is None:
-            return None, None, None
-        return maps[0], breaking_edges, forming_edges
+        
+        return map, breaking_edges, forming_edges
 
     def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
                                 pro_elems, breaking_bonds):
@@ -218,10 +217,11 @@ class ReactionMatcher:
         self.ostream.print_info(
             f"Found forming bonds: {forming_edges}. Finding mapping from isomorphism."
         )
+        self.ostream.flush()
         # print(forming_edges)
         GM = GraphMatcher(A, B, categorical_node_match('elem', ''))
-        maps = list(GM.isomorphisms_iter())
+        map = next(GM.isomorphisms_iter())
 
         self._check_time(f"finding mapping with. Total graphmatcher calls: {self._gm_count}", dont_abort=True)
 
-        return maps, breaking_edges, forming_edges
+        return map, breaking_edges, forming_edges
