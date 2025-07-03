@@ -100,7 +100,7 @@ class EvbForceFieldBuilder():
         reactant_total_multiplicity: int,
         product_total_multiplicity: int,
         ordered_input: bool = False,
-        breaking_bonds: list[tuple[int, int]] | None = None,
+        breaking_bonds: set[tuple[int, int]] = set(),
     ):
 
         reactants: list[MMForceFieldGenerator] = []
@@ -428,42 +428,23 @@ class EvbForceFieldBuilder():
         rea_elems: list,
         product_ff: MMForceFieldGenerator,
         pro_elems: list,
-        breaking_bonds: list[tuple[int, int]] | None = None,
+        breaking_bonds: set[tuple[int, int]],
     ) -> MMForceFieldGenerator:
         assert len(reactant_ff.atoms) == len(
             product_ff.atoms
         ), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
-        rea_graph = nx.Graph()
-        reactant_bonds = list(reactant_ff.bonds.keys())
-        # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
-        if breaking_bonds is not None:
-            reactant_bonds = [
-                bond for bond in reactant_bonds if bond not in breaking_bonds
-            ]
-
-        rea_graph.add_nodes_from(reactant_ff.atoms.keys())
-        rea_graph.add_edges_from(reactant_bonds)
-
-        for i, elem in enumerate(rea_elems):
-            rea_graph.nodes[i]['elem'] = elem
-
-        pro_graph = nx.Graph()
-        pro_graph.add_nodes_from(product_ff.atoms.keys())
-        pro_graph.add_edges_from(list(product_ff.bonds.keys()))
-        for i, elem in enumerate(pro_elems):
-            pro_graph.nodes[i]['elem'] = elem
-
+        
         rm = ReactionMatcher(ostream=self.ostream)
-        total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
+        total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(reactant_ff, rea_elems, product_ff, pro_elems,breaking_bonds)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
         self.ostream.flush()
         product_ff = EvbForceFieldBuilder._apply_mapping_to_forcefield(
-            product_ff, total_mapping)
+            product_ff, total_mapping,)
 
         product_ff.molecule = EvbForceFieldBuilder._apply_mapping_to_molecule(
-            product_ff.molecule, total_mapping)
+            product_ff.molecule, total_mapping,)
         return product_ff
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices

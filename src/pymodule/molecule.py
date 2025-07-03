@@ -926,7 +926,7 @@ def _Molecule_show(self,
                    height=300,
                    atom_indices=False,
                    atom_labels=False,
-                   one_indexed=True):
+                   starting_index=1):
     """
     Creates a 3D view with py3dmol.
 
@@ -954,10 +954,7 @@ def _Molecule_show(self,
                 if atom_labels:
                     text += f'{labels[i]}'
                 if atom_indices:
-                    if one_indexed:
-                        text += f'{i + 1}'
-                    else:
-                        text += f'{i}'
+                        text += f'{i+starting_index}'
                 viewer.addLabel(
                     text, {
                         'position': {

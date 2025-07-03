@@ -167,7 +167,7 @@ class EvbDriver():
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
-        breaking_bonds: list[tuple[int, int]] = [],
+        breaking_bonds: set[tuple[int, int]] = set(),
         name=None,
     ):
         if self.name is None:
