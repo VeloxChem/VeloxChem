@@ -2858,7 +2858,7 @@ class IMDatabasePointCollecter:
                 args = args,
                 method='L-BFGS-B',
                 jac = obj_gradient_function,
-                bounds=[(0.01, 1.5)],
+                bounds=[(-10.0, 10.0)],
                 options={'disp': True}
             )
 

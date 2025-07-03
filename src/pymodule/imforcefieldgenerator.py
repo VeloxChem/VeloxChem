@@ -2194,7 +2194,6 @@ class IMForceFieldGenerator:
             error_txt += "Please define a QM driver."
             raise ValueError(error_txt)
 
-        print(scf_tensors)
         return qm_energy, scf_tensors
 
     def compute_gradient(self, grad_driver, molecule, basis=None, scf_results=None):
