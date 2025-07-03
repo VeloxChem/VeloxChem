@@ -128,6 +128,7 @@ class EvbDataProcessing:
             self.alpha, self.H12 = self._fit_EVB_parameters()
         else:
             self.ostream.print_info("Using provided H12 and alpha")
+        results.update({'alpha':self.alpha,'H12':self.H12})
         self.ostream.print_info("Calculating FEP and EVB curves")
         self.ostream.flush()
         self._get_FEP_and_EVB()
@@ -157,7 +158,7 @@ class EvbDataProcessing:
             xi = np.linspace(-10000, 10000, 20000)
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
-            dGevb_smooth, barrier, free_energy = self._get_free_energies(
+            dGevb_smooth, barrier, free_energy,_,_ = self._get_free_energies(
                 dGevb_ana, fitting=True)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
@@ -283,7 +284,7 @@ class EvbDataProcessing:
 
         return dGevb, pns, dGcor
 
-    def _get_free_energies(self, dGevb, fitting=False):
+    def _get_free_energies(self, dGevb, fitting=True):
 
         assert_msg_critical('scipy' in sys.modules,
                             'scipy is required for EvbDataProcessing.')
@@ -338,7 +339,7 @@ class EvbDataProcessing:
         free_energy = Epro - Erea
         dGevb_smooth -= Erea
         self.ostream.flush()
-        return dGevb_smooth, barrier, free_energy
+        return dGevb_smooth, barrier, free_energy,min_arg,max_arg
 
     def _get_FEP_and_EVB(self):
 
@@ -390,6 +391,8 @@ class EvbDataProcessing:
                     dGevb_discrete,
                     barrier_discretised,
                     reaction_free_energy_discretised,
+                    min_arg,
+                    max_arg,
                 ) = self._get_free_energies(dGevb_discrete)
 
                 result.update({
@@ -399,6 +402,8 @@ class EvbDataProcessing:
                         "barrier": barrier_discretised,
                         "pns": pns,
                         "dGcor": dGcor,
+                        "min_arg":min_arg,
+                        "max_arg":max_arg,
                     }
                 })
 
@@ -414,6 +419,8 @@ class EvbDataProcessing:
                     dGevb_analytical,
                     barrier_analytical,
                     reaction_free_energy_analytical,
+                    min_arg,
+                    max_arg,
                 ) = self._get_free_energies(dGevb_analytical)
 
                 result.update({
@@ -423,6 +430,8 @@ class EvbDataProcessing:
                         "fep": fepxi,
                         "free_energy": reaction_free_energy_analytical,
                         "barrier": barrier_analytical,
+                        "min_arg":min_arg,
+                        "max_arg":max_arg,
                     }
                 })
 
@@ -674,6 +683,62 @@ class EvbDataProcessing:
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
+                    #add zero-line
+                    zero_ind = result['analytical']['min_arg'][0]
+                    barrier = result['analytical']['barrier']
+                    barrier_ind = result['analytical']['max_arg'][0]
+                    free_energy = result['analytical']['free_energy']
+                    free_ind = result['analytical']['min_arg'][1]
+
+                    #mark the zero-point
+                    ax[1].plot(
+                        [bin_indicators[max(0,zero_ind-25)],
+                        bin_indicators[min(len(bin_indicators)-1,zero_ind+25)]],
+                        [0,0],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].plot(
+                        [bin_indicators[zero_ind]]*2,
+                        [-10,+10],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+
+                    ax[1].plot(
+                        [bin_indicators[max(0,barrier_ind-25)],
+                        bin_indicators[min(len(bin_indicators)-1,barrier_ind+25)]],
+                        [barrier,barrier],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].plot(
+                        [bin_indicators[barrier_ind]]*2,
+                        [barrier-10,barrier+10],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].text(bin_indicators[barrier_ind],barrier,f"{barrier:.0f}",ha='left', va='bottom')
+
+                    ax[1].plot(
+                        [bin_indicators[max(0,free_ind-25)],
+                        bin_indicators[min(len(bin_indicators)-1,free_ind+25)]],
+                        [free_energy,free_energy],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].plot(
+                        [bin_indicators[free_ind]]*2,
+                        [free_energy-10,free_energy+10],
+                        color=colors[colorkeys[i]],
+                        linewidth=.5,
+                    )
+                    ax[1].text(bin_indicators[free_ind],free_energy,f"{free_energy:.0f}",ha='left', va='bottom')
+                    # #Add barrier
+                    # ax[1].plot(
+
+                    # )
+                    # #add free energy
 
             ax[1].set_xlim(coordinate_bins[0], coordinate_bins[-1])
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
@@ -774,3 +839,101 @@ class EvbDataProcessing:
             r"$\nu$",
             r"$\Delta G_{EVB,ana.}$",
         ])
+
+    @staticmethod
+    def plot_force_decomp(results, dif_to=0):
+        from IPython.display import clear_output
+        from IPython.display import display
+        import matplotlib.pyplot as plt
+        import ipywidgets as widgets
+
+        lam = results['Lambda']
+        bins = results['coordinate_bins']
+        config_results = results['configuration_results']
+        relevant_fgs = []
+
+        dp = EvbDataProcessing()
+        dp.Lambda_frame = results["Lambda_frame"]
+        dp.Lambda = lam
+        dp.Lambda_indices = results["Lambda_indices"]
+        dp.alpha = results['alpha']
+        dp.H12 = results['H12']
+
+        for fg in EvbForceGroup.pes_forcegroups():
+            for result in config_results.values():
+                if not np.all(result['E1_fg'][fg - 1] == 0) or not np.all(
+                        result['E2_fg'][fg - 1] == 0):
+                    if fg not in relevant_fgs:
+                        relevant_fgs.append(fg)
+                    continue
+
+        checkboxes = [
+            widgets.Checkbox(
+                True,
+                description=f"{EvbForceGroup(fg_val).name} ({fg_val})",
+            ) for fg_val in relevant_fgs
+        ]
+        plot_output = widgets.Output()
+
+        def update_plot(change=None):
+            x = np.linspace(0, 10, 500)
+            with plot_output:
+                fig1, ax1 = plt.subplots(1, 3, figsize=(18, 4))
+                fig2, ax2 = plt.subplots(1, 1, figsize=(18, 4))
+                evbs = []
+                for name, result in config_results.items():
+                    print(name)
+                    clear_output(wait=True)
+
+                    to_sum = []
+                    for fg, cb in zip(relevant_fgs, checkboxes):
+                        if cb.value:
+                            to_sum.append(fg - 1)
+                    E1_fg = np.sum(result['E1_fg'][to_sum], axis=0)
+                    E2_fg = np.sum(result['E2_fg'][to_sum], axis=0)
+                    E2_shifted, V, dE, Eg = dp._calculate_Eg_V_dE(
+                        E1_fg,
+                        E2_fg,
+                        dp.alpha,
+                        dp.H12,
+                    )
+                    dGfep = dp._calculate_dGfep(dE, result['Temp_set'])
+                    dGevb, shift, fepxi = dp._dGevb_analytical(
+                        dGfep,
+                        lam,
+                        dp.H12,
+                        bins,
+                    )
+                    dGevb,_,_,min_arg,max_arg=dp._get_free_energies(dGevb)
+                    evbs.append(dGevb)
+                    ax1[0].plot(lam, dGfep)
+
+                    ax1[1].plot(bins, dGevb, label=name)
+
+                    ax2.plot(E1_fg - np.min(E1_fg), label=f'rea {name}')
+                    ax2.plot(E2_fg - np.min(E2_fg), label=f'pro {name}')
+                for i, (name, evb) in enumerate(zip(config_results.keys(), evbs)):
+                    if not i == dif_to:
+                        dif = evb-evbs[dif_to]
+                        ax1[2].plot(bins, dif, label=f"dif {name}")
+
+                fig1.legend()
+                fig2.legend()
+                plt.show()
+
+        # Observe checkbox changes
+        for cb in checkboxes:
+            cb.observe(update_plot, names='value')
+
+        # Layout in 5x5 grid
+        grid = widgets.GridBox(
+            checkboxes,
+            layout=widgets.Layout(
+                grid_template_columns="repeat(5, 180px)",
+                grid_gap="5px",
+            ),
+        )
+
+        # Initial display
+        display(grid, plot_output)
+        update_plot()  # initial empty plot

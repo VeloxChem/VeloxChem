@@ -37,6 +37,9 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
+from .oneeints import compute_quadrupole_integrals
+from .oneeints import compute_linear_momentum_integrals
+from .oneeints import compute_angular_momentum_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -107,6 +110,10 @@ class CubicResponseDriver(NonlinearSolver):
             'c_frequencies': ('seq_range', 'C frequencies'),
             'd_frequencies': ('seq_range', 'D frequencies'),
             'damping': ('float', 'damping parameter'),
+            'a_operator': ('str_lower', 'A operator'),
+            'b_operator': ('str_lower', 'B operator'),
+            'c_operator': ('str_lower', 'C operator'),
+            'd_operator': ('str_lower', 'D operator'),
             'a_component': ('str_lower', 'Cartesian component of A operator'),
             'b_component': ('str_lower', 'Cartesian component of B operator'),
             'c_component': ('str_lower', 'Cartesian component of C operator'),
@@ -143,6 +150,28 @@ class CubicResponseDriver(NonlinearSolver):
               A dictonary containing the E[3], X[2], A[2] contractions
         """
 
+        operator_mapping = {
+            'dipole': 'electric_dipole',
+            'electric dipole': 'electric_dipole',
+            'quadrupole': 'electric_quadrupole',
+            'electric quadrupole': 'electric_quadrupole',
+            'linear momentum': 'linear_momentum',
+            'angular momentum': 'angular_momentum',
+            'magnetic dipole': 'magnetic_dipole',
+        }
+
+        if self.a_operator in operator_mapping:
+            self._a_op_key = operator_mapping[self.a_operator]
+
+        if self.b_operator in operator_mapping:
+            self._b_op_key = operator_mapping[self.b_operator]
+
+        if self.c_operator in operator_mapping:
+            self._c_op_key = operator_mapping[self.c_operator]
+
+        if self.d_operator in operator_mapping:
+            self._d_op_key = operator_mapping[self.d_operator]
+
         # for backward compatibility
         if self.a_component is None and hasattr(self, 'a_components'):
             self.a_component = self.a_components
@@ -158,19 +187,19 @@ class CubicResponseDriver(NonlinearSolver):
 
         # sanity check
         assert_msg_critical(
-            self.a_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.a_component, self.a_operator),
             'CubicResponseDriver: Undefined or invalid a_component')
 
         assert_msg_critical(
-            self.b_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.b_component, self.b_operator),
             'CubicResponseDriver: Undefined or invalid b_component')
 
         assert_msg_critical(
-            self.c_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.c_component, self.c_operator),
             'CubicResponseDriver: Undefined or invalid c_component')
 
         assert_msg_critical(
-            self.d_component in ['x', 'y', 'z'],
+            self.is_valid_component(self.d_component, self.d_operator),
             'CubicResponseDriver: Undefined or invalid d_component')
 
         if self.norm_thresh is None:
@@ -224,27 +253,35 @@ class CubicResponseDriver(NonlinearSolver):
 
         # Computing first-order gradient vectors
         if self.rank == mpi_master():
-            mu_dipole_mats = compute_electric_dipole_integrals(
+            dipole_mats = compute_electric_dipole_integrals(
+                molecule, ao_basis, [0.0, 0.0, 0.0])
+            quadrupole_mats = compute_quadrupole_integrals(
+                molecule, ao_basis, [0.0, 0.0, 0.0])
+            linmom_mats = compute_linear_momentum_integrals(
                 molecule, ao_basis)
-            # Note: nonliear response uses r instead of mu for dipole operator
-            dipole_mats = (mu_dipole_mats[0] * (-1.0),
-                           mu_dipole_mats[1] * (-1.0),
-                           mu_dipole_mats[2] * (-1.0))
+            angmom_mats = compute_angular_momentum_integrals(
+                molecule, ao_basis, [0.0, 0.0, 0.0])
         else:
-            dipole_mats = tuple()
+            dipole_mats = None
+            quadrupole_mats = None
+            linmom_mats = None
+            angmom_mats = None
 
-        operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_grad = linear_solver.get_complex_prop_grad(operator, self.a_component,
+        a_grad = linear_solver.get_complex_prop_grad(self._a_op_key,
+                                                     [self.a_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        b_grad = linear_solver.get_complex_prop_grad(operator, self.b_component,
+        b_grad = linear_solver.get_complex_prop_grad(self._b_op_key,
+                                                     [self.b_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        c_grad = linear_solver.get_complex_prop_grad(operator, self.c_component,
+        c_grad = linear_solver.get_complex_prop_grad(self._c_op_key,
+                                                     [self.c_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        d_grad = linear_solver.get_complex_prop_grad(operator, self.d_component,
+        d_grad = linear_solver.get_complex_prop_grad(self._d_op_key,
+                                                     [self.d_component],
                                                      molecule, ao_basis,
                                                      scf_tensors)
 
@@ -254,29 +291,29 @@ class CubicResponseDriver(NonlinearSolver):
             a_grad = list(a_grad)
             for ind in range(len(a_grad)):
                 a_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if operator == 'dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._a_op_key in ['electric_dipole', 'electric_quadrupole']:
                     a_grad[ind] *= -1.0
 
             b_grad = list(b_grad)
             for ind in range(len(b_grad)):
                 b_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if operator == 'dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._b_op_key in ['electric_dipole', 'electric_quadrupole']:
                     b_grad[ind] *= -1.0
 
             c_grad = list(c_grad)
             for ind in range(len(c_grad)):
                 c_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if operator == 'dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._c_op_key in ['electric_dipole', 'electric_quadrupole']:
                     c_grad[ind] *= -1.0
 
             d_grad = list(d_grad)
             for ind in range(len(d_grad)):
                 d_grad[ind] *= inv_sqrt_2
-                # Note: nonliear response uses r instead of mu for dipole operator
-                if operator == 'dipole':
+                # Note: nonliear response uses r and rr^T for multipole operator
+                if self._d_op_key in ['electric_dipole', 'electric_quadrupole']:
                     d_grad[ind] *= -1.0
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
@@ -321,9 +358,37 @@ class CubicResponseDriver(NonlinearSolver):
             ABCD.update(D)
 
             X = {
-                'x': 2 * self.ao2mo(mo, dipole_mats[0]),
-                'y': 2 * self.ao2mo(mo, dipole_mats[1]),
-                'z': 2 * self.ao2mo(mo, dipole_mats[2])
+                # Note: nonliear response uses r for dipole operator
+                'electric_dipole': {
+                    'x': 2 * self.ao2mo(mo, dipole_mats[0]) * (-1.0),
+                    'y': 2 * self.ao2mo(mo, dipole_mats[1]) * (-1.0),
+                    'z': 2 * self.ao2mo(mo, dipole_mats[2]) * (-1.0),
+                },
+                # Note: nonliear response uses rr^T for quadrupole operator
+                'electric_quadrupole': {
+                    'xx': 2 * self.ao2mo(mo, quadrupole_mats[0]) * (-1.0),
+                    'xy': 2 * self.ao2mo(mo, quadrupole_mats[1]) * (-1.0),
+                    'xz': 2 * self.ao2mo(mo, quadrupole_mats[2]) * (-1.0),
+                    'yy': 2 * self.ao2mo(mo, quadrupole_mats[3]) * (-1.0),
+                    'yz': 2 * self.ao2mo(mo, quadrupole_mats[4]) * (-1.0),
+                    'zz': 2 * self.ao2mo(mo, quadrupole_mats[5]) * (-1.0),
+                },
+                'linear_momentum': {
+                    'x': 2 * self.ao2mo(mo, linmom_mats[0]) * (-1j),
+                    'y': 2 * self.ao2mo(mo, linmom_mats[1]) * (-1j),
+                    'z': 2 * self.ao2mo(mo, linmom_mats[2]) * (-1j),
+                },
+                'angular_momentum': {
+                    'x': 2 * self.ao2mo(mo, angmom_mats[0]) * (-1j),
+                    'y': 2 * self.ao2mo(mo, angmom_mats[1]) * (-1j),
+                    'z': 2 * self.ao2mo(mo, angmom_mats[2]) * (-1j),
+                },
+                'magnetic_dipole': {
+                    'x': 2 * self.ao2mo(mo, angmom_mats[0]) * (0.5j),
+                    'y': 2 * self.ao2mo(mo, angmom_mats[1]) * (0.5j),
+                    'z': 2 * self.ao2mo(mo, angmom_mats[2]) * (0.5j),
+                },
+
             }
         else:
             X = None
@@ -407,14 +472,14 @@ class CubicResponseDriver(NonlinearSolver):
             F0 = None
             norb = None
 
-        eri_dict = self._init_eri(molecule, ao_basis)
-
-        dft_dict = self._init_dft(molecule, scf_tensors)
-
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
         nocc = molecule.number_of_alpha_electrons()
+
+        eri_dict = self._init_eri(molecule, ao_basis)
+
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # computing all compounded first-order densities
         density_list1, density_list2, density_list3 = self.get_densities(
@@ -475,10 +540,10 @@ class CubicResponseDriver(NonlinearSolver):
 
             if self.rank == mpi_master():
 
-                A = X[self.a_component]
-                B = X[self.b_component]
-                C = X[self.c_component]
-                D = X[self.d_component]
+                A = X[self._a_op_key][self.a_component]
+                B = X[self._b_op_key][self.b_component]
+                C = X[self._c_op_key][self.c_component]
+                D = X[self._d_op_key][self.d_component]
 
                 kb = self.complex_lrvec2mat(Nb, nocc, norb)
                 kc = self.complex_lrvec2mat(Nc, nocc, norb)
@@ -550,16 +615,119 @@ class CubicResponseDriver(NonlinearSolver):
                 NbcA2Nd = np.dot(self._a2_contract(kbc, A, d_a_mo, nocc, norb),
                                  Nd)
 
-                val_E3 = -(NaE3NbNcd)
+                op_a_type = 'imag' if self.is_imag(self._a_op_key) else 'real'
+                op_b_type = 'imag' if self.is_imag(self._b_op_key) else 'real'
+                op_c_type = 'imag' if self.is_imag(self._c_op_key) else 'real'
+                op_d_type = 'imag' if self.is_imag(self._d_op_key) else 'real'
+
+                # flip sign for X3 and X2 terms
+                if op_a_type == 'real':
+                    if (op_b_type == op_c_type) and (op_c_type != op_d_type):
+                        NaD3NbNc *= -1.0
+                        NaD3NcNb *= -1.0
+                        NaD2Nbc *= -1.0
+                    elif (op_c_type == op_d_type) and (op_d_type != op_b_type):
+                        NaB3NcNd *= -1.0
+                        NaB3NdNc *= -1.0
+                        NaB2Ncd *= -1.0
+                    elif (op_d_type == op_b_type) and (op_b_type != op_c_type):
+                        NaC3NbNd *= -1.0
+                        NaC3NdNb *= -1.0
+                        NaC2Nbd *= -1.0
+                elif op_a_type == 'imag':
+                    if (op_b_type == op_c_type) and (op_c_type != op_d_type):
+                        if op_d_type == 'real':
+                            NaD3NbNc *= -1.0
+                            NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
+                        else:
+                            NaB3NcNd *= -1.0
+                            NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
+                            NaC3NbNd *= -1.0
+                            NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
+                    elif (op_c_type == op_d_type) and (op_d_type != op_b_type):
+                        if op_b_type == 'real':
+                            NaB3NcNd *= -1.0
+                            NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
+                        else:
+                            NaC3NbNd *= -1.0
+                            NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
+                            NaD3NbNc *= -1.0
+                            NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
+                    elif (op_d_type == op_b_type) and (op_b_type != op_c_type):
+                        if op_c_type == 'real':
+                            NaC3NbNd *= -1.0
+                            NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
+                        else:
+                            NaD3NbNc *= -1.0
+                            NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
+                            NaB3NcNd *= -1.0
+                            NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
+                    elif (op_b_type == op_c_type) and (op_c_type == op_d_type):
+                        if op_d_type == 'imag':
+                            NaB3NcNd *= -1.0
+                            NaB3NdNc *= -1.0
+                            NaB2Ncd *= -1.0
+                            NaC3NbNd *= -1.0
+                            NaC3NdNb *= -1.0
+                            NaC2Nbd *= -1.0
+                            NaD3NbNc *= -1.0
+                            NaD3NcNb *= -1.0
+                            NaD2Nbc *= -1.0
+
                 val_T4 = -(NaE4NbNcNd - NaS4NbNcNd - NaR4NbNcNd)
-                val_X2 = NaB2Ncd + NaC2Nbd + NaD2Nbc
+                val_E3 = -(NaE3NbNcd)
                 val_X3 = NaB3NcNd + NaB3NdNc + NaC3NbNd + NaC3NdNb + NaD3NbNc + NaD3NcNb
+                val_X2 = NaB2Ncd + NaC2Nbd + NaD2Nbc
+                val_A3 = -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc + NcA3NbNd + NcA3NdNb)
                 val_A2 = NbA2Ncd + NcdA2Nb + NcA2Nbd + NbdA2Nc + NdA2Nbc + NbcA2Nd
-                val_A3 = -(NdA3NbNc + NdA3NcNb + NbA3NcNd + NbA3NdNc +
-                           NcA3NbNd + NcA3NdNb)
+
+                # flip sign for T4 and E3
+                if op_a_type == 'real':
+                    if (op_c_type == op_d_type) and (op_c_type != op_b_type):
+                        val_T4 *= -1.0
+                        val_E3 *= -1.0
+                    if op_b_type == 'imag':
+                        val_T4 *= -1.0
+                        val_E3 *= -1.0
+                elif op_a_type == 'imag':
+                    if (op_b_type != op_c_type) or (op_c_type != op_d_type):
+                        val_T4 *= -1.0
+                        val_E3 *= -1.0
+
+                # flip sign for A3 and A2
+                if op_a_type == 'real':
+                    if (op_c_type == op_d_type) and (op_c_type != op_b_type):
+                        val_A3 *= -1.0
+                        val_A2 *= -1.0
+                    if op_b_type == 'imag':
+                        val_A3 *= -1.0
+                        val_A2 *= -1.0
+                elif op_a_type == 'imag':
+                    if (op_b_type == op_c_type) and (op_c_type == op_d_type):
+                        val_A3 *= -1.0
+                        val_A2 *= -1.0
 
                 # Cubic response function
-                gamma = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
+                crf_rsp_func = val_T4 + val_E3 + val_X3 + val_A3 + val_X2 + val_A2
+
+                # flip sign for response function
+                if op_a_type == 'real':
+                    if (op_b_type != op_c_type) or (op_c_type != op_d_type):
+                        crf_rsp_func *= -1.0
+                elif op_a_type == 'imag':
+                    if (op_b_type != op_c_type) and (op_c_type == op_d_type):
+                        crf_rsp_func *= -1.0
+                    if op_b_type == 'imag':
+                        crf_rsp_func *= -1.0
 
                 self.ostream.print_blank()
                 w_str = 'Cubic response function: << {};{},{},{} >>  ({},{},{})'.format(
@@ -573,10 +741,19 @@ class CubicResponseDriver(NonlinearSolver):
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('CRF', gamma, width)
+                self._print_component('CRF', crf_rsp_func, width)
                 self.ostream.print_blank()
 
-                result[('crf', wb, wc, wd)] = gamma
+                result[('crf', wb, wc, wd)] = crf_rsp_func
+
+                result['crf_terms'] = {
+                    ('crf_T4_term', wb, wc, wd): val_T4,
+                    ('crf_E3_term', wb, wc, wd): val_E3,
+                    ('crf_X3_term', wb, wc, wd): val_X3,
+                    ('crf_X2_term', wb, wc, wd): val_X2,
+                    ('crf_A3_term', wb, wc, wd): val_A3,
+                    ('crf_A2_term', wb, wc, wd): val_A2,
+                }
 
         profiler.check_memory_usage('End of CRF')
 
@@ -1300,9 +1477,13 @@ class CubicResponseDriver(NonlinearSolver):
             kc = (self.complex_lrvec2mat(Nc, nocc, norb)).T
             kd = (self.complex_lrvec2mat(Nd, nocc, norb)).T
 
-            B = X[self.b_component]
-            C = X[self.c_component]
-            D = X[self.d_component]
+            B = X[self._b_op_key][self.b_component]
+            C = X[self._c_op_key][self.c_component]
+            D = X[self._d_op_key][self.d_component]
+
+            op_b_type = 'imag' if self.is_imag(self._b_op_key) else 'real'
+            op_c_type = 'imag' if self.is_imag(self._c_op_key) else 'real'
+            op_d_type = 'imag' if self.is_imag(self._d_op_key) else 'real'
 
             # BC
 
@@ -1313,6 +1494,12 @@ class CubicResponseDriver(NonlinearSolver):
 
             C2Nb = 0.5 * self._x2_contract(kb.T, C, d_a_mo, nocc, norb)
             B2Nc = 0.5 * self._x2_contract(kc.T, B, d_a_mo, nocc, norb)
+
+            # flip sign for BC term
+            if op_b_type == 'imag':
+                B2Nc *= -1.0
+            if op_c_type == 'imag':
+                C2Nb *= -1.0
 
             BC[(('BC', wb, wc), wb + wc)] = E3NbNc - C2Nb - B2Nc
 
@@ -1326,6 +1513,12 @@ class CubicResponseDriver(NonlinearSolver):
             D2Nb = 0.5 * self._x2_contract(kb.T, D, d_a_mo, nocc, norb)
             B2Nd = 0.5 * self._x2_contract(kd.T, B, d_a_mo, nocc, norb)
 
+            # flip sign for BD term
+            if op_b_type == 'imag':
+                B2Nd *= -1.0
+            if op_d_type == 'imag':
+                D2Nb *= -1.0
+
             BD[(('BD', wb, wd), wb + wd)] = E3NbNd - D2Nb - B2Nd
 
             # CD
@@ -1337,6 +1530,12 @@ class CubicResponseDriver(NonlinearSolver):
 
             C2Nd = 0.5 * self._x2_contract(kd.T, C, d_a_mo, nocc, norb)
             D2Nc = 0.5 * self._x2_contract(kc.T, D, d_a_mo, nocc, norb)
+
+            # flip sign for CD term
+            if op_c_type == 'imag':
+                C2Nd *= -1.0
+            if op_d_type == 'imag':
+                D2Nc *= -1.0
 
             CD[(('CD', wc, wd), wc + wd)] = E3NcNd - C2Nd - D2Nc
 

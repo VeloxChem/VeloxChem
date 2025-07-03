@@ -761,8 +761,9 @@ class OpenMMDynamics:
             If True, the energy of the conformations will be minimized. Default is True.
 
         :return:
-            energies: List of potential energies of the conformations.
-            opt_coordinates: List of XYZ format strings of the minimized coordinates.
+            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
+            and their corresponding coordinates in XYZ format.
+            
         """
 
         if self.system is None:
@@ -823,8 +824,6 @@ class OpenMMDynamics:
         self.ostream.print_info(f'Number of conformations: {len(opt_coordinates)}')
         self.ostream.flush()
 
-
-        # TODO: Replace this with the unique_conformers function
         equiv_conformer_pairs= []
         if unique_conformers:
             msg = f'Filtering for unique conformers'
@@ -874,39 +873,13 @@ class OpenMMDynamics:
             opt_coordinates = filtered_geometries
             energies = filtered_energies
 
-            def calculate_boltzmann(energies, T=300, unit='kj/mol'):
-                if unit=='kj/mol':
-                    R = 0.008314462618
-                elif unit=='kcal/mol':
-                    R = 1.98720425864083e-3
-                elif unit=='hartree':
-                    R = 3.166811563671e-6
-                else:
-                    raise ValueError('Invalid unit')
-                # calculate relative energies
-                relative_energies = [energy - min(energies) for energy in energies]
-                # calculate the boltzmann factors
-                boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
-                # calculate the partition function
-                partition_function = sum(boltzmann_factors)
-                # calculate the probabilities
-                probabilities = [factor/partition_function for factor in boltzmann_factors]
-                return probabilities
+
         
-            weights = calculate_boltzmann(energies, T=300, unit='kj/mol')
+        
             # print table of results
             msg = f'\nNumber of unique conformers: {len(opt_coordinates)}'
             self.ostream.print_info(msg)
             self.ostream.flush()
-            for i, (energy, weight) in enumerate(zip(energies, weights)):
-                # on the first line of the msg, print the energy in kJ/mol and the weight
-                # on the second line, add a visulization of the conformer
-                
-                msg = f'\nConformation {i+1}: Energy: {energy:.2f} kJ/mol, Weight: {weight:.4f}'
-                msg += f'\n{Molecule.from_xyz_string(opt_coordinates[i]).show()}'    
-
-                self.ostream.print_info(msg)
-                self.ostream.flush()
 
         if qm_driver:
             # Use qm_miniization to minimize the energy of the conformations
@@ -942,15 +915,75 @@ class OpenMMDynamics:
             energies = qm_energies
             opt_coordinates = qm_opt_coordinates
 
-        # Convert the opt_coordinates to molecule objects
+        # Save final molecules, coordinates and corresponding energies to a dictionary
+        conformers_dict = {
+                'energies': energies,
+                'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
+                'geometries': opt_coordinates
+        }
 
-        opt_molecules = [Molecule.from_xyz_string(coords) for coords in opt_coordinates]
+        self.conformer_dict = conformers_dict
 
+        return conformers_dict
+    
+    def calculate_boltzmann_distribution(self, energies=None, T=300, unit='kj/mol'):
+        """ 
+        Calculate the Boltzmann distribution of conformers based on their energies.
+        
+        :param energies: 
+            list of energies. If None, it will use the energies from the conformers_dict from the conformational sampling.
+        :param T: 
+            temperature in Kelvin
+        :param unit: 
+            unit of energy, options are 'kj/mol', 'kcal/mol', 'hartree'
 
+        :return: 
+            list of probabilities for each conformer
+        
+        """
+        if unit=='kj/mol':
+            R = 0.008314462618
+        elif unit=='kcal/mol':
+            R = 1.98720425864083e-3
+        elif unit=='hartree':
+            R = 3.166811563671e-6
+        else:
+            raise ValueError('Invalid unit')
+        # calculate relative energies
+        if energies is None:
+            energies = self.conformer_dict['energies']
+        else:
+            energies = energies
 
+        relative_energies = [energy - min(energies) for energy in energies]
 
-        return energies, opt_molecules
+        # calculate the boltzmann factors
+        boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
+        # calculate the partition function
+        partition_function = sum(boltzmann_factors)
+        # calculate the probabilities
+        probabilities = [factor/partition_function for factor in boltzmann_factors]
+        
+        return probabilities
+    
+    def show_conformers(self, number=5, atom_indices=False, atom_labels=False, boltzmann_distribution=True):
+        weights = None
+        if boltzmann_distribution:
+            weights = self.calculate_boltzmann_distribution(T=300, unit='kj/mol')
 
+        if number > len(self.conformer_dict["energies"]):
+            number = len(self.conformer_dict["energies"])
+            print(f"Only {number} conformers available, showing all.")
+        for i in range(number):
+            if weights is not None:
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
+            else:
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol'
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+            self.conformer_dict["molecules"][i].show(
+                atom_indices=atom_indices, atom_labels=atom_labels)
+                
     def run_md(self, 
                restart_file=None,
                ensemble='NVE',

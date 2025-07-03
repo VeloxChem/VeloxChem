@@ -163,11 +163,11 @@ class EvbDriver():
         reactant_partial_charges: list[float] | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
         reactant_total_multiplicity: int = -1,
-        product_total_multiplicity: int =-1,
+        product_total_multiplicity: int = -1,
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
-        breaking_bonds: list[tuple[int, int]] = [],
+        breaking_bonds: set[tuple[int, int]] = set(),
         name=None,
     ):
         if self.name is None:
@@ -181,7 +181,7 @@ class EvbDriver():
             reactant,
             reactant_partial_charges,
         )
-        
+
         pro_input, product_total_charge = self._process_molecule_input(
             product,
             product_partial_charges,
@@ -247,8 +247,6 @@ class EvbDriver():
         product_charge: int | list[int] = 0,
         reactant_multiplicity: int | list[int] = 1,
         product_multiplicity: int | list[int] = 1,
-        reactant_total_multiplicity: int = -1,
-        product_total_multiplicity: int =-1,
         reparameterize: bool = True,
         optimize: bool = False,
         ordered_input: bool = False,
@@ -269,6 +267,10 @@ class EvbDriver():
         else:
             combined_product_name = product
         combined_pro_input = self._get_input_files(combined_product_name)
+        # combined_pro_input = self._process_file_input(
+        #     combined_product_name,
+        #     product_charge,product_multiplicity,
+        # )[0]
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
@@ -318,8 +320,6 @@ class EvbDriver():
             self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
-                reactant_total_multiplicity,
-                product_total_multiplicity,
                 ordered_input,
                 breaking_bonds,
             )
@@ -566,24 +566,6 @@ class EvbDriver():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbDriver.')
 
-        if Lambda is None:
-            if configurations[0] == "debug":
-                Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-            else:
-                Lambda = np.linspace(0, 0.1, 11)
-                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
-                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
-                Lambda = np.round(Lambda, 3)
-                self.ostream.print_info(
-                    f"Using default lambda vector: {list(Lambda)}")
-        assert (Lambda[0] == 0 and Lambda[-1]
-                == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
-        assert np.all(
-            np.diff(Lambda) >
-            0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
-        Lambda = [round(lam, 3) for lam in Lambda]
-        self.Lambda = Lambda
-
         if all(isinstance(conf, str) for conf in configurations):
             configurations = [
                 self.default_system_configurations(conf)
@@ -598,6 +580,24 @@ class EvbDriver():
             constraints = []
         if isinstance(constraints, dict):
             constraints = [constraints]
+
+        if Lambda is None:
+            if configurations[0].get("debug", False):
+                Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+            else:
+                Lambda = np.linspace(0, 0.1, 6)
+                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
+                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
+                Lambda = np.round(Lambda, 3)
+                self.ostream.print_info(
+                    f"Using default lambda vector: {list(Lambda)}")
+        assert (Lambda[0] == 0 and Lambda[-1]
+                == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
+        assert np.all(
+            np.diff(Lambda) >
+            0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
+        Lambda = [round(lam, 3) for lam in Lambda]
+        self.Lambda = Lambda
 
         #Per configuration
         for conf in self.configurations:
@@ -623,6 +623,11 @@ class EvbDriver():
                 str(data_folder_path / "reactant_struct.xyz"))
             self.product.molecule.write_xyz_file(
                 str(data_folder_path / "product_struct.xyz"))
+
+            self.save_forcefield(
+                self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
+            self.save_forcefield(
+                self.product, str(data_folder_path / f"product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',
                                                               -1) > 0:
@@ -656,8 +661,7 @@ class EvbDriver():
 
             mmapp.PDBFile.writeFile(
                 topology,
-                initial_positions *
-                10,  # positions are handled in nanometers, but pdb's should be in angstroms
+                initial_positions,  # positions are handled in nanometers, but pdb's should be in angstroms
                 open(top_path, "w"),
             )
 
@@ -668,17 +672,18 @@ class EvbDriver():
             self.update_options_json(dump_conf, conf)
             self.update_options_json(
                 {
-                    "Lambda":
-                    Lambda,
-                    "integration forcegroups":
-                    list(EvbForceGroup.integration_force_groups()),
-                    "pes forcegroups":
-                    list(EvbForceGroup.pes_force_groups()),
+                    "Lambda": Lambda,
+                    # "integration forcegroups":
+                    # list(EvbForceGroup.integration_force_groups()),
+                    # "pes forcegroups":
+                    # list(EvbForceGroup.pes_force_groups()),
                 },
                 conf,
             )
 
         self.system_confs = configurations
+
+        self.create_viamd_environment_files()
         self.ostream.flush()
 
     def load_initialisation(self,
@@ -751,10 +756,14 @@ class EvbDriver():
 
         path = Path().cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
-        for lam in self.Lambda:
-            file_path = str(path / f"{lam:.3f}_sys.xml")
-            with open(file_path, mode="w", encoding="utf-8") as output:
-                output.write(mm.XmlSerializer.serialize(systems[lam]))
+        self.ostream.flush()
+        for name, system in systems.items():
+            if isinstance(name, float) or isinstance(name, int):
+                filename = f"{name:.3f}_sys.xml"
+            else:
+                filename = f"{name}_sys.xml"
+            with open(path / filename, mode="w", encoding="utf-8") as output:
+                output.write(mm.XmlSerializer.serialize(system))
 
     def load_systems_from_xml(self, folder: str):
         """Load the systems from xml files in the given folder.
@@ -778,7 +787,6 @@ class EvbDriver():
 
     def run_FEP(
         self,
-        saved_frames_on_crash=None,
         platform=None,
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
@@ -798,8 +806,6 @@ class EvbDriver():
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver(ostream=self.ostream)
-            if saved_frames_on_crash is not None:
-                FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
                 Lambda=self.Lambda,
                 configuration=conf,
@@ -857,9 +863,9 @@ class EvbDriver():
 
         self.dataprocessing = dp
         results = dp.compute(results, barrier, free_energy)
-        self._save_dict_as_h5(results, f"results_{self.name}")
         self.results = results
         self.print_results()
+        self._save_dict_as_h5(results, f"results_{self.name}")
         self.ostream.flush()
         return self.results
 
@@ -998,6 +1004,15 @@ class EvbDriver():
             Lambda = np.append(Lambda, 1)
 
         E_data = np.loadtxt(E_file, skiprows=1, delimiter=',').T
+        fg_data = []
+        rea_fg_data = []
+        pro_fg_data = []
+        if Path(fg_file).exists():
+            fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
+        if Path(fg_rea_file).exists():
+            rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
+        if Path(fg_pro_file).exists():
+            pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
 
         sub_indices = l_sub_indices[::time_sub_sample]
@@ -1008,7 +1023,7 @@ class EvbDriver():
         E1_int = E_data[3, sub_indices]
         E2_int = E_data[4, sub_indices]
         E_m_pes = E_data[5, sub_indices]
-        E_m_int = E_data[6, sub_indices]
+        # E_m_int = E_data[6, sub_indices]
 
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(
             data_file,
@@ -1103,6 +1118,101 @@ class EvbDriver():
 
             save_group(data, file)
 
+    def create_viamd_environment_files(self):
+        for conf in self.system_confs:
+            base = (
+                "[Files]\n"
+                "MoleculeFile=./topology.pdb\n"
+                "TrajectoryFile=./trajectory.xtc\n"
+                "CoarseGrained=0\n"
+                "\n"
+                "[RenderSettings]\n"
+                "SsaoEnabled=0\n"
+                "DofEnabled=0\n"
+                "\n"
+                "[Representation]\n"
+                "Name=Reaction\n"
+                'Filter=resname("REA")\n'
+                "Enabled=1\n"
+                "Type=2\n"
+                "ColorMapping=1\n"
+                "Saturation=1.000000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n")
+
+            script = (
+            "[Script]\n"
+            'Text="""\n'
+            'rea = resname("REA");\n')
+            if conf.get("solvent", None) is not None:
+                script+=(
+                    'sol = resname("SOL");\n'
+                    'close_sol = (within(5, rea) and resname("SOL"));\n')
+            if conf.get('pdb', None) is not None:
+                script+="pocket = residue(protein and within(3,rea)) and not element('H');\n"
+
+            script+= '"""'
+
+            solvent_rep = (
+                "[Representation]\n"
+                "Name=Solvent\n"
+                "Filter=close_sol\n"
+                "Enabled=1\n"
+                "Type=1\n"
+                "ColorMapping=1\n"
+                "Saturation=1.000000\n"
+                "Param=0.354000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=1\n")
+
+            protein_rep = (
+                "[Representation]\n"
+                "Name=Protein\n"
+                "Filter=protein\n"
+                "Enabled=1\n"
+                "Type=4\n"
+                "ColorMapping=8\n"
+                "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
+                "Saturation=1.000000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n"
+                "\n"
+                "[Representation]\n"
+                "Name=pocket\n"
+                "Filter=pocket\n"
+                "Enabled=1\n"
+                "Type=0\n"
+                "ColorMapping=1\n"
+                "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
+                "Saturation=0.570000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n")
+            
+            carbon_rep = (
+                "[Representation]\n"
+                "Name=Carbon\n"
+                'Filter=resname("CCC")\n'
+                "Enabled=1\n"
+                "Type=2\n"
+                "ColorMapping=1\n"
+                "Saturation=1.000000\n"
+                "Param=1.000000,1.000000,1.000000,1.000000\n"
+                "DynamicEval=0\n")
+
+            string = base + "\n" 
+            if conf.get("solvent", None) is not None:
+                string += solvent_rep + "\n"
+            if conf.get('pdb', None) is not None:
+                string += protein_rep + "\n"
+            if conf.get('CNT', False) or conf.get('graphene', False):
+                string += carbon_rep + "\n"
+
+            string += script + "\n"
+
+            with open(f"{conf['data_folder']}/workspace.via", "w") as file:
+                file.write(string)
+            
+
+
     def default_system_configurations(self, name: str) -> dict:
         """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
 
@@ -1121,6 +1231,7 @@ class EvbDriver():
         elif name == "debug":
             conf = {
                 "name": "debug",
+                "debug": True,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "equil_NVT_steps": 100,

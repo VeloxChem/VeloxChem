@@ -34,11 +34,13 @@ from mpi4py import MPI
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 import networkx as nx
+import numpy as np
 import time
 import sys
 
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
+
 
 class ReactionMatcher:
 
@@ -60,188 +62,166 @@ class ReactionMatcher:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
+        self._gm_count = 0
+        self._start_time = 0
         self.max_time = 600
 
-    def match_reaction_graphs(self, A: nx.Graph, B: nx.Graph):
-        # figure out how many bonds need to change -> difficult to impossible with multiple graphs right?
-        # largest_in_A = max(len(c) for c in nx.connected_components(A))
-        # largest_in_B = max(len(c) for c in nx.connected_components(B))
-        # swapped = False
-        # if largest_in_A > largest_in_B:
-        #     A, B = B, A
-        #     swapped = True
-        
-        mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(A, B)
-        start_time = time.time()
+    def get_mapping(self, reactant_ff, rea_elems, product_ff, pro_elems,
+                    breaking_bonds):
 
-        if not mapping == {}:
-            spent_time = time.time() - start_time
-            self.ostream.print_info(f"Found mapping without removing bonds.")
+        rea_graph, pro_graph = self._create_reaction_graphs(
+            reactant_ff,
+            rea_elems,
+            product_ff,
+            pro_elems,
+            breaking_bonds,
+        )
+        maps, breaking_edges, forming_edges = self._find_mapping(rea_graph, pro_graph,
+                                              breaking_bonds)
+        if maps is None:
+            return None, None, None
+        return maps[0], breaking_edges, forming_edges
+
+    def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
+                                pro_elems, breaking_bonds):
+        rea_graph = nx.Graph()
+        reactant_bonds = list(reactant_ff.bonds.keys())
+        # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
+
+        rea_graph.add_nodes_from(reactant_ff.atoms.keys())
+        rea_graph.add_edges_from(reactant_bonds)
+
+        for i, elem in enumerate(rea_elems):
+            rea_graph.nodes[i]['elem'] = elem
+
+        pro_graph = nx.Graph()
+        pro_graph.add_nodes_from(product_ff.atoms.keys())
+        pro_graph.add_edges_from(list(product_ff.bonds.keys()))
+        for i, elem in enumerate(pro_elems):
+            pro_graph.nodes[i]['elem'] = elem
+
+        return rea_graph, pro_graph
+
+    def _check_time(self, msg=None, dont_abort=False):
+        if time.time() - self._start_time > self.max_time and not dont_abort:
+            self.ostream.print_warning(
+                f"Spent more then {self.max_time:.3f} s finding mapping, aborting"
+            )
+            return False
         else:
-            # self.ostream.print_info("No mapping found without removing bonds, trying to remove one bond")
-            Am1_mappings = []
-            for edge in A.edges:
-                Am1 = nx.Graph(A)
-                Am1.remove_edge(*edge)
-                bond_elems = (A.nodes[edge[0]]["elem"], A.nodes[edge[1]]["elem"])
+            if msg is not None:
+                self.ostream.print_info(f"Spent {time.time() - self._start_time:.3f} s on {msg}")
+                self.ostream.flush()
+        return True
 
-                mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(Am1, B)
-                if mapping != {}:
-                    Am1_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
+    
+    def _connected_components_are_subgraphs(self,A, B):
+        """
+        Check if all connected components of A are subgraphs of B. If true, return a list of GraphMatchers for each connected component and their corresponding subgraphs. 
+        Otherwise return None.
+        """
+        for g in nx.connected_components(A):
+            self._gm_count += 1
+            A_sub = A.subgraph(g)
+            GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
+            if not GM.subgraph_is_isomorphic():
+                return False
+        return True
 
-            if len(Am1_mappings) > 0:
-                self.ostream.print_info(f"Found {len(Am1_mappings)} mappings with removing 1 bond")
-                mapping = self._sort_broken_mappings(Am1_mappings)
+    
+    def _find_mapping(self, A, B, forced_breaking_edges=set()):
+        """
+        Find a mapping between the connected components of A and B, while avoiding reconnecting broken edges.
+        """
+        # make copies of A and B to avoid modifying the original graphs
+        for edge in forced_breaking_edges:
+            A.remove_edge(*edge)
+        # loop progressively over more and more broken bonds till all connected components of A are subgraphs of B
+        # can be done based on elements
+
+        breaking_edges = set()
+
+        self._gm_count = 0
+
+        self._start_time = time.time()
+        if not self._connected_components_are_subgraphs(A, B):
+            for edge in A.edges():
+                A.remove_edge(*edge)
+                if self._connected_components_are_subgraphs(A, B):
+                    breaking_edges.add(edge)
+                    break
+                else:
+                    A.add_edge(*edge)
+                if not self._check_time():
+                    return None, None, None
+        
+            self._check_time("finding one breaking bond")
+            if len(breaking_edges) == 0:
+                self.ostream.print_info("No subgraph solution with one broken bond found, trying to find two breaking bonds")
+                self.ostream.flush()
+                for edge_a in A.edges():
+                    A.remove_edge(*edge_a)
+                    for edge_b in A.edges():
+                        A.remove_edge(*edge_b)
+                        if self._connected_components_are_subgraphs(A, B):
+                            breaking_edges.add(edge_a)
+                            breaking_edges.add(edge_b)
+                            break
+                        else:
+                            A.add_edge(*edge_a)
+                            A.add_edge(*edge_b)
+                        if not self._check_time():
+                            return None, None, None
+                if len(breaking_edges) == 0:
+                    self.ostream.print_warning(
+                        "No subgraph solution with two broken bonds found, aborting. Try suggisting more breaking bonds.")
+                    self.ostream.flush()
+                    return None, None, None
             else:
-                Am2_mappings = []
-                remaining_edges = set(A.edges)
-                for edge1 in A.edges:
-                    if time.time() - start_time > self.max_time:
-                        self.ostream.print_info(f"Spent more then {self.max_time} seconds finding mapping, aborting")
-                        mapping = {}
-                        break
-                    edge_set = set()
-                    edge_set.add(edge1)
-                    remaining_edges = remaining_edges - edge_set
-                    Am1 = nx.Graph(A)
-                    Am1.remove_edge(*edge1)
-                    for edge2 in remaining_edges:
-                        Am2 = nx.Graph(Am1)
-                        Am2.remove_edge(*edge2)
-                        bond_elems1 = {A.nodes[edge1[0]]["elem"], A.nodes[edge1[1]]["elem"]}
-                        bond_elems2 = {A.nodes[edge2[0]]["elem"], A.nodes[edge2[1]]["elem"]}
-                        mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(Am2, B)
-                        if mapping != {}:
-                            Am2_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
-                if len(Am2_mappings) > 0:
-                    mapping = self._sort_broken_mappings(Am2_mappings)
-                    self.ostream.print_info(f"Found {len(Am2_mappings)} mappings with removing 2 bonds")
-        if mapping == {}:
-            self.ostream.print_info("No mapping found with removing two bonds, removing 3 bonds is not implemented. Try suggesting some broken bonds.")
-        # if swapped:
-        #     mapping = {v: k for k, v in mapping.items()}
+                self.ostream.print_info(
+                    f"Found breaking bonds: {breaking_edges}, continuing to find forming bonds"
+                )
 
-        spent_time = time.time() - start_time
-        self.ostream.print_info(f"Spent {spent_time:.3f} seconds finding mapping")
-        self.ostream.flush()
-        return mapping
+        # loop progressively over more and more formed bonds till an isomorphism is found that doesn't include forced broken bonds
+        bond_count = 0
+        forming_edges = []
+        while len(A.edges()) < len(B.edges()):
+            bond_count += 1
+            edge = None
+            for i in A.nodes():
+                for j in B.nodes():
+                    if j < i:
+                        continue
+                    edge_in_A = (i, j) in A.edges() or (j, i) in A.edges()
+                    edge_in_broken = (i, j) in forced_breaking_edges or (
+                        j, i) in forced_breaking_edges
+                    if edge_in_A or edge_in_broken:
+                        continue
 
-    def _sort_broken_mappings(self, mappings):
-        sorted_mappings = sorted(mappings, key=lambda x: x["forming_bonds"]+x["breaking_bonds"])
-        total_mappings = len(sorted_mappings)
-        least_changing_bonds = mappings[0]["forming_bonds"]+mappings[0]["breaking_bonds"]
-        best_mappnigs = [mapping for mapping in mappings if mapping["forming_bonds"]+mapping["breaking_bonds"] == least_changing_bonds]
-        
-        self.ostream.print_info(f"Found {total_mappings} mappings with removing 2 bonds, of which {len(best_mappnigs)} have {least_changing_bonds}+2 changing bonds which is the minimal amount")
-        return mappings[0]["mapping"]
-        
-    @staticmethod
-    def _match_subgraph(A, B):
-        A = nx.Graph(A)
-        B = nx.Graph(B)
-        A_copy = nx.Graph(A)
-        B_copy = nx.Graph(B)
-        total_mapping = {}
-        while A.number_of_nodes() > 0:
-            # if find largest subgraph
-            mapping, res, size = ReactionMatcher._find_largest_subgraph(A, B)
-            if mapping is None:
-                return {}, -1, -1
-            # remove mapping from both graphs
-            
-            for key, value in mapping.items():
-                A.remove_node(key)
-                B.remove_node(value)
-            
-            total_mapping.update(mapping)
-    
-        forming_bonds, breaking_bonds = ReactionMatcher._count_changing_bonds(A_copy, B_copy, total_mapping)
-        return total_mapping, forming_bonds, breaking_bonds
+                    A.add_edge(i, j)
+                    if not self._connected_components_are_subgraphs(A, B):
+                        A.remove_edge(i, j)
+                        continue
+                    if not self._check_time():
+                        return None, None, None
 
-    @staticmethod
-    def _count_changing_bonds(A, B, mapping):
-        # apply mapping to B
-        B_mapped = nx.Graph(B)
-        mapping = {v: k for k, v in mapping.items()}
-        B_mapped = nx.relabel_nodes(B_mapped, mapping)
-        
-        A_bonds = set(tuple(sorted(bond)) for bond in A.edges)
-        B_bonds = set(tuple(sorted(bond)) for bond in B_mapped.edges)
-        breaking_bonds = A_bonds - B_bonds
-        forming_bonds = B_bonds - A_bonds
-        return len(forming_bonds), len(breaking_bonds)
-        
-    @staticmethod
-    def _find_largest_subgraph(a: nx.Graph, b: nx.Graph):
-        swapped = False
-        # Sort the molecules by size
-        A = ReactionMatcher._sort_graph_by_size(ReactionMatcher._split_graphs(a))
-        B = ReactionMatcher._sort_graph_by_size(ReactionMatcher._split_graphs(b))
+                    edge = (i, j)
+                    forming_edges.append(edge)
+                    self._check_time(f"finding bond {bond_count}: {edge}", dont_abort=True)
+                    self.ostream.flush()
+                    break
+                if edge is not None:
+                    break
+            if edge is None:
+                print(f"Bond {i} not found, aborting")
+                return None, None, None
+        self.ostream.print_info(
+            f"Found forming bonds: {forming_edges}. Finding mapping from isomorphism."
+        )
+        # print(forming_edges)
+        GM = GraphMatcher(A, B, categorical_node_match('elem', ''))
+        maps = list(GM.isomorphisms_iter())
 
-        # If the largest graph is in B, swap A and B, the reactant is now being treated as the product or vice versa
-        if len(A[0].nodes) < len(B[0].nodes):
-            A, B = B, A
+        self._check_time(f"finding mapping with. Total graphmatcher calls: {self._gm_count}", dont_abort=True)
 
-            if swapped is False:
-                swapped = True
-
-        # Find the next largest subgraph isomorphism of the elements of B in A[0]
-        # move swapping into here
-        mapping, res = ReactionMatcher._find_next_subgraph(A[0], B)
-
-        # Save the obtained mapping
-        # If the reactant is being treated as the product, the mapping needs to be inverted before saving
-        if mapping is not None:
-            if swapped:
-                mapping = {v: k for k, v in mapping.items()}
-
-            # self.ostream.print_info(f"Found mapping through largest subgraph: {mapping}")
-            size = len(mapping)
-        else:
-            size = None
-
-        return mapping, res, size
-
-    # Split a graph into a list of connected graphs
-    @staticmethod
-    def _split_graphs(graph: nx.Graph | list[nx.Graph]) -> list[nx.Graph]:
-        graphs = []
-        if type(graph) is nx.Graph:
-            graph = [graph]
-        for g in graph:
-            graphs.extend(list(g.subgraph(c) for c in nx.connected_components(g)))
-        return graphs
-
-    
-    @staticmethod
-    def _sort_graph_by_size(graphs: list[nx.Graph]) -> list[nx.Graph]:
-        return sorted(graphs, key=lambda graph: len(graph.nodes), reverse=True)
-
-    @staticmethod
-    def _find_next_subgraph(a: nx.Graph, B: list[nx.Graph]):
-        # Loops through B and finds the largest subgraph isomorphism in A that leaves the least scattered atoms
-        # Returns the mapping and the index of the subgraph in B
-        B = sorted(B, key=lambda graph: len(graph.nodes), reverse=True)
-
-        for b in B:
-            GM = GraphMatcher(a, b, node_match=categorical_node_match("elem", 0))
-
-            # Get all subgraph isomorphisms
-            sub_graph_mappings = [sub for sub in GM.subgraph_isomorphisms_iter()]
-
-            # If there are any subgraph isomorphisms, find the one with the smallest number of connected components in the remaining graph
-            if len(sub_graph_mappings) > 0:
-                best_mapping = None
-                best_res = -1
-
-                for mapping in sub_graph_mappings:
-
-                    temp_a = nx.Graph(a)  # Unfreeze the graph to allow for node removal
-                    temp_a.remove_nodes_from(mapping.keys())
-                    res = nx.number_connected_components(temp_a)
-                    if best_res == -1 or res < best_res:
-                        best_res = res
-                        best_mapping = mapping
-
-                return best_mapping, best_res
-        return None, None
+        return maps, breaking_edges, forming_edges
