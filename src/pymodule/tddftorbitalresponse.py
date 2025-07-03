@@ -40,6 +40,9 @@ from .cphfsolver import CphfSolver
 from .distributedarray import DistributedArray
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 
 
 class TddftOrbitalResponse(CphfSolver):
@@ -150,9 +153,39 @@ class TddftOrbitalResponse(CphfSolver):
             unrelaxed one-particle density.
         """
 
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute_rhs')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation setup
+        solvation_model_sanity_check(self)
+
         # TODO: replace with a sanity check?
         if 'eigenvectors' in rsp_results:
             self.tamm_dancoff = True
+
+        # TODO: in the original implementation eri_dict, dft_dict, pe_dict
+        # are passed as arguments, but I am not sure why. Better to initialize
+        # here instead and remove from function arguments.
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
 
         profiler = Profiler({
             'timing': self.timing,
@@ -458,10 +491,15 @@ class TddftOrbitalResponse(CphfSolver):
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
+
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
+        dft_dict = self._init_dft(molecule, scf_tensors)
+
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
 
         self.ostream.unmute()
 

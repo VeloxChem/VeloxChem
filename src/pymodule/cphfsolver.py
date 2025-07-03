@@ -42,7 +42,8 @@ from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
@@ -405,6 +406,9 @@ class CphfSolver(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM_information
+        self._init_cpcm(molecule)
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E_alpha']
@@ -1063,6 +1067,9 @@ class CphfSolver(LinearSolver):
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
+
+        # check solvation setup
+        solvation_model_sanity_check(self)
 
         if self.rank == mpi_master():
             if self._dft:
