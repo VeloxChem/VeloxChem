@@ -65,20 +65,30 @@ class ReactionMatcher:
         self._gm_count = 0
         self._start_time = 0
         self.max_time = 600
+        self.check_monomorphic = False
 
     def get_mapping(self, reactant_ff, rea_elems, product_ff, pro_elems,
                     breaking_bonds):
 
-        rea_graph, pro_graph = self._create_reaction_graphs(
+        self.rea_graph, self.pro_graph = self._create_reaction_graphs(
             reactant_ff,
             rea_elems,
             product_ff,
             pro_elems,
             breaking_bonds,
         )
-        map, breaking_edges, forming_edges = self._find_mapping(rea_graph, pro_graph,
-                                              breaking_bonds)
-        
+
+        map, breaking_edges, forming_edges = self._find_mapping(
+            self.rea_graph.copy(), self.pro_graph.copy(), breaking_bonds)
+        if map is None:
+
+            self.check_monomorphic = True
+            self.ostream.print_info(
+                "No mapping found by checking subgraph isomorphism, trying to find mapping with subgraph monomorphism."
+            )
+            map, breaking_edges, forming_edges = self._find_mapping(
+                self.rea_graph.copy(), self.pro_graph.copy(), breaking_bonds)
+        self.ostream.flush()
         return map, breaking_edges, forming_edges
 
     def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
@@ -109,25 +119,29 @@ class ReactionMatcher:
             return False
         else:
             if msg is not None:
-                self.ostream.print_info(f"Spent {time.time() - self._start_time:.3f} s on {msg}")
+                self.ostream.print_info(
+                    f"Spent {time.time() - self._start_time:.3f} s on {msg}")
                 self.ostream.flush()
         return True
 
-    
-    def _connected_components_are_subgraphs(self,A, B):
+    def _connected_components_are_subgraphs(self, A, B):
         """
         Check if all connected components of A are subgraphs of B. If true, return a list of GraphMatchers for each connected component and their corresponding subgraphs. 
         Otherwise return None.
         """
-        for g in nx.connected_components(A):
+        connected_components = list(nx.connected_components(A))
+        for g in connected_components:
             self._gm_count += 1
             A_sub = A.subgraph(g)
             GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
             if not GM.subgraph_is_isomorphic():
-                return False
+                if self.check_monomorphic:
+                    if not GM.subgraph_is_monomorphic():
+                        return False
+                else:
+                    return False
         return True
 
-    
     def _find_mapping(self, A, B, forced_breaking_edges=set()):
         """
         Find a mapping between the connected components of A and B, while avoiding reconnecting broken edges.
@@ -137,6 +151,27 @@ class ReactionMatcher:
             A.remove_edge(*edge)
         # loop progressively over more and more broken bonds till all connected components of A are subgraphs of B
         # can be done based on elements
+        swapped = False
+
+        cc_A = list(nx.connected_components(A))
+        cc_B = list(nx.connected_components(B))
+        if len(cc_A) < len(cc_B):
+            # swap A and B to ensure that A has more or equal connected components than B
+            A, B = B, A
+            self.ostream.print_info(
+                f"A (reactant) has {len(cc_A)} connected components, B (product) has {len(cc_B)} connected components. Swapping A and B."
+            )
+            swapped = True
+        elif len(cc_A) == len(cc_B):
+            # if they have the same amount of connected components, swap if A has a larger largest connected component than B
+            largest_cc_A = max(len(cc) for cc in cc_A)
+            largest_cc_B = max(len(cc) for cc in cc_B)
+            if largest_cc_A > largest_cc_B:
+                self.ostream.print_info(
+                    f"A (reactant) has {largest_cc_A} nodes in largest connected component, B (product) has {largest_cc_B} nodes in largest connected component. Swapping A and B."
+                )
+                A, B = B, A
+                swapped = True
 
         breaking_edges = set()
 
@@ -153,10 +188,12 @@ class ReactionMatcher:
                     A.add_edge(*edge)
                 if not self._check_time():
                     return None, None, None
-        
+
             self._check_time("finding one breaking bond")
             if len(breaking_edges) == 0:
-                self.ostream.print_info("No subgraph solution with one broken bond found, trying to find two breaking bonds")
+                self.ostream.print_info(
+                    "No subgraph solution with one broken bond found, trying to find two breaking bonds"
+                )
                 self.ostream.flush()
                 for edge_a in A.edges():
                     A.remove_edge(*edge_a)
@@ -173,7 +210,8 @@ class ReactionMatcher:
                             return None, None, None
                 if len(breaking_edges) == 0:
                     self.ostream.print_warning(
-                        "No subgraph solution with two broken bonds found, aborting. Try suggisting more breaking bonds.")
+                        "No subgraph solution with two broken bonds found, aborting. Try suggisting more breaking bonds."
+                    )
                     self.ostream.flush()
                     return None, None, None
             else:
@@ -189,14 +227,14 @@ class ReactionMatcher:
             edge = None
             for i in A.nodes():
                 for j in B.nodes():
-                    if j < i:
+                    if j <= i:
                         continue
                     edge_in_A = (i, j) in A.edges() or (j, i) in A.edges()
                     edge_in_broken = (i, j) in forced_breaking_edges or (
                         j, i) in forced_breaking_edges
                     if edge_in_A or edge_in_broken:
                         continue
-
+                    self.ostream.flush()
                     A.add_edge(i, j)
                     if not self._connected_components_are_subgraphs(A, B):
                         A.remove_edge(i, j)
@@ -206,13 +244,14 @@ class ReactionMatcher:
 
                     edge = (i, j)
                     forming_edges.append(edge)
-                    self._check_time(f"finding bond {bond_count}: {edge}", dont_abort=True)
+                    self._check_time(f"finding bond {bond_count}: {edge}",
+                                     dont_abort=True)
                     self.ostream.flush()
                     break
                 if edge is not None:
                     break
             if edge is None:
-                print(f"Bond {i} not found, aborting")
+                self.ostream.print_info(f"Bond {i} not found, aborting")
                 return None, None, None
         self.ostream.print_info(
             f"Found forming bonds: {forming_edges}. Finding mapping from isomorphism."
@@ -222,6 +261,12 @@ class ReactionMatcher:
         GM = GraphMatcher(A, B, categorical_node_match('elem', ''))
         map = next(GM.isomorphisms_iter())
 
-        self._check_time(f"finding mapping with. Total graphmatcher calls: {self._gm_count}", dont_abort=True)
-
+        self._check_time(
+            f"finding mapping. Total graphmatcher calls: {self._gm_count}",
+            dont_abort=True)
+        if swapped:
+            # if we swapped A and B, we need to swap the mapping back
+            self.ostream.print_info(
+                "Inverting mapping because A and B were swapped.")
+            map = {v: k for k, v in map.items()}
         return map, breaking_edges, forming_edges
