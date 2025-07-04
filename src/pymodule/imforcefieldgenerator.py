@@ -685,7 +685,7 @@ class IMForceFieldGenerator:
                         current_dihedral_angle = list(self.allowed_deviation[state][key].keys())[i]
                         forcefield_generator = MMForceFieldGenerator()
                         self.dynamics_settings['trajectory_file'] = f'trajectory_{state}_{key}_{i}.pdb'
-                        
+                        forcefield_generator.partial_charges = mol.get_partial_charges(mol.get_charge())
                         forcefield_generator.create_topology(mol)
                             
                         im_database_driver = IMDatabasePointCollecter()
