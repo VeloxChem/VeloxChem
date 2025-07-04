@@ -36,6 +36,7 @@ import networkx as nx
 import sys
 import os
 import copy
+import math
 from .veloxchemlib import mpi_master
 from .sanitychecks import molecule_sanity_check
 from .molecule import Molecule
@@ -207,31 +208,34 @@ class EvbForceFieldBuilder():
         for bond in changing_bonds:
             s1 = forcefield.atoms[bond[0]]['sigma']
             s2 = forcefield.atoms[bond[1]]['sigma']
+            e1 = forcefield.atoms[bond[0]]['epsilon']
+            e2 = forcefield.atoms[bond[1]]['epsilon']
             if bond[0] not in changing_atoms:
                 changing_atoms.append(bond[0])
             if bond[1] not in changing_atoms:
                 changing_atoms.append(bond[1])
             s = (s1 + s2) / 2
-            rmin = s * 2**(1 / 6)
-            # s*=0.8
+            e = math.sqrt(e1 * e2)
+            
+            rmin = s*(2**(1/6))  # rmin = sigma * 2^(1/6)
+            fc = 250000 * e  # force constant in kJ/mol/angstrom^2
             forcefield.bonds.update(
                 {bond: {
                     'equilibrium': rmin,
-                    'force_constant': 2500000
+                    'force_constant': fc
                 }})
             self.ostream.print_info(
-                f"Adding bond {bond} with r {rmin:.3f} for equilibration {note}"
+                f"Adding bond {bond} with r {rmin:.3f} and fc {fc:.3f} for equilibration {note}"
             )
 
         self.ostream.flush()
 
-
-        for bond in changing_bonds:
-            forcefield.bonds.pop(bond)
-
         #merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
         #todo find a better way to do this
         forcefield.write_openmm_files(name, name)
+
+        for bond in changing_bonds:
+            forcefield.bonds.pop(bond)
 
         pdb = mmapp.PDBFile(f'{name}.pdb')
         ff = mmapp.ForceField(f'{name}.xml')
@@ -258,19 +262,17 @@ class EvbForceFieldBuilder():
                 sorted_tuple = (params[0], params[1])
                 existing_exceptions.update({sorted_tuple: i})
         added_exceptions = {}
-        for i in changing_atoms:
-            for j in changing_atoms:
-                if i > j:
-                    if (i, j) in existing_exceptions.keys():
-                        nbforce.setExceptionParameters(
-                            existing_exceptions[(i, j)], i, j, 0, 1, 0)
-                    elif (j, i) in existing_exceptions.keys():
-                        nbforce.setExceptionParameters(
-                            existing_exceptions[(j, i)], i, j, 0, 1, 0)
-                    else:
-
-                        index = nbforce.addException(i, j, 0, 1, 0)
-                        added_exceptions.update({(i, j): index})
+        for bond in changing_bonds:
+            if bond in existing_exceptions.keys():
+                nbforce.setExceptionParameters(
+                    existing_exceptions[bond], bond[0], bond[1], 0, 1, 0)
+            elif (bond[1], bond[0]) in existing_exceptions.keys():
+                nbforce.setExceptionParameters(
+                    existing_exceptions[(bond[1], bond[0])], bond[0], bond[1],
+                    0, 1, 0)
+            else:
+                index = nbforce.addException(bond[0], bond[1], 0, 1, 0)
+                added_exceptions.update({bond: index})
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
         os.unlink(f'{name}.xml')
