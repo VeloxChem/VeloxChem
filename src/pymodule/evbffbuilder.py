@@ -94,13 +94,13 @@ class EvbForceFieldBuilder():
         self.water_model: str
 
     def build_forcefields(
-        self,
-        reactant_input: list[dict],
-        product_input: list[dict],
-        reactant_total_multiplicity: int,
-        product_total_multiplicity: int,
-        ordered_input: bool = False,
-        breaking_bonds: set[tuple[int, int]] = set(),
+            self,
+            reactant_input: list[dict],
+            product_input: list[dict],
+            reactant_total_multiplicity: int,
+            product_total_multiplicity: int,
+            ordered_input: bool = False,
+            breaking_bonds: set[tuple[int, int]] = set(),
     ):
 
         reactants: list[MMForceFieldGenerator] = []
@@ -203,37 +203,35 @@ class EvbForceFieldBuilder():
                            name='MOL',
                            note=None):
         # for i, ff in enumerate(forcefields):
-        atoms = []
+        changing_atoms = []
         for bond in changing_bonds:
             s1 = forcefield.atoms[bond[0]]['sigma']
             s2 = forcefield.atoms[bond[1]]['sigma']
-            if bond[0] not in atoms:
-                atoms.append(bond[0])
-            if bond[1] not in atoms:
-                atoms.append(bond[1])
-            # if s1 < 0.3:
-            #     s1 = 0.3
-            # if s2 < 0.3:
-            #     s2 = 0.3
+            if bond[0] not in changing_atoms:
+                changing_atoms.append(bond[0])
+            if bond[1] not in changing_atoms:
+                changing_atoms.append(bond[1])
             s = (s1 + s2) / 2
+            rmin = s * 2**(1 / 6)
             # s*=0.8
             forcefield.bonds.update(
                 {bond: {
-                    'equilibrium': s,
+                    'equilibrium': rmin,
                     'force_constant': 2500000
                 }})
             self.ostream.print_info(
-                f"Adding bond {bond} with r {s} for equilibration {note}, s1={s1}, s2={s2}"
+                f"Adding bond {bond} with r {rmin:.3f} for equilibration {note}"
             )
 
         self.ostream.flush()
 
-        #merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
-        #todo find a better way to do this
-        forcefield.write_openmm_files(name, name)
 
         for bond in changing_bonds:
             forcefield.bonds.pop(bond)
+
+        #merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
+        #todo find a better way to do this
+        forcefield.write_openmm_files(name, name)
 
         pdb = mmapp.PDBFile(f'{name}.pdb')
         ff = mmapp.ForceField(f'{name}.xml')
@@ -256,13 +254,13 @@ class EvbForceFieldBuilder():
         existing_exceptions = {}
         for i in range(nbforce.getNumExceptions()):
             params = nbforce.getExceptionParameters(i)
-            if params[0] in atoms or params[1] in atoms:
+            if params[0] in changing_atoms or params[1] in changing_atoms:
                 sorted_tuple = (params[0], params[1])
                 existing_exceptions.update({sorted_tuple: i})
-
-        for i in range(mmsys.getNumParticles()):
-            for j in atoms:
-                if i != j:
+        added_exceptions = {}
+        for i in changing_atoms:
+            for j in changing_atoms:
+                if i > j:
                     if (i, j) in existing_exceptions.keys():
                         nbforce.setExceptionParameters(
                             existing_exceptions[(i, j)], i, j, 0, 1, 0)
@@ -270,7 +268,9 @@ class EvbForceFieldBuilder():
                         nbforce.setExceptionParameters(
                             existing_exceptions[(j, i)], i, j, 0, 1, 0)
                     else:
-                        nbforce.addException(i, j, 0, 1, 0)
+
+                        index = nbforce.addException(i, j, 0, 1, 0)
+                        added_exceptions.update({(i, j): index})
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
         os.unlink(f'{name}.xml')
@@ -280,8 +280,9 @@ class EvbForceFieldBuilder():
         sim = mmapp.Simulation(top, mmsys, integrator)
         sim.context.setPositions(pos)
         sim.minimizeEnergy()
-        # sim.step(1000)
-        # sim.minimizeEnergy()
+        sim.context.setVelocitiesToTemperature(300 * mmunit.kelvin)
+        sim.step(100)
+        sim.minimizeEnergy()
 
         state = sim.context.getState(getPositions=True)
         pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
@@ -434,17 +435,26 @@ class EvbForceFieldBuilder():
             product_ff.atoms
         ), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
-        
+
         rm = ReactionMatcher(ostream=self.ostream)
-        total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(reactant_ff, rea_elems, product_ff, pro_elems,breaking_bonds)
+        total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
+            reactant_ff, rea_elems, product_ff, pro_elems, breaking_bonds)
+        if total_mapping is None:
+            raise ValueError(
+                "Could not find a mapping between the reactant and product force fields."
+            )
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
         self.ostream.flush()
         product_ff = EvbForceFieldBuilder._apply_mapping_to_forcefield(
-            product_ff, total_mapping,)
+            product_ff,
+            total_mapping,
+        )
 
         product_ff.molecule = EvbForceFieldBuilder._apply_mapping_to_molecule(
-            product_ff.molecule, total_mapping,)
+            product_ff.molecule,
+            total_mapping,
+        )
         return product_ff
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
