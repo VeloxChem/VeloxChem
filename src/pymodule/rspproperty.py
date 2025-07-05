@@ -225,6 +225,13 @@ class ResponseProperty:
 
             self._rsp_driver = CubicResponseDriver(self.comm, self.ostream)
 
+        elif (self._rsp_dict['property'] == 'thg' and 
+              self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['is_complex'] == 'yes'):    
+             
+             self._rsp_driver = ThgDriver(self.comm, self.ostream)
+
         # TPA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['residue'] == 'none' and

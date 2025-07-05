@@ -145,6 +145,7 @@ from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
 from .shgdriver import ShgDriver
+from .thgdriver import ThgDriver
 from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
@@ -158,6 +159,7 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
+from .rspthg import THG
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
