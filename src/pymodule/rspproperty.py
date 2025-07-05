@@ -42,6 +42,7 @@ from .lreigensolver import LinearResponseEigenSolver
 from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .shgdriver import ShgDriver
+from .thgdriver import ThgDriver
 from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
