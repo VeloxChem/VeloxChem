@@ -863,27 +863,12 @@ class ThgDriver(NonlinearSolver):
             #       [κ_{β}^{-ω},Φ_{αβ}^{σ}+f_{αβ}^{σ}]
 
             # x
-
-            f_lamtau_xx = 2.0 * f_sig_xx
-            f_lamtau_xy = 2.0 * f_sig_xy
-            f_lamtau_xz = 2.0 * f_sig_xz
-            f_lamtau_yy = 2.0 * f_sig_yy
-            f_lamtau_yz = 2.0 * f_sig_yz
-            f_lamtau_zz = 2.0 * f_sig_zz
-            f_lamtau_xz = 2.0 * f_sig_xz
-            f_lamtau_zz = 2.0 * f_sig_zz
-            f_lamtau_yz = 2.0 * f_sig_yz
-
                 
             # Creating the transformed total Fock matrices
-            f_x += (self.commut(kx, Phi_lamtau_xx + f_lamtau_xx) +
-                    self.commut(ky, Phi_lamtau_xy + f_lamtau_xy) +
-                    self.commut(kz, Phi_lamtau_xz + f_lamtau_xz))
+            f_x += (self.commut(kx, Phi_sig_xx + Phi_lamtau_xx +  3.0 * f_sig_xx) +
+                    self.commut(ky, Phi_sig_xy + Phi_lamtau_xy +  3.0 * f_sig_xy) +
+                    self.commut(kz, Phi_sig_xz + Phi_lamtau_xz +  3.0 * f_sig_xz))
             
-            f_x += (self.commut(kx, Phi_sig_xx + f_sig_xx) +
-                    self.commut(ky, Phi_sig_xy + f_sig_xy) +
-                    self.commut(kz, Phi_sig_xz + f_sig_xz))
-
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
             f_x = -2. / 6 * LinearSolver.lrmat2vec(f_x.T, nocc, norb)
@@ -893,13 +878,10 @@ class ThgDriver(NonlinearSolver):
             # y
 
             # Creating the transformed total Fock matrices
-            f_y += (self.commut(kx, Phi_lamtau_xy + f_lamtau_xy) +
-                    self.commut(ky, Phi_lamtau_yy + f_lamtau_yy) +
-                    self.commut(kz, Phi_lamtau_yz + f_lamtau_yz))
-            f_y += (self.commut(kx, Phi_sig_xy + f_sig_xy) +
-                    self.commut(ky, Phi_sig_yy + f_sig_yy) +
-                    self.commut(kz, Phi_sig_yz + f_sig_yz))
-
+            f_y += (self.commut(kx, Phi_sig_xy + Phi_lamtau_xy + 3.0 * f_sig_xy) +
+                    self.commut(ky, Phi_sig_yy + Phi_lamtau_yy + 3.0 * f_sig_yy) +
+                    self.commut(kz, Phi_sig_yz + Phi_lamtau_yz + 3.0 * f_sig_yz))
+            
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
             f_y = -2. / 6 * LinearSolver.lrmat2vec(f_y.T, nocc, norb)
@@ -909,13 +891,10 @@ class ThgDriver(NonlinearSolver):
             # z
 
             # Creating the transformed total Fock matrices
-            f_z += (self.commut(kx, Phi_lamtau_xz + f_lamtau_xz) +
-                    self.commut(ky, Phi_lamtau_yz + f_lamtau_yz) +
-                    self.commut(kz, Phi_lamtau_zz + f_lamtau_zz))
-            f_z += (self.commut(kx, Phi_sig_xz + f_sig_xz) +
-                    self.commut(ky, Phi_sig_yz + f_sig_yz) +
-                    self.commut(kz, Phi_sig_zz + f_sig_zz))
-
+            f_z += (self.commut(kx, Phi_sig_xz + Phi_lamtau_xz + 3.0 * f_sig_xz) +
+                    self.commut(ky, Phi_sig_yz + Phi_lamtau_yz + 3.0 * f_sig_yz) +
+                    self.commut(kz, Phi_sig_zz + Phi_lamtau_zz + 3.0 * f_sig_zz))
+            
             # Taking the non redundant matrix elements {i,s} and forming the
             # anti-symmetric Fock vector
             f_z = -2. / 6 * LinearSolver.lrmat2vec(f_z.T, nocc, norb)
@@ -1491,12 +1470,6 @@ class ThgDriver(NonlinearSolver):
             f_sig_xz = f_sig_xz.T.conj()
             f_sig_yz = f_sig_yz.T.conj()
 
-            f_lamtau_xx = 2.0 * f_sig_xx
-            f_lamtau_yy = 2.0 * f_sig_yy
-            f_lamtau_zz = 2.0 * f_sig_zz
-            f_lamtau_xy = 2.0 * f_sig_xy
-            f_lamtau_xz = 2.0 * f_sig_xz
-            f_lamtau_yz = 2.0 * f_sig_yz
 
             F0_a = fo['F0']
 
@@ -1513,60 +1486,41 @@ class ThgDriver(NonlinearSolver):
             k_sig_xz = (self.complex_lrvec2mat(n_sig_xz, nocc, norb)).T
             k_sig_yz = (self.complex_lrvec2mat(n_sig_yz, nocc, norb)).T
 
-            k_lamtau_xx = 2.0 * k_sig_xx
-            k_lamtau_yy = 2.0 * k_sig_yy
-            k_lamtau_zz = 2.0 * k_sig_zz
-            k_lamtau_xy = 2.0 * k_sig_xy
-            k_lamtau_xz = 2.0 * k_sig_xz
-            k_lamtau_yz = 2.0 * k_sig_yz
-
             # Focks #
 
             # x
 
-            zeta_sig_xx = self._xi(k_x, k_sig_xx, f_x, f_sig_xx, F0_a)
-            zeta_sig_yy = self._xi(k_x, k_sig_yy, f_x, f_sig_yy, F0_a)
-            zeta_sig_zz = self._xi(k_x, k_sig_zz, f_x, f_sig_zz, F0_a)
-            zeta_sig_xy = self._xi(k_y, k_sig_xy, f_y, f_sig_xy, F0_a)
-            zeta_sig_xz = self._xi(k_z, k_sig_xz, f_z, f_sig_xz, F0_a)
+            zeta_sig_xx = self._xi(k_x, k_sig_xx, f_x, f_sig_xx, F0_a) + self._xi(k_x, 2.0 * k_sig_xx, f_x, 2.0 * f_sig_xx, F0_a) 
+            zeta_sig_yy = self._xi(k_x, k_sig_yy, f_x, f_sig_yy, F0_a) + self._xi(k_x, 2.0 * k_sig_yy, f_x, 2.0 * f_sig_yy, F0_a)
+            zeta_sig_zz = self._xi(k_x, k_sig_zz, f_x, f_sig_zz, F0_a) + self._xi(k_x, 2.0 * k_sig_zz, f_x, 2.0 * f_sig_zz, F0_a)
+            zeta_sig_xy = self._xi(k_y, k_sig_xy, f_y, f_sig_xy, F0_a) + self._xi(k_y, 2.0 * k_sig_xy, f_y, 2.0 * f_sig_xy, F0_a)
+            zeta_sig_xz = self._xi(k_z, k_sig_xz, f_z, f_sig_xz, F0_a) + self._xi(k_z, 2.0 * k_sig_xz, f_z, 2.0 * f_sig_xz, F0_a)
 
-            zeta_lamtau_xx = self._xi(k_x, k_lamtau_xx, f_x, f_lamtau_xx, F0_a)
-            zeta_lamtau_yy = self._xi(k_x, k_lamtau_yy, f_x, f_lamtau_yy, F0_a)
-            zeta_lamtau_zz = self._xi(k_x, k_lamtau_zz, f_x, f_lamtau_zz, F0_a)
-            zeta_lamtau_xy = self._xi(k_y, k_lamtau_xy, f_y, f_lamtau_xy, F0_a)
-            zeta_lamtau_xz = self._xi(k_z, k_lamtau_xz, f_z, f_lamtau_xz, F0_a)
 
-            X_terms = (zeta_sig_xx + zeta_sig_xy + zeta_sig_xz).T + (zeta_lamtau_xx + zeta_lamtau_xy + zeta_lamtau_xz).T + (0.5 * F123_x).T
+            X_terms = (zeta_sig_xx + zeta_sig_xy + zeta_sig_xz).T + (0.5 * F123_x).T
             Ff_x = -2 * LinearSolver.lrmat2vec(X_terms, nocc, norb)
             Ff_x = self.anti_sym(Ff_x)
             f_iso_x[w] = Ff_x
 
             # y
 
-            zeta_sig_yx = self._xi(k_x, k_sig_xy, f_x, f_sig_xy, F0_a)
-            zeta_sig_yy = self._xi(k_y, k_sig_yy, f_y, f_sig_yy, F0_a)
-            zeta_sig_yz = self._xi(k_z, k_sig_yz, f_z, f_sig_yz, F0_a)
+            zeta_sig_yx = self._xi(k_x, k_sig_xy, f_x, f_sig_xy, F0_a) + self._xi(k_x, 2.0 * k_sig_xy, f_x, 2.0 * f_sig_xy, F0_a)
+            zeta_sig_yy = self._xi(k_y, k_sig_yy, f_y, f_sig_yy, F0_a) + self._xi(k_y, 2.0 * k_sig_yy, f_y, 2.0 * f_sig_yy, F0_a)
+            zeta_sig_yz = self._xi(k_z, k_sig_yz, f_z, f_sig_yz, F0_a) + self._xi(k_z, 2.0 * k_sig_yz, f_z, 2.0 * f_sig_yz, F0_a)
 
-            zeta_lamtau_yx = self._xi(k_x, k_lamtau_xy, f_x, f_lamtau_xy, F0_a)
-            zeta_lamtau_yy = self._xi(k_y, k_lamtau_yy, f_y, f_lamtau_yy, F0_a)
-            zeta_lamtau_yz = self._xi(k_z, k_lamtau_yz, f_z, f_lamtau_yz, F0_a)
 
-            Y_terms = (zeta_sig_yx + zeta_sig_yy + zeta_sig_yz).T + (zeta_lamtau_yx + zeta_lamtau_yy + zeta_lamtau_yz).T + (0.5 * F123_y).T
+            Y_terms = (zeta_sig_yx + zeta_sig_yy + zeta_sig_yz).T + (0.5 * F123_y).T
             Ff_y = -2 * LinearSolver.lrmat2vec(Y_terms, nocc, norb)
             Ff_y = self.anti_sym(Ff_y)
             f_iso_y[w] = Ff_y
 
             # z
+            zeta_sig_zx = self._xi(k_x, k_sig_xz, f_x, f_sig_xz, F0_a) + self._xi(k_x, 2.0 * k_sig_xz, f_x, 2.0 * f_sig_xz, F0_a) 
+            zeta_sig_zy = self._xi(k_y, k_sig_yz, f_y, f_sig_yz, F0_a) + self._xi(k_y, 2.0 * k_sig_yz, f_y, 2.0 * f_sig_yz, F0_a)
+            zeta_sig_zz = self._xi(k_z, k_sig_zz, f_z, f_sig_zz, F0_a) + self._xi(k_z, 2.0 * k_sig_zz, f_z, 2.0 * f_sig_zz, F0_a)
 
-            zeta_sig_zx = self._xi(k_x, k_sig_xz, f_x, f_sig_xz, F0_a)
-            zeta_sig_zy = self._xi(k_y, k_sig_yz, f_y, f_sig_yz, F0_a)
-            zeta_sig_zz = self._xi(k_z, k_sig_zz, f_z, f_sig_zz, F0_a)
 
-            zeta_lamtau_zx = self._xi(k_x, k_lamtau_xz, f_x, f_lamtau_xz, F0_a)
-            zeta_lamtau_zy = self._xi(k_y, k_lamtau_yz, f_y, f_lamtau_yz, F0_a)
-            zeta_lamtau_zz = self._xi(k_z, k_lamtau_zz, f_z, f_lamtau_zz, F0_a)
-
-            Z_terms = (zeta_sig_zx + zeta_sig_zy + zeta_sig_zz).T + (zeta_lamtau_zx + zeta_lamtau_zy + zeta_lamtau_zz).T + (0.5 * F123_z).T
+            Z_terms = (zeta_sig_zx + zeta_sig_zy + zeta_sig_zz).T + (0.5 * F123_z).T
             Ff_z = -2 * LinearSolver.lrmat2vec(Z_terms, nocc, norb)
             Ff_z = self.anti_sym(Ff_z)
             f_iso_z[w] = Ff_z
