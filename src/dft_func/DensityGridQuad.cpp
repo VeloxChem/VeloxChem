@@ -922,6 +922,145 @@ CDensityGridQuad::DensityProdForLDA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
+        else if (format::upper_case(quadMode) == "THG_II") 
+        {
+            // This code is inteded to compute F_b_sigma fock matrices for the final E3 contraction for tpa calculations.
+
+            for (int j = 0; j < numdens / 6; j++)
+            {
+                auto rr_x_r = gam(6 * j);
+
+                auto rr_x_i = gam(6 * j + 1);
+
+                auto rr_y_r = gam(6 * j + 2);
+
+                auto rr_y_i = gam(6 * j + 3);
+
+                auto rr_z_r = gam(6 * j + 4);
+
+                auto rr_z_i = gam(6 * j + 5);
+
+
+                auto rhoBx_r = rwDensityGrid.alphaDensity(18 * j);
+
+                auto rhoBx_i = rwDensityGrid.alphaDensity(18 * j + 1);
+
+                auto rhoBy_r = rwDensityGrid.alphaDensity(18 * j + 2);
+
+                auto rhoBy_i = rwDensityGrid.alphaDensity(18 * j + 3);
+
+                auto rhoBz_r = rwDensityGrid.alphaDensity(18 * j + 4);
+
+                auto rhoBz_i = rwDensityGrid.alphaDensity(18 * j + 5);  
+
+                auto Rho_sig_xx_r = rwDensityGrid.alphaDensity(18 * j + 6);
+
+                auto Rho_sig_xx_i = rwDensityGrid.alphaDensity(18 * j + 7);
+
+                auto Rho_sig_yy_r = rwDensityGrid.alphaDensity(18 * j + 8);
+
+                auto Rho_sig_yy_i = rwDensityGrid.alphaDensity(18 * j + 9);
+
+                auto Rho_sig_zz_r = rwDensityGrid.alphaDensity(18 * j + 10);
+
+                auto Rho_sig_zz_i = rwDensityGrid.alphaDensity(18 * j + 11);
+
+                auto Rho_sig_xy_r = rwDensityGrid.alphaDensity(18 * j + 12);
+
+                auto Rho_sig_xy_i = rwDensityGrid.alphaDensity(18 * j + 13);
+
+                auto Rho_sig_xz_r = rwDensityGrid.alphaDensity(18 * j + 14);
+
+                auto Rho_sig_xz_i = rwDensityGrid.alphaDensity(18 * j + 15);
+
+                auto Rho_sig_yz_r = rwDensityGrid.alphaDensity(18 * j + 16);
+
+                auto Rho_sig_yz_i = rwDensityGrid.alphaDensity(18 * j + 17);
+
+                          
+
+                for (int i = 0; i < npoints; i++)
+                {
+
+                    rr_x_r[i] = 2.0 * (Rho_sig_xx_r[i] * rhoBx_r[i] - Rho_sig_xx_i[i] * rhoBx_i[i] 
+                    
+                                    +  Rho_sig_xy_r[i] * rhoBy_r[i] - Rho_sig_xy_i[i] * rhoBy_i[i] 
+
+                                    + Rho_sig_xz_r[i] * rhoBz_r[i] -  Rho_sig_xz_i[i] * rhoBz_i[i] 
+
+                                    + 2.0 * Rho_sig_xx_r[i] * rhoBx_r[i] - 2.0 * Rho_sig_xx_i[i] * rhoBx_i[i] 
+
+                                    + 2.0 * Rho_sig_xy_r[i] * rhoBy_r[i] - 2.0 * Rho_sig_xy_i[i] * rhoBy_i[i] 
+                                    
+                                    + 2.0 * Rho_sig_xz_r[i] * rhoBz_r[i] - 2.0 * Rho_sig_xz_i[i] * rhoBz_i[i]);
+
+
+                    rr_y_r[i] = 2.0 * (Rho_sig_xy_r[i]* rhoBx_r[i] - Rho_sig_xy_i[i] * rhoBx_i[i] 
+                    
+                                     + Rho_sig_yy_r[i]* rhoBy_r[i] - Rho_sig_yy_i[i] * rhoBy_i[i] 
+                                                                      
+                                     + Rho_sig_yz_r[i]* rhoBz_r[i] - Rho_sig_yz_i[i] * rhoBz_i[i]
+     
+                                     + 2.0 * Rho_sig_xy_r[i]* rhoBx_r[i] - 2.0 * Rho_sig_xy_i[i] * rhoBx_i[i] 
+
+                                     + 2.0 * Rho_sig_yy_r[i]* rhoBy_r[i] - 2.0 * Rho_sig_yy_i[i] * rhoBy_i[i] 
+                                     
+                                     + 2.0 * Rho_sig_yz_r[i]* rhoBz_r[i] - 2.0 * Rho_sig_yz_i[i] * rhoBz_i[i]);
+
+
+                    rr_z_r[i] = 2.0 * (Rho_sig_xz_r[i] * rhoBx_r[i] - Rho_sig_xz_i[i] * rhoBx_i[i] 
+                 
+                                     + Rho_sig_yz_r[i] * rhoBy_r[i] - Rho_sig_yz_i[i] * rhoBy_i[i] 
+                                    
+                                    +  Rho_sig_zz_r[i] * rhoBz_r[i] - Rho_sig_zz_i[i] * rhoBz_i[i] 
+
+                                    + 2.0 * Rho_sig_xz_r[i]* rhoBx_r[i] - 2.0 * Rho_sig_xz_i[i] * rhoBx_i[i]
+
+                                    + 2.0 * Rho_sig_yz_r[i]* rhoBy_r[i] - 2.0 * Rho_sig_yz_i[i] * rhoBy_i[i] 
+                                    
+                                    + 2.0 * Rho_sig_zz_r[i]* rhoBz_r[i] - 2.0 * Rho_sig_zz_i[i] * rhoBz_i[i]);
+
+
+                    rr_x_i[i] = 2.0 * (Rho_sig_xx_i[i]* rhoBx_r[i] + Rho_sig_xx_r[i] * rhoBx_i[i] 
+                    
+                                    + Rho_sig_xy_i[i]* rhoBy_r[i] + Rho_sig_xy_r[i] * rhoBy_i[i] 
+
+                                    + Rho_sig_xz_i[i]* rhoBz_r[i] + Rho_sig_xz_r[i] * rhoBz_i[i] 
+
+                                    + 2.0 * Rho_sig_xx_i[i]* rhoBx_r[i] + 2.0 * Rho_sig_xx_r[i] * rhoBx_i[i] 
+
+                                    + 2.0 * Rho_sig_xy_i[i]* rhoBy_r[i] + 2.0 * Rho_sig_xy_r[i] * rhoBy_i[i] 
+
+                                    + 2.0 * Rho_sig_xz_i[i]* rhoBz_r[i] + 2.0 * Rho_sig_xz_r[i] * rhoBz_i[i] );
+
+
+                    rr_y_i[i] = 2.0 * (Rho_sig_xy_i[i]* rhoBx_r[i] + Rho_sig_xy_r[i] * rhoBx_i[i] 
+
+                                    + Rho_sig_yy_i[i]* rhoBy_r[i] + Rho_sig_yy_r[i] * rhoBy_i[i] 
+
+                                    + Rho_sig_yz_i[i]* rhoBz_r[i] + Rho_sig_yz_r[i] * rhoBz_i[i] 
+
+                                    + 2.0 * Rho_sig_xy_i[i]* rhoBx_r[i] + 2.0 * Rho_sig_xy_r[i] * rhoBx_i[i] 
+
+                                    + 2.0 * Rho_sig_yy_i[i]* rhoBy_r[i] + 2.0 * Rho_sig_yy_r[i] * rhoBy_i[i] 
+                                
+                                    + 2.0 * Rho_sig_yz_i[i]* rhoBz_r[i] + 2.0 * Rho_sig_yz_r[i] * rhoBz_i[i] );
+
+
+                    rr_z_i[i] = 2.0 * (Rho_sig_xz_i[i]* rhoBx_r[i] + Rho_sig_xz_r[i] * rhoBx_i[i] 
+                                
+                                    + Rho_sig_yz_i[i]* rhoBy_r[i] + Rho_sig_yz_r[i] * rhoBy_i[i]
+
+                                    + Rho_sig_zz_i[i]* rhoBz_r[i] + Rho_sig_zz_r[i] * rhoBz_i[i] 
+
+                                    + 2.0 * Rho_sig_xz_i[i]* rhoBx_r[i] + 2.0 * Rho_sig_xz_r[i] * rhoBx_i[i] 
+                                    
+                                    + 2.0 * Rho_sig_yz_i[i]* rhoBy_r[i] + 2.0 * Rho_sig_yz_r[i] * rhoBy_i[i]
+                                    
+                                    + 2.0 * Rho_sig_zz_i[i]* rhoBz_r[i] + 2.0 * Rho_sig_zz_r[i] * rhoBz_i[i]);
+                }
+            }
+        }
         else if (format::upper_case(quadMode) == "REDTPA_I")
         {
             // This routine computes the first-order two-times transformed Fock matrices for the E[4] contraction for TPA calculations
@@ -6224,6 +6363,2976 @@ CDensityGridQuad::DensityProdForGGA(const CDensityGrid& rwDensityGrid,
                     ryw1_i = Rho_lamtau_zz_grad_y_i[i];
 
                     rzw1_i = Rho_lamtau_zz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBz_rho_r[i];
+
+                    rxw2_r = rhoBz_grad_x_r[i];
+
+                    ryw2_r = rhoBz_grad_y_r[i];
+
+                    rzw2_r = rhoBz_grad_z_r[i];
+
+                    rhow2_i = rhoBz_rho_i[i];
+
+                    rxw2_i = rhoBz_grad_x_i[i];
+
+                    ryw2_i = rhoBz_grad_y_i[i];
+
+                    rzw2_i = rhoBz_grad_z_i[i];
+                        
+
+                    F_z_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_z_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_z_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_z_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_z_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_z_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_z_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_z_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_z_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_z_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_z_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_z_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_z_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_z_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_z_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_z_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_z_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_z_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_z_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_z_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_z_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_z_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_z_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_z_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_z_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_z_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+                }
+            }
+        }    
+        else if (format::upper_case(quadMode) == "THG_II") 
+        {
+            // This code is inteded to compute F_b_sigma fock matrices for the final E3 contraction for THG calculations.
+
+            for (int j = 0; j < numdens / 6; j++)
+            {
+                auto F_x_gam_r = gam(6 * j);
+
+                auto F_x_gam_i = gam(6 * j + 1);
+
+                auto F_x_gamX_r = gamX(6 * j);
+
+                auto F_x_gamX_i = gamX(6 * j + 1);
+
+                auto F_x_gamY_r = gamY(6 * j);
+
+                auto F_x_gamY_i = gamY(6 * j + 1);
+
+                auto F_x_gamZ_r = gamZ(6 * j);
+
+                auto F_x_gamZ_i = gamZ(6 * j + 1);
+
+                auto F_x_gamXX_r = gamXX(6 * j);
+
+                auto F_x_gamXX_i = gamXX(6 * j + 1);
+
+                auto F_x_gamXY_r = gamXY(6 * j);
+
+                auto F_x_gamXY_i = gamXY(6 * j + 1);
+
+                auto F_x_gamXZ_r = gamXZ(6 * j);
+
+                auto F_x_gamXZ_i = gamXZ(6 * j + 1);
+
+                auto F_x_gamYX_r = gamYX(6 * j);
+
+                auto F_x_gamYX_i = gamYX(6 * j + 1);
+
+                auto F_x_gamYY_r = gamYY(6 * j);
+
+                auto F_x_gamYY_i = gamYY(6 * j + 1);
+
+                auto F_x_gamYZ_r = gamYZ(6 * j);
+
+                auto F_x_gamYZ_i = gamYZ(6 * j + 1);
+
+                auto F_x_gamZX_r = gamZX(6 * j);
+
+                auto F_x_gamZX_i = gamZX(6 * j + 1);
+
+                auto F_x_gamZY_r = gamZY(6 * j);
+
+                auto F_x_gamZY_i = gamZY(6 * j + 1);
+
+                auto F_x_gamZZ_r = gamZZ(6 * j);
+
+                auto F_x_gamZZ_i = gamZZ(6 * j + 1);
+
+                // Fy
+
+                auto F_y_gam_r = gam(6 * j  + 2);
+ 
+                auto F_y_gam_i = gam(6 * j  + 3);
+
+                auto F_y_gamX_r = gamX(6 * j  + 2);
+
+                auto F_y_gamX_i = gamX(6 * j  + 3);
+
+                auto F_y_gamY_r = gamY(6 * j  + 2);
+
+                auto F_y_gamY_i = gamY(6 * j  + 3);
+
+                auto F_y_gamZ_r = gamZ(6 * j  + 2);
+
+                auto F_y_gamZ_i = gamZ(6 * j  + 3);
+
+                auto F_y_gamXX_r = gamXX(6 * j  + 2);
+
+                auto F_y_gamXX_i = gamXX(6 * j  + 3);
+
+                auto F_y_gamXY_r = gamXY(6 * j  + 2);
+
+                auto F_y_gamXY_i = gamXY(6 * j  + 3);
+
+                auto F_y_gamXZ_r = gamXZ(6 * j  + 2);
+
+                auto F_y_gamXZ_i = gamXZ(6 * j  + 3);
+
+                auto F_y_gamYX_r = gamYX(6 * j  + 2);
+
+                auto F_y_gamYX_i = gamYX(6 * j  + 3);
+
+                auto F_y_gamYY_r = gamYY(6 * j  + 2);
+
+                auto F_y_gamYY_i = gamYY(6 * j  + 3);
+
+                auto F_y_gamYZ_r = gamYZ(6 * j  + 2);
+
+                auto F_y_gamYZ_i = gamYZ(6 * j  + 3);
+
+                auto F_y_gamZX_r = gamZX(6 * j  + 2);
+
+                auto F_y_gamZX_i = gamZX(6 * j  + 3);
+
+                auto F_y_gamZY_r = gamZY(6 * j  + 2);
+
+                auto F_y_gamZY_i = gamZY(6 * j  + 3);
+
+                auto F_y_gamZZ_r = gamZZ(6 * j  + 2);
+
+                auto F_y_gamZZ_i = gamZZ(6 * j  + 3);
+
+                // Fz
+
+                auto F_z_gam_r = gam(6 * j  + 4);
+
+                auto F_z_gam_i = gam(6 * j  + 5);
+
+                auto F_z_gamX_r = gamX(6 * j  + 4);
+
+                auto F_z_gamX_i = gamX(6 * j  + 5);
+
+                auto F_z_gamY_r = gamY(6 * j  + 4);
+
+                auto F_z_gamY_i = gamY(6 * j  + 5);
+
+                auto F_z_gamZ_r = gamZ(6 * j  + 4);
+
+                auto F_z_gamZ_i = gamZ(6 * j  + 5);
+
+                auto F_z_gamXX_r = gamXX(6 * j  + 4);
+
+                auto F_z_gamXX_i = gamXX(6 * j  + 5);
+
+                auto F_z_gamXY_r = gamXY(6 * j  + 4);
+
+                auto F_z_gamXY_i = gamXY(6 * j  + 5);
+
+                auto F_z_gamXZ_r = gamXZ(6 * j  + 4);
+
+                auto F_z_gamXZ_i = gamXZ(6 * j  + 5);
+
+                auto F_z_gamYX_r = gamYX(6 * j  + 4);
+
+                auto F_z_gamYX_i = gamYX(6 * j  + 5);
+
+                auto F_z_gamYY_r = gamYY(6 * j  + 4);
+
+                auto F_z_gamYY_i = gamYY(6 * j  + 5);
+
+                auto F_z_gamYZ_r = gamYZ(6 * j  + 4);
+
+                auto F_z_gamYZ_i = gamYZ(6 * j  + 5);
+
+                auto F_z_gamZX_r = gamZX(6 * j  + 4);
+
+                auto F_z_gamZX_i = gamZX(6 * j  + 5);
+
+                auto F_z_gamZY_r = gamZY(6 * j  + 4);
+
+                auto F_z_gamZY_i = gamZY(6 * j  + 5);
+
+                auto F_z_gamZZ_r = gamZZ(6 * j  + 4);
+
+                auto F_z_gamZZ_i = gamZZ(6 * j  + 5);
+
+
+                // Perturbed densities
+
+                auto rhoBx_rho_r = rwDensityGrid.alphaDensity(18 * j);
+
+                auto rhoBx_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j);
+
+                auto rhoBx_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j);
+
+                auto rhoBx_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j);
+
+
+                auto rhoBx_rho_i = rwDensityGrid.alphaDensity(18 * j + 1);
+
+                auto rhoBx_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 1);
+
+                auto rhoBx_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 1);
+
+                auto rhoBx_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 1);
+
+
+                auto rhoBy_rho_r = rwDensityGrid.alphaDensity(18 * j + 2);
+
+                auto rhoBy_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j + 2);
+
+                auto rhoBy_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j + 2 );
+
+                auto rhoBy_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j + 2);
+
+
+                auto rhoBy_rho_i = rwDensityGrid.alphaDensity(18 * j + 3);
+
+                auto rhoBy_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 3);
+
+                auto rhoBy_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 3);
+
+                auto rhoBy_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 3);
+
+
+                auto rhoBz_rho_r = rwDensityGrid.alphaDensity(18 * j + 4);
+
+                auto rhoBz_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j+ 4);
+
+                auto rhoBz_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j+ 4);
+
+                auto rhoBz_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j+ 4);
+
+
+                auto rhoBz_rho_i = rwDensityGrid.alphaDensity(18 * j + 5);
+
+                auto rhoBz_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 5);
+
+                auto rhoBz_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 5);
+
+                auto rhoBz_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 5);
+
+               
+                auto Rho_sig_xx_rho_r = rwDensityGrid.alphaDensity(18 * j + 6);
+
+                auto Rho_sig_xx_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j + 6);
+                auto Rho_sig_xx_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j + 6);
+                auto Rho_sig_xx_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j + 6);
+
+                auto Rho_sig_xx_rho_i = rwDensityGrid.alphaDensity(18 * j + 7);
+                auto Rho_sig_xx_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 7);
+                auto Rho_sig_xx_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 7);
+                auto Rho_sig_xx_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 7);
+
+                auto Rho_sig_yy_rho_r = rwDensityGrid.alphaDensity(18 * j + 8);
+                auto Rho_sig_yy_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j + 8);
+                auto Rho_sig_yy_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j + 8);
+                auto Rho_sig_yy_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j + 8);
+
+                auto Rho_sig_yy_rho_i = rwDensityGrid.alphaDensity(18 * j + 9);
+                auto Rho_sig_yy_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 9);
+                auto Rho_sig_yy_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 9);
+                auto Rho_sig_yy_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 9);
+
+                auto Rho_sig_zz_rho_r = rwDensityGrid.alphaDensity(18 * j + 10);
+                auto Rho_sig_zz_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j + 10);
+                auto Rho_sig_zz_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j + 10);
+                auto Rho_sig_zz_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j + 10);
+
+                auto Rho_sig_zz_rho_i = rwDensityGrid.alphaDensity(18 * j + 11);
+                auto Rho_sig_zz_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 11);
+                auto Rho_sig_zz_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 11);
+                auto Rho_sig_zz_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 11);
+
+                auto Rho_sig_xy_rho_r = rwDensityGrid.alphaDensity(18 * j + 12);
+                auto Rho_sig_xy_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j + 12);
+                auto Rho_sig_xy_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j + 12);
+                auto Rho_sig_xy_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j + 12);
+
+                auto Rho_sig_xy_rho_i = rwDensityGrid.alphaDensity(18 * j + 13);
+                auto Rho_sig_xy_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 13);
+                auto Rho_sig_xy_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 13);
+                auto Rho_sig_xy_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 13);
+
+                auto Rho_sig_xz_rho_r = rwDensityGrid.alphaDensity(18 * j + 14);
+                auto Rho_sig_xz_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j + 14);
+                auto Rho_sig_xz_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j + 14);
+                auto Rho_sig_xz_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j + 14);
+
+                auto Rho_sig_xz_rho_i = rwDensityGrid.alphaDensity(18 * j + 15);
+                auto Rho_sig_xz_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 15);
+                auto Rho_sig_xz_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 15);
+                auto Rho_sig_xz_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 15);
+
+                auto Rho_sig_yz_rho_r = rwDensityGrid.alphaDensity(18 * j + 16);
+                auto Rho_sig_yz_grad_x_r = rwDensityGrid.alphaDensityGradientX(18 * j + 16);
+                auto Rho_sig_yz_grad_y_r = rwDensityGrid.alphaDensityGradientY(18 * j + 16);
+                auto Rho_sig_yz_grad_z_r = rwDensityGrid.alphaDensityGradientZ(18 * j + 16);
+
+                auto Rho_sig_yz_rho_i = rwDensityGrid.alphaDensity(18 * j + 17);
+                auto Rho_sig_yz_grad_x_i = rwDensityGrid.alphaDensityGradientX(18 * j + 17);
+                auto Rho_sig_yz_grad_y_i = rwDensityGrid.alphaDensityGradientY(18 * j + 17);
+                auto Rho_sig_yz_grad_z_i = rwDensityGrid.alphaDensityGradientZ(18 * j + 17);
+
+
+         
+
+
+                for (int i = 0; i < npoints; i++)
+                {
+                    // Sig_xx rho_x
+
+                    double rhow1_r = Rho_sig_xx_rho_r[i];
+
+                    double rxw1_r = Rho_sig_xx_grad_x_r[i];
+
+                    double ryw1_r = Rho_sig_xx_grad_y_r[i];
+
+                    double rzw1_r = Rho_sig_xx_grad_z_r[i];
+
+                    double rhow1_i = Rho_sig_xx_rho_i[i];
+
+                    double rxw1_i = Rho_sig_xx_grad_x_i[i];
+
+                    double ryw1_i = Rho_sig_xx_grad_y_i[i];
+
+                    double rzw1_i = Rho_sig_xx_grad_z_i[i];
+
+
+                    double rhow2_r = rhoBx_rho_r[i];
+
+                    double rxw2_r = rhoBx_grad_x_r[i];
+
+                    double ryw2_r = rhoBx_grad_y_r[i];
+
+                    double rzw2_r = rhoBx_grad_z_r[i];
+
+                    double rhow2_i = rhoBx_rho_i[i];
+
+                    double rxw2_i = rhoBx_grad_x_i[i];
+
+                    double ryw2_i = rhoBx_grad_y_i[i];
+
+                    double rzw2_i = rhoBx_grad_z_i[i];
+                    
+
+                    F_x_gam_r[i] = 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_x_gam_i[i] = 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_x_gamX_r[i] = 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_x_gamX_i[i] = 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_x_gamY_r[i] = 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_x_gamY_i[i] = 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_x_gamZ_r[i] = 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_x_gamZ_i[i] = 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_x_gamXX_r[i] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_x_gamXX_i[i] = rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_x_gamXY_r[i] = rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_x_gamXY_i[i] = rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_x_gamXZ_r[i] = rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_x_gamXZ_i[i] = rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_x_gamYX_r[i] = ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_x_gamYX_i[i] = ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_x_gamYY_r[i] = ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_x_gamYY_i[i] = ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_x_gamYZ_r[i] = ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_x_gamYZ_i[i] = ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_x_gamZX_r[i] = rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_x_gamZX_i[i] = rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_x_gamZY_r[i] = rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_x_gamZY_i[i] = rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_x_gamZZ_r[i] = rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_x_gamZZ_i[i] = rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // Sig_xy rho_y
+
+                    rhow1_r = Rho_sig_xy_rho_r[i];
+
+                    rxw1_r = Rho_sig_xy_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_xy_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_xy_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_xy_rho_i[i];
+
+                    rxw1_i = Rho_sig_xy_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_xy_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_xy_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBy_rho_r[i];
+
+                    rxw2_r = rhoBy_grad_x_r[i];
+
+                    ryw2_r = rhoBy_grad_y_r[i];
+
+                    rzw2_r = rhoBy_grad_z_r[i];
+
+                    rhow2_i = rhoBy_rho_i[i];
+
+                    rxw2_i = rhoBy_grad_x_i[i];
+
+                    ryw2_i = rhoBy_grad_y_i[i];
+
+                    rzw2_i = rhoBy_grad_z_i[i];
+                        
+
+                    F_x_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_x_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_x_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_x_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_x_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_x_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_x_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_x_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_x_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_x_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_x_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_x_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_x_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_x_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_x_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_x_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_x_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_x_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_x_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_x_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_x_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_x_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_x_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_x_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_x_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_x_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+                    // Sig_xz rho_z
+
+                    rhow1_r = Rho_sig_xz_rho_r[i];
+
+                    rxw1_r = Rho_sig_xz_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_xz_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_xz_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_xz_rho_i[i];
+
+                    rxw1_i = Rho_sig_xz_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_xz_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_xz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBz_rho_r[i];
+
+                    rxw2_r = rhoBz_grad_x_r[i];
+
+                    ryw2_r = rhoBz_grad_y_r[i];
+
+                    rzw2_r = rhoBz_grad_z_r[i];
+
+                    rhow2_i = rhoBz_rho_i[i];
+
+                    rxw2_i = rhoBz_grad_x_i[i];
+
+                    ryw2_i = rhoBz_grad_y_i[i];
+
+                    rzw2_i = rhoBz_grad_z_i[i];
+                        
+
+                    F_x_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_x_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_x_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_x_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_x_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_x_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_x_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_x_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_x_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_x_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_x_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_x_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_x_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_x_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_x_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_x_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_x_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_x_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_x_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_x_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_x_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_x_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_x_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_x_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_x_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_x_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+                    // lamtau_xx rho_x
+
+                    rhow1_r = 2.0 * Rho_sig_xx_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_xx_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_xx_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_xx_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_xx_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_xx_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_xx_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_xx_grad_z_i[i];
+
+
+                    rhow2_r = rhoBx_rho_r[i];
+
+                    rxw2_r = rhoBx_grad_x_r[i];
+
+                    ryw2_r = rhoBx_grad_y_r[i];
+
+                    rzw2_r = rhoBx_grad_z_r[i];
+
+                    rhow2_i = rhoBx_rho_i[i];
+
+                    rxw2_i = rhoBx_grad_x_i[i];
+
+                    ryw2_i = rhoBx_grad_y_i[i];
+
+                    rzw2_i = rhoBx_grad_z_i[i];
+                    
+
+                    F_x_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_x_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_x_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_x_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_x_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_x_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_x_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_x_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_x_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_x_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_x_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_x_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_x_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_x_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_x_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_x_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_x_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_x_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_x_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_x_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_x_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_x_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_x_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_x_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_x_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_x_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // lamtau_xy rho_y
+
+                    rhow1_r = 2.0 * Rho_sig_xy_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_xy_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_xy_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_xy_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_xy_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_xy_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_xy_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_xy_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBy_rho_r[i];
+
+                    rxw2_r = rhoBy_grad_x_r[i];
+
+                    ryw2_r = rhoBy_grad_y_r[i];
+
+                    rzw2_r = rhoBy_grad_z_r[i];
+
+                    rhow2_i = rhoBy_rho_i[i];
+
+                    rxw2_i = rhoBy_grad_x_i[i];
+
+                    ryw2_i = rhoBy_grad_y_i[i];
+
+                    rzw2_i = rhoBy_grad_z_i[i];
+                        
+
+                    F_x_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_x_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_x_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_x_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_x_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_x_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_x_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_x_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_x_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_x_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_x_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_x_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_x_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_x_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_x_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_x_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_x_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_x_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_x_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_x_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_x_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_x_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_x_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_x_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_x_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_x_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+                    // lamtau_xz rho_z
+
+                    rhow1_r = 2.0 * Rho_sig_xz_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_xz_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_xz_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_xz_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_xz_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_xz_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_xz_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_xz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBz_rho_r[i];
+
+                    rxw2_r = rhoBz_grad_x_r[i];
+
+                    ryw2_r = rhoBz_grad_y_r[i];
+
+                    rzw2_r = rhoBz_grad_z_r[i];
+
+                    rhow2_i = rhoBz_rho_i[i];
+
+                    rxw2_i = rhoBz_grad_x_i[i];
+
+                    ryw2_i = rhoBz_grad_y_i[i];
+
+                    rzw2_i = rhoBz_grad_z_i[i];
+                        
+
+                    F_x_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_x_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_x_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_x_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_x_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_x_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_x_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_x_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_x_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_x_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_x_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_x_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_x_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_x_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_x_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_x_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_x_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_x_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_x_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_x_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_x_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_x_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_x_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_x_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_x_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_x_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+
+                    // Y case
+
+                    
+                    // Sig_yx rho_x
+
+                    rhow1_r = Rho_sig_xy_rho_r[i];
+
+                    rxw1_r = Rho_sig_xy_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_xy_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_xy_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_xy_rho_i[i];
+
+                    rxw1_i = Rho_sig_xy_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_xy_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_xy_grad_z_i[i];
+
+
+                    rhow2_r = rhoBx_rho_r[i];
+
+                    rxw2_r = rhoBx_grad_x_r[i];
+
+                    ryw2_r = rhoBx_grad_y_r[i];
+
+                    rzw2_r = rhoBx_grad_z_r[i];
+
+                    rhow2_i = rhoBx_rho_i[i];
+
+                    rxw2_i = rhoBx_grad_x_i[i];
+
+                    ryw2_i = rhoBx_grad_y_i[i];
+
+                    rzw2_i = rhoBx_grad_z_i[i];
+                    
+
+                    F_y_gam_r[i] = 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_y_gam_i[i] = 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_y_gamX_r[i] = 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_y_gamX_i[i] = 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_y_gamY_r[i] = 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_y_gamY_i[i] = 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_y_gamZ_r[i] = 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_y_gamZ_i[i] = 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_y_gamXX_r[i] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_y_gamXX_i[i] = rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_y_gamXY_r[i] = rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_y_gamXY_i[i] = rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_y_gamXZ_r[i] = rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_y_gamXZ_i[i] = rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_y_gamYX_r[i] = ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_y_gamYX_i[i] = ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_y_gamYY_r[i] = ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_y_gamYY_i[i] = ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_y_gamYZ_r[i] = ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_y_gamYZ_i[i] = ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_y_gamZX_r[i] = rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_y_gamZX_i[i] = rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_y_gamZY_r[i] = rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_y_gamZY_i[i] = rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_y_gamZZ_r[i] = rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_y_gamZZ_i[i] = rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // Sig_yy rho_y
+
+                    rhow1_r = Rho_sig_yy_rho_r[i];
+
+                    rxw1_r = Rho_sig_yy_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_yy_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_yy_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_yy_rho_i[i];
+
+                    rxw1_i = Rho_sig_yy_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_yy_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_yy_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBy_rho_r[i];
+
+                    rxw2_r = rhoBy_grad_x_r[i];
+
+                    ryw2_r = rhoBy_grad_y_r[i];
+
+                    rzw2_r = rhoBy_grad_z_r[i];
+
+                    rhow2_i = rhoBy_rho_i[i];
+
+                    rxw2_i = rhoBy_grad_x_i[i];
+
+                    ryw2_i = rhoBy_grad_y_i[i];
+
+                    rzw2_i = rhoBy_grad_z_i[i];
+                        
+
+                    F_y_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_y_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_y_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_y_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_y_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_y_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_y_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_y_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_y_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_y_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_y_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_y_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_y_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_y_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_y_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_y_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_y_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_y_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_y_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_y_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_y_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_y_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_y_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_y_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_y_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_y_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // Sig_yz rho_z
+
+                    rhow1_r = Rho_sig_yz_rho_r[i];
+
+                    rxw1_r = Rho_sig_yz_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_yz_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_yz_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_yz_rho_i[i];
+
+                    rxw1_i = Rho_sig_yz_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_yz_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_yz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBz_rho_r[i];
+
+                    rxw2_r = rhoBz_grad_x_r[i];
+
+                    ryw2_r = rhoBz_grad_y_r[i];
+
+                    rzw2_r = rhoBz_grad_z_r[i];
+
+                    rhow2_i = rhoBz_rho_i[i];
+
+                    rxw2_i = rhoBz_grad_x_i[i];
+
+                    ryw2_i = rhoBz_grad_y_i[i];
+
+                    rzw2_i = rhoBz_grad_z_i[i];
+                        
+
+                    F_y_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_y_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_y_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_y_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_y_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_y_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_y_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_y_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_y_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_y_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_y_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_y_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_y_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_y_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_y_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_y_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_y_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_y_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_y_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_y_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_y_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_y_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_y_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_y_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_y_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_y_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+                    // lamtau_yx rho_x
+
+                    rhow1_r = 2.0 * Rho_sig_xy_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_xy_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_xy_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_xy_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_xy_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_xy_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_xy_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_xy_grad_z_i[i];
+
+
+                    rhow2_r = rhoBx_rho_r[i];
+
+                    rxw2_r = rhoBx_grad_x_r[i];
+
+                    ryw2_r = rhoBx_grad_y_r[i];
+
+                    rzw2_r = rhoBx_grad_z_r[i];
+
+                    rhow2_i = rhoBx_rho_i[i];
+
+                    rxw2_i = rhoBx_grad_x_i[i];
+
+                    ryw2_i = rhoBx_grad_y_i[i];
+
+                    rzw2_i = rhoBx_grad_z_i[i];
+                    
+
+                    F_y_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_y_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_y_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_y_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_y_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_y_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_y_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_y_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_y_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_y_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_y_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_y_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_y_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_y_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_y_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_y_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_y_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_y_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_y_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_y_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_y_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_y_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_y_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_y_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_y_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_y_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // lamtau_yy rho_y
+
+                    rhow1_r = 2.0 * Rho_sig_yy_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_yy_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_yy_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_yy_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_yy_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_yy_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_yy_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_yy_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBy_rho_r[i];
+
+                    rxw2_r = rhoBy_grad_x_r[i];
+
+                    ryw2_r = rhoBy_grad_y_r[i];
+
+                    rzw2_r = rhoBy_grad_z_r[i];
+
+                    rhow2_i = rhoBy_rho_i[i];
+
+                    rxw2_i = rhoBy_grad_x_i[i];
+
+                    ryw2_i = rhoBy_grad_y_i[i];
+
+                    rzw2_i = rhoBy_grad_z_i[i];
+                        
+
+                    F_y_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_y_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_y_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_y_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_y_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_y_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_y_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_y_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_y_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_y_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_y_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_y_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_y_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_y_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_y_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_y_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_y_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_y_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_y_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_y_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_y_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_y_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_y_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_y_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_y_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_y_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+                    // lamtau_yz rho_z
+
+                    rhow1_r = 2.0 * Rho_sig_yz_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_yz_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_yz_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_yz_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_yz_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_yz_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_yz_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_yz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBz_rho_r[i];
+
+                    rxw2_r = rhoBz_grad_x_r[i];
+
+                    ryw2_r = rhoBz_grad_y_r[i];
+
+                    rzw2_r = rhoBz_grad_z_r[i];
+
+                    rhow2_i = rhoBz_rho_i[i];
+
+                    rxw2_i = rhoBz_grad_x_i[i];
+
+                    ryw2_i = rhoBz_grad_y_i[i];
+
+                    rzw2_i = rhoBz_grad_z_i[i];
+                        
+
+                    F_y_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_y_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_y_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_y_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_y_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_y_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_y_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_y_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_y_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_y_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_y_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_y_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_y_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_y_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_y_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_y_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_y_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_y_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_y_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_y_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_y_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_y_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_y_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_y_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_y_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_y_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // Z case
+
+
+                    
+                    // Sig_zx rho_x
+
+                    rhow1_r = Rho_sig_xz_rho_r[i];
+
+                    rxw1_r = Rho_sig_xz_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_xz_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_xz_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_xz_rho_i[i];
+
+                    rxw1_i = Rho_sig_xz_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_xz_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_xz_grad_z_i[i];
+
+
+                    rhow2_r = rhoBx_rho_r[i];
+
+                    rxw2_r = rhoBx_grad_x_r[i];
+
+                    ryw2_r = rhoBx_grad_y_r[i];
+
+                    rzw2_r = rhoBx_grad_z_r[i];
+
+                    rhow2_i = rhoBx_rho_i[i];
+
+                    rxw2_i = rhoBx_grad_x_i[i];
+
+                    ryw2_i = rhoBx_grad_y_i[i];
+
+                    rzw2_i = rhoBx_grad_z_i[i];
+                
+
+                    F_z_gam_r[i] = 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_z_gam_i[i] = 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_z_gamX_r[i] = 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_z_gamX_i[i] = 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_z_gamY_r[i] = 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_z_gamY_i[i] = 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_z_gamZ_r[i] = 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_z_gamZ_i[i] = 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_z_gamXX_r[i] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_z_gamXX_i[i] = rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_z_gamXY_r[i] = rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_z_gamXY_i[i] = rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_z_gamXZ_r[i] = rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_z_gamXZ_i[i] = rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_z_gamYX_r[i] = ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_z_gamYX_i[i] = ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_z_gamYY_r[i] = ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_z_gamYY_i[i] = ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_z_gamYZ_r[i] = ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_z_gamYZ_i[i] = ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_z_gamZX_r[i] = rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_z_gamZX_i[i] = rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_z_gamZY_r[i] = rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_z_gamZY_i[i] = rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_z_gamZZ_r[i] = rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_z_gamZZ_i[i] = rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // Sig_zy rho_y
+
+                    rhow1_r = Rho_sig_yz_rho_r[i];
+
+                    rxw1_r = Rho_sig_yz_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_yz_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_yz_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_yz_rho_i[i];
+
+                    rxw1_i = Rho_sig_yz_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_yz_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_yz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBy_rho_r[i];
+
+                    rxw2_r = rhoBy_grad_x_r[i];
+
+                    ryw2_r = rhoBy_grad_y_r[i];
+
+                    rzw2_r = rhoBy_grad_z_r[i];
+
+                    rhow2_i = rhoBy_rho_i[i];
+
+                    rxw2_i = rhoBy_grad_x_i[i];
+
+                    ryw2_i = rhoBy_grad_y_i[i];
+
+                    rzw2_i = rhoBy_grad_z_i[i];
+                        
+
+                    F_z_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_z_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_z_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_z_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_z_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_z_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_z_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_z_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_z_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_z_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_z_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_z_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_z_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_z_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_z_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_z_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_z_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_z_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_z_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_z_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_z_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_z_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_z_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_z_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_z_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_z_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+                    // Sig_zx rho_z
+
+                    rhow1_r = Rho_sig_zz_rho_r[i];
+
+                    rxw1_r = Rho_sig_zz_grad_x_r[i];
+
+                    ryw1_r = Rho_sig_zz_grad_y_r[i];
+
+                    rzw1_r = Rho_sig_zz_grad_z_r[i];
+
+                    rhow1_i = Rho_sig_zz_rho_i[i];
+
+                    rxw1_i = Rho_sig_zz_grad_x_i[i];
+
+                    ryw1_i = Rho_sig_zz_grad_y_i[i];
+
+                    rzw1_i = Rho_sig_zz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBz_rho_r[i];
+
+                    rxw2_r = rhoBz_grad_x_r[i];
+
+                    ryw2_r = rhoBz_grad_y_r[i];
+
+                    rzw2_r = rhoBz_grad_z_r[i];
+
+                    rhow2_i = rhoBz_rho_i[i];
+
+                    rxw2_i = rhoBz_grad_x_i[i];
+
+                    ryw2_i = rhoBz_grad_y_i[i];
+
+                    rzw2_i = rhoBz_grad_z_i[i];
+                        
+
+                    F_z_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_z_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_z_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_z_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_z_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_z_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_z_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_z_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_z_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_z_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_z_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_z_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_z_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_z_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_z_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_z_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_z_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_z_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_z_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_z_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_z_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_z_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_z_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_z_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_z_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_z_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+                    // lamtau_zx rho_x
+
+                    rhow1_r = 2.0 * Rho_sig_xz_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_xz_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_xz_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_xz_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_xz_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_xz_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_xz_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_xz_grad_z_i[i];
+
+
+                    rhow2_r = rhoBx_rho_r[i];
+
+                    rxw2_r = rhoBx_grad_x_r[i];
+
+                    ryw2_r = rhoBx_grad_y_r[i];
+
+                    rzw2_r = rhoBx_grad_z_r[i];
+
+                    rhow2_i = rhoBx_rho_i[i];
+
+                    rxw2_i = rhoBx_grad_x_i[i];
+
+                    ryw2_i = rhoBx_grad_y_i[i];
+
+                    rzw2_i = rhoBx_grad_z_i[i];
+                    
+
+                    F_z_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_z_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_z_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_z_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_z_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_z_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_z_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_z_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_z_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_z_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_z_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_z_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_z_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_z_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_z_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_z_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_z_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_z_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_z_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_z_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_z_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_z_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_z_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_z_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_z_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_z_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+                    // lamtau_yz rho_y
+
+                    rhow1_r = 2.0 * Rho_sig_yz_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_yz_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_yz_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_yz_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_yz_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_yz_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_yz_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_yz_grad_z_i[i];
+                
+
+                    rhow2_r = rhoBy_rho_r[i];
+
+                    rxw2_r = rhoBy_grad_x_r[i];
+
+                    ryw2_r = rhoBy_grad_y_r[i];
+
+                    rzw2_r = rhoBy_grad_z_r[i];
+
+                    rhow2_i = rhoBy_rho_i[i];
+
+                    rxw2_i = rhoBy_grad_x_i[i];
+
+                    ryw2_i = rhoBy_grad_y_i[i];
+
+                    rzw2_i = rhoBy_grad_z_i[i];
+                        
+
+                    F_z_gam_r[i] += 2.0 * (rhow1_r * rhow2_r - rhow1_i * rhow2_i);
+
+                    F_z_gam_i[i] += 2.0 * (rhow1_r * rhow2_i + rhow1_i * rhow2_r);
+
+
+                    F_z_gamX_r[i] += 2.0 * (rxw1_r * rhow2_r - rxw1_i * rhow2_i
+
+                                            + rxw2_r * rhow1_r - rxw2_i * rhow1_i);
+
+
+                    F_z_gamX_i[i] += 2.0 * (rxw1_r * rhow2_i + rxw1_i * rhow2_r
+
+                                            + rxw2_r * rhow1_i + rxw2_i * rhow1_r);
+
+
+                    F_z_gamY_r[i] += 2.0 * (ryw1_r * rhow2_r - ryw1_i * rhow2_i
+
+                                            + ryw2_r * rhow1_r - ryw2_i * rhow1_i);
+
+
+                    F_z_gamY_i[i] += 2.0 * (ryw1_r * rhow2_i + ryw1_i * rhow2_r
+
+                                            + ryw2_r * rhow1_i + ryw2_i * rhow1_r);
+
+
+                    F_z_gamZ_r[i] += 2.0 * (rzw1_r * rhow2_r - rzw1_i * rhow2_i
+
+                                            + rzw2_r * rhow1_r - rzw2_i * rhow1_i);
+
+
+                    F_z_gamZ_i[i] += 2.0 * (rzw1_r * rhow2_i + rzw1_i * rhow2_r
+
+                                            + rzw2_r * rhow1_i + rzw2_i * rhow1_r);
+
+
+                    F_z_gamXX_r[i] += rxw1_r * rxw2_r - rxw1_i * rxw2_i
+
+                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+
+
+                    F_z_gamXX_i[i] += rxw1_r * rxw2_i + rxw1_r * rxw2_i
+
+                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+
+
+                    F_z_gamXY_r[i] += rxw1_r * ryw2_r - rxw1_i * ryw2_i
+
+                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+
+
+                    F_z_gamXY_i[i] += rxw1_r * ryw2_i + rxw1_r * ryw2_i
+
+                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+
+
+                    F_z_gamXZ_r[i] += rxw1_r * rzw2_r - rxw1_i * rzw2_i
+
+                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+
+                    F_z_gamXZ_i[i] += rxw1_r * rzw2_i + rxw1_r * rzw2_i
+
+                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+
+                    F_z_gamYX_r[i] += ryw1_r * rxw2_r - ryw1_i * rxw2_i
+
+                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+
+                    F_z_gamYX_i[i] += ryw1_r * rxw2_i + ryw1_r * rxw2_i
+
+                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+
+                    F_z_gamYY_r[i] += ryw1_r * ryw2_r - ryw1_i * ryw2_i
+
+                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+
+                    F_z_gamYY_i[i] += ryw1_r * ryw2_i + ryw1_r * ryw2_i
+
+                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+
+                    F_z_gamYZ_r[i] += ryw1_r * rzw2_r - ryw1_i * rzw2_i
+
+                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+
+                    F_z_gamYZ_i[i] += ryw1_r * rzw2_i + ryw1_r * rzw2_i
+
+                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+
+                    F_z_gamZX_r[i] += rzw1_r * rxw2_r - rzw1_i * rxw2_i
+
+                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+
+                    F_z_gamZX_i[i] += rzw1_r * rxw2_i + rzw1_r * rxw2_i
+
+                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
+
+                    F_z_gamZY_r[i] += rzw1_r * ryw2_r - rzw1_i * ryw2_i
+
+                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
+
+                    F_z_gamZY_i[i] += rzw1_r * ryw2_i + rzw1_r * ryw2_i
+
+                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
+
+                    F_z_gamZZ_r[i] += rzw1_r * rzw2_r - rzw1_i * rzw2_i
+
+                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
+
+                    F_z_gamZZ_i[i] += rzw1_r * rzw2_i + rzw1_r * rzw2_i
+
+                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+
+
+
+                    // lamtau_zz rho_z
+
+                    rhow1_r = 2.0 * Rho_sig_zz_rho_r[i];
+
+                    rxw1_r = 2.0 * Rho_sig_zz_grad_x_r[i];
+
+                    ryw1_r = 2.0 * Rho_sig_zz_grad_y_r[i];
+
+                    rzw1_r = 2.0 * Rho_sig_zz_grad_z_r[i];
+
+                    rhow1_i = 2.0 * Rho_sig_zz_rho_i[i];
+
+                    rxw1_i = 2.0 * Rho_sig_zz_grad_x_i[i];
+
+                    ryw1_i = 2.0 * Rho_sig_zz_grad_y_i[i];
+
+                    rzw1_i = 2.0 * Rho_sig_zz_grad_z_i[i];
                 
 
                     rhow2_r = rhoBz_rho_r[i];

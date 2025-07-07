@@ -502,6 +502,10 @@ class CDensityGridCubic
                                const CDensityGrid& rw2DensityGrid,
                                const int           numdens);
 
+    void DensityProdForLDA_THG(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
     void DensityProdForLDA_CRF(const CDensityGrid& rwDensityGrid,
                                const CDensityGrid& rw2DensityGrid,
                                const int           numdens);
@@ -519,6 +523,10 @@ class CDensityGridCubic
                                const int           numdens);
 
     void DensityProdForGGA_3PA(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
+    void DensityProdForGGA_THG(const CDensityGrid& rwDensityGrid,
                                const CDensityGrid& rw2DensityGrid,
                                const int           numdens);
 

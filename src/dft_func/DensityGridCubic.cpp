@@ -2324,6 +2324,10 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         {
             DensityProdForLDA_3PA(rwDensityGrid, rw2DensityGrid, numdens);
         }
+        else if (format::upper_case(cubeMode) == "THG")
+        {
+            DensityProdForLDA_THG(rwDensityGrid, rw2DensityGrid, numdens);
+        }
         else
         {
             errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
@@ -2343,6 +2347,10 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         else if (format::upper_case(cubeMode) == "3PA")
         {
             DensityProdForGGA_3PA(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else if (format::upper_case(cubeMode) == "THG")
+        {
+            DensityProdForGGA_THG(rwDensityGrid, rw2DensityGrid, numdens);
         }
         else
         {
@@ -2496,6 +2504,7 @@ CDensityGridCubic::DensityProdForLDA_TPA(const CDensityGrid& rwDensityGrid,
                     gam_sig_xy_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBy_r[i],rhoBy_i[i]);
                     gam_sig_xz_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBz_r[i],rhoBz_i[i]);
                     gam_sig_yz_i[i] = 12.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBz_r[i],rhoBz_i[i]);
+
                     gam_lamtau_xx_r[i] = 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoCx_r[i],rhoCx_i[i]) 
                                        + 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoCx_r[i],rhoCx_i[i])  + lamtau_term_r;
                     gam_lamtau_yy_r[i] = 12.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoCy_r[i],rhoCy_i[i]) 
@@ -2600,6 +2609,181 @@ CDensityGridCubic::DensityProdForLDA_TPA(const CDensityGrid& rwDensityGrid,
             }
         }
 }
+
+
+void
+CDensityGridCubic::DensityProdForLDA_THG(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
+        {
+            for (int j = 0; j < numdens / 18; j++)
+            {
+                // Second-order 
+
+                auto gam_sig_xx_r = gam2(12 * j);
+                auto gam_sig_xx_i = gam2(12 * j + 1);
+                auto gam_sig_yy_r = gam2(12 * j + 2);
+                auto gam_sig_yy_i = gam2(12 * j + 3);
+                auto gam_sig_zz_r = gam2(12 * j + 4);
+                auto gam_sig_zz_i = gam2(12 * j + 5);
+                auto gam_sig_xy_r = gam2(12 * j + 6);
+                auto gam_sig_xy_i = gam2(12 * j + 7);
+                auto gam_sig_xz_r = gam2(12 * j + 8);
+                auto gam_sig_xz_i = gam2(12 * j + 9);
+                auto gam_sig_yz_r = gam2(12 * j + 10);
+                auto gam_sig_yz_i = gam2(12 * j + 11);
+
+
+                // Third-order 
+                auto gamx_r = gam(6 * j);
+                auto gamx_i = gam(6 * j + 1);
+                auto gamy_r = gam(6 * j + 2);
+                auto gamy_i = gam(6 * j + 3);
+                auto gamz_r = gam(6 * j + 4);
+                auto gamz_i = gam(6 * j + 5);
+                auto pix_r = pi(6 * j);
+                auto pix_i = pi(6 * j + 1);
+                auto piy_r = pi(6 * j + 2);
+                auto piy_i = pi(6 * j + 3);
+                auto piz_r = pi(6 * j + 4);
+                auto piz_i = pi(6 * j + 5);
+
+
+                // First-order densities
+
+                auto rhoBx_r = rwDensityGrid.alphaDensity(6 * j);
+                auto rhoBx_i = rwDensityGrid.alphaDensity(6 * j + 1);
+                auto rhoBy_r = rwDensityGrid.alphaDensity(6 * j + 2);
+                auto rhoBy_i = rwDensityGrid.alphaDensity(6 * j + 3);
+                auto rhoBz_r = rwDensityGrid.alphaDensity(6 * j + 4);
+                auto rhoBz_i = rwDensityGrid.alphaDensity(6 * j + 5);  
+
+
+                auto rho_sig_xx_r = rw2DensityGrid.alphaDensity(12 * j);
+                auto rho_sig_xx_i = rw2DensityGrid.alphaDensity(12 * j + 1);
+                auto rho_sig_yy_r = rw2DensityGrid.alphaDensity(12 * j + 2);
+                auto rho_sig_yy_i = rw2DensityGrid.alphaDensity(12 * j + 3);
+                auto rho_sig_zz_r = rw2DensityGrid.alphaDensity(12 * j + 4);
+                auto rho_sig_zz_i = rw2DensityGrid.alphaDensity(12 * j + 5);
+                auto rho_sig_xy_r = rw2DensityGrid.alphaDensity(12 * j + 6);
+                auto rho_sig_xy_i = rw2DensityGrid.alphaDensity(12 * j + 7);
+                auto rho_sig_xz_r = rw2DensityGrid.alphaDensity(12 * j + 8);
+                auto rho_sig_xz_i = rw2DensityGrid.alphaDensity(12 * j + 9);
+                auto rho_sig_yz_r = rw2DensityGrid.alphaDensity(12 * j + 10);
+                auto rho_sig_yz_i = rw2DensityGrid.alphaDensity(12 * j + 11);
+
+
+
+                for (int i = 0; i < npoints; i++)
+                {
+                    double sig_term_r =  + 6.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                         + 6.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                         + 6.0 * prod2_r(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]);
+
+                    double sig_term_i =  + 6.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                         + 6.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                         + 6.0 * prod2_i(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]);
+
+                    gam_sig_xx_r[i] = 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_r;
+                    gam_sig_yy_r[i] = 12.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_r;
+                    gam_sig_zz_r[i] = 12.0 * prod2_r(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_r;
+                    gam_sig_xy_r[i] = 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_xz_r[i] = 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gam_sig_yz_r[i] = 12.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gam_sig_xx_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_i;
+                    gam_sig_yy_i[i] = 12.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_i;
+                    gam_sig_zz_i[i] = 12.0 * prod2_i(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_i;
+                    gam_sig_xy_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_xz_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gam_sig_yz_i[i] = 12.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    
+
+                    gamx_r[i] = prod2_r(rho_sig_xx_r[i],rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);
+
+
+                    gamy_r[i] = prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_yy_r[i],rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gamz_r[i] = prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_zz_r[i],rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gamx_i[i] = prod2_i(rho_sig_xx_r[i],rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gamy_i[i] = prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_yy_r[i],rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gamz_i[i] = prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_zz_r[i],rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);
+
+
+                    pix_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_r[i],gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    piy_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_yy_r[i],gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    piz_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_zz_r[i],gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    pix_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_r[i],gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    piy_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_yy_r[i],gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    piz_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_zz_r[i],gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);
+                }
+            }
+        }
+}
+
 
 void
 CDensityGridCubic::DensityProdForLDA_CRF(const CDensityGrid& rwDensityGrid,
@@ -7356,6 +7540,3466 @@ CDensityGridCubic::DensityProdForGGA_TPA(const CDensityGrid& rwDensityGrid,
         }
 }
 
+
+
+void
+CDensityGridCubic::DensityProdForGGA_THG(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
+        {
+            for (int j = 0; j < numdens / 18; j++)
+            {
+                auto gam_sig_xx_r = gam2(12 * j);
+                auto gam_sig_xx_i = gam2(12 * j + 1);
+                auto gam_sig_yy_r = gam2(12 * j + 2);
+                auto gam_sig_yy_i = gam2(12 * j + 3);
+                auto gam_sig_zz_r = gam2(12 * j + 4);
+                auto gam_sig_zz_i = gam2(12 * j + 5);
+                auto gam_sig_xy_r = gam2(12 * j + 6);
+                auto gam_sig_xy_i = gam2(12 * j + 7);
+                auto gam_sig_xz_r = gam2(12 * j + 8);
+                auto gam_sig_xz_i = gam2(12 * j + 9);
+                auto gam_sig_yz_r = gam2(12 * j + 10);
+                auto gam_sig_yz_i = gam2(12 * j + 11);
+                
+                auto gam_sig_xx_x_r = gam2X(12 * j);
+                auto gam_sig_xx_x_i = gam2X(12 * j + 1);
+                auto gam_sig_yy_x_r = gam2X(12 * j + 2);
+                auto gam_sig_yy_x_i = gam2X(12 * j + 3);
+                auto gam_sig_zz_x_r = gam2X(12 * j + 4);
+                auto gam_sig_zz_x_i = gam2X(12 * j + 5);
+                auto gam_sig_xy_x_r = gam2X(12 * j + 6);
+                auto gam_sig_xy_x_i = gam2X(12 * j + 7);
+                auto gam_sig_xz_x_r = gam2X(12 * j + 8);
+                auto gam_sig_xz_x_i = gam2X(12 * j + 9);
+                auto gam_sig_yz_x_r = gam2X(12 * j + 10);
+                auto gam_sig_yz_x_i = gam2X(12 * j + 11);
+              
+                auto gam_sig_xx_y_r = gam2Y(12 * j);
+                auto gam_sig_xx_y_i = gam2Y(12 * j + 1);
+                auto gam_sig_yy_y_r = gam2Y(12 * j + 2);
+                auto gam_sig_yy_y_i = gam2Y(12 * j + 3);
+                auto gam_sig_zz_y_r = gam2Y(12 * j + 4);
+                auto gam_sig_zz_y_i = gam2Y(12 * j + 5);
+                auto gam_sig_xy_y_r = gam2Y(12 * j + 6);
+                auto gam_sig_xy_y_i = gam2Y(12 * j + 7);
+                auto gam_sig_xz_y_r = gam2Y(12 * j + 8);
+                auto gam_sig_xz_y_i = gam2Y(12 * j + 9);
+                auto gam_sig_yz_y_r = gam2Y(12 * j + 10);
+                auto gam_sig_yz_y_i = gam2Y(12 * j + 11);
+              
+                auto gam_sig_xx_z_r = gam2Z(12 * j);
+                auto gam_sig_xx_z_i = gam2Z(12 * j + 1);
+                auto gam_sig_yy_z_r = gam2Z(12 * j + 2);
+                auto gam_sig_yy_z_i = gam2Z(12 * j + 3);
+                auto gam_sig_zz_z_r = gam2Z(12 * j + 4);
+                auto gam_sig_zz_z_i = gam2Z(12 * j + 5);
+                auto gam_sig_xy_z_r = gam2Z(12 * j + 6);
+                auto gam_sig_xy_z_i = gam2Z(12 * j + 7);
+                auto gam_sig_xz_z_r = gam2Z(12 * j + 8);
+                auto gam_sig_xz_z_i = gam2Z(12 * j + 9);
+                auto gam_sig_yz_z_r = gam2Z(12 * j + 10);
+                auto gam_sig_yz_z_i = gam2Z(12 * j + 11);
+              
+                auto gam_sig_xx_xx_r = gam2XX(12 * j);
+                auto gam_sig_xx_xx_i = gam2XX(12 * j + 1);
+                auto gam_sig_yy_xx_r = gam2XX(12 * j + 2);
+                auto gam_sig_yy_xx_i = gam2XX(12 * j + 3);
+                auto gam_sig_zz_xx_r = gam2XX(12 * j + 4);
+                auto gam_sig_zz_xx_i = gam2XX(12 * j + 5);
+                auto gam_sig_xy_xx_r = gam2XX(12 * j + 6);
+                auto gam_sig_xy_xx_i = gam2XX(12 * j + 7);
+                auto gam_sig_xz_xx_r = gam2XX(12 * j + 8);
+                auto gam_sig_xz_xx_i = gam2XX(12 * j + 9);
+                auto gam_sig_yz_xx_r = gam2XX(12 * j + 10);
+                auto gam_sig_yz_xx_i = gam2XX(12 * j + 11);
+              
+                auto gam_sig_xx_xy_r = gam2XY(12 * j);
+                auto gam_sig_xx_xy_i = gam2XY(12 * j + 1);
+                auto gam_sig_yy_xy_r = gam2XY(12 * j + 2);
+                auto gam_sig_yy_xy_i = gam2XY(12 * j + 3);
+                auto gam_sig_zz_xy_r = gam2XY(12 * j + 4);
+                auto gam_sig_zz_xy_i = gam2XY(12 * j + 5);
+                auto gam_sig_xy_xy_r = gam2XY(12 * j + 6);
+                auto gam_sig_xy_xy_i = gam2XY(12 * j + 7);
+                auto gam_sig_xz_xy_r = gam2XY(12 * j + 8);
+                auto gam_sig_xz_xy_i = gam2XY(12 * j + 9);
+                auto gam_sig_yz_xy_r = gam2XY(12 * j + 10);
+                auto gam_sig_yz_xy_i = gam2XY(12 * j + 11);
+              
+                auto gam_sig_xx_xz_r = gam2XZ(12 * j);
+                auto gam_sig_xx_xz_i = gam2XZ(12 * j + 1);
+                auto gam_sig_yy_xz_r = gam2XZ(12 * j + 2);
+                auto gam_sig_yy_xz_i = gam2XZ(12 * j + 3);
+                auto gam_sig_zz_xz_r = gam2XZ(12 * j + 4);
+                auto gam_sig_zz_xz_i = gam2XZ(12 * j + 5);
+                auto gam_sig_xy_xz_r = gam2XZ(12 * j + 6);
+                auto gam_sig_xy_xz_i = gam2XZ(12 * j + 7);
+                auto gam_sig_xz_xz_r = gam2XZ(12 * j + 8);
+                auto gam_sig_xz_xz_i = gam2XZ(12 * j + 9);
+                auto gam_sig_yz_xz_r = gam2XZ(12 * j + 10);
+                auto gam_sig_yz_xz_i = gam2XZ(12 * j + 11);
+                
+                auto gam_sig_xx_yx_r = gam2YX(12 * j);
+                auto gam_sig_xx_yx_i = gam2YX(12 * j + 1);
+                auto gam_sig_yy_yx_r = gam2YX(12 * j + 2);
+                auto gam_sig_yy_yx_i = gam2YX(12 * j + 3);
+                auto gam_sig_zz_yx_r = gam2YX(12 * j + 4);
+                auto gam_sig_zz_yx_i = gam2YX(12 * j + 5);
+                auto gam_sig_xy_yx_r = gam2YX(12 * j + 6);
+                auto gam_sig_xy_yx_i = gam2YX(12 * j + 7);
+                auto gam_sig_xz_yx_r = gam2YX(12 * j + 8);
+                auto gam_sig_xz_yx_i = gam2YX(12 * j + 9);
+                auto gam_sig_yz_yx_r = gam2YX(12 * j + 10);
+                auto gam_sig_yz_yx_i = gam2YX(12 * j + 11);
+                
+                auto gam_sig_xx_yy_r = gam2YY(12 * j);
+                auto gam_sig_xx_yy_i = gam2YY(12 * j + 1);
+                auto gam_sig_yy_yy_r = gam2YY(12 * j + 2);
+                auto gam_sig_yy_yy_i = gam2YY(12 * j + 3);
+                auto gam_sig_zz_yy_r = gam2YY(12 * j + 4);
+                auto gam_sig_zz_yy_i = gam2YY(12 * j + 5);
+                auto gam_sig_xy_yy_r = gam2YY(12 * j + 6);
+                auto gam_sig_xy_yy_i = gam2YY(12 * j + 7);
+                auto gam_sig_xz_yy_r = gam2YY(12 * j + 8);
+                auto gam_sig_xz_yy_i = gam2YY(12 * j + 9);
+                auto gam_sig_yz_yy_r = gam2YY(12 * j + 10);
+                auto gam_sig_yz_yy_i = gam2YY(12 * j + 11);
+                
+                auto gam_sig_xx_yz_r = gam2YZ(12 * j);
+                auto gam_sig_xx_yz_i = gam2YZ(12 * j + 1);
+                auto gam_sig_yy_yz_r = gam2YZ(12 * j + 2);
+                auto gam_sig_yy_yz_i = gam2YZ(12 * j + 3);
+                auto gam_sig_zz_yz_r = gam2YZ(12 * j + 4);
+                auto gam_sig_zz_yz_i = gam2YZ(12 * j + 5);
+                auto gam_sig_xy_yz_r = gam2YZ(12 * j + 6);
+                auto gam_sig_xy_yz_i = gam2YZ(12 * j + 7);
+                auto gam_sig_xz_yz_r = gam2YZ(12 * j + 8);
+                auto gam_sig_xz_yz_i = gam2YZ(12 * j + 9);
+                auto gam_sig_yz_yz_r = gam2YZ(12 * j + 10);
+                auto gam_sig_yz_yz_i = gam2YZ(12 * j + 11);
+               
+                auto gam_sig_xx_zx_r = gam2ZX(12 * j);
+                auto gam_sig_xx_zx_i = gam2ZX(12 * j + 1);
+                auto gam_sig_yy_zx_r = gam2ZX(12 * j + 2);
+                auto gam_sig_yy_zx_i = gam2ZX(12 * j + 3);
+                auto gam_sig_zz_zx_r = gam2ZX(12 * j + 4);
+                auto gam_sig_zz_zx_i = gam2ZX(12 * j + 5);
+                auto gam_sig_xy_zx_r = gam2ZX(12 * j + 6);
+                auto gam_sig_xy_zx_i = gam2ZX(12 * j + 7);
+                auto gam_sig_xz_zx_r = gam2ZX(12 * j + 8);
+                auto gam_sig_xz_zx_i = gam2ZX(12 * j + 9);
+                auto gam_sig_yz_zx_r = gam2ZX(12 * j + 10);
+                auto gam_sig_yz_zx_i = gam2ZX(12 * j + 11);
+                
+                auto gam_sig_xx_zy_r = gam2ZY(12 * j);
+                auto gam_sig_xx_zy_i = gam2ZY(12 * j + 1);
+                auto gam_sig_yy_zy_r = gam2ZY(12 * j + 2);
+                auto gam_sig_yy_zy_i = gam2ZY(12 * j + 3);
+                auto gam_sig_zz_zy_r = gam2ZY(12 * j + 4);
+                auto gam_sig_zz_zy_i = gam2ZY(12 * j + 5);
+                auto gam_sig_xy_zy_r = gam2ZY(12 * j + 6);
+                auto gam_sig_xy_zy_i = gam2ZY(12 * j + 7);
+                auto gam_sig_xz_zy_r = gam2ZY(12 * j + 8);
+                auto gam_sig_xz_zy_i = gam2ZY(12 * j + 9);
+                auto gam_sig_yz_zy_r = gam2ZY(12 * j + 10);
+                auto gam_sig_yz_zy_i = gam2ZY(12 * j + 11);
+            
+                auto gam_sig_xx_zz_r = gam2ZZ(12 * j);
+                auto gam_sig_xx_zz_i = gam2ZZ(12 * j + 1);
+                auto gam_sig_yy_zz_r = gam2ZZ(12 * j + 2);
+                auto gam_sig_yy_zz_i = gam2ZZ(12 * j + 3);
+                auto gam_sig_zz_zz_r = gam2ZZ(12 * j + 4);
+                auto gam_sig_zz_zz_i = gam2ZZ(12 * j + 5);
+                auto gam_sig_xy_zz_r = gam2ZZ(12 * j + 6);
+                auto gam_sig_xy_zz_i = gam2ZZ(12 * j + 7);
+                auto gam_sig_xz_zz_r = gam2ZZ(12 * j + 8);
+                auto gam_sig_xz_zz_i = gam2ZZ(12 * j + 9);
+                auto gam_sig_yz_zz_r = gam2ZZ(12 * j + 10);
+                auto gam_sig_yz_zz_i = gam2ZZ(12 * j + 11);
+               
+
+                auto gamx_r = gam(6 * j);
+                auto gamx_X_r = gamX(6 * j);
+                auto gamx_Y_r = gamY(6 * j);
+                auto gamx_Z_r = gamZ(6 * j);
+                auto gamx_XX_r = gamXX(6 * j);
+                auto gamx_XY_r = gamXY(6 * j);
+                auto gamx_XZ_r = gamXZ(6 * j);
+                auto gamx_YX_r = gamYX(6 * j);
+                auto gamx_YY_r = gamYY(6 * j);
+                auto gamx_YZ_r = gamYZ(6 * j);
+                auto gamx_ZX_r = gamZX(6 * j);
+                auto gamx_ZY_r = gamZY(6 * j);
+                auto gamx_ZZ_r = gamZZ(6 * j);
+
+                auto gamx_i = gam(6 * j + 1);
+                auto gamx_X_i = gamX(6 * j + 1);
+                auto gamx_Y_i = gamY(6 * j + 1);
+                auto gamx_Z_i = gamZ(6 * j + 1);
+                auto gamx_XX_i = gamXX(6 * j + 1);
+                auto gamx_XY_i = gamXY(6 * j + 1);
+                auto gamx_XZ_i = gamXZ(6 * j + 1);
+                auto gamx_YX_i = gamYX(6 * j + 1);
+                auto gamx_YY_i = gamYY(6 * j + 1);
+                auto gamx_YZ_i = gamYZ(6 * j + 1);
+                auto gamx_ZX_i = gamZX(6 * j + 1);
+                auto gamx_ZY_i = gamZY(6 * j + 1);
+                auto gamx_ZZ_i = gamZZ(6 * j + 1);
+
+                auto gamy_r = gam(6 * j + 2);
+                auto gamy_X_r = gamX(6 * j + 2);
+                auto gamy_Y_r = gamY(6 * j + 2);
+                auto gamy_Z_r = gamZ(6 * j + 2);
+                auto gamy_XX_r = gamXX(6 * j + 2);
+                auto gamy_XY_r = gamXY(6 * j + 2);
+                auto gamy_XZ_r = gamXZ(6 * j + 2);
+                auto gamy_YX_r = gamYX(6 * j + 2);
+                auto gamy_YY_r = gamYY(6 * j + 2);
+                auto gamy_YZ_r = gamYZ(6 * j + 2);
+                auto gamy_ZX_r = gamZX(6 * j + 2);
+                auto gamy_ZY_r = gamZY(6 * j + 2);
+                auto gamy_ZZ_r = gamZZ(6 * j + 2);
+
+                auto gamy_i = gam(6 * j + 3);
+                auto gamy_X_i = gamX(6 * j + 3);
+                auto gamy_Y_i = gamY(6 * j + 3);
+                auto gamy_Z_i = gamZ(6 * j + 3);
+                auto gamy_XX_i = gamXX(6 * j + 3);
+                auto gamy_XY_i = gamXY(6 * j + 3);
+                auto gamy_XZ_i = gamXZ(6 * j + 3);
+                auto gamy_YX_i = gamYX(6 * j + 3);
+                auto gamy_YY_i = gamYY(6 * j + 3);
+                auto gamy_YZ_i = gamYZ(6 * j + 3);
+                auto gamy_ZX_i = gamZX(6 * j + 3);
+                auto gamy_ZY_i = gamZY(6 * j + 3);
+                auto gamy_ZZ_i = gamZZ(6 * j + 3);
+
+                auto gamz_r = gam(6 * j + 4);
+                auto gamz_X_r = gamX(6 * j + 4);
+                auto gamz_Y_r = gamY(6 * j + 4);
+                auto gamz_Z_r = gamZ(6 * j + 4);
+                auto gamz_XX_r = gamXX(6 * j + 4);
+                auto gamz_XY_r = gamXY(6 * j + 4);
+                auto gamz_XZ_r = gamXZ(6 * j + 4);
+                auto gamz_YX_r = gamYX(6 * j + 4);
+                auto gamz_YY_r = gamYY(6 * j + 4);
+                auto gamz_YZ_r = gamYZ(6 * j + 4);
+                auto gamz_ZX_r = gamZX(6 * j + 4);
+                auto gamz_ZY_r = gamZY(6 * j + 4);
+                auto gamz_ZZ_r = gamZZ(6 * j + 4);
+
+                auto gamz_i = gam(6 * j + 5);
+                auto gamz_X_i = gamX(6 * j + 5);
+                auto gamz_Y_i = gamY(6 * j + 5);
+                auto gamz_Z_i = gamZ(6 * j + 5);
+                auto gamz_XX_i = gamXX(6 * j + 5);
+                auto gamz_XY_i = gamXY(6 * j + 5);
+                auto gamz_XZ_i = gamXZ(6 * j + 5);
+                auto gamz_YX_i = gamYX(6 * j + 5);
+                auto gamz_YY_i = gamYY(6 * j + 5);
+                auto gamz_YZ_i = gamYZ(6 * j + 5);
+                auto gamz_ZX_i = gamZX(6 * j + 5);
+                auto gamz_ZY_i = gamZY(6 * j + 5);
+                auto gamz_ZZ_i = gamZZ(6 * j + 5);
+                
+                auto pix_r = pi(6 * j);
+                auto pix_i = pi(6 * j + 1);
+                auto piy_r = pi(6 * j + 2);
+                auto piy_i = pi(6 * j + 3);
+                auto piz_r = pi(6 * j + 4);
+                auto piz_i = pi(6 * j + 5);
+
+                auto pix_X_r = piX(6 * j);
+                auto pix_Y_r = piY(6 * j);
+                auto pix_Z_r = piZ(6 * j);
+
+                auto pix_XX_r = piXX(6 * j);
+                auto pix_XY_r = piXY(6 * j);
+                auto pix_XZ_r = piXZ(6 * j);
+                auto pix_YX_r = piYX(6 * j);
+                auto pix_YY_r = piYY(6 * j);
+                auto pix_YZ_r = piYZ(6 * j);
+                auto pix_ZX_r = piZX(6 * j);
+                auto pix_ZY_r = piZY(6 * j);
+                auto pix_ZZ_r = piZZ(6 * j);
+
+                auto pix_XXX_r = piXXX(6 * j);
+                auto pix_XXY_r = piXXY(6 * j);
+                auto pix_XXZ_r = piXXZ(6 * j);
+                auto pix_XYX_r = piXYX(6 * j);
+                auto pix_XYY_r = piXYY(6 * j);
+                auto pix_XYZ_r = piXYZ(6 * j);
+                auto pix_XZX_r = piXZX(6 * j);
+                auto pix_XZY_r = piXZY(6 * j);
+                auto pix_XZZ_r = piXZZ(6 * j);
+                auto pix_YXX_r = piYXX(6 * j);
+                auto pix_YXY_r = piYXY(6 * j);
+                auto pix_YXZ_r = piYXZ(6 * j);
+                auto pix_YYX_r = piYYX(6 * j);
+                auto pix_YYY_r = piYYY(6 * j);
+                auto pix_YYZ_r = piYYZ(6 * j);
+                auto pix_YZX_r = piYZX(6 * j);
+                auto pix_YZY_r = piYZY(6 * j);
+                auto pix_YZZ_r = piYZZ(6 * j);
+                auto pix_ZXX_r = piZXX(6 * j);
+                auto pix_ZXY_r = piZXY(6 * j);
+                auto pix_ZXZ_r = piZXZ(6 * j);
+                auto pix_ZYX_r = piZYX(6 * j);
+                auto pix_ZYY_r = piZYY(6 * j);
+                auto pix_ZYZ_r = piZYZ(6 * j);
+                auto pix_ZZX_r = piZZX(6 * j);
+                auto pix_ZZY_r = piZZY(6 * j);
+                auto pix_ZZZ_r = piZZZ(6 * j);
+
+                auto pix_X_i = piX(6 * j + 1);
+                auto pix_Y_i = piY(6 * j + 1);
+                auto pix_Z_i = piZ(6 * j + 1);
+
+                auto pix_XX_i = piXX(6 * j + 1);
+                auto pix_XY_i = piXY(6 * j + 1);
+                auto pix_XZ_i = piXZ(6 * j + 1);
+                auto pix_YX_i = piYX(6 * j + 1);
+                auto pix_YY_i = piYY(6 * j + 1);
+                auto pix_YZ_i = piYZ(6 * j + 1);
+                auto pix_ZX_i = piZX(6 * j + 1);
+                auto pix_ZY_i = piZY(6 * j + 1);
+                auto pix_ZZ_i = piZZ(6 * j + 1);
+
+                auto pix_XXX_i = piXXX(6 * j + 1);
+                auto pix_XXY_i = piXXY(6 * j + 1);
+                auto pix_XXZ_i = piXXZ(6 * j + 1);
+                auto pix_XYX_i = piXYX(6 * j + 1);
+                auto pix_XYY_i = piXYY(6 * j + 1);
+                auto pix_XYZ_i = piXYZ(6 * j + 1);
+                auto pix_XZX_i = piXZX(6 * j + 1);
+                auto pix_XZY_i = piXZY(6 * j + 1);
+                auto pix_XZZ_i = piXZZ(6 * j + 1);
+                auto pix_YXX_i = piYXX(6 * j + 1);
+                auto pix_YXY_i = piYXY(6 * j + 1);
+                auto pix_YXZ_i = piYXZ(6 * j + 1);
+                auto pix_YYX_i = piYYX(6 * j + 1);
+                auto pix_YYY_i = piYYY(6 * j + 1);
+                auto pix_YYZ_i = piYYZ(6 * j + 1);
+                auto pix_YZX_i = piYZX(6 * j + 1);
+                auto pix_YZY_i = piYZY(6 * j + 1);
+                auto pix_YZZ_i = piYZZ(6 * j + 1);
+                auto pix_ZXX_i = piZXX(6 * j + 1);
+                auto pix_ZXY_i = piZXY(6 * j + 1);
+                auto pix_ZXZ_i = piZXZ(6 * j + 1);
+                auto pix_ZYX_i = piZYX(6 * j + 1);
+                auto pix_ZYY_i = piZYY(6 * j + 1);
+                auto pix_ZYZ_i = piZYZ(6 * j + 1);
+                auto pix_ZZX_i = piZZX(6 * j + 1);
+                auto pix_ZZY_i = piZZY(6 * j + 1);
+                auto pix_ZZZ_i = piZZZ(6 * j + 1);
+
+                auto piy_X_r = piX(6 * j + 2);
+                auto piy_Y_r = piY(6 * j + 2);
+                auto piy_Z_r = piZ(6 * j + 2);
+
+                auto piy_XX_r = piXX(6 * j + 2);
+                auto piy_XY_r = piXY(6 * j + 2);
+                auto piy_XZ_r = piXZ(6 * j + 2);
+                auto piy_YX_r = piYX(6 * j + 2);
+                auto piy_YY_r = piYY(6 * j + 2);
+                auto piy_YZ_r = piYZ(6 * j + 2);
+                auto piy_ZX_r = piZX(6 * j + 2);
+                auto piy_ZY_r = piZY(6 * j + 2);
+                auto piy_ZZ_r = piZZ(6 * j + 2);
+
+                auto piy_XXX_r = piXXX(6 * j + 2);
+                auto piy_XXY_r = piXXY(6 * j + 2);
+                auto piy_XXZ_r = piXXZ(6 * j + 2);
+                auto piy_XYX_r = piXYX(6 * j + 2);
+                auto piy_XYY_r = piXYY(6 * j + 2);
+                auto piy_XYZ_r = piXYZ(6 * j + 2);
+                auto piy_XZX_r = piXZX(6 * j + 2);
+                auto piy_XZY_r = piXZY(6 * j + 2);
+                auto piy_XZZ_r = piXZZ(6 * j + 2);
+                auto piy_YXX_r = piYXX(6 * j + 2);
+                auto piy_YXY_r = piYXY(6 * j + 2);
+                auto piy_YXZ_r = piYXZ(6 * j + 2);
+                auto piy_YYX_r = piYYX(6 * j + 2);
+                auto piy_YYY_r = piYYY(6 * j + 2);
+                auto piy_YYZ_r = piYYZ(6 * j + 2);
+                auto piy_YZX_r = piYZX(6 * j + 2);
+                auto piy_YZY_r = piYZY(6 * j + 2);
+                auto piy_YZZ_r = piYZZ(6 * j + 2);
+                auto piy_ZXX_r = piZXX(6 * j + 2);
+                auto piy_ZXY_r = piZXY(6 * j + 2);
+                auto piy_ZXZ_r = piZXZ(6 * j + 2);
+                auto piy_ZYX_r = piZYX(6 * j + 2);
+                auto piy_ZYY_r = piZYY(6 * j + 2);
+                auto piy_ZYZ_r = piZYZ(6 * j + 2);
+                auto piy_ZZX_r = piZZX(6 * j + 2);
+                auto piy_ZZY_r = piZZY(6 * j + 2);
+                auto piy_ZZZ_r = piZZZ(6 * j + 2);
+
+                auto piy_X_i = piX(6 * j + 3);
+                auto piy_Y_i = piY(6 * j + 3);
+                auto piy_Z_i = piZ(6 * j + 3);
+
+                auto piy_XX_i = piXX(6 * j + 3);
+                auto piy_XY_i = piXY(6 * j + 3);
+                auto piy_XZ_i = piXZ(6 * j + 3);
+                auto piy_YX_i = piYX(6 * j + 3);
+                auto piy_YY_i = piYY(6 * j + 3);
+                auto piy_YZ_i = piYZ(6 * j + 3);
+                auto piy_ZX_i = piZX(6 * j + 3);
+                auto piy_ZY_i = piZY(6 * j + 3);
+                auto piy_ZZ_i = piZZ(6 * j + 3);
+
+                auto piy_XXX_i = piXXX(6 * j + 3);
+                auto piy_XXY_i = piXXY(6 * j + 3);
+                auto piy_XXZ_i = piXXZ(6 * j + 3);
+                auto piy_XYX_i = piXYX(6 * j + 3);
+                auto piy_XYY_i = piXYY(6 * j + 3);
+                auto piy_XYZ_i = piXYZ(6 * j + 3);
+                auto piy_XZX_i = piXZX(6 * j + 3);
+                auto piy_XZY_i = piXZY(6 * j + 3);
+                auto piy_XZZ_i = piXZZ(6 * j + 3);
+                auto piy_YXX_i = piYXX(6 * j + 3);
+                auto piy_YXY_i = piYXY(6 * j + 3);
+                auto piy_YXZ_i = piYXZ(6 * j + 3);
+                auto piy_YYX_i = piYYX(6 * j + 3);
+                auto piy_YYY_i = piYYY(6 * j + 3);
+                auto piy_YYZ_i = piYYZ(6 * j + 3);
+                auto piy_YZX_i = piYZX(6 * j + 3);
+                auto piy_YZY_i = piYZY(6 * j + 3);
+                auto piy_YZZ_i = piYZZ(6 * j + 3);
+                auto piy_ZXX_i = piZXX(6 * j + 3);
+                auto piy_ZXY_i = piZXY(6 * j + 3);
+                auto piy_ZXZ_i = piZXZ(6 * j + 3);
+                auto piy_ZYX_i = piZYX(6 * j + 3);
+                auto piy_ZYY_i = piZYY(6 * j + 3);
+                auto piy_ZYZ_i = piZYZ(6 * j + 3);
+                auto piy_ZZX_i = piZZX(6 * j + 3);
+                auto piy_ZZY_i = piZZY(6 * j + 3);
+                auto piy_ZZZ_i = piZZZ(6 * j + 3);
+
+                auto piz_X_r = piX(6 * j + 4);
+                auto piz_Y_r = piY(6 * j + 4);
+                auto piz_Z_r = piZ(6 * j + 4);
+
+                auto piz_XX_r = piXX(6 * j + 4);
+                auto piz_XY_r = piXY(6 * j + 4);
+                auto piz_XZ_r = piXZ(6 * j + 4);
+                auto piz_YX_r = piYX(6 * j + 4);
+                auto piz_YY_r = piYY(6 * j + 4);
+                auto piz_YZ_r = piYZ(6 * j + 4);
+                auto piz_ZX_r = piZX(6 * j + 4);
+                auto piz_ZY_r = piZY(6 * j + 4);
+                auto piz_ZZ_r = piZZ(6 * j + 4);
+
+                auto piz_XXX_r = piXXX(6 * j + 4);
+                auto piz_XXY_r = piXXY(6 * j + 4);
+                auto piz_XXZ_r = piXXZ(6 * j + 4);
+                auto piz_XYX_r = piXYX(6 * j + 4);
+                auto piz_XYY_r = piXYY(6 * j + 4);
+                auto piz_XYZ_r = piXYZ(6 * j + 4);
+                auto piz_XZX_r = piXZX(6 * j + 4);
+                auto piz_XZY_r = piXZY(6 * j + 4);
+                auto piz_XZZ_r = piXZZ(6 * j + 4);
+                auto piz_YXX_r = piYXX(6 * j + 4);
+                auto piz_YXY_r = piYXY(6 * j + 4);
+                auto piz_YXZ_r = piYXZ(6 * j + 4);
+                auto piz_YYX_r = piYYX(6 * j + 4);
+                auto piz_YYY_r = piYYY(6 * j + 4);
+                auto piz_YYZ_r = piYYZ(6 * j + 4);
+                auto piz_YZX_r = piYZX(6 * j + 4);
+                auto piz_YZY_r = piYZY(6 * j + 4);
+                auto piz_YZZ_r = piYZZ(6 * j + 4);
+                auto piz_ZXX_r = piZXX(6 * j + 4);
+                auto piz_ZXY_r = piZXY(6 * j + 4);
+                auto piz_ZXZ_r = piZXZ(6 * j + 4);
+                auto piz_ZYX_r = piZYX(6 * j + 4);
+                auto piz_ZYY_r = piZYY(6 * j + 4);
+                auto piz_ZYZ_r = piZYZ(6 * j + 4);
+                auto piz_ZZX_r = piZZX(6 * j + 4);
+                auto piz_ZZY_r = piZZY(6 * j + 4);
+                auto piz_ZZZ_r = piZZZ(6 * j + 4);
+
+
+                auto piz_X_i = piX(6 * j + 5);
+                auto piz_Y_i = piY(6 * j + 5);
+                auto piz_Z_i = piZ(6 * j + 5);
+
+                auto piz_XX_i = piXX(6 * j + 5);
+                auto piz_XY_i = piXY(6 * j + 5);
+                auto piz_XZ_i = piXZ(6 * j + 5);
+                auto piz_YX_i = piYX(6 * j + 5);
+                auto piz_YY_i = piYY(6 * j + 5);
+                auto piz_YZ_i = piYZ(6 * j + 5);
+                auto piz_ZX_i = piZX(6 * j + 5);
+                auto piz_ZY_i = piZY(6 * j + 5);
+                auto piz_ZZ_i = piZZ(6 * j + 5);
+
+                auto piz_XXX_i = piXXX(6 * j + 5);
+                auto piz_XXY_i = piXXY(6 * j + 5);
+                auto piz_XXZ_i = piXXZ(6 * j + 5);
+                auto piz_XYX_i = piXYX(6 * j + 5);
+                auto piz_XYY_i = piXYY(6 * j + 5);
+                auto piz_XYZ_i = piXYZ(6 * j + 5);
+                auto piz_XZX_i = piXZX(6 * j + 5);
+                auto piz_XZY_i = piXZY(6 * j + 5);
+                auto piz_XZZ_i = piXZZ(6 * j + 5);
+                auto piz_YXX_i = piYXX(6 * j + 5);
+                auto piz_YXY_i = piYXY(6 * j + 5);
+                auto piz_YXZ_i = piYXZ(6 * j + 5);
+                auto piz_YYX_i = piYYX(6 * j + 5);
+                auto piz_YYY_i = piYYY(6 * j + 5);
+                auto piz_YYZ_i = piYYZ(6 * j + 5);
+                auto piz_YZX_i = piYZX(6 * j + 5);
+                auto piz_YZY_i = piYZY(6 * j + 5);
+                auto piz_YZZ_i = piYZZ(6 * j + 5);
+                auto piz_ZXX_i = piZXX(6 * j + 5);
+                auto piz_ZXY_i = piZXY(6 * j + 5);
+                auto piz_ZXZ_i = piZXZ(6 * j + 5);
+                auto piz_ZYX_i = piZYX(6 * j + 5);
+                auto piz_ZYY_i = piZYY(6 * j + 5);
+                auto piz_ZYZ_i = piZYZ(6 * j + 5);
+                auto piz_ZZX_i = piZZX(6 * j + 5);
+                auto piz_ZZY_i = piZZY(6 * j + 5);
+                auto piz_ZZZ_i = piZZZ(6 * j + 5);
+
+
+                // First-order densities First variable is for the component of the dipole, the second variable is for the component of the gradient
+                // B means positive frequency and C means negative frequency
+
+                auto rhoBx_r = rwDensityGrid.alphaDensity(6 * j);
+                auto gradBx_x_r = rwDensityGrid.alphaDensityGradientX(6 * j);
+                auto gradBx_y_r = rwDensityGrid.alphaDensityGradientY(6 * j);
+                auto gradBx_z_r = rwDensityGrid.alphaDensityGradientZ(6 * j);
+
+                
+                auto rhoBx_i = rwDensityGrid.alphaDensity(6 * j + 1);
+                auto gradBx_x_i = rwDensityGrid.alphaDensityGradientX(6 * j + 1);
+                auto gradBx_y_i = rwDensityGrid.alphaDensityGradientY(6 * j + 1);
+                auto gradBx_z_i = rwDensityGrid.alphaDensityGradientZ(6 * j + 1);
+
+
+                auto rhoBy_r = rwDensityGrid.alphaDensity(6 * j + 2);
+                auto gradBy_x_r = rwDensityGrid.alphaDensityGradientX(6 * j + 2);
+                auto gradBy_y_r = rwDensityGrid.alphaDensityGradientY(6 * j + 2);
+                auto gradBy_z_r = rwDensityGrid.alphaDensityGradientZ(6 * j + 2);
+
+
+                auto rhoBy_i = rwDensityGrid.alphaDensity(6 * j + 3);
+                auto gradBy_x_i = rwDensityGrid.alphaDensityGradientX(6 * j + 3);
+                auto gradBy_y_i = rwDensityGrid.alphaDensityGradientY(6 * j + 3);
+                auto gradBy_z_i = rwDensityGrid.alphaDensityGradientZ(6 * j + 3);
+
+
+                auto rhoBz_r = rwDensityGrid.alphaDensity(6 * j + 4);
+                auto gradBz_x_r = rwDensityGrid.alphaDensityGradientX(6 * j + 4);
+                auto gradBz_y_r = rwDensityGrid.alphaDensityGradientY(6 * j + 4);
+                auto gradBz_z_r = rwDensityGrid.alphaDensityGradientZ(6 * j + 4);
+
+
+                auto rhoBz_i = rwDensityGrid.alphaDensity(6 * j + 5);  
+                auto gradBz_x_i = rwDensityGrid.alphaDensityGradientX(6 * j + 5);
+                auto gradBz_y_i = rwDensityGrid.alphaDensityGradientY(6 * j + 5);
+                auto gradBz_z_i = rwDensityGrid.alphaDensityGradientZ(6 * j + 5);
+
+
+                auto rho_sig_xx_r = rw2DensityGrid.alphaDensity(12 * j  + 0 );
+                auto rho_sig_xx_x_r = rw2DensityGrid.alphaDensityGradientX(12 * j + 0 );
+                auto rho_sig_xx_y_r = rw2DensityGrid.alphaDensityGradientY(12 * j + 0 );
+                auto rho_sig_xx_z_r = rw2DensityGrid.alphaDensityGradientZ(12 * j + 0 );
+                auto rho_sig_xx_i = rw2DensityGrid.alphaDensity(12 * j + 1 );
+                auto rho_sig_xx_x_i = rw2DensityGrid.alphaDensityGradientX(12 * j +  1 );
+                auto rho_sig_xx_y_i = rw2DensityGrid.alphaDensityGradientY(12 * j +  1 );
+                auto rho_sig_xx_z_i = rw2DensityGrid.alphaDensityGradientZ(12 * j +  1 );
+                auto rho_sig_yy_r = rw2DensityGrid.alphaDensity(12 * j  + 2 );
+                auto rho_sig_yy_x_r = rw2DensityGrid.alphaDensityGradientX(12 * j + 2 );
+                auto rho_sig_yy_y_r = rw2DensityGrid.alphaDensityGradientY(12 * j + 2 );
+                auto rho_sig_yy_z_r = rw2DensityGrid.alphaDensityGradientZ(12 * j + 2 );
+                auto rho_sig_yy_i = rw2DensityGrid.alphaDensity(12 * j + 3 );
+                auto rho_sig_yy_x_i = rw2DensityGrid.alphaDensityGradientX(12 * j +  3 );
+                auto rho_sig_yy_y_i = rw2DensityGrid.alphaDensityGradientY(12 * j +  3 );
+                auto rho_sig_yy_z_i = rw2DensityGrid.alphaDensityGradientZ(12 * j +  3 );
+                auto rho_sig_zz_r = rw2DensityGrid.alphaDensity(12 * j  + 4 );
+                auto rho_sig_zz_x_r = rw2DensityGrid.alphaDensityGradientX(12 * j + 4 );
+                auto rho_sig_zz_y_r = rw2DensityGrid.alphaDensityGradientY(12 * j + 4 );
+                auto rho_sig_zz_z_r = rw2DensityGrid.alphaDensityGradientZ(12 * j + 4 );
+                auto rho_sig_zz_i = rw2DensityGrid.alphaDensity(12 * j + 5 );
+                auto rho_sig_zz_x_i = rw2DensityGrid.alphaDensityGradientX(12 * j +  5 );
+                auto rho_sig_zz_y_i = rw2DensityGrid.alphaDensityGradientY(12 * j +  5 );
+                auto rho_sig_zz_z_i = rw2DensityGrid.alphaDensityGradientZ(12 * j +  5 );
+                auto rho_sig_xy_r = rw2DensityGrid.alphaDensity(12 * j  + 6 );
+                auto rho_sig_xy_x_r = rw2DensityGrid.alphaDensityGradientX(12 * j + 6 );
+                auto rho_sig_xy_y_r = rw2DensityGrid.alphaDensityGradientY(12 * j + 6 );
+                auto rho_sig_xy_z_r = rw2DensityGrid.alphaDensityGradientZ(12 * j + 6 );
+                auto rho_sig_xy_i = rw2DensityGrid.alphaDensity(12 * j + 7 );
+                auto rho_sig_xy_x_i = rw2DensityGrid.alphaDensityGradientX(12 * j +  7 );
+                auto rho_sig_xy_y_i = rw2DensityGrid.alphaDensityGradientY(12 * j +  7 );
+                auto rho_sig_xy_z_i = rw2DensityGrid.alphaDensityGradientZ(12 * j +  7 );
+                auto rho_sig_xz_r = rw2DensityGrid.alphaDensity(12 * j  + 8 );
+                auto rho_sig_xz_x_r = rw2DensityGrid.alphaDensityGradientX(12 * j + 8 );
+                auto rho_sig_xz_y_r = rw2DensityGrid.alphaDensityGradientY(12 * j + 8 );
+                auto rho_sig_xz_z_r = rw2DensityGrid.alphaDensityGradientZ(12 * j + 8 );
+                auto rho_sig_xz_i = rw2DensityGrid.alphaDensity(12 * j + 9 );
+                auto rho_sig_xz_x_i = rw2DensityGrid.alphaDensityGradientX(12 * j +  9 );
+                auto rho_sig_xz_y_i = rw2DensityGrid.alphaDensityGradientY(12 * j +  9 );
+                auto rho_sig_xz_z_i = rw2DensityGrid.alphaDensityGradientZ(12 * j +  9 );
+                auto rho_sig_yz_r = rw2DensityGrid.alphaDensity(12 * j  + 10 );
+                auto rho_sig_yz_x_r = rw2DensityGrid.alphaDensityGradientX(12 * j + 10 );
+                auto rho_sig_yz_y_r = rw2DensityGrid.alphaDensityGradientY(12 * j + 10 );
+                auto rho_sig_yz_z_r = rw2DensityGrid.alphaDensityGradientZ(12 * j + 10 );
+                auto rho_sig_yz_i = rw2DensityGrid.alphaDensity(12 * j + 11 );
+                auto rho_sig_yz_x_i = rw2DensityGrid.alphaDensityGradientX(12 * j +  11 );
+                auto rho_sig_yz_y_i = rw2DensityGrid.alphaDensityGradientY(12 * j +  11 );
+                auto rho_sig_yz_z_i = rw2DensityGrid.alphaDensityGradientZ(12 * j +  11 );
+                
+
+                for (int i = 0; i < npoints; i++)
+                {
+                    double sig_term_r =  + 6.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                         + 6.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                         + 6.0 * prod2_r(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]);
+
+                    double sig_term_i =  + 6.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                         + 6.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                         + 6.0 * prod2_i(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    double lamtau_term_r =  + 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                            + 12.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                            + 12.0 * prod2_r(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    double lamtau_term_i =  + 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                            + 12.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                            + 12.0 * prod2_i(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    double sig_term_x_r =  + 12.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                                           + 12.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                                           + 12.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    double sig_term_y_r =  + 12.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                                           + 12.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                                           + 12.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    double sig_term_z_r =  + 12.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                                           + 12.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                                           + 12.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    double sig_term_x_i =  + 12.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                                           + 12.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                                           + 12.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    double sig_term_y_i =  + 12.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                                           + 12.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                                           + 12.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    double sig_term_z_i =  + 12.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                                           + 12.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                                           + 12.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    double sig_term_xx_r =  + 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                            + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                            + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    double sig_term_xy_r =  + 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                            + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                            + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    double sig_term_xz_r =  + 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                            + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                            + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    double sig_term_yx_r =  + 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                            + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                            + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    double sig_term_yy_r =  + 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                            + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                            + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    double sig_term_yz_r =  + 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                            + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                            + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    double sig_term_zx_r =  + 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                            + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                            + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    double sig_term_zy_r =  + 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                            + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                            + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    double sig_term_zz_r =  + 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                            + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                            + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    double sig_term_xx_i =  + 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                            + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                            + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    double sig_term_xy_i =  + 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                            + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                            + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    double sig_term_xz_i =  + 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                            + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                            + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    double sig_term_yx_i =  + 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                            + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                            + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    double sig_term_yy_i =  + 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                            + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                            + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    double sig_term_yz_i =  + 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                            + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                            + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    double sig_term_zx_i =  + 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                            + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                            + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    double sig_term_zy_i =  + 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                            + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                            + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    double sig_term_zz_i =  + 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                            + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                            + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    gam_sig_xx_r[i] = 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_r;                 
+
+                    gam_sig_yy_r[i] = 12.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_r;                 
+
+                    gam_sig_zz_r[i] = 12.0 * prod2_r(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_r;                 
+
+                    gam_sig_xy_r[i] = 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBy_r[i],rhoBy_i[i]);                  
+
+                    gam_sig_xz_r[i] = 12.0 * prod2_r(rhoBx_r[i],rhoBx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    gam_sig_yz_r[i] = 12.0 * prod2_r(rhoBy_r[i],rhoBy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    gam_sig_xx_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_i;                 
+
+                    gam_sig_yy_i[i] = 12.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_i;                 
+
+                    gam_sig_zz_i[i] = 12.0 * prod2_i(rhoBz_r[i],rhoBz_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_i;                 
+
+                    gam_sig_xy_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_xz_i[i] = 12.0 * prod2_i(rhoBx_r[i],rhoBx_i[i],rhoBz_r[i],rhoBz_i[i]);
+                    gam_sig_yz_i[i] = 12.0 * prod2_i(rhoBy_r[i],rhoBy_i[i],rhoBz_r[i],rhoBz_i[i]);
+
+                
+                    
+                    gam_sig_xx_x_r[i] = 12.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                                       +12.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_x_r;                   
+
+                    gam_sig_xx_y_r[i] = 12.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                                       +12.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_y_r;                   
+
+                    gam_sig_xx_z_r[i] = 12.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                                       +12.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_z_r;                   
+
+                    gam_sig_yy_x_r[i] = 12.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                                       +12.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_x_r;                   
+
+                    gam_sig_yy_y_r[i] = 12.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                                       +12.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_y_r;                   
+
+                    gam_sig_yy_z_r[i] = 12.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                                       +12.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_z_r;                   
+
+                    gam_sig_zz_x_r[i] = 12.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                                       +12.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_x_r;                   
+
+                    gam_sig_zz_y_r[i] = 12.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                                       +12.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_y_r;                   
+
+                    gam_sig_zz_z_r[i] = 12.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                                       +12.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_z_r;                   
+
+                    gam_sig_xy_x_r[i] = 12.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                                      + 12.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xy_y_r[i] = 12.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                                      + 12.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xy_z_r[i] = 12.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                                      + 12.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xz_x_r[i] = 12.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xz_y_r[i] = 12.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xz_z_r[i] = 12.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_yz_x_r[i] = 12.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_yz_y_r[i] = 12.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_yz_z_r[i] = 12.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_xx_x_i[i] = 12.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                                       + 12.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_x_i;                  
+
+                    gam_sig_xx_y_i[i] = 12.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                                       + 12.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_y_i;                  
+
+                    gam_sig_xx_z_i[i] = 12.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                                       + 12.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],rhoBx_r[i],rhoBx_i[i]) + sig_term_z_i;                  
+
+                    gam_sig_yy_x_i[i] = 12.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                                       + 12.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_x_i;                  
+
+                    gam_sig_yy_y_i[i] = 12.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                                       + 12.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_y_i;                  
+
+                    gam_sig_yy_z_i[i] = 12.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                                       + 12.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],rhoBy_r[i],rhoBy_i[i]) + sig_term_z_i;                  
+
+                    gam_sig_zz_x_i[i] = 12.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                                       + 12.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_x_i;                  
+
+                    gam_sig_zz_y_i[i] = 12.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                                       + 12.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_y_i;                  
+
+                    gam_sig_zz_z_i[i] = 12.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                                       + 12.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],rhoBz_r[i],rhoBz_i[i]) + sig_term_z_i;                  
+
+                    gam_sig_xy_x_i[i] = 12.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                                      + 12.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xy_y_i[i] = 12.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                                      + 12.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xy_z_i[i] = 12.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                                      + 12.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xz_x_i[i] = 12.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xz_y_i[i] = 12.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_xz_z_i[i] = 12.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],rhoBx_r[i],rhoBx_i[i]);
+                    gam_sig_yz_x_i[i] = 12.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_yz_y_i[i] = 12.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],rhoBy_r[i],rhoBy_i[i]);
+                    gam_sig_yz_z_i[i] = 12.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                                      + 12.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],rhoBy_r[i],rhoBy_i[i]);
+
+                    gam_sig_xx_xx_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                       + 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_x_r[i],gradBx_x_i[i]) + sig_term_xx_r;                    
+
+                    gam_sig_xx_xy_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                       + 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_y_r[i],gradBx_y_i[i]) + sig_term_xy_r;                    
+
+                    gam_sig_xx_xz_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                       + 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBx_z_r[i],gradBx_z_i[i]) + sig_term_xz_r;                    
+
+                    gam_sig_xx_yx_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                       + 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_x_r[i],gradBx_x_i[i]) + sig_term_yx_r;                    
+
+                    gam_sig_xx_yy_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                       + 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_y_r[i],gradBx_y_i[i]) + sig_term_yy_r;                    
+
+                    gam_sig_xx_yz_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                       + 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBx_z_r[i],gradBx_z_i[i]) + sig_term_yz_r;                    
+
+                    gam_sig_xx_zx_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                       + 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_x_r[i],gradBx_x_i[i]) + sig_term_zx_r;                    
+
+                    gam_sig_xx_zy_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                       + 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_y_r[i],gradBx_y_i[i]) + sig_term_zy_r;                    
+
+                    gam_sig_xx_zz_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                       + 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBx_z_r[i],gradBx_z_i[i]) + sig_term_zz_r;                    
+
+                    gam_sig_yy_xx_r[i] = 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_x_r[i],gradBy_x_i[i]) + sig_term_xx_r;                    
+
+                    gam_sig_yy_xy_r[i] = 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_y_r[i],gradBy_y_i[i]) + sig_term_xy_r;                    
+
+                    gam_sig_yy_xz_r[i] = 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBy_z_r[i],gradBy_z_i[i]) + sig_term_xz_r;                    
+
+                    gam_sig_yy_yx_r[i] = 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_x_r[i],gradBy_x_i[i]) + sig_term_yx_r;                    
+
+                    gam_sig_yy_yy_r[i] = 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_y_r[i],gradBy_y_i[i]) + sig_term_yy_r;                    
+
+                    gam_sig_yy_yz_r[i] = 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBy_z_r[i],gradBy_z_i[i]) + sig_term_yz_r;                    
+
+                    gam_sig_yy_zx_r[i] = 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_x_r[i],gradBy_x_i[i]) + sig_term_zx_r;                    
+
+                    gam_sig_yy_zy_r[i] = 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_y_r[i],gradBy_y_i[i]) + sig_term_zy_r;                    
+
+                    gam_sig_yy_zz_r[i] = 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBy_z_r[i],gradBy_z_i[i]) + sig_term_zz_r;                    
+
+                    gam_sig_zz_xx_r[i] = 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]) + sig_term_xx_r;                    
+
+                    gam_sig_zz_xy_r[i] = 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]) + sig_term_xy_r;                    
+
+                    gam_sig_zz_xz_r[i] = 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]) + sig_term_xz_r;                    
+
+                    gam_sig_zz_yx_r[i] = 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]) + sig_term_yx_r;                    
+
+                    gam_sig_zz_yy_r[i] = 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]) + sig_term_yy_r;                    
+
+                    gam_sig_zz_yz_r[i] = 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]) + sig_term_yz_r;                    
+
+                    gam_sig_zz_zx_r[i] = 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]) + sig_term_zx_r;                    
+
+                    gam_sig_zz_zy_r[i] = 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]) + sig_term_zy_r;                    
+
+                    gam_sig_zz_zz_r[i] = 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]) + sig_term_zz_r;                    
+
+                    gam_sig_xy_xx_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xy_xy_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xy_xz_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xy_yx_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xy_yy_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xy_yz_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xy_zx_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xy_zy_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xy_zz_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xz_xx_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xz_xy_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xz_xz_r[i] = 6.0 * prod2_r(gradBx_x_r[i],gradBx_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xz_yx_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xz_yy_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xz_yz_r[i] = 6.0 * prod2_r(gradBx_y_r[i],gradBx_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xz_zx_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xz_zy_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xz_zz_r[i] = 6.0 * prod2_r(gradBx_z_r[i],gradBx_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_yz_xx_r[i] = 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBy_x_r[i],gradBy_x_i[i]);
+                    gam_sig_yz_xy_r[i] = 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBy_y_r[i],gradBy_y_i[i]);
+                    gam_sig_yz_xz_r[i] = 6.0 * prod2_r(gradBy_x_r[i],gradBy_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_x_r[i],gradBz_x_i[i],gradBy_z_r[i],gradBy_z_i[i]);
+                    gam_sig_yz_yx_r[i] = 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBy_x_r[i],gradBy_x_i[i]);
+                    gam_sig_yz_yy_r[i] = 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBy_y_r[i],gradBy_y_i[i]);
+                    gam_sig_yz_yz_r[i] = 6.0 * prod2_r(gradBy_y_r[i],gradBy_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_y_r[i],gradBz_y_i[i],gradBy_z_r[i],gradBy_z_i[i]);
+                    gam_sig_yz_zx_r[i] = 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBy_x_r[i],gradBy_x_i[i]);
+                    gam_sig_yz_zy_r[i] = 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBy_y_r[i],gradBy_y_i[i]);
+                    gam_sig_yz_zz_r[i] = 6.0 * prod2_r(gradBy_z_r[i],gradBy_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_r(gradBz_z_r[i],gradBz_z_i[i],gradBy_z_r[i],gradBy_z_i[i]);
+                    gam_sig_xx_xx_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                       + 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_x_r[i],gradBx_x_i[i]) + sig_term_xx_i;                    
+
+                    gam_sig_xx_xy_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                       + 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_y_r[i],gradBx_y_i[i]) + sig_term_xy_i;                    
+
+                    gam_sig_xx_xz_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                       + 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBx_z_r[i],gradBx_z_i[i]) + sig_term_xz_i;                    
+
+                    gam_sig_xx_yx_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                       + 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_x_r[i],gradBx_x_i[i]) + sig_term_yx_i;                    
+
+                    gam_sig_xx_yy_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                       + 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_y_r[i],gradBx_y_i[i]) + sig_term_yy_i;                    
+
+                    gam_sig_xx_yz_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                       + 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBx_z_r[i],gradBx_z_i[i]) + sig_term_yz_i;                    
+
+                    gam_sig_xx_zx_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                       + 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_x_r[i],gradBx_x_i[i]) + sig_term_zx_i;                    
+
+                    gam_sig_xx_zy_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                       + 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_y_r[i],gradBx_y_i[i]) + sig_term_zy_i;                    
+
+                    gam_sig_xx_zz_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                       + 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBx_z_r[i],gradBx_z_i[i]) + sig_term_zz_i;                    
+
+                    gam_sig_yy_xx_i[i] = 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_x_r[i],gradBy_x_i[i]) + sig_term_xx_i;                    
+
+                    gam_sig_yy_xy_i[i] = 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_y_r[i],gradBy_y_i[i]) + sig_term_xy_i;                    
+
+                    gam_sig_yy_xz_i[i] = 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBy_z_r[i],gradBy_z_i[i]) + sig_term_xz_i;                    
+
+                    gam_sig_yy_yx_i[i] = 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_x_r[i],gradBy_x_i[i]) + sig_term_yx_i;                    
+
+                    gam_sig_yy_yy_i[i] = 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_y_r[i],gradBy_y_i[i]) + sig_term_yy_i;                    
+
+                    gam_sig_yy_yz_i[i] = 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBy_z_r[i],gradBy_z_i[i]) + sig_term_yz_i;                    
+
+                    gam_sig_yy_zx_i[i] = 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_x_r[i],gradBy_x_i[i]) + sig_term_zx_i;                    
+
+                    gam_sig_yy_zy_i[i] = 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_y_r[i],gradBy_y_i[i]) + sig_term_zy_i;                    
+
+                    gam_sig_yy_zz_i[i] = 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBy_z_r[i],gradBy_z_i[i]) + sig_term_zz_i;                    
+
+                    gam_sig_zz_xx_i[i] = 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]) + sig_term_xx_i;                    
+
+                    gam_sig_zz_xy_i[i] = 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]) + sig_term_xy_i;                    
+
+                    gam_sig_zz_xz_i[i] = 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]) + sig_term_xz_i;                    
+
+                    gam_sig_zz_yx_i[i] = 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]) + sig_term_yx_i;                    
+
+                    gam_sig_zz_yy_i[i] = 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]) + sig_term_yy_i;                    
+
+                    gam_sig_zz_yz_i[i] = 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]) + sig_term_yz_i;                    
+
+                    gam_sig_zz_zx_i[i] = 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]) + sig_term_zx_i;                    
+
+                    gam_sig_zz_zy_i[i] = 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]) + sig_term_zy_i;                    
+
+                    gam_sig_zz_zz_i[i] = 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]) + sig_term_zz_i;                    
+
+                    gam_sig_xy_xx_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xy_xy_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xy_xz_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xy_yx_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xy_yy_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xy_yz_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xy_zx_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                       + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xy_zy_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                       + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xy_zz_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                       + 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xz_xx_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xz_xy_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xz_xz_i[i] = 6.0 * prod2_i(gradBx_x_r[i],gradBx_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xz_yx_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xz_yy_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xz_yz_i[i] = 6.0 * prod2_i(gradBx_y_r[i],gradBx_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_xz_zx_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBx_x_r[i],gradBx_x_i[i]);
+                    gam_sig_xz_zy_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBx_y_r[i],gradBx_y_i[i]);
+                    gam_sig_xz_zz_i[i] = 6.0 * prod2_i(gradBx_z_r[i],gradBx_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBx_z_r[i],gradBx_z_i[i]);
+                    gam_sig_yz_xx_i[i] = 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBy_x_r[i],gradBy_x_i[i]);
+                    gam_sig_yz_xy_i[i] = 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBy_y_r[i],gradBy_y_i[i]);
+                    gam_sig_yz_xz_i[i] = 6.0 * prod2_i(gradBy_x_r[i],gradBy_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_x_r[i],gradBz_x_i[i],gradBy_z_r[i],gradBy_z_i[i]);
+                    gam_sig_yz_yx_i[i] = 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBy_x_r[i],gradBy_x_i[i]);
+                    gam_sig_yz_yy_i[i] = 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBy_y_r[i],gradBy_y_i[i]);
+                    gam_sig_yz_yz_i[i] = 6.0 * prod2_i(gradBy_y_r[i],gradBy_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_y_r[i],gradBz_y_i[i],gradBy_z_r[i],gradBy_z_i[i]);
+                    gam_sig_yz_zx_i[i] = 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBy_x_r[i],gradBy_x_i[i]);
+                    gam_sig_yz_zy_i[i] = 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBy_y_r[i],gradBy_y_i[i]);
+                    gam_sig_yz_zz_i[i] = 6.0 * prod2_i(gradBy_z_r[i],gradBy_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                       + 6.0 * prod2_i(gradBz_z_r[i],gradBz_z_i[i],gradBy_z_r[i],gradBy_z_i[i]);
+                         
+
+                    gamx_r[i] = prod2_r(rho_sig_xx_r[i],rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                   
+
+                    gamy_r[i] = prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_yy_r[i],rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                   
+
+                    gamz_r[i] = prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_zz_r[i],rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                   
+
+                    gamx_i[i] = prod2_i(rho_sig_xx_r[i],rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                   
+
+                    gamy_i[i] = prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_yy_r[i],rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                   
+
+                    gamz_i[i] = prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_zz_r[i],rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                   
+
+                    gamx_X_r[i] =  prod2_r(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xx_r[i],rho_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_Y_r[i] =  prod2_r(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xx_r[i],rho_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_Z_r[i] =  prod2_r(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xx_r[i],rho_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_X_r[i] =  prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yy_r[i],rho_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_Y_r[i] =  prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yy_r[i],rho_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_Z_r[i] =  prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yy_r[i],rho_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_X_r[i] =  prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_zz_r[i],rho_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_Y_r[i] =  prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_zz_r[i],rho_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_Z_r[i] =  prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(rho_sig_zz_r[i],rho_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamx_X_i[i] =  prod2_i(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xx_r[i],rho_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_Y_i[i] =  prod2_i(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xx_r[i],rho_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_Z_i[i] =  prod2_i(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xx_r[i],rho_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_r[i],2.0 * rho_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_X_i[i] =  prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yy_r[i],rho_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_Y_i[i] =  prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yy_r[i],rho_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_Z_i[i] =  prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xy_r[i],rho_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yy_r[i],rho_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_r[i],2.0 * rho_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_r[i],2.0 * rho_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_X_i[i] =  prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_zz_r[i],rho_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_Y_i[i] =  prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_zz_r[i],rho_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_Z_i[i] =  prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(rho_sig_xz_r[i],rho_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(rho_sig_yz_r[i],rho_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(rho_sig_zz_r[i],rho_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_r[i],2.0 * rho_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_r[i],2.0 * rho_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_r[i],2.0 * rho_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamx_XX_r[i] = prod2_r(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_XY_r[i] = prod2_r(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_XZ_r[i] = prod2_r(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamx_YX_r[i] = prod2_r(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_YY_r[i] = prod2_r(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_YZ_r[i] = prod2_r(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamx_ZX_r[i] = prod2_r(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_ZY_r[i] = prod2_r(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_ZZ_r[i] = prod2_r(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_XX_r[i] = prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_XY_r[i] = prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_XZ_r[i] = prod2_r(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_YX_r[i] = prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_YY_r[i] = prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_YZ_r[i] = prod2_r(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_ZX_r[i] = prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_ZY_r[i] = prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_ZZ_r[i] = prod2_r(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_XX_r[i] = prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_XY_r[i] = prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_XZ_r[i] = prod2_r(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_YX_r[i] = prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_YY_r[i] = prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_YZ_r[i] = prod2_r(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_ZX_r[i] = prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_ZY_r[i] = prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_ZZ_r[i] = prod2_r(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_r(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_r(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_r(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamx_XX_i[i] = prod2_i(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_XY_i[i] = prod2_i(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_XZ_i[i] = prod2_i(rho_sig_xx_x_r[i],rho_sig_xx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_x_r[i],2.0 * rho_sig_xx_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamx_YX_i[i] = prod2_i(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_YY_i[i] = prod2_i(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_YZ_i[i] = prod2_i(rho_sig_xx_y_r[i],rho_sig_xx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_y_r[i],2.0 * rho_sig_xx_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamx_ZX_i[i] = prod2_i(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamx_ZY_i[i] = prod2_i(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamx_ZZ_i[i] = prod2_i(rho_sig_xx_z_r[i],rho_sig_xx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xx_z_r[i],2.0 * rho_sig_xx_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_XX_i[i] = prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_XY_i[i] = prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_XZ_i[i] = prod2_i(rho_sig_xy_x_r[i],rho_sig_xy_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yy_x_r[i],rho_sig_yy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_x_r[i],2.0 * rho_sig_xy_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_x_r[i],2.0 * rho_sig_yy_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_YX_i[i] = prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_YY_i[i] = prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_YZ_i[i] = prod2_i(rho_sig_xy_y_r[i],rho_sig_xy_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yy_y_r[i],rho_sig_yy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_y_r[i],2.0 * rho_sig_xy_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_y_r[i],2.0 * rho_sig_yy_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamy_ZX_i[i] = prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamy_ZY_i[i] = prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamy_ZZ_i[i] = prod2_i(rho_sig_xy_z_r[i],rho_sig_xy_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yy_z_r[i],rho_sig_yy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xy_z_r[i],2.0 * rho_sig_xy_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yy_z_r[i],2.0 * rho_sig_yy_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_XX_i[i] = prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_XY_i[i] = prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_XZ_i[i] = prod2_i(rho_sig_xz_x_r[i],rho_sig_xz_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yz_x_r[i],rho_sig_yz_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_zz_x_r[i],rho_sig_zz_x_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_x_r[i],2.0 * rho_sig_xz_x_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_x_r[i],2.0 * rho_sig_yz_x_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_x_r[i],2.0 * rho_sig_zz_x_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_YX_i[i] = prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_YY_i[i] = prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_YZ_i[i] = prod2_i(rho_sig_xz_y_r[i],rho_sig_xz_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yz_y_r[i],rho_sig_yz_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_zz_y_r[i],rho_sig_zz_y_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_y_r[i],2.0 * rho_sig_xz_y_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_y_r[i],2.0 * rho_sig_yz_y_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_y_r[i],2.0 * rho_sig_zz_y_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    gamz_ZX_i[i] = prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    gamz_ZY_i[i] = prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    gamz_ZZ_i[i] = prod2_i(rho_sig_xz_z_r[i],rho_sig_xz_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(rho_sig_yz_z_r[i],rho_sig_yz_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(rho_sig_zz_z_r[i],rho_sig_zz_z_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                              + prod2_i(2.0 * rho_sig_xz_z_r[i],2.0 * rho_sig_xz_z_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                              + prod2_i(2.0 * rho_sig_yz_z_r[i],2.0 * rho_sig_yz_z_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                              + prod2_i(2.0 * rho_sig_zz_z_r[i],2.0 * rho_sig_zz_z_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_r[i],gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+
+                    piy_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_yy_r[i],gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+
+                    piz_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(gam_sig_zz_r[i],gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+
+                    pix_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_r[i],gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    piy_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_yy_r[i],gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    piz_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(gam_sig_zz_r[i],gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                              + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                 
+
+                    pix_X_r[i] =  prod2_r(gam_sig_xx_r[i],gam_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_r(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                + prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    pix_Y_r[i] =  prod2_r(gam_sig_xx_r[i],gam_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_r(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                + prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    pix_Z_r[i] =  prod2_r(gam_sig_xx_r[i],gam_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_r(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                + prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    piy_X_r[i] =  prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_r(gam_sig_yy_r[i],gam_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_r(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                + prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    piy_Y_r[i] =  prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_r(gam_sig_yy_r[i],gam_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_r(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                + prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    piy_Z_r[i] =  prod2_r(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_r(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_r(gam_sig_yy_r[i],gam_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_r(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                + prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    piz_X_r[i] =  prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_r(gam_sig_zz_r[i],gam_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                + prod2_r(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    piz_Y_r[i] =  prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_r(gam_sig_zz_r[i],gam_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                + prod2_r(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    piz_Z_r[i] =  prod2_r(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_r(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_r(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_r(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_r(gam_sig_zz_r[i],gam_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                + prod2_r(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    pix_X_i[i] =  prod2_i(gam_sig_xx_r[i],gam_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_i(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                + prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    pix_Y_i[i] =  prod2_i(gam_sig_xx_r[i],gam_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_i(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                + prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    pix_Z_i[i] =  prod2_i(gam_sig_xx_r[i],gam_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_i(2.0 * gam_sig_xx_r[i],2.0 * gam_sig_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                + prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    piy_X_i[i] =  prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_i(gam_sig_yy_r[i],gam_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_i(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                + prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    piy_Y_i[i] =  prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_i(gam_sig_yy_r[i],gam_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_i(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                + prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    piy_Z_i[i] =  prod2_i(gam_sig_xy_r[i],gam_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_i(2.0 * gam_sig_xy_r[i],2.0 * gam_sig_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_i(gam_sig_yy_r[i],gam_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_i(2.0 * gam_sig_yy_r[i],2.0 * gam_sig_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                + prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    piz_X_i[i] =  prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                + prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                + prod2_i(gam_sig_zz_r[i],gam_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                + prod2_i(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                   
+
+                    piz_Y_i[i] =  prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                + prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                + prod2_i(gam_sig_zz_r[i],gam_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                + prod2_i(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                   
+
+                    piz_Z_i[i] =  prod2_i(gam_sig_xz_r[i],gam_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_i(2.0 * gam_sig_xz_r[i],2.0 * gam_sig_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                + prod2_i(gam_sig_yz_r[i],gam_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_i(2.0 * gam_sig_yz_r[i],2.0 * gam_sig_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                + prod2_i(gam_sig_zz_r[i],gam_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                + prod2_i(2.0 * gam_sig_zz_r[i],2.0 * gam_sig_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                   
+
+                    pix_XX_r[i] =  prod2_r(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_XY_r[i] =  prod2_r(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_XZ_r[i] =  prod2_r(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_YX_r[i] =  prod2_r(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_YY_r[i] =  prod2_r(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_YZ_r[i] =  prod2_r(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_ZX_r[i] =  prod2_r(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_ZY_r[i] =  prod2_r(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_ZZ_r[i] =  prod2_r(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_XX_r[i] =  prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_XY_r[i] =  prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_XZ_r[i] =  prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_YX_r[i] =  prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_YY_r[i] =  prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_YZ_r[i] =  prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_ZX_r[i] =  prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_ZY_r[i] =  prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_ZZ_r[i] =  prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_XX_r[i] =  prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_XY_r[i] =  prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_XZ_r[i] =  prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_YX_r[i] =  prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_YY_r[i] =  prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_YZ_r[i] =  prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_ZX_r[i] =  prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_ZY_r[i] =  prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_ZZ_r[i] =  prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_r(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_r(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_XX_i[i] =  prod2_i(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_XY_i[i] =  prod2_i(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_XZ_i[i] =  prod2_i(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_YX_i[i] =  prod2_i(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_YY_i[i] =  prod2_i(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_YZ_i[i] =  prod2_i(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_ZX_i[i] =  prod2_i(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_ZY_i[i] =  prod2_i(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_ZZ_i[i] =  prod2_i(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_XX_i[i] =  prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_XY_i[i] =  prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_XZ_i[i] =  prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_YX_i[i] =  prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_YY_i[i] =  prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_YZ_i[i] =  prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_ZX_i[i] =  prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_ZY_i[i] =  prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piy_ZZ_i[i] =  prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_XX_i[i] =  prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_XY_i[i] =  prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_XZ_i[i] =  prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_YX_i[i] =  prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_YY_i[i] =  prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_YZ_i[i] =  prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_ZX_i[i] =  prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_ZY_i[i] =  prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    piz_ZZ_i[i] =  prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],rhoBx_r[i],rhoBx_i[i])
+                                 + prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],rhoBy_r[i],rhoBy_i[i])
+                                 + prod2_i(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],rhoBz_r[i],rhoBz_i[i])
+                                 + prod2_i(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],rhoBz_r[i],rhoBz_i[i]);                  
+
+                    pix_XXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_XXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_XXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_XYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_XYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_XYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_XZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_XZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_XZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_YXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_YXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_YXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_YYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_YYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_YYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_YZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_YZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_YZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_ZXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_ZXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_ZXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_ZYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_ZYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_ZYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_ZZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_ZZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_ZZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_XXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_XXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_XXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_XYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_XYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_XYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_XZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_XZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_XZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_YXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_YXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_YXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_YYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_YYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_YYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_YZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_YZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_YZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_ZXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_ZXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_ZXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_ZYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_ZYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_ZYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_ZZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_ZZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_ZZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_XXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_XXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_XXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_XYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_XYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_XYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_XZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_XZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_XZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_YXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_YXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_YXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_YYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_YYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_YYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_YZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_YZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_YZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_ZXX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_ZXY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_ZXZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_ZYX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_ZYY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_ZYZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_ZZX_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_ZZY_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_ZZZ_r[i] =  1.0/3.0 * prod2_r(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_r(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_r(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_XXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_XXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_XXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xx_r[i],gam_sig_xx_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xx_r[i],2.0 * gam_sig_xx_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_XYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_XYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_XYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xy_r[i],gam_sig_xx_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xy_r[i],2.0 * gam_sig_xx_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_XZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_XZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_XZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_xz_r[i],gam_sig_xx_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_xz_r[i],2.0 * gam_sig_xx_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_YXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_YXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_YXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yx_r[i],gam_sig_xx_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yx_r[i],2.0 * gam_sig_xx_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_YYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_YYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_YYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yy_r[i],gam_sig_xx_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yy_r[i],2.0 * gam_sig_xx_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_YZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_YZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_YZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_yz_r[i],gam_sig_xx_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_yz_r[i],2.0 * gam_sig_xx_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_ZXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_ZXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_ZXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zx_r[i],gam_sig_xx_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zx_r[i],2.0 * gam_sig_xx_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_ZYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_ZYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_ZYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zy_r[i],gam_sig_xx_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zy_r[i],2.0 * gam_sig_xx_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    pix_ZZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    pix_ZZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    pix_ZZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xx_zz_r[i],gam_sig_xx_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xx_zz_r[i],2.0 * gam_sig_xx_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_XXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_XXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_XXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xx_r[i],gam_sig_xy_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xx_r[i],2.0 * gam_sig_xy_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xx_r[i],gam_sig_yy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xx_r[i],2.0 * gam_sig_yy_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_XYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_XYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_XYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xy_r[i],gam_sig_xy_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xy_r[i],2.0 * gam_sig_xy_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xy_r[i],gam_sig_yy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xy_r[i],2.0 * gam_sig_yy_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_XZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_XZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_XZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_xz_r[i],gam_sig_xy_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_xz_r[i],2.0 * gam_sig_xy_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_xz_r[i],gam_sig_yy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_xz_r[i],2.0 * gam_sig_yy_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_YXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_YXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_YXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yx_r[i],gam_sig_xy_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yx_r[i],2.0 * gam_sig_xy_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yx_r[i],gam_sig_yy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yx_r[i],2.0 * gam_sig_yy_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_YYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_YYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_YYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yy_r[i],gam_sig_xy_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yy_r[i],2.0 * gam_sig_xy_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yy_r[i],gam_sig_yy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yy_r[i],2.0 * gam_sig_yy_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_YZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_YZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_YZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_yz_r[i],gam_sig_xy_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_yz_r[i],2.0 * gam_sig_xy_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_yz_r[i],gam_sig_yy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_yz_r[i],2.0 * gam_sig_yy_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_ZXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_ZXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_ZXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zx_r[i],gam_sig_xy_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zx_r[i],2.0 * gam_sig_xy_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zx_r[i],gam_sig_yy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zx_r[i],2.0 * gam_sig_yy_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_ZYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_ZYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_ZYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zy_r[i],gam_sig_xy_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zy_r[i],2.0 * gam_sig_xy_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zy_r[i],gam_sig_yy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zy_r[i],2.0 * gam_sig_yy_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piy_ZZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piy_ZZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piy_ZZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xy_zz_r[i],gam_sig_xy_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xy_zz_r[i],2.0 * gam_sig_xy_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yy_zz_r[i],gam_sig_yy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yy_zz_r[i],2.0 * gam_sig_yy_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_XXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_XXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_XXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xx_r[i],gam_sig_xz_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xx_r[i],2.0 * gam_sig_xz_xx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xx_r[i],gam_sig_yz_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xx_r[i],2.0 * gam_sig_yz_xx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xx_r[i],gam_sig_zz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xx_r[i],2.0 * gam_sig_zz_xx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_XYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_XYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_XYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xy_r[i],gam_sig_xz_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xy_r[i],2.0 * gam_sig_xz_xy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xy_r[i],gam_sig_yz_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xy_r[i],2.0 * gam_sig_yz_xy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xy_r[i],gam_sig_zz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xy_r[i],2.0 * gam_sig_zz_xy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_XZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_XZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_XZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_xz_r[i],gam_sig_xz_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_xz_r[i],2.0 * gam_sig_xz_xz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_xz_r[i],gam_sig_yz_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_xz_r[i],2.0 * gam_sig_yz_xz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_xz_r[i],gam_sig_zz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_xz_r[i],2.0 * gam_sig_zz_xz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_YXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_YXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_YXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yx_r[i],gam_sig_xz_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yx_r[i],2.0 * gam_sig_xz_yx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yx_r[i],gam_sig_yz_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yx_r[i],2.0 * gam_sig_yz_yx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yx_r[i],gam_sig_zz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yx_r[i],2.0 * gam_sig_zz_yx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_YYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_YYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_YYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yy_r[i],gam_sig_xz_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yy_r[i],2.0 * gam_sig_xz_yy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yy_r[i],gam_sig_yz_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yy_r[i],2.0 * gam_sig_yz_yy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yy_r[i],gam_sig_zz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yy_r[i],2.0 * gam_sig_zz_yy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_YZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_YZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_YZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_yz_r[i],gam_sig_xz_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_yz_r[i],2.0 * gam_sig_xz_yz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_yz_r[i],gam_sig_yz_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_yz_r[i],2.0 * gam_sig_yz_yz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_yz_r[i],gam_sig_zz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_yz_r[i],2.0 * gam_sig_zz_yz_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_ZXX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_ZXY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_ZXZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zx_r[i],gam_sig_xz_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zx_r[i],2.0 * gam_sig_xz_zx_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zx_r[i],gam_sig_yz_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zx_r[i],2.0 * gam_sig_yz_zx_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zx_r[i],gam_sig_zz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zx_r[i],2.0 * gam_sig_zz_zx_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_ZYX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_ZYY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_ZYZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zy_r[i],gam_sig_xz_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zy_r[i],2.0 * gam_sig_xz_zy_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zy_r[i],gam_sig_yz_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zy_r[i],2.0 * gam_sig_yz_zy_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zy_r[i],gam_sig_zz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zy_r[i],2.0 * gam_sig_zz_zy_i[i],gradBz_z_r[i],gradBz_z_i[i]);                 
+
+                    piz_ZZX_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBx_x_r[i],gradBx_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBy_x_r[i],gradBy_x_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],gradBz_x_r[i],gradBz_x_i[i]);                 
+
+                    piz_ZZY_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBx_y_r[i],gradBx_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBy_y_r[i],gradBy_y_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],gradBz_y_r[i],gradBz_y_i[i]);                 
+
+                    piz_ZZZ_i[i] =  1.0/3.0 * prod2_i(gam_sig_xz_zz_r[i],gam_sig_xz_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_xz_zz_r[i],2.0 * gam_sig_xz_zz_i[i],gradBx_z_r[i],gradBx_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_yz_zz_r[i],gam_sig_yz_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_yz_zz_r[i],2.0 * gam_sig_yz_zz_i[i],gradBy_z_r[i],gradBy_z_i[i])
+                                  + 1.0/3.0 * prod2_i(gam_sig_zz_zz_r[i],gam_sig_zz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i])
+                                  + 1.0/3.0 * prod2_i(2.0 * gam_sig_zz_zz_r[i],2.0 * gam_sig_zz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);
+                }
+            }
+        }
+}
+
 void
 CDensityGridCubic::DensityProdForGGA_CRF(const CDensityGrid& rwDensityGrid,
                                          const CDensityGrid& rw2DensityGrid,
@@ -10670,6 +14314,7 @@ CDensityGridCubic::DensityProdForGGA_3PA(const CDensityGrid& rwDensityGrid,
             }
         }
 }
+
 
 void
 CDensityGridCubic::DensityProdForMGGA_CRF(const CDensityGrid& rwDensityGrid,

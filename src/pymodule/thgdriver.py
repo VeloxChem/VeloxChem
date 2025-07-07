@@ -944,6 +944,7 @@ class ThgDriver(NonlinearSolver):
             freq = tuple([0.0] + [x[0] + x[1] for x in zip(w, w)])
         else:
             freq = None
+
         freq = self.comm.bcast(freq, root=mpi_master())
 
         N_total_drv = ComplexResponse(self.comm, self.ostream)
