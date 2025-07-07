@@ -66,6 +66,7 @@ class ReactionMatcher:
         self._mono_count = 0
         self._start_time = 0
         self.max_time = 600
+        self._breaking_depth = 2  # how many breaking edges to try
         self._check_monomorphic = False
 
     def get_mapping(self, reactant_ff, rea_elems, product_ff, pro_elems,
@@ -138,7 +139,7 @@ class ReactionMatcher:
             swapped = True
 
         self._start_time = time.time()
-        breaking_edges = self._find_breaking_edges(A, B, forced_breaking_edges)
+        breaking_edges = self._find_breaking_edges(A, B, self._breaking_depth)
         if breaking_edges is None:
             return None, None, None
 
@@ -169,47 +170,28 @@ class ReactionMatcher:
             map = {v: k for k, v in map.items()}
         return map, breaking_edges, forming_edges
 
-    def _find_breaking_edges(self,A,B, forced_breaking_edges):
-        breaking_edges = set()
+
+    def _find_breaking_edges(self,A,B, depth):
+        if not self._check_time():
+            return None
+
         if self._connected_components_are_subgraphs(A, B):
-            return breaking_edges
-
-        for edge in A.edges():
-            A.remove_edge(*edge)
-            if self._connected_components_are_subgraphs(A, B):
-                breaking_edges.add(edge)
-                break
-            else:
+            return set()
+            
+        if depth > 0:
+            for edge in A.edges():
+                A.remove_edge(*edge)
+                edges = self._find_breaking_edges(A, B, depth-1)
+                if edges is not None:
+                    edges.add(edge)
+                    self.ostream.print_info(
+                        f"Found breaking edges: {edges} at depth {depth}."
+                    )
+                    self.ostream.flush()
+                    return edges
                 A.add_edge(*edge)
-            if not self._check_time():
-                return None
-
-        self._check_time("finding one breaking bond")
-        if len(breaking_edges) > 0:
-            return breaking_edges
-        
-        self.ostream.print_info(
-            "No subgraph solution with one broken bond found, trying to find two breaking bonds"
-        )
-        self.ostream.flush()
-        for edge_a in A.edges():
-            if edge_a not in A.edges():
-                continue
-            A.remove_edge(*edge_a)
-            for edge_b in A.edges():
-                A.remove_edge(*edge_b)
-                if self._connected_components_are_subgraphs(A, B):
-                    breaking_edges.add(edge_a)
-                    breaking_edges.add(edge_b)
-                    return breaking_edges
-                else:
-                    A.add_edge(*edge_b)
-                if not self._check_time():
-                    return None
-            A.add_edge(*edge_a)
-        self.ostream.flush()
         return None
-        
+
 
     def _find_forming_edges(self, A, B, breaking_edges, forced_breaking_edges):
         """
