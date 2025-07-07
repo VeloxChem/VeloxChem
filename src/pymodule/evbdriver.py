@@ -1009,11 +1009,11 @@ class EvbDriver():
         fg_data = []
         rea_fg_data = []
         pro_fg_data = []
-        if Path(fg_file).exists():
+        if fg_file is not None and Path(fg_file).exists():
             fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
-        if Path(fg_rea_file).exists():
+        if fg_rea_file is not None and Path(fg_rea_file).exists():
             rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
-        if Path(fg_pro_file).exists():
+        if fg_pro_file is not None and Path(fg_pro_file).exists():
             pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
 
@@ -1039,7 +1039,6 @@ class EvbDriver():
             "E1_int": E1_int,
             "E2_int": E2_int,
             "E_m_pes": E_m_pes,
-            "E_m_int": E_m_int,
             "Ep": Ep,
             "Ek": Ek,
             "Temp_step": Temp,
@@ -1115,6 +1114,8 @@ class EvbDriver():
                         save_group(v, subgroup)
                     elif isinstance(v, np.ndarray) or isinstance(v, list):
                         group.create_dataset(k, data=v)
+                    elif isinstance(v, set):
+                        group.create_dataset(k, data=list(v))
                     else:
                         group[k] = v
 
