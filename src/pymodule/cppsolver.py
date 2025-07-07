@@ -832,7 +832,7 @@ class ComplexResponse(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x)
+                                final_h5_fname, solution_keys, x, self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -1277,7 +1277,7 @@ class ComplexResponse(LinearSolver):
             hf = h5py.File(fname, 'a')
 
             # Write frequencies
-            xlabel = 'rsp/frequencies'
+            xlabel = self.group_label + '/frequencies'
             if xlabel in hf:
                 del hf[xlabel]
             hf.create_dataset(xlabel, data=rsp_results['frequencies'])
@@ -1290,9 +1290,9 @@ class ComplexResponse(LinearSolver):
                 y_data = np.array(spectrum['y_data'])
 
                 if self.cpp_flag == 'absorption':
-                    ylabel = 'rsp/sigma'
+                    ylabel = self.group_label + '/sigma'
                 elif self.cpp_flag == 'ecd':
-                    ylabel = 'rsp/delta-epsilon'
+                    ylabel = self.group_label + '/delta-epsilon'
                 if ylabel in hf:
                     del hf[ylabel]
                 hf.create_dataset(ylabel, data=y_data)

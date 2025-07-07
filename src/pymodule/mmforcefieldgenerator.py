@@ -1424,7 +1424,7 @@ class MMForceFieldGenerator:
                             bond_found = True
                             break
             
-            elif use_water_model: ##TODO: Double check the UNITS
+            elif use_water_model: 
                 r = water_bonds['equilibrium']
                 k_r = water_bonds['force_constant']
                 comment = 'ow-hw'
@@ -1844,13 +1844,23 @@ class MMForceFieldGenerator:
                     (at_2.strip(), at_4.strip(), at_3.strip(), at_1.strip()),
                     (at_2.strip(), at_1.strip(), at_3.strip(), at_4.strip()),
                 ]
+                target_orderings = [
+                    (2, 3, 4, 1),
+                    (2, 1, 4, 3),
+                    (2, 4, 1, 3),
+                    (2, 3, 1, 4),
+                    (2, 4, 3, 1),
+                    (2, 1, 3, 4),
+                ]
 
                 dihedral_found = False
                 barrier, phase, periodicity, comment = None, None, None, None
+                improper_ordering = None
 
                 if use_xml:
                     for dihedral_data in ff_data_dict['impropers']:
-                        for target_dihedral in target_dihedral_types:
+                        for target_dihedral, ordering in zip(target_dihedral_types,
+                                                             target_orderings):
                             if target_dihedral == (dihedral_data['class1'],
                                                    dihedral_data['class2'],
                                                    dihedral_data['class3'],
@@ -1859,11 +1869,12 @@ class MMForceFieldGenerator:
                                 barrier = float(dihedral_data[f'k1'])
                                 phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
                                 comment = self.get_dihedral_type_string(target_dihedral)
+                                improper_ordering = ordering
                                 dihedral_found = True
                                 break
                 else:
                     for line in ff_data_lines:
-                        for p in patterns:
+                        for p, ordering in zip(patterns, target_orderings):
                             m = re.search(p, line)
                             if m is not None:
                                 dihedral_ff = line[11:60].strip().split()
@@ -1872,6 +1883,7 @@ class MMForceFieldGenerator:
                                     phase = float(dihedral_ff[1])
                                     periodicity = int(float(dihedral_ff[2]))
                                     comment = m.group(0)
+                                    improper_ordering = ordering
                                     dihedral_found = True
                                     break
 
@@ -1892,10 +1904,19 @@ class MMForceFieldGenerator:
                         (at_2.strip(), '', at_4.strip(), at_1.strip()),
                         (at_2.strip(), '', at_1.strip(), at_4.strip()),
                     ]
+                    target_orderings = [
+                        (2, 4, 3, 1),
+                        (2, 4, 1, 3),
+                        (2, 1, 4, 3),
+                        (2, 1, 3, 4),
+                        (2, 3, 4, 1),
+                        (2, 3, 1, 4),
+                    ]
 
                     if use_xml:
                         for dihedral_data in ff_data_dict['impropers']:
-                            for target_dihedral in target_dihedral_types:
+                            for target_dihedral, ordering in zip(target_dihedral_types,
+                                                                 target_orderings):
                                 if target_dihedral == (dihedral_data['class1'],
                                                        dihedral_data['class2'],
                                                        dihedral_data['class3'],
@@ -1904,11 +1925,12 @@ class MMForceFieldGenerator:
                                     barrier = float(dihedral_data[f'k1'])
                                     phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(target_dihedral)
+                                    improper_ordering = ordering
                                     dihedral_found = True
                                     break
                     else:
                         for line in ff_data_lines:
-                            for p in patterns:
+                            for p, ordering in zip(patterns, target_orderings):
                                 m = re.search(p, line)
                                 if m is not None:
                                     dihedral_ff = line[11:60].strip().split()
@@ -1917,6 +1939,7 @@ class MMForceFieldGenerator:
                                         phase = float(dihedral_ff[1])
                                         periodicity = int(float(dihedral_ff[2]))
                                         comment = m.group(0)
+                                        improper_ordering = ordering
                                         dihedral_found = True
                                         break
 
@@ -1931,10 +1954,16 @@ class MMForceFieldGenerator:
                         (at_2.strip(), '', '', at_1.strip()),
                         (at_2.strip(), '', '', at_4.strip()),
                     ]
+                    target_orderings = [
+                        (2, 4, 1, 3),
+                        (2, 3, 4, 1),
+                        (2, 1, 3, 4),
+                    ]
 
                     if use_xml:
                         for dihedral_data in ff_data_dict['impropers']:
-                            for target_dihedral in target_dihedral_types:
+                            for target_dihedral, ordering in zip(target_dihedral_types,
+                                                                 target_orderings):
                                 if target_dihedral == (dihedral_data['class1'],
                                                        dihedral_data['class2'],
                                                        dihedral_data['class3'],
@@ -1943,11 +1972,12 @@ class MMForceFieldGenerator:
                                     barrier = float(dihedral_data[f'k1'])
                                     phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(target_dihedral)
+                                    improper_ordering = ordering
                                     dihedral_found = True
                                     break
                     else:
                         for line in ff_data_lines:
-                            for p in patterns:
+                            for p, ordering in zip(patterns, target_orderings):
                                 m = re.search(p, line)
                                 if m is not None:
                                     dihedral_ff = line[11:60].strip().split()
@@ -1956,6 +1986,7 @@ class MMForceFieldGenerator:
                                         phase = float(dihedral_ff[1])
                                         periodicity = int(float(dihedral_ff[2]))
                                         comment = m.group(0)
+                                        improper_ordering = ordering
                                         dihedral_found = True
                                         break
 
@@ -1973,7 +2004,20 @@ class MMForceFieldGenerator:
                     'MMForceFieldGenerator: invalid improper dihedral periodicity'
                 )
 
-                self.impropers[(i, j, k, l)] = {
+                # The ordering of the atoms in improper dihedral: the first
+                # atom is connected to all the other three atoms. See e.g.
+                # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
+
+                if improper_ordering is None:
+                    dih_atom_inds_tuple = (j, i, k, l)
+                elif improper_ordering[-1] == 4:
+                    dih_atom_inds_tuple = (j, i, k, l)
+                elif improper_ordering[-1] == 3:
+                    dih_atom_inds_tuple = (j, l, i, k)
+                elif improper_ordering[-1] == 1:
+                    dih_atom_inds_tuple = (j, k, l, i)
+
+                self.impropers[dih_atom_inds_tuple] = {
                     'type': 'Fourier',
                     'barrier': barrier,
                     'phase': phase,
@@ -2272,6 +2316,11 @@ class MMForceFieldGenerator:
         for (i, j), bond in rotatable_bonds_types.items():
             # Check if the bond is non-rotatable due to atom types
             if bond in non_rotatable_bonds:
+                bonds_to_delete.append((i, j))
+                continue
+            
+            # Check if any side atom of the bond is involved in a triple bond
+            if (bond[0] in ['c1','n1','cg','ch']) or (bond[1] in ['c1', 'n1','cg','ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -2726,7 +2775,8 @@ class MMForceFieldGenerator:
                     ';   ai     aj     ak     al    funct    phase     k_d      n\n'
                 )
 
-            for (i, j, k, l), dih in self.impropers.items():
+            # Note: reorder improper dihedral to get consistent energy with openmm
+            for (k, l, j, i), dih in self.impropers.items():
                 line_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1, l + 1)
                 line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
                     4, dih['phase'], dih['barrier'], abs(dih['periodicity']),
@@ -2849,12 +2899,9 @@ class MMForceFieldGenerator:
         # Improper dihedrals
         for improper_id, improper_data in self.impropers.items():
 
-            # The order of the atoms is defined in the OpenMM documentation
-            # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
-
             attributes = {
-                "class1": str(improper_id[1] + 1) + f'_{mol_name}',
-                "class2": str(improper_id[0] + 1) + f'_{mol_name}',
+                "class1": str(improper_id[0] + 1) + f'_{mol_name}',
+                "class2": str(improper_id[1] + 1) + f'_{mol_name}',
                 "class3": str(improper_id[2] + 1) + f'_{mol_name}',
                 "class4": str(improper_id[3] + 1) + f'_{mol_name}',
                 "periodicity1": str(improper_data['periodicity']),

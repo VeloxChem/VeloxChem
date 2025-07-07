@@ -512,13 +512,24 @@ class QuadraticResponseDriver(NonlinearSolver):
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
 
-                qrf_rsp_func = val_E3 + val_A2 + val_X2
+                extra_sign = 1.0
 
                 # flip sign for response function
                 if (op_b_type != op_a_type) or (op_c_type != op_a_type):
-                    qrf_rsp_func *= -1.0
+                    extra_sign *= -1.0
                 if op_a_type == 'imag':
-                    qrf_rsp_func *= -1.0
+                    extra_sign *= -1.0
+
+                # we need yet another minus sign which was previously missing
+                # in finite difference reference due to the -mu operator
+                extra_sign *= -1.0
+
+                val_X2 *= extra_sign
+                val_A2 *= extra_sign
+                val_E3 *= extra_sign
+
+                # quadratic response function
+                qrf_rsp_func = val_E3 + val_A2 + val_X2
 
                 self.ostream.print_blank()
                 w_str = 'Quadratic response function: '
@@ -539,11 +550,9 @@ class QuadraticResponseDriver(NonlinearSolver):
 
                 result[('qrf', wb, wc)] = qrf_rsp_func
 
-                result['qrf_terms'] = {
-                    ('qrf_E3_term', wb, wc): val_E3,
-                    ('qrf_X2_term', wb, wc): val_X2,
-                    ('qrf_A2_term', wb, wc): val_A2,
-                }
+                result[('qrf_E3_term', wb, wc)] = val_E3
+                result[('qrf_X2_term', wb, wc)] = val_X2
+                result[('qrf_A2_term', wb, wc)] = val_A2
 
         profiler.check_memory_usage('End of QRF')
 

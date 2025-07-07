@@ -137,8 +137,8 @@
 		</Force>
 		<Force forceGroup="11" name="Reaction improper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
 			<Torsions>
-				<Torsion k="1.8409600000000002" p1="0" p2="1" p3="4" p4="5" periodicity="2" phase="3.141592653589793"/>
-				<Torsion k="1.8409600000000002" p1="1" p2="0" p3="2" p4="3" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="1.8409600000000002" p1="0" p2="1" p3="2" p4="3" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="1.8409600000000002" p1="1" p2="0" p3="4" p4="5" periodicity="2" phase="3.141592653589793"/>
 			</Torsions>
 		</Force>
 		<Force energy=" (1-l) * LjtotA + l * LjtotB; LjtotA     = (step(r - rljA) * LjA + step(rljA - r) * LjlinA);LjtotB     = (step(r - rljB) * LjB + step(rljB - r) * LjlinB);LjlinA     = ( (78*A12) / (rljAdiv^14) - (21*A6) / (rljAdiv^8) )*r^2 - ( (168*A12) / (rljAdiv^13) - (48*A6) / (rljAdiv^7) )*r + ( (91*A12) / (rljAdiv^12) - (28*A6) / (rljAdiv^6) );LjlinB     = ( (78*B12) / (rljBdiv^14) - (21*B6) / (rljBdiv^8) )*r^2 - ( (168*B12) / (rljBdiv^13) - (48*B6) / (rljBdiv^7) )*r + ( (91*B12) / (rljBdiv^12) - (28*B6) / (rljBdiv^6) );rljAdiv    = select(rljA,rljA,1);rljBdiv    = select(rljB,rljB,1);rljA       = alphalj * ( (26/7 ) * A6  * 1 ) ^ pow;rljB       = alphalj * ( (26/7 ) * B6  * 1 ) ^ pow;LjA        = A12 / r^12 - A6 / r^6;LjB        = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; alphalj   = 0.7;alphaq    = 0.3;sigmaq    = 1.0;pow       = 0.16666666666666666;" forceGroup="2" name="Reaction internal lennard-jones soft-core(int)" type="CustomBondForce" usesPeriodic="0" version="3">
