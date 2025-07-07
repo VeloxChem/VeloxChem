@@ -341,8 +341,7 @@ class ThgDriver(NonlinearSolver):
         nocc = molecule.number_of_alpha_electrons()
 
         # computing all compounded first-order densities
-        density_list1, density_list2, density_list3 = self.get_densities(
-            w, Nx, mo, nocc, norb)
+        density_list1, density_list2, density_list3 = self.get_densities(w, Nx, mo, nocc, norb)
 
         profiler.check_memory_usage('1st densities')
 
@@ -503,6 +502,7 @@ class ThgDriver(NonlinearSolver):
 
                 # create the first order two indexed densities #
 
+
                 # σ terms #
 
                 Dxx = self.commut(kx, Dx)
@@ -512,11 +512,22 @@ class ThgDriver(NonlinearSolver):
                 D_sig_xx = 6 * (3 * Dxx + Dyy + Dzz)
                 D_sig_yy = 6 * (Dxx + 3 * Dyy + Dzz)
                 D_sig_zz = 6 * (Dxx + Dyy + 3 * Dzz)
-
                 D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
                 D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
                 D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
+                # λ+τ terms #
+
+                Dxx = self.commut(kx, Dx) + self.commut(kx, Dx)
+                Dyy = self.commut(ky, Dy) + self.commut(ky, Dy)
+                Dzz = self.commut(kz, Dz) + self.commut(kz, Dz)
+
+                D_lamtau_xx = 2.0 * D_sig_xx
+                D_lamtau_yy = 2.0 * D_sig_yy
+                D_lamtau_zz = 2.0 * D_sig_zz
+                D_lamtau_xy = 2.0 * D_sig_xy 
+                D_lamtau_xz = 2.0 * D_sig_xz 
+                D_lamtau_yz = 2.0 * D_sig_yz 
 
                 # Create first order three indexed Densities #
 
@@ -524,15 +535,25 @@ class ThgDriver(NonlinearSolver):
                                    self.commut(ky, one_third * D_sig_xy) +
                                    self.commut(kz, one_third * D_sig_xz))
 
+                D_lam_sig_tau_x += (self.commut(kx, one_third * D_lamtau_xx) +
+                                    self.commut(ky, one_third * D_lamtau_xy) +
+                                    self.commut(kz, one_third * D_lamtau_xz))
 
                 D_lam_sig_tau_y = (self.commut(kx, one_third * D_sig_xy) +
                                    self.commut(ky, one_third * D_sig_yy) +
                                    self.commut(kz, one_third * D_sig_yz))
 
+                D_lam_sig_tau_y += (self.commut(kx, one_third * D_lamtau_xy) +
+                                    self.commut(ky, one_third * D_lamtau_yy) +
+                                    self.commut(kz, one_third * D_lamtau_yz))
 
                 D_lam_sig_tau_z = (self.commut(kx, one_third * D_sig_xz) +
                                    self.commut(ky, one_third * D_sig_yz) +
                                    self.commut(kz, one_third * D_sig_zz))
+
+                D_lam_sig_tau_z += (self.commut(kx, one_third * D_lamtau_xz) +
+                                    self.commut(ky, one_third * D_lamtau_yz) +
+                                    self.commut(kz, one_third * D_lamtau_zz))
                 
                 # density transformation from MO to AO basis
 
@@ -740,7 +761,7 @@ class ThgDriver(NonlinearSolver):
 
         :return:
             A dictonary of compounded E[4] tensors for the isotropic cubic
-            response function for thg
+            response function for TPA
         """
 
         f_iso_x = {}
@@ -777,6 +798,7 @@ class ThgDriver(NonlinearSolver):
 
             (Fx, Fy, Fz, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy,
              f_sig_xz, f_sig_yz, f_x, f_y, f_z) = vec_pack
+
 
             F0 = fo['F0']
 
@@ -816,6 +838,21 @@ class ThgDriver(NonlinearSolver):
             Pyy = self.phi(ky, ky, Fy, F0) + self.phi(ky, ky, Fy, F0)
             Pzz = self.phi(kz, kz, Fz, F0) + self.phi(kz, kz, Fz, F0)
 
+            Phi_lamtau_xx = 2 * (3 * Pxx + Pyy + Pzz)
+            Phi_lamtau_yy = 2 * (Pxx + 3 * Pyy + Pzz)
+            Phi_lamtau_zz = 2 * (Pxx + Pyy + 3 * Pzz)
+
+            Phi_lamtau_xy = 2 * (
+                self.phi(kx, ky, Fy, F0) + self.phi(ky, kx, Fx, F0) +
+                self.phi(kx, ky, Fy, F0) + self.phi(ky, kx, Fx, F0))
+
+            Phi_lamtau_xz = 2 * (
+                self.phi(kx, kz, Fz, F0) + self.phi(kz, kx, Fx, F0) +
+                self.phi(kx, kz, Fz, F0) + self.phi(kz, kx, Fx, F0))
+
+            Phi_lamtau_yz = 2 * (
+                self.phi(ky, kz, Fz, F0) + self.phi(kz, ky, Fy, F0) +
+                self.phi(ky, kz, Fz, F0) + self.phi(kz, ky, Fy, F0))
 
             # Computess all the elements of the Fock vector formed from the
             # E[4] contraction as E[4]NxNyNz = [f_{is} // f_{si}], for the
@@ -827,7 +864,21 @@ class ThgDriver(NonlinearSolver):
 
             # x
 
+            f_lamtau_xx = 2.0 * f_sig_xx
+            f_lamtau_xy = 2.0 * f_sig_xy
+            f_lamtau_xz = 2.0 * f_sig_xz
+            f_lamtau_yy = 2.0 * f_sig_yy
+            f_lamtau_yz = 2.0 * f_sig_yz
+            f_lamtau_zz = 2.0 * f_sig_zz
+            f_lamtau_xz = 2.0 * f_sig_xz
+            f_lamtau_zz = 2.0 * f_sig_zz
+            f_lamtau_yz = 2.0 * f_sig_yz
+
+                
             # Creating the transformed total Fock matrices
+            f_x += (self.commut(kx, Phi_lamtau_xx + f_lamtau_xx) +
+                    self.commut(ky, Phi_lamtau_xy + f_lamtau_xy) +
+                    self.commut(kz, Phi_lamtau_xz + f_lamtau_xz))
             
             f_x += (self.commut(kx, Phi_sig_xx + f_sig_xx) +
                     self.commut(ky, Phi_sig_xy + f_sig_xy) +
@@ -842,7 +893,9 @@ class ThgDriver(NonlinearSolver):
             # y
 
             # Creating the transformed total Fock matrices
-
+            f_y += (self.commut(kx, Phi_lamtau_xy + f_lamtau_xy) +
+                    self.commut(ky, Phi_lamtau_yy + f_lamtau_yy) +
+                    self.commut(kz, Phi_lamtau_yz + f_lamtau_yz))
             f_y += (self.commut(kx, Phi_sig_xy + f_sig_xy) +
                     self.commut(ky, Phi_sig_yy + f_sig_yy) +
                     self.commut(kz, Phi_sig_yz + f_sig_yz))
@@ -856,6 +909,9 @@ class ThgDriver(NonlinearSolver):
             # z
 
             # Creating the transformed total Fock matrices
+            f_z += (self.commut(kx, Phi_lamtau_xz + f_lamtau_xz) +
+                    self.commut(ky, Phi_lamtau_yz + f_lamtau_yz) +
+                    self.commut(kz, Phi_lamtau_zz + f_lamtau_zz))
             f_z += (self.commut(kx, Phi_sig_xz + f_sig_xz) +
                     self.commut(ky, Phi_sig_yz + f_sig_yz) +
                     self.commut(kz, Phi_sig_zz + f_sig_zz))
@@ -992,6 +1048,15 @@ class ThgDriver(NonlinearSolver):
                 k_sig_xz = self.complex_lrvec2mat(n_sig_xz, nocc, norb)
                 k_sig_yz = self.complex_lrvec2mat(n_sig_yz, nocc, norb)
 
+
+                k_lamtau_xx =  2.0 * k_sig_xx
+                k_lamtau_yy =  2.0 * k_sig_yy
+                k_lamtau_zz =  2.0 * k_sig_zz
+                k_lamtau_xy =  2.0 * k_sig_xy
+                k_lamtau_xz =  2.0 * k_sig_xz
+                k_lamtau_yz =  2.0 * k_sig_yz
+
+
                 kx = self.complex_lrvec2mat(nx, nocc, norb)
                 ky = self.complex_lrvec2mat(ny, nocc, norb)
                 kz = self.complex_lrvec2mat(nz, nocc, norb)
@@ -1002,40 +1067,69 @@ class ThgDriver(NonlinearSolver):
                 Dc_y = self.commut_mo_density(ky, nocc)
                 Dc_z = self.commut_mo_density(kz, nocc)
 
+                Db_x = Dc_x
+                Db_y = Dc_y
+                Db_z = Dc_z
+
                 D_sig_xx = self.commut_mo_density(k_sig_xx, nocc)
                 D_sig_yy = self.commut_mo_density(k_sig_yy, nocc)
                 D_sig_zz = self.commut_mo_density(k_sig_zz, nocc)
-
                 D_sig_xy = self.commut_mo_density(k_sig_xy, nocc)
                 D_sig_xz = self.commut_mo_density(k_sig_xz, nocc)
                 D_sig_yz = self.commut_mo_density(k_sig_yz, nocc)
 
-              
-                # x #
-                Dx = self.commut(kx, D_sig_xx)
-                Dx += self.commut(k_sig_xx, Dc_x)
-                Dx += self.commut(ky, D_sig_xy)
-                Dx += self.commut(k_sig_xy, Dc_y)
-                Dx += self.commut(kz, D_sig_xz)
-                Dx += self.commut(k_sig_xz, Dc_z)
+                D_lamtau_xx =  2.0 * D_sig_xx
+                D_lamtau_yy =  2.0 * D_sig_yy
+                D_lamtau_zz =  2.0 * D_sig_zz
+                D_lamtau_xy =  2.0 * D_sig_xy
+                D_lamtau_xz =  2.0 * D_sig_xz
+                D_lamtau_yz =  2.0 * D_sig_yz
 
+
+                # x #
+                Dx =  3.0 * self.commut(kx, D_sig_xx)
+                Dx += 3.0 * self.commut(k_sig_xx, Dc_x)
+                Dx += 3.0 * self.commut(ky, D_sig_xy)
+                Dx += 3.0 * self.commut(k_sig_xy, Dc_y)
+                Dx += 3.0 * self.commut(kz, D_sig_xz)
+                Dx += 3.0 * self.commut(k_sig_xz, Dc_z)
+
+                #Dx += self.commut(kx, D_lamtau_xx)
+                #Dx += self.commut(k_lamtau_xx, Db_x)
+                #Dx += self.commut(ky, D_lamtau_xy)
+                #Dx += self.commut(k_lamtau_xy, Db_y)
+                #Dx += self.commut(kz, D_lamtau_xz)
+                #Dx += self.commut(k_lamtau_xz, Db_z)
 
                 # y #
-                Dy = self.commut(kx, D_sig_xy)
-                Dy += self.commut(k_sig_xy, Dc_x)
-                Dy += self.commut(ky, D_sig_yy)
-                Dy += self.commut(k_sig_yy, Dc_y)
-                Dy += self.commut(kz, D_sig_yz)
-                Dy += self.commut(k_sig_yz, Dc_z)
+                Dy =  3.0 * self.commut(kx, D_sig_xy)
+                Dy += 3.0 * self.commut(k_sig_xy, Dc_x)
+                Dy += 3.0 * self.commut(ky, D_sig_yy)
+                Dy += 3.0 * self.commut(k_sig_yy, Dc_y)
+                Dy += 3.0 * self.commut(kz, D_sig_yz)
+                Dy += 3.0 * self.commut(k_sig_yz, Dc_z)
 
+                #Dy += self.commut(kx, D_lamtau_xy)
+                #Dy += self.commut(k_lamtau_xy, Db_x)
+                #Dy += self.commut(ky, D_lamtau_yy)
+                #Dy += self.commut(k_lamtau_yy, Db_y)
+                #Dy += self.commut(kz, D_lamtau_yz)
+                #Dy += self.commut(k_lamtau_yz, Db_z)
 
                 # z #
-                Dz = self.commut(kx, D_sig_xz)
-                Dz += self.commut(k_sig_xz, Dc_x)
-                Dz += self.commut(ky, D_sig_yz)
-                Dz += self.commut(k_sig_yz, Dc_y)
-                Dz += self.commut(kz, D_sig_zz)
-                Dz += self.commut(k_sig_zz, Dc_z)
+                Dz =  3.0 * self.commut(kx, D_sig_xz)
+                Dz += 3.0 * self.commut(k_sig_xz, Dc_x)
+                Dz += 3.0 * self.commut(ky, D_sig_yz)
+                Dz += 3.0 * self.commut(k_sig_yz, Dc_y)
+                Dz += 3.0 * self.commut(kz, D_sig_zz)
+                Dz += 3.0 * self.commut(k_sig_zz, Dc_z)
+
+                #Dz += self.commut(kx, D_lamtau_xz)
+                #Dz += self.commut(k_lamtau_xz, Db_x)
+                #Dz += self.commut(ky, D_lamtau_yz)
+                #Dz += self.commut(k_lamtau_yz, Db_y)
+                #Dz += self.commut(kz, D_lamtau_zz)
+                #Dz += self.commut(k_lamtau_zz, Db_z)
 
 
                 # density transformation from MO to AO basis
@@ -1345,7 +1439,7 @@ class ThgDriver(NonlinearSolver):
 
         :return:
             A dictonary of compounded E[3] tensors for the isotropic cubic
-            response function for thg
+            response function for TPA
         """
 
         f_iso_x = {}
@@ -1375,28 +1469,34 @@ class ThgDriver(NonlinearSolver):
             ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
             nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
 
-            n_sig_xx = ComplexResponse.get_full_solution_vector( Nxy[(('N_sig_xx', w), 2 * w)])
+            n_sig_xx = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xx', w), 2 * w)])
             n_sig_yy = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yy', w), 2 * w)])
             n_sig_zz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_zz', w), 2 * w)])
             n_sig_xy = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xy', w), 2 * w)])
             n_sig_xz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xz', w), 2 * w)])
             n_sig_yz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yz', w), 2 * w)])
 
+
             if self.rank != mpi_master():
                 continue
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,f_sig_yz, F123_x, F123_y, F123_z) = vec_pack
-
+            (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz, f_sig_yz, F123_x, F123_y, F123_z) = vec_pack
 
             f_sig_xx = f_sig_xx.T.conj()
             f_sig_yy = f_sig_yy.T.conj()
             f_sig_zz = f_sig_zz.T.conj()
-
             f_sig_xy = f_sig_xy.T.conj()
             f_sig_xz = f_sig_xz.T.conj()
             f_sig_yz = f_sig_yz.T.conj()
+
+            f_lamtau_xx = 2.0 * f_sig_xx
+            f_lamtau_yy = 2.0 * f_sig_yy
+            f_lamtau_zz = 2.0 * f_sig_zz
+            f_lamtau_xy = 2.0 * f_sig_xy
+            f_lamtau_xz = 2.0 * f_sig_xz
+            f_lamtau_yz = 2.0 * f_sig_yz
 
             F0_a = fo['F0']
 
@@ -1413,6 +1513,13 @@ class ThgDriver(NonlinearSolver):
             k_sig_xz = (self.complex_lrvec2mat(n_sig_xz, nocc, norb)).T
             k_sig_yz = (self.complex_lrvec2mat(n_sig_yz, nocc, norb)).T
 
+            k_lamtau_xx = 2.0 * k_sig_xx
+            k_lamtau_yy = 2.0 * k_sig_yy
+            k_lamtau_zz = 2.0 * k_sig_zz
+            k_lamtau_xy = 2.0 * k_sig_xy
+            k_lamtau_xz = 2.0 * k_sig_xz
+            k_lamtau_yz = 2.0 * k_sig_yz
+
             # Focks #
 
             # x
@@ -1423,10 +1530,13 @@ class ThgDriver(NonlinearSolver):
             zeta_sig_xy = self._xi(k_y, k_sig_xy, f_y, f_sig_xy, F0_a)
             zeta_sig_xz = self._xi(k_z, k_sig_xz, f_z, f_sig_xz, F0_a)
 
-        
-            X_terms = (zeta_sig_xx + zeta_sig_xy +
-                       zeta_sig_xz).T  + (0.5 * F123_x).T
-            
+            zeta_lamtau_xx = self._xi(k_x, k_lamtau_xx, f_x, f_lamtau_xx, F0_a)
+            zeta_lamtau_yy = self._xi(k_x, k_lamtau_yy, f_x, f_lamtau_yy, F0_a)
+            zeta_lamtau_zz = self._xi(k_x, k_lamtau_zz, f_x, f_lamtau_zz, F0_a)
+            zeta_lamtau_xy = self._xi(k_y, k_lamtau_xy, f_y, f_lamtau_xy, F0_a)
+            zeta_lamtau_xz = self._xi(k_z, k_lamtau_xz, f_z, f_lamtau_xz, F0_a)
+
+            X_terms = (zeta_sig_xx + zeta_sig_xy + zeta_sig_xz).T + (zeta_lamtau_xx + zeta_lamtau_xy + zeta_lamtau_xz).T + (0.5 * F123_x).T
             Ff_x = -2 * LinearSolver.lrmat2vec(X_terms, nocc, norb)
             Ff_x = self.anti_sym(Ff_x)
             f_iso_x[w] = Ff_x
@@ -1437,8 +1547,11 @@ class ThgDriver(NonlinearSolver):
             zeta_sig_yy = self._xi(k_y, k_sig_yy, f_y, f_sig_yy, F0_a)
             zeta_sig_yz = self._xi(k_z, k_sig_yz, f_z, f_sig_yz, F0_a)
 
-            Y_terms = (zeta_sig_yx + zeta_sig_yy +
-                       zeta_sig_yz).T + (0.5 * F123_y).T
+            zeta_lamtau_yx = self._xi(k_x, k_lamtau_xy, f_x, f_lamtau_xy, F0_a)
+            zeta_lamtau_yy = self._xi(k_y, k_lamtau_yy, f_y, f_lamtau_yy, F0_a)
+            zeta_lamtau_yz = self._xi(k_z, k_lamtau_yz, f_z, f_lamtau_yz, F0_a)
+
+            Y_terms = (zeta_sig_yx + zeta_sig_yy + zeta_sig_yz).T + (zeta_lamtau_yx + zeta_lamtau_yy + zeta_lamtau_yz).T + (0.5 * F123_y).T
             Ff_y = -2 * LinearSolver.lrmat2vec(Y_terms, nocc, norb)
             Ff_y = self.anti_sym(Ff_y)
             f_iso_y[w] = Ff_y
@@ -1449,9 +1562,11 @@ class ThgDriver(NonlinearSolver):
             zeta_sig_zy = self._xi(k_y, k_sig_yz, f_y, f_sig_yz, F0_a)
             zeta_sig_zz = self._xi(k_z, k_sig_zz, f_z, f_sig_zz, F0_a)
 
-            Z_terms = (zeta_sig_zx + zeta_sig_zy +
-                       zeta_sig_zz).T + (0.5 * F123_z).T
-            
+            zeta_lamtau_zx = self._xi(k_x, k_lamtau_xz, f_x, f_lamtau_xz, F0_a)
+            zeta_lamtau_zy = self._xi(k_y, k_lamtau_yz, f_y, f_lamtau_yz, F0_a)
+            zeta_lamtau_zz = self._xi(k_z, k_lamtau_zz, f_z, f_lamtau_zz, F0_a)
+
+            Z_terms = (zeta_sig_zx + zeta_sig_zy + zeta_sig_zz).T + (zeta_lamtau_zx + zeta_lamtau_zy + zeta_lamtau_zz).T + (0.5 * F123_z).T
             Ff_z = -2 * LinearSolver.lrmat2vec(Z_terms, nocc, norb)
             Ff_z = self.anti_sym(Ff_z)
             f_iso_z[w] = Ff_z
@@ -1814,9 +1929,9 @@ class ThgDriver(NonlinearSolver):
             w = float(vals[1])
             ww = float(vals[1])
 
-            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', 3 * w)])
+            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', 3 * w)])
+            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', 3 * w)])
 
             if self.rank == mpi_master():
                 t4val = (np.dot(na_x, e4_dict['f_iso_x'][ww] - S4[('x', ww)]) +
@@ -1867,9 +1982,9 @@ class ThgDriver(NonlinearSolver):
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', 3.0 * w)])
+            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', 3.0 * w)])
+            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', 3.0 * w)])
 
             if self.rank == mpi_master():
 
