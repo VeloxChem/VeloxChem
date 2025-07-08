@@ -104,6 +104,7 @@ class TransitionStateGuesser():
         scf_drv=None,
         constraints=None,
         reparameterize=True,
+        mm_opt_constrain_bonds=True
     ):
         """Find a guess for the transition state using a force field scan.
 
@@ -131,6 +132,7 @@ class TransitionStateGuesser():
             product_total_multiplicity=product_total_multiplicity,
             breaking_bonds=breaking_bonds,
             reparameterize=reparameterize,
+            mm_opt_constrain_bonds=mm_opt_constrain_bonds,
         )
         if self.mute_evb:
             evb_drv.ostream.mute()
@@ -139,7 +141,7 @@ class TransitionStateGuesser():
         if scf:
             molecule_sanity_check(self.evb_drv.reactant.molecule)
 
-        self.molecule = self.evb_drv.reactant.molecule
+        self.molecule = Molecule.read_xyz_string(self.evb_drv.reactant.molecule.get_xyz_string())
         print(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
@@ -150,15 +152,16 @@ class TransitionStateGuesser():
             self.lambda_vec,
             constraints=constraints,
         )
+        self.lambda_vec = self.evb_drv.Lambda
         self.ostream.print_blank()
         self.ostream.print_header("Starting MM scan")
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
         self.ostream.flush()
-        mm_energies, mm_geometries, ff_exception = self._scan_ff(self.evb_drv)
+        mm_energies, mm_geometries, ff_exception = self._scan_ff()
         xyz_geometries = []
         for mm_geom in mm_geometries:
             xyz_geom = self._mm_to_xyz_geom(mm_geom,
-                                            self.evb_drv.reactant.molecule)
+                                            self.molecule)
             xyz_geometries.append(xyz_geom)
         self.results = {
             'mm_energies': mm_energies,
@@ -353,12 +356,12 @@ class TransitionStateGuesser():
             atoms.update({i: atom})
         return atoms
 
-    def _scan_ff(self, EVB):
+    def _scan_ff(self):
         energies = []
         positions = []
-        initial_positions = EVB.system_confs[0]['initial_positions']  #in nm
+        initial_positions = self.evb_drv.system_confs[0]['initial_positions']  #in nm
 
-        topology = EVB.system_confs[0]['topology']
+        topology = self.evb_drv.system_confs[0]['topology']
         if self.save_mm_traj:
             if not os.path.exists('ts_data'):
                 os.makedirs('ts_data')
@@ -374,12 +377,13 @@ class TransitionStateGuesser():
         exception = None
         mm_P = initial_positions
         try:
-            for l in self.lambda_vec:
+            for l in self.evb_drv.Lambda:
                 integrator = mm.VerletIntegrator(self.mm_step_size)
                 simulation = mmapp.Simulation(topology,
-                                              EVB.system_confs[0]['systems'][l],
+                                              self.evb_drv.system_confs[0]['systems'][l],
                                               integrator)
                 simulation.context.setPositions(mm_P)
+                simulation.context.setVelocitiesToTemperature(300 * mmunit.kelvin)
 
                 simulation.minimizeEnergy()
                 if self.save_mm_traj:
@@ -426,12 +430,18 @@ class TransitionStateGuesser():
 
     def _scan_scf(self):
         scf_energies = []
-        for i, l in enumerate(self.lambda_vec):
+        ref = 0
+        for i, l in enumerate(self.evb_drv.Lambda):
             geom = self.results['mm_geometries'][i]
             scf_E = self._get_scf_energy(geom)
+            if i == 0:
+                ref = scf_E
+                dif = 0
+            else:
+                dif = scf_E - ref
             scf_energies.append(scf_E)
             self.ostream.print_info(
-                f"Lambda: {l}, SCF Energy: {scf_E:.3f} kJ/mol")
+                f"Lambda: {l}, SCF Energy: {scf_E:.3f} kJ/mol, difference: {dif:.3f} kJ/mol")
             self.ostream.flush()
 
         self.results['scf_energies'] = scf_energies
