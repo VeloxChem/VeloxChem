@@ -426,7 +426,7 @@ class ThgDriver(NonlinearSolver):
         ret_dict = {}
 
         if self.rank == mpi_master():
-            gamma = {}
+            THG = {}
 
             for w in self.frequencies:
                 sum_val = t3_dict[(w, w, w)]
@@ -434,15 +434,15 @@ class ThgDriver(NonlinearSolver):
                     sum_val += t4_dict[(w, w, w)]
                 for key, val in other_dict.items():
                     sum_val += val[(w, w, w)]
-                gamma[(w, w, w)] = sum_val
+                THG[(w, w, w)] = sum_val.real
 
             ret_dict.update(other_dict)
 
             ret_dict.update({
                 't4_dict': t4_dict,
                 't3_dict': t3_dict,
-                 'other': other_dict,
-                'gamma': gamma,
+                'other': other_dict,
+                'THG': THG,
                 'frequencies': list(self.frequencies),
             })
 
@@ -2087,37 +2087,35 @@ class ThgDriver(NonlinearSolver):
             A dictionary containing the results of response calculation.
         """
 
-        print("rsp_results", rsp_results.keys())
-
         freqs = rsp_results['frequencies']
-        components_to_print = ['gamma', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz', 'NxA2Nyz', 't4_dict', 't3_dict']
+        component = 'THG'
 
         self.ostream.print_blank()
 
-        w_str = 'Isotropic Average of gamma and Other Tensors at Given Frequencies'
+        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Thid-Harmonic Generation (THG) intensities'
         self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        title = '{:<12s} {:>12s} {:>20s} {:>21s}'.format('Component', 'Frequency', 'Real', 'Imaginary')
+        # Updated header with only two columns
+        title = '{:>12s} {:>25s}'.format('Frequency', 'THG intensity (a.u.)')
         width = len(title)
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header(('-' * len(title)).ljust(width))
 
-        for w in freqs:
-            for comp in components_to_print:
-                tensor = rsp_results.get(comp)
-                if tensor is None:
-                    continue
+        tensor = rsp_results.get(component)
+        if tensor is not None:
+            for w in freqs:
                 key = (w, w, w)
                 val = tensor.get(key)
                 if val is not None:
-                    self._print_component(comp, w, val, width)
+                    intensity = val.real if hasattr(val, 'real') else val
+                    line = '{:>12.4f} {:>25.8f}'.format(w, intensity)
+                    self.ostream.print_header(line.ljust(width))
                 else:
-                    self.ostream.print_header(f"{comp:<12s} {w:>12.4f} {'N/A':>20} {'N/A':>21}")
+                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
 
         self.ostream.print_blank()
-
         self.ostream.print_header('Reference:'.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()
