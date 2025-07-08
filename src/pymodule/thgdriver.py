@@ -864,6 +864,7 @@ class ThgDriver(NonlinearSolver):
 
             # x
                 
+
             # Creating the transformed total Fock matrices
             f_x += (self.commut(kx, Phi_sig_xx + Phi_lamtau_xx +  3.0 * f_sig_xx) +
                     self.commut(ky, Phi_sig_xy + Phi_lamtau_xy +  3.0 * f_sig_xy) +

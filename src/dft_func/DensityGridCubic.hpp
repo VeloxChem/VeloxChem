@@ -534,6 +534,10 @@ class CDensityGridCubic
                                 const CDensityGrid& rw2DensityGrid,
                                 const int           numdens);
 
+    void DensityProdForMGGA_THG(const CDensityGrid& rwDensityGrid,
+                                const CDensityGrid& rw2DensityGrid,
+                                const int           numdens);
+
     void DensityProdForMGGA_CRF(const CDensityGrid& rwDensityGrid,
                                 const CDensityGrid& rw2DensityGrid,
                                 const int           numdens);
