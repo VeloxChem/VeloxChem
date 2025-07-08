@@ -77,6 +77,8 @@ try:
 except ImportError:
     pass
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import partial
 
 def _worker_error_func(mol, qm_e_i, alphas, z_matrix,
              dps, impes_dict, sym_datapoints, sym_dict):
