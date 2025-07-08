@@ -1575,7 +1575,7 @@ class IMForceFieldGenerator:
                     
                     print(f'\n\n ########## Step {i} ######### \n')
                     print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()} kcal/mol \n')
-                    if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() > self.energy_threshold and improve == True or 1 == 1:
+                    if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() > self.energy_threshold and improve == True:
 
                         print(mol.get_xyz_string())
 
