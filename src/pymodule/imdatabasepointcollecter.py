@@ -77,8 +77,10 @@ try:
 except ImportError:
     pass
 
+
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import partial
+
 
 def _worker_error_func(mol, qm_e_i, alphas, z_matrix,
              dps, impes_dict, sym_datapoints, sym_dict):
@@ -2328,10 +2330,8 @@ class IMDatabasePointCollecter:
                     
                     if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
 
-                        opt_qm_driver = ScfRestrictedDriver()
-                        opt_qm_driver.xcfun = 'b3lyp'
-                        _, scf_tensors = self.compute_energy(opt_qm_driver, molecule, current_basis)
-                        opt_drv = OptimizationDriver(opt_qm_driver)
+                        _, scf_tensors = self.compute_energy(self.drivers['ground_state'][0], molecule, current_basis)
+                        opt_drv = OptimizationDriver(self.drivers['ground_state'][0])
                         opt_drv.ostream.mute()
                         
                         opt_constraint_list = []
@@ -2976,18 +2976,35 @@ class IMDatabasePointCollecter:
 
             # Minimizer expects a function returning just the objective,
             # plus a function returning the gradient if we pass `jac=True`.
-            res = minimize(
-                fun = obj_energy_function_parallel,
-                x0 = alphas,
-                args = args,
-                method='L-BFGS-B',
-                jac = obj_gradient_function_parallel,
-                bounds=[(-10.0, 10.0)],
-                options={'disp': True}
-            )
+            if len(alphas) > 50 and len(geom_list) > 100:
+            
+                res = minimize(
+                    fun = obj_energy_function_parallel,
+                    x0 = alphas,
+                    args = args,
+                    method='L-BFGS-B',
+                    jac = obj_gradient_function_parallel,
+                    bounds=[(-10.0, 10.0)],
+                    options={'disp': True}
+                )
 
-            # res.x is the optimal R, res.fun is F(R) at optimum
-            return res
+                # res.x is the optimal R, res.fun is F(R) at optimum
+                return res
+            
+            else:
+            
+                res = minimize(
+                    fun = obj_energy_function,
+                    x0 = alphas,
+                    args = args,
+                    method='L-BFGS-B',
+                    jac = obj_gradient_function,
+                    bounds=[(-10.0, 10.0)],
+                    options={'disp': True}
+                )
+
+                # res.x is the optimal R, res.fun is F(R) at optimum
+                return res
         
 
         inital_alphas = [dp.confidence_radius for dp in datapoints]

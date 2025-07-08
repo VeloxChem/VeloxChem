@@ -885,12 +885,10 @@ class IMForceFieldGenerator:
                                 energy = None
                                 self.use_minimized_structures[1].append(key)
                                 if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
-                                
-                                    opt_qm_driver = ScfRestrictedDriver()
-                                    opt_qm_driver.xcfun = 'b3lyp'
-                                    opt_drv = OptimizationDriver(opt_qm_driver)
+
+                                    opt_drv = OptimizationDriver(self.drivers['ground_state'][0])
                                     current_basis = MolecularBasis.read(mol, 'def2-svp')
-                                    _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
+                                    _, scf_results = self.compute_energy(self.drivers['ground_state'][0], mol, current_basis)
                                     opt_drv.ostream.mute()
                                     
                                     opt_constraint_list = []
@@ -1028,7 +1026,7 @@ class IMForceFieldGenerator:
                             self.unique_molecules.append(im_database_driver.allowed_molecules)
                         
                         entries = list(self.molecules_along_rp.values())
-                        # self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
+                        self.confirm_database_quality(molecule, self.states_interpolation_settings, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
 
             
             desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
@@ -1395,7 +1393,7 @@ class IMForceFieldGenerator:
         return all_structures
 
 
-    def confirm_database_quality(self, molecule, im_database_files, basis, given_molecular_strucutres=None, improve=True):
+    def confirm_database_quality(self, molecule, states_interpolation_settings, basis, given_molecular_strucutres=None, improve=True):
         """Validates the quality of an interpolation database for a given molecule.
 
        This function assesses the quality of the provided interpolation database 
@@ -1440,8 +1438,9 @@ class IMForceFieldGenerator:
             else:
                 drivers = self.drivers['excited_state']
             all_structures = given_molecular_strucutres[root]
-            datapoint_molecules, _ = self.database_extracter(im_database_files[root], molecule.get_labels())
-            current_datafile = im_database_files[root]
+            current_datafile = states_interpolation_settings[root]['imforcefield_file']
+            datapoint_molecules, _ = self.database_extracter(current_datafile, molecule.get_labels())
+            
             if len(all_structures) == 0:
                 continue
 
@@ -1456,51 +1455,60 @@ class IMForceFieldGenerator:
                 counter = 0
                 # if given_molecular_strucutres is not None:
                 #     random_structure_choices = given_molecular_strucutres
-                
-                while rmsd < 0.3 and counter <= 20:
+                dist_ok = False
+                while dist_ok == False and counter <= 20:
+                    print('Dihedrals dict is given here', self.dihedrals_dict)
                     if self.dihedrals_dict is not None:
-                        desired_angles = np.linspace(0, 360, 36)
-                        angles_mols = {int(angle):[] for angle in desired_angles}
-
-                        keys = list(angles_mols.keys())
-                        for mol in all_structures:  
-                            mol_angle = (mol.get_dihedral_in_degrees(self.dihedrals[0]) + 360) % 360
-                            
-                            
-                            for i in range(len(desired_angles) - 1):
-                                
-                                if keys[i] <= mol_angle < keys[i + 1]:
-                                    angles_mols[keys[i]].append(mol)
-                                    break
-                        
-                        # List to hold selected molecules
                         selected_molecules = []
-                        total_molecules = sum(len(mols) for mols in angles_mols.values())
+                        for entries in self.dihedrals_dict:
+                            specific_dihedral = entries[0]
+                            n_sampling = entries[1]
+                            state = entries[2]
+                            if state != root:
+                                continue
+                            start = entries[3]
+                            desired_angles = np.linspace(0, 360, 36)
+                            angles_mols = {int(angle):[] for angle in desired_angles}
 
-                        # Adaptive selection based on bin sizes
-            
-                        for angle_bin, molecules_in_bin in angles_mols.items():
-                            num_mols_in_bin = len(molecules_in_bin)
+                            keys = list(angles_mols.keys())
 
-                            if num_mols_in_bin == 0:
-                                continue  # Skip empty bins
+                            for mol in all_structures:  
+                                mol_angle = (mol.get_dihedral_in_degrees(specific_dihedral) + 360) % 360
+                                
+                                
+                                for i in range(len(desired_angles) - 1):
+                                    
+                                    if keys[i] <= mol_angle < keys[i + 1]:
+                                        angles_mols[keys[i]].append(mol)
+                                        break
+                        
+                            # List to hold selected molecules
+                            
+                            total_molecules = sum(len(mols) for mols in angles_mols.values())
 
-                            # If 2 or fewer molecules, take all
-                            elif num_mols_in_bin <= 2:
-                                selected_molecules.extend(molecules_in_bin)
+                            # Adaptive selection based on bin sizes
+                
+                            for angle_bin, molecules_in_bin in angles_mols.items():
+                                num_mols_in_bin = len(molecules_in_bin)
 
-                            else:
-                                # Calculate proportional number of molecules to select
-                                proportion = num_mols_in_bin / total_molecules
-                                num_to_select = max(1, math.ceil(proportion * self.nstruc_to_confirm_database_quality))
+                                if num_mols_in_bin == 0:
+                                    continue  # Skip empty bins
 
-                                # Randomly select the proportional number
-                                selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
-                                selected_molecules.extend(selected_mols)
+                                # If 2 or fewer molecules, take all
+                                elif num_mols_in_bin <= 2:
+                                    selected_molecules.extend(molecules_in_bin)
+
+                                else:
+                                    # Calculate proportional number of molecules to select
+                                    proportion = num_mols_in_bin / total_molecules
+                                    num_to_select = max(1, math.ceil(proportion * self.nstruc_to_confirm_database_quality))
+
+                                    # Randomly select the proportional number
+                                    selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
+                                    selected_molecules.extend(selected_mols)
                     else:
                         selected_molecules = random.sample(all_structures, min(self.nstruc_to_confirm_database_quality, len(all_structures)))
-                    
-                                
+                          
                     individual_distances = []
                     random_structure_choices = selected_molecules
                     for datapoint_molecule in datapoint_molecules:
@@ -1511,31 +1519,50 @@ class IMForceFieldGenerator:
                     
                     rmsd = min(individual_distances)
                     counter += 1
-                    if rmsd >= 0.3:
+                    if rmsd >= 0.1:
                         print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
+                        dist_ok = True
                     else:
                         print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
                 
+                # if self.roots_to_follow[0] == 0 and energy is None:
+                #     energy, scf_results = self.compute_energy(self.drivers['ground_state'][0], optimized_molecule, current_basis)
+                # elif self.roots_to_follow[0] > 0 and energy is None:
+                #     energy, scf_results = self.compute_energy(self.drivers['excited_state'][0], optimized_molecule, current_basis)
+                impes_driver = InterpolationDriver(self.z_matrix)
+                impes_driver.update_settings(states_interpolation_settings[root])
+                if root == 0:
+                    impes_driver.symmetry_information = self.symmetry_information['gs']
+                else:
+                    impes_driver.symmetry_information = self.symmetry_information['es']
                 
+                old_label = None
+                im_labels, _ = impes_driver.read_labels()
+                impes_driver.qm_data_points = []
+                for label in im_labels:
+                    if '_symmetry' not in label:
+                        qm_data_point = InterpolationDatapoint(self.z_matrix)
+                        qm_data_point.read_hdf5(current_datafile, label)
+                        
+                        old_label = qm_data_point.point_label
+                        impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
+                        impes_driver.qm_data_points.append(qm_data_point)
+
+                    else:
+                        symmetry_data_point = InterpolationDatapoint(self.z_matrix)
+                        symmetry_data_point.read_hdf5(current_datafile, label)
+                        
+                        impes_driver.qm_symmetry_data_points[old_label].append(symmetry_data_point)
+
+
                 qm_energies = []
                 im_energies = []
-                impes_driver = InterpolationDriver()
-                impes_driver.update_settings(self.states_interpolation_settings[root])
-                impes_driver.imforcefield_file = current_datafile
-                labels, z_matrix = impes_driver.read_labels()
-                impes_driver.impes_coordinate.z_matrix = z_matrix
-                impes_driver.symmetry_sub_groups = symmetry_groups
-                sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
 
                 for i, mol in enumerate(random_structure_choices):
 
                     current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
-                    impes_driver.compute(mol, labels=sorted_labels)
+                    impes_driver.compute(mol)
                     reference_energy, scf_results = self.compute_energy(drivers[0], mol, current_basis)
-                    while scf_results is None and isinstance(drivers[0], ScfRestrictedDriver):
-                        new_mol = Molecule.from_xyz_string(mol.get_xyz_string())
-                        current_basis = MolecularBasis.read(new_mol, basis.get_main_basis_label())
-                        reference_energy, scf_results = self.compute_energy(drivers[0], new_mol, current_basis)
                     
                     current_element = 0
                     if root >= 1:
@@ -1548,75 +1575,102 @@ class IMForceFieldGenerator:
                     
                     print(f'\n\n ########## Step {i} ######### \n')
                     print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()} kcal/mol \n')
-                    if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() > self.energy_threshold and improve == True:
+                    if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() > self.energy_threshold and improve == True or 1 == 1:
+
                         print(mol.get_xyz_string())
 
-                        if self.minimize:
-                            ############# Implement constraint optimization ############
-                            opt_qm_driver = ScfRestrictedDriver()
-                            opt_qm_driver.xcfun = 'b3lyp'
-
-                            opt_drv = OptimizationDriver(opt_qm_driver)
-                            opt_drv.ostream.mute()
-                            
-                            interpolation_driver = InterpolationDriver(z_matrix)
-                            interpolation_driver.update_settings(self.states_interpolation_settings[root])
-
-                            interpolation_driver.distance_thrsh = 1000
-                            interpolation_driver.exponent_p = 2
-                            interpolation_driver.store_weights = True
-                            interpolation_driver.symmetry_sub_groups = symmetry_groups
-                            interpolation_driver.compute(mol)
-                            current_weights = interpolation_driver.weights
+                        if self.use_minimized_structures[0]:
+                            current_weights = impes_driver.weights
 
                             weights = [value for _, value in current_weights.items()]
-                            sorted_weights = sorted(weights, reverse=True)
+                            used_labels = [label_idx for label_idx, _ in current_weights.items()]
 
+                            # Sort labels and weights by descending weight
+                            sorted_items = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
+
+                            total_weight = sum(weights)
+                            cumulative_weight = 0.0
                             internal_coordinate_datapoints = []
-                            for i, weight in enumerate(sorted_weights):
-                                
-                                if weight >= max(weights) - 0.2:
-                                    label = [key for key, value in current_weights.items() if value == weight]
-                                    print('LABEL', label)
-                                    internal_coordinate_datapoints.append(interpolation_driver.qm_data_points[sorted_labels.index(label[0])])
-                                else:
+
+                            for label, weight in sorted_items:
+                                cumulative_weight += weight
+                                internal_coordinate_datapoints.append(impes_driver.qm_data_points[label])
+                                if cumulative_weight >= 0.8 * total_weight:
                                     break
 
                             # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
-                            constraints = interpolation_driver.determine_important_internal_coordinates(reference_energy, mol, self.z_matrix, internal_coordinate_datapoints)
-                            
-                            
-                            print('FINAL WIEGHTS', current_weights)
+                            constraints = impes_driver.determine_important_internal_coordinates(qm_energies[-1], mol, self.z_matrix, internal_coordinate_datapoints)
+
                             print('CONSTRAINTS', constraints)
 
-                            opt_constraint_list = []
-                            for constraint in constraints[:]:
-                                if len(constraint) == 2:
-                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                                
-                                elif len(constraint) == 3:
-                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
                             
-                                else:
-                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
-                                    opt_constraint_list.append(opt_constraint)
-                            opt_drv.constraints = opt_constraint_list
-                            opt_results = opt_drv.compute(mol, current_basis, scf_results)
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            opt_current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
-                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', mol.get_xyz_string())
+                            if isinstance(drivers[0], ScfRestrictedDriver):
+
+                                _, scf_tensors = self.compute_energy(drivers[0], molecule, current_basis)
+                                opt_drv = OptimizationDriver(drivers[0])
+                                opt_drv.ostream.mute()
+                                
+                                opt_constraint_list = []
+                                for constraint in constraints:
+                                    if len(constraint) == 2:
+                                        opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                        opt_constraint_list.append(opt_constraint)
+                                    
+                                    elif len(constraint) == 3:
+                                        opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                        opt_constraint_list.append(opt_constraint)
+                                
+                                    else:
+                                        opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                        opt_constraint_list.append(opt_constraint)
+                                
+                                for constraint in self.use_minimized_structures[1]:
+                                    if constraint in opt_constraint_list:
+                                        continue
+                                    if len(constraint) == 2:
+                                        opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
+                                        opt_constraint_list.append(opt_constraint)
+                                    
+                                    elif len(constraint) == 3:
+                                        opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
+                                        opt_constraint_list.append(opt_constraint)
+                                
+                                    else:
+                                        opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
+                                        opt_constraint_list.append(opt_constraint)
+                                opt_drv.constraints = opt_constraint_list
+                                opt_results = opt_drv.compute(mol, current_basis, scf_tensors)
+                                optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                                optimized_molecule.set_charge(mol.get_charge())
+                                optimized_molecule.set_multiplicity(mol.get_multiplicity())
+                                
+                                # qm_energy, scf_tensors = self.compute_energy(drivers[0], optimized_molecule, opt_current_basis)
+                                print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', mol.get_xyz_string())
+                            
+                            elif isinstance(drivers[0], ExternalScfDriver):
+                                
+                                for constraint in self.use_minimized_structures[1]:
+                                    if constraint in constraints:
+                                        continue
+                                    constraints.append(constraint)
+                                optim_driver = ExternalOptimDriver(drivers[0])
+                                optim_driver.constraints = constraints
+                                opt_mol_string, energy = optim_driver.optimize(molecule)
+                                optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+
+                                print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                            current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())      
                             labels = []
-                            labels.append("point_{0}".format((len(sorted_labels) + 1)))
-                            self.add_point(optimized_molecule, opt_current_basis, self.states_interpolation_settings)
+                            labels.append("point_{0}".format((len(im_labels) + 1)))
+                            self.add_point(optimized_molecule, current_basis, states_interpolation_settings, symmetry_information=self.symmetry_information)
                             database_expanded = True
                             print('The interpolation quality was to low! Structre as been added to the database')
                         
                         else:
                             labels = []
-                            labels.append("point_{0}".format((len(sorted_labels) + 1)))
-                            self.add_point(mol, self.states_interpolation_settings, current_basis)
+                            labels.append("point_{0}".format((len(im_labels) + 1)))
+                            current_basis = MolecularBasis.read(mol, current_basis.get_main_basis_label())
+                            self.add_point(mol, current_basis, states_interpolation_settings, symmetry_information=self.symmetry_information)
                             database_expanded = True
 
                 if not database_expanded:
