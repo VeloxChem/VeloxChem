@@ -1456,9 +1456,9 @@ class IMForceFieldGenerator:
                 counter = 0
                 # if given_molecular_strucutres is not None:
                 #     random_structure_choices = given_molecular_strucutres
-
+                
                 while rmsd < 0.3 and counter <= 20:
-                    if self.dihedrals is not None:
+                    if self.dihedrals_dict is not None:
                         desired_angles = np.linspace(0, 360, 36)
                         angles_mols = {int(angle):[] for angle in desired_angles}
 
@@ -1516,12 +1516,7 @@ class IMForceFieldGenerator:
                     else:
                         print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
                 
-                if self.dihedrals is not None:
-                    for random_mol in random_structure_choices:
-                        print('angle', random_mol.get_dihedral_in_degrees(self.dihedrals[0]))
                 
-                atom_mapper = AtomMapper(molecule, molecule)
-                symmetry_groups = atom_mapper.determine_symmetry_group()
                 qm_energies = []
                 im_energies = []
                 impes_driver = InterpolationDriver()

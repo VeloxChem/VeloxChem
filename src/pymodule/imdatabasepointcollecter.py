@@ -78,6 +78,61 @@ except ImportError:
     pass
 
 
+def _worker_error_func(mol, qm_e_i, alphas, z_matrix,
+             dps, impes_dict, sym_datapoints, sym_dict):
+    """
+    Compute the contribution to dF_dalphas from a single molecule.
+    Assumes that each dp.confidence_radius has already been set to alphas.
+    """
+    # Reconstruct the driver
+    interpolation_driver = InterpolationDriver(z_matrix)
+    interpolation_driver.update_settings(impes_dict)
+    interpolation_driver.symmetry_information = sym_dict
+    interpolation_driver.qm_symmetry_data_points = sym_datapoints
+    interpolation_driver.distance_thrsh = 1000
+    interpolation_driver.exponent_p = 2
+    interpolation_driver.qm_data_points = dps
+    # Run the interpolation
+    interpolation_driver.compute(mol)
+
+    new_im_energy = interpolation_driver.get_energy()
+    diff = (new_im_energy * hartree_in_kcalpermol() - qm_e_i * hartree_in_kcalpermol())
+    sum_sq_error = (diff)**2
+
+    return sum_sq_error
+
+def _worker_gradient(mol, qm_e_i, alphas, z_matrix,
+             dps, impes_dict, sym_datapoints, sym_dict):
+    """
+    Compute the contribution to dF_dalphas from a single molecule.
+    Assumes that each dp.confidence_radius has already been set to alphas.
+    """
+    # Reconstruct the driver
+    interpolation_driver = InterpolationDriver(z_matrix)
+    interpolation_driver.update_settings(impes_dict)
+    interpolation_driver.symmetry_information = sym_dict
+    interpolation_driver.qm_symmetry_data_points = sym_datapoints
+    interpolation_driver.distance_thrsh = 1000
+    interpolation_driver.exponent_p = 2
+    interpolation_driver.qm_data_points = dps
+    # Run the interpolation
+    interpolation_driver.compute(mol)
+    E_hat = interpolation_driver.get_energy()
+    hart2kcal = hartree_in_kcalpermol()
+    diff = (E_hat * hart2kcal) - (qm_e_i * hart2kcal)
+    S = interpolation_driver.sum_of_weights
+    # Build this molecule’s partial gradient
+    n = len(dps)
+    dF_loc = np.empty(n, dtype=float)
+    for j, dp in enumerate(dps):
+        dw = interpolation_driver.trust_radius_weight_gradient(dp)
+        P_j = interpolation_driver.potentials[j]
+        # ∂E/∂α_j in hartree
+        dE_dalpha = dw * (P_j * hart2kcal - E_hat * hart2kcal) / S
+        # ∂F/∂α_j contribution
+        dF_loc[j] = 2.0 * diff * dE_dalpha
+    return dF_loc
+
 class IMDatabasePointCollecter:
     """
     Implements the OpenMMDynamics.
@@ -2769,7 +2824,39 @@ class IMDatabasePointCollecter:
 
         return bey_trust_radius
 
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    from functools import partial
+
     def determine_trust_radius(self, molecules, qm_energies, im_energies, datapoints, interpolation_setting, sym_datapoints, sym_dict):
+
+        def obj_energy_function_parallel(alphas, structure_list, qm_e, im_e, dps, impes_dict, sym_datapoints, sym_dict):
+                
+            for alpha, dp in zip(alphas, dps):
+                dp.confidence_radius = alpha
+
+            # 2) Prepare the worker with all constant arguments baked in
+            worker = partial(_worker_error_func,
+                            alphas=alphas,
+                            z_matrix=self.z_matrix,
+                            dps=dps,
+                            impes_dict=impes_dict,
+                            sym_datapoints=sym_datapoints,
+                            sym_dict=sym_dict)
+
+            # 3) Launch a process pool
+            sum_sq_error = 0
+            with ProcessPoolExecutor() as executor:
+                futures = []
+                for mol, qe in zip(structure_list, qm_e):
+                    futures.append(executor.submit(worker, mol, qe))
+
+                # 4) As each worker finishes, accumulate its contribution
+                for fut in as_completed(futures):
+                    dF_loc = fut.result()
+                    sum_sq_error += dF_loc
+
+            print('Here is the error value', sum_sq_error)
+            return sum_sq_error
         
         def obj_energy_function(alphas, structure_list, qm_e, im_e, dps, impes_dict, sym_datapoints, sym_dict):
                 
@@ -2797,6 +2884,44 @@ class IMDatabasePointCollecter:
             print('sum_of_sqaure', sum_sq_error, alphas)
             return sum_sq_error
         
+        def obj_gradient_function_parallel(alphas,
+                                   structure_list,
+                                   qm_e,
+                                   im_e,       # unused in original? but kept for signature
+                                   dps,
+                                   impes_dict,
+                                   sym_datapoints,
+                                   sym_dict):
+            # 1) Set the confidence radius on each data point
+            for alpha, dp in zip(alphas, dps):
+                dp.confidence_radius = alpha
+
+            # 2) Prepare the worker with all constant arguments baked in
+            worker = partial(_worker_gradient,
+                            alphas=alphas,
+                            z_matrix=self.z_matrix,
+                            dps=dps,
+                            impes_dict=impes_dict,
+                            sym_datapoints=sym_datapoints,
+                            sym_dict=sym_dict)
+
+            # 3) Launch a process pool
+            n_alpha = len(dps)
+            dF_dalphas = np.zeros(n_alpha, dtype=float)
+            with ProcessPoolExecutor() as executor:
+                futures = []
+                for mol, qe in zip(structure_list, qm_e):
+                    futures.append(executor.submit(worker, mol, qe))
+
+                # 4) As each worker finishes, accumulate its contribution
+                for fut in as_completed(futures):
+                    dF_loc = fut.result()
+                    dF_dalphas += dF_loc
+
+            return dF_dalphas
+
+
+
         def obj_gradient_function(alphas, structure_list, qm_e, im_e, dps, impes_dict, sym_datapoints, sym_dict):
             
             n_points = len(dps)
@@ -2821,19 +2946,16 @@ class IMDatabasePointCollecter:
                 
                 diff = (new_im_energy * hartree_in_kcalpermol() - qm_e[i] * hartree_in_kcalpermol())
                     
-                S     = interpolation_driver.sum_of_weights      # scalar
-                E_hat = interpolation_driver.get_energy()        # \hat{E}_m
+                S     = interpolation_driver.sum_of_weights 
     
                 for j, dp in enumerate(dps):
                     # weight derivative for THIS alpha_j
                     dw = interpolation_driver.trust_radius_weight_gradient(dp)   # w'_{mj}
 
                     P_j = interpolation_driver.potentials[j]                     # P_j
-                    # ---- one-liner from (★) ----
-                    dE_dalpha = dw * (P_j * hartree_in_kcalpermol() - new_im_energy * hartree_in_kcalpermol()) / S                           # hartree
-                    # -------------------------------------------
 
-                    # objective derivative (★★) – ONE unit conversion only
+                    dE_dalpha = dw * (P_j * hartree_in_kcalpermol() - new_im_energy * hartree_in_kcalpermol()) / S  
+
                     dF_dalphas[j] += 2.0 * diff * dE_dalpha   
                     
 
@@ -2853,11 +2975,11 @@ class IMDatabasePointCollecter:
             # Minimizer expects a function returning just the objective,
             # plus a function returning the gradient if we pass `jac=True`.
             res = minimize(
-                fun = obj_energy_function,
+                fun = obj_energy_function_parallel,
                 x0 = alphas,
                 args = args,
                 method='L-BFGS-B',
-                jac = obj_gradient_function,
+                jac = obj_gradient_function_parallel,
                 bounds=[(-10.0, 10.0)],
                 options={'disp': True}
             )
