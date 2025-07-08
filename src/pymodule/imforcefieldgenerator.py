@@ -694,7 +694,7 @@ class IMForceFieldGenerator:
                         im_database_driver.starting_state = state
                         im_database_driver.platform = 'CUDA'
 
-                        im_database_driver.identfy_relevant_int_coordinates = self.identfy_relevant_int_coordinates
+                        im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structure[1])
                         im_database_driver.use_symmetry = self.use_symmetry
                         im_database_driver.ghost_atom = self.ghost_atom
 
@@ -981,7 +981,7 @@ class IMForceFieldGenerator:
                         
                         # set optimization features in the construction run
 
-                        im_database_driver.identfy_relevant_int_coordinates = self.identfy_relevant_int_coordinates
+                        im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structure[1])
                         im_database_driver.use_symmetry = self.use_symmetry
 
                         im_database_driver.add_bayes_model = self.add_bayes_model
@@ -1859,20 +1859,6 @@ class IMForceFieldGenerator:
                             if self.symmetry_information is not None:
                                 print('opt_dihedral_angle', opt_dihedral_angle)
                                 self.symmetry_information['gs'][8][dihedral].append(opt_dihedral_angle)
-
-                        if self.use_minimized_structures:
-                            ## Add constraints optimization for the moldeucle
-                            opt_qm_driver = ScfRestrictedDriver()
-                            opt_qm_driver.xcfun = 'b3lyp'
-                            reference_dih = key
-                            opt_drv = OptimizationDriver(opt_qm_driver)
-                            current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
-                            _, scf_results = self.compute_energy(opt_qm_driver, cur_molecule, current_basis)
-                            opt_drv.ostream.mute()
-                            opt_drv.constraints = constraints
-                            opt_results = opt_drv.compute(cur_molecule, current_basis, scf_results)
-                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            cur_molecule = optimized_molecule
 
                         current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
                         adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change))

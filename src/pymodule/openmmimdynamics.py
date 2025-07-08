@@ -51,6 +51,7 @@ from .solvationbuilder import SolvationBuilder
 from .optimizationdriver import OptimizationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .scfrestdriver import ScfRestrictedDriver
+from .externalscfdriver import ExternalScfDriver
 from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 from .interpolationdriver import InterpolationDriver
 from .atommapper import AtomMapper
@@ -192,6 +193,9 @@ class OpenMMIMDynamics:
         self.sorted_state_spec_im_labels = None
         self.root_spec_molecules = None
         self.interpolation_settings_dict = None
+        self.dihedrals_dict = None
+        self.basis_set_label = 'def2-svp'
+        self.ab_init_drivers = None
 
         self.step = None
         self.basis = None
@@ -1446,10 +1450,218 @@ class OpenMMIMDynamics:
         print(f'Simulation state saved as {state_file}')
 
         # Write the output to a file
+        self.confirm_database_quality(self.ab_init_drivers, self.molecule, self.interpolation_settings_dict, self.basis_set_label, self.root_spec_molecules, dihedrals_dict=self.dihedrals_dict)
         self._save_output(output_file)
         self.ostream.print_info(f'Simulation report saved as {output_file}.out')
         self.ostream.flush()
 
+    
+    def confirm_database_quality(self, ab_init_drivers, molecule, states_interpolation_settings, basis_set_label, given_molecular_strucutres, nsamples=10, dihedrals_dict=None):
+        """Validates the quality of an interpolation database for a given molecule.
+
+       This function assesses the quality of the provided interpolation database 
+       comparing the interpolated energy with a QM-reference energy.
+
+       :param molecule:
+           A VeloxChem molecule object representing the reference molecular system.
+
+       :param im_database_file:
+           Interpolation database file.
+
+       :param given_molecular_strucutres:
+           An optional list of additional molecular structures that will be used for the validation.
+
+       :returns:
+           List of QM-energies, IM-energies.
+        """
+
+        for root in self.roots_to_follow:
+            database_quality = False
+            drivers = None
+            if root == 0:
+                drivers = ab_init_drivers['ground_state']
+            else:
+                drivers = ab_init_drivers['excited_state']
+            all_structures = given_molecular_strucutres[root]
+            current_datafile = states_interpolation_settings[root]['imforcefield_file']
+            datapoint_molecules, _ = self.database_extracter(current_datafile, molecule.get_labels())
+            
+            if len(all_structures) == 0:
+                continue
+
+            while database_quality is False:
+                rmsd = -np.inf
+                random_structure_choices = None
+                counter = 0
+                # if given_molecular_strucutres is not None:
+                #     random_structure_choices = given_molecular_strucutres
+                dist_ok = False
+                while dist_ok == False and counter <= 20:
+                    print('Dihedrals dict is given here', dihedrals_dict)
+                    if dihedrals_dict is not None:
+                        selected_molecules = []
+                        for entries in dihedrals_dict:
+                            specific_dihedral = entries[0]
+                            state = entries[2]
+                            if state != root:
+                                continue
+                            desired_angles = np.linspace(0, 360, 36)
+                            angles_mols = {int(angle):[] for angle in desired_angles}
+
+                            keys = list(angles_mols.keys())
+
+                            for mol in all_structures:  
+                                mol_angle = (mol.get_dihedral_in_degrees(specific_dihedral) + 360) % 360
+                                
+                                
+                                for i in range(len(desired_angles) - 1):
+                                    
+                                    if keys[i] <= mol_angle < keys[i + 1]:
+                                        angles_mols[keys[i]].append(mol)
+                                        break
+                        
+                            # List to hold selected molecules
+                            
+                            total_molecules = sum(len(mols) for mols in angles_mols.values())
+
+                            # Adaptive selection based on bin sizes
+                
+                            for angle_bin, molecules_in_bin in angles_mols.items():
+                                num_mols_in_bin = len(molecules_in_bin)
+
+                                if num_mols_in_bin == 0:
+                                    continue  # Skip empty bins
+
+                                # If 2 or fewer molecules, take all
+                                elif num_mols_in_bin <= 2:
+                                    selected_molecules.extend(molecules_in_bin)
+
+                                else:
+                                    # Calculate proportional number of molecules to select
+                                    proportion = num_mols_in_bin / total_molecules
+                                    num_to_select = max(1, math.ceil(proportion * nsamples))
+
+                                    # Randomly select the proportional number
+                                    selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
+                                    selected_molecules.extend(selected_mols)
+                    else:
+                        selected_molecules = random.sample(all_structures, min(nsamples, len(all_structures)))
+                          
+                    individual_distances = []
+                    random_structure_choices = selected_molecules
+                    for datapoint_molecule in datapoint_molecules:
+                        for random_struc in random_structure_choices:
+                            
+                            distance_norm = self.calculate_distance_to_ref(random_struc.get_coordinates_in_bohr(), datapoint_molecule.get_coordinates_in_bohr())
+                            individual_distances.append(distance_norm / np.sqrt(len(molecule.get_labels())) * bohr_in_angstrom())
+                    
+                    rmsd = min(individual_distances)
+                    counter += 1
+                    if rmsd >= 0.1:
+                        print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
+                        dist_ok = True
+                    else:
+                        print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
+                
+                # if self.roots_to_follow[0] == 0 and energy is None:
+                #     energy, scf_results = self.compute_energy(self.drivers['ground_state'][0], optimized_molecule, current_basis)
+                # elif self.roots_to_follow[0] > 0 and energy is None:
+                #     energy, scf_results = self.compute_energy(self.drivers['excited_state'][0], optimized_molecule, current_basis)
+                impes_driver = InterpolationDriver(self.z_matrix)
+                impes_driver.update_settings(states_interpolation_settings[root])
+                if root == 0:
+                    impes_driver.symmetry_information = self.symmetry_information['gs']
+                else:
+                    impes_driver.symmetry_information = self.symmetry_information['es']
+                
+                old_label = None
+                im_labels, _ = impes_driver.read_labels()
+                impes_driver.qm_data_points = []
+                for label in im_labels:
+                    if '_symmetry' not in label:
+                        qm_data_point = InterpolationDatapoint(self.z_matrix)
+                        qm_data_point.read_hdf5(current_datafile, label)
+                        
+                        old_label = qm_data_point.point_label
+                        impes_driver.qm_symmetry_data_points[old_label] = [qm_data_point]
+                        impes_driver.qm_data_points.append(qm_data_point)
+
+                    else:
+                        symmetry_data_point = InterpolationDatapoint(self.z_matrix)
+                        symmetry_data_point.read_hdf5(current_datafile, label)
+                        
+                        impes_driver.qm_symmetry_data_points[old_label].append(symmetry_data_point)
+
+
+                qm_energies = []
+                im_energies = []
+
+                for i, mol in enumerate(random_structure_choices):
+
+                    current_basis = MolecularBasis.read(mol, basis_set_label)
+                    impes_driver.compute(mol)
+                    reference_energy, scf_results = self.compute_energy(drivers[0], mol, current_basis)
+                    
+                    current_element = 0
+                    if root >= 1:
+                        current_element = root - 1
+                    
+                    qm_energies.append(reference_energy[current_element])
+                    im_energies.append(impes_driver.impes_coordinate.energy)
+                    
+                    print('Energies', qm_energies[-1], im_energies[-1])
+                    
+                    print(f'\n\n ########## Step {i} ######### \n')
+                    print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol()} kj/mol --> 	{abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol() * 4,184} kcal/mol\n')
+                    if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol() > self.energy_threshold * hartree_in_kjpermol():
+                        
+                        print(mol.get_xyz_string())
+
+                        
+                    database_quality = True
+
+            
+            # self.plot_final_energies(qm_energies, im_energies)
+            self.structures_to_xyz_file(random_structure_choices, 'random_xyz_structures.xyz', im_energies, qm_energies)
+    
+    def compute_energy(self, qm_driver, molecule, basis=None):
+        """ Computes the QM energy using self.qm_driver.
+
+            :param molecule:
+                The molecule.
+            :param basis:
+                The basis set.
+
+            :returns the QM energy.
+        """
+        # Dtermine the type of energy driver, to be able to
+        # call it correctly.
+
+        qm_energy = None
+        scf_tensors = None
+
+        # XTB
+        # restricted SCF
+        if isinstance(qm_driver, ScfRestrictedDriver):
+            qm_driver.ostream.mute()
+            scf_tensors = qm_driver.compute(molecule, basis)
+            qm_energy = qm_driver.scf_energy
+            qm_energy = np.array([qm_energy])
+            qm_driver.ostream.unmute()
+        
+        elif isinstance(qm_driver, ExternalScfDriver):
+            qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())
+            print('qm_energy', qm_energy)
+        
+        elif isinstance(qm_driver, ExternalExcitedStatesScfDriver):
+            qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())
+
+        if qm_energy is None:
+            error_txt = "Could not compute the QM energy. "
+            error_txt += "Please define a QM driver."
+            raise ValueError(error_txt)
+
+        return qm_energy, scf_tensors
     # Post-simulation analysis methods
     def plot_energy(self,
                     components=['total'],
@@ -2528,135 +2740,133 @@ class OpenMMIMDynamics:
 
         return distance_core
 
-    def confirm_database_quality(self, molecule, interpolation_settings, basis_set_label, given_molecular_strucutres, symmetry_information):
-        """Validates the quality of an interpolation database for a given molecule.
+    # def confirm_database_quality(self, molecule, interpolation_settings, basis_set_label, given_molecular_strucutres, symmetry_information):
+    #     """Validates the quality of an interpolation database for a given molecule.
 
-       This function assesses the quality of the provided interpolation database 
-       comparing the interpolated energy with a QM-reference energy.
+    #    This function assesses the quality of the provided interpolation database 
+    #    comparing the interpolated energy with a QM-reference energy.
 
-       :param molecule:
-           A VeloxChem molecule object representing the reference molecular system.
+    #    :param molecule:
+    #        A VeloxChem molecule object representing the reference molecular system.
 
-       :param im_database_file:
-           Interpolation database file.
+    #    :param im_database_file:
+    #        Interpolation database file.
 
-       :param given_molecular_strucutres:
-           An optional list of additional molecular structures that will be used for the validation.
+    #    :param given_molecular_strucutres:
+    #        An optional list of additional molecular structures that will be used for the validation.
 
-       :returns:
-           List of QM-energies, IM-energies.
-        """
+    #    :returns:
+    #        List of QM-energies, IM-energies.
+    #     """
 
-        # For all Methods a ForceField of the molecule is requiered
-        forcefield_generator = MMForceFieldGenerator()
-        forcefield_generator.create_topology(molecule)
+    #     # For all Methods a ForceField of the molecule is requiered
     
-        for root in given_molecular_strucutres.keys():
+    #     for root in given_molecular_strucutres.keys():
 
-            drivers = None
-            symmetry_inf = None
-            if root == 0:
-                symmetry_inf = symmetry_information['gs']
-                drivers = ScfRestrictedDriver()
-                drivers.xcfun = 'b3lyp'
-                # drivers.ri_coulomb = True
-            else:
-                symmetry_inf = symmetry_information['es']
-                drivers = ExternalExcitedStatesScfDriver('ORCA', self.roots_to_follow, 0, 1)
-            all_structures = given_molecular_strucutres[root]
-            datapoint_molecules, _ = self.database_extracter(interpolation_settings[root]['imforcefield_file'], molecule.get_labels())
-            current_datafile = interpolation_settings[root]['imforcefield_file']
+    #         drivers = None
+    #         symmetry_inf = None
+    #         if root == 0:
+    #             symmetry_inf = symmetry_information['gs']
+    #             drivers = ScfRestrictedDriver()
+    #             drivers.xcfun = 'b3lyp'
+    #             # drivers.ri_coulomb = True
+    #         else:
+    #             symmetry_inf = symmetry_information['es']
+    #             drivers = ExternalExcitedStatesScfDriver('ORCA', self.roots_to_follow, 0, 1)
+    #         all_structures = given_molecular_strucutres[root]
+    #         datapoint_molecules, _ = self.database_extracter(interpolation_settings[root]['imforcefield_file'], molecule.get_labels())
+    #         current_datafile = interpolation_settings[root]['imforcefield_file']
                 
-            rmsd = -np.inf
-            random_structure_choices = None
-            counter = 0
-            # if given_molecular_strucutres is not None:
-            #     random_structure_choices = given_molecular_strucutres
-            while rmsd < 0.3 and counter <= 20:
-                # if self.dihedrals is not None:
-                #     desired_angles = np.linspace(0, 360, 36)
-                #     angles_mols = {int(angle):[] for angle in desired_angles}
-                #     keys = list(angles_mols.keys())
-                #     for mol in all_structures:  
-                #         mol_angle = (mol.get_dihedral_in_degrees(self.dihedrals[0]) + 360) % 360
+    #         rmsd = -np.inf
+    #         random_structure_choices = None
+    #         counter = 0
+    #         # if given_molecular_strucutres is not None:
+    #         #     random_structure_choices = given_molecular_strucutres
+    #         while rmsd < 0.3 and counter <= 20:
+    #             # if self.dihedrals is not None:
+    #             #     desired_angles = np.linspace(0, 360, 36)
+    #             #     angles_mols = {int(angle):[] for angle in desired_angles}
+    #             #     keys = list(angles_mols.keys())
+    #             #     for mol in all_structures:  
+    #             #         mol_angle = (mol.get_dihedral_in_degrees(self.dihedrals[0]) + 360) % 360
                         
                         
-                #         for i in range(len(desired_angles) - 1):
+    #             #         for i in range(len(desired_angles) - 1):
                             
-                #             if keys[i] <= mol_angle < keys[i + 1]:
-                #                 angles_mols[keys[i]].append(mol)
-                #                 break
+    #             #             if keys[i] <= mol_angle < keys[i + 1]:
+    #             #                 angles_mols[keys[i]].append(mol)
+    #             #                 break
                     
-                #     # List to hold selected molecules
-                #     selected_molecules = []
-                #     total_molecules = sum(len(mols) for mols in angles_mols.values())
-                #     # Adaptive selection based on bin sizes
+    #             #     # List to hold selected molecules
+    #             #     selected_molecules = []
+    #             #     total_molecules = sum(len(mols) for mols in angles_mols.values())
+    #             #     # Adaptive selection based on bin sizes
         
-                #     for angle_bin, molecules_in_bin in angles_mols.items():
-                #         num_mols_in_bin = len(molecules_in_bin)
-                #         if num_mols_in_bin == 0:
-                #             continue  # Skip empty bins
-                #         # If 2 or fewer molecules, take all
-                #         elif num_mols_in_bin <= 2:
-                #             selected_molecules.extend(molecules_in_bin)
-                #         else:
-                #             # Calculate proportional number of molecules to select
-                #             proportion = num_mols_in_bin / total_molecules
-                #             num_to_select = max(1, math.ceil(proportion * 15))
-                #             # Randomly select the proportional number
-                #             selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
-                #             selected_molecules.extend(selected_mols)
-                # else:
-                selected_molecules = random.sample(all_structures, min(100, len(all_structures)))
+    #             #     for angle_bin, molecules_in_bin in angles_mols.items():
+    #             #         num_mols_in_bin = len(molecules_in_bin)
+    #             #         if num_mols_in_bin == 0:
+    #             #             continue  # Skip empty bins
+    #             #         # If 2 or fewer molecules, take all
+    #             #         elif num_mols_in_bin <= 2:
+    #             #             selected_molecules.extend(molecules_in_bin)
+    #             #         else:
+    #             #             # Calculate proportional number of molecules to select
+    #             #             proportion = num_mols_in_bin / total_molecules
+    #             #             num_to_select = max(1, math.ceil(proportion * 15))
+    #             #             # Randomly select the proportional number
+    #             #             selected_mols = random.sample(molecules_in_bin, min(num_to_select, num_mols_in_bin))
+    #             #             selected_molecules.extend(selected_mols)
+    #             # else:
+    #             selected_molecules = random.sample(all_structures, min(100, len(all_structures)))
                 
                             
-                individual_distances = []
-                random_structure_choices = selected_molecules
-                for datapoint_molecule in datapoint_molecules:
-                    for random_struc in random_structure_choices:
+    #             individual_distances = []
+    #             random_structure_choices = selected_molecules
+    #             for datapoint_molecule in datapoint_molecules:
+    #                 for random_struc in random_structure_choices:
                         
-                        distance_norm = self.calculate_distance_to_ref(random_struc.get_coordinates_in_bohr(), datapoint_molecule.get_coordinates_in_bohr())
-                        individual_distances.append(distance_norm / np.sqrt(len(molecule.get_labels())) * bohr_in_angstrom())
+    #                     distance_norm = self.calculate_distance_to_ref(random_struc.get_coordinates_in_bohr(), datapoint_molecule.get_coordinates_in_bohr())
+    #                     individual_distances.append(distance_norm / np.sqrt(len(molecule.get_labels())) * bohr_in_angstrom())
                 
-                rmsd = min(individual_distances)
-                counter += 1
-                if rmsd >= 0.3:
-                    print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
-                else:
-                    print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
+    #             rmsd = min(individual_distances)
+    #             counter += 1
+    #             if rmsd >= 0.3:
+    #                 print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
+    #             else:
+    #                 print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
             
-            # if self.dihedrals is not None:
-            #     for random_mol in random_structure_choices:
-            #         print('angle', random_mol.get_dihedral_in_degrees(self.dihedrals[0]))
+    #         # if self.dihedrals is not None:
+    #         #     for random_mol in random_structure_choices:
+    #         #         print('angle', random_mol.get_dihedral_in_degrees(self.dihedrals[0]))
             
-            atom_mapper = AtomMapper(molecule, molecule)
-            qm_energies = []
-            im_energies = []
-            impes_driver = InterpolationDriver()
-            impes_driver.update_settings(interpolation_settings[root])
-            labels, z_matrix = impes_driver.read_labels()
+    #         atom_mapper = AtomMapper(molecule, molecule)
+    #         qm_energies = []
+    #         im_energies = []
+    #         impes_driver = InterpolationDriver()
+    #         impes_driver.update_settings(interpolation_settings[root])
+    #         labels, z_matrix = impes_driver.read_labels()
  
-            impes_driver.impes_coordinate.z_matrix = z_matrix
-            impes_driver.symmetry_information = symmetry_inf
-            impes_driver.use_symmetry = True
-            sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
-            for i, mol in enumerate(random_structure_choices):
+    #         impes_driver.impes_coordinate.z_matrix = z_matrix
+    #         impes_driver.symmetry_information = symmetry_inf
+    #         impes_driver.use_symmetry = True
+    #         sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
+    #         for i, mol in enumerate(random_structure_choices):
                 
-                current_basis = MolecularBasis.read(mol, basis_set_label)
-                impes_driver.compute(mol, labels=sorted_labels)
-                drivers.ostream.mute()
-                scf_tensors = drivers.compute(mol, current_basis)
-                qm_energy = drivers.scf_energy
+    #             current_basis = MolecularBasis.read(mol, basis_set_label)
+    #             impes_driver.compute(mol, labels=sorted_labels)
+    #             drivers.ostream.mute()
+    #             scf_tensors = drivers.compute(mol, current_basis)
+    #             qm_energy = drivers.scf_energy
                 
-                qm_energies.append(qm_energy)
-                im_energies.append(impes_driver.impes_coordinate.energy)
+    #             qm_energies.append(qm_energy)
+    #             im_energies.append(impes_driver.impes_coordinate.energy)
 
-                print(f'\n\n ########## Step {i} ######### \n')
-                print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol()} kJ/mol \n')
+    #             print(f'\n\n ########## Step {i} ######### \n')
+    #             print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol()} kJ/mol \n')
         
-            # self.plot_final_energies(qm_energies, im_energies)
-            self.structures_to_xyz_file(all_structures, f'full_xyz_traj_root_{root}.xyz')
-            self.structures_to_xyz_file(random_structure_choices, f'random_xyz_structures_root_{root}.xyz', im_energies, qm_energies)
+    #         # self.plot_final_energies(qm_energies, im_energies)
+    #         self.structures_to_xyz_file(all_structures, f'full_xyz_traj_root_{root}.xyz')
+    #         self.structures_to_xyz_file(random_structure_choices, f'random_xyz_structures_root_{root}.xyz', im_energies, qm_energies)
     
     def structures_to_xyz_file(self, molecules_for_xyz, structure_filename, im_energies=None, qm_energies=None):
         """Writes molecular structures to an XYZ file.
@@ -2780,6 +2990,7 @@ class OpenMMIMDynamics:
         if not self.use_symmetry:
             symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
         ff_gen = MMForceFieldGenerator()
+        ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         ff_gen.create_topology(molecule)
 
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)

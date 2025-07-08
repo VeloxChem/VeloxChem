@@ -310,7 +310,7 @@ class IMDatabasePointCollecter:
         self.state_specific_molecules = None
         self.all_gradients = []
         
-        self.identfy_relevant_int_coordinates = True
+        self.identfy_relevant_int_coordinates = (True, [])
         self.use_symmetry = True
         self.use_opt_confidence_radius = True
         self.qm_symmetry_dict = None
@@ -2290,7 +2290,7 @@ class IMDatabasePointCollecter:
 
                 ############# Implement constraint optimization ############
 
-                if self.identfy_relevant_int_coordinates:                    
+                if self.identfy_relevant_int_coordinates[0]:                    
                     # interpolation_driver = InterpolationDriver(self.z_matrix)
                     # interpolation_driver.update_settings(self.interpolation_settings[self.current_state])
                     # if self.current_state == 0:
@@ -2347,6 +2347,22 @@ class IMDatabasePointCollecter:
                             else:
                                 opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
                                 opt_constraint_list.append(opt_constraint)
+                        
+                        for constraint in self.identfy_relevant_int_coordinates[1]:
+                            if constraint in opt_constraint_list:
+                                continue
+                            if len(constraint) == 2:
+                                opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
+                                opt_constraint_list.append(opt_constraint)
+                            
+                            elif len(constraint) == 3:
+                                opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
+                                opt_constraint_list.append(opt_constraint)
+                        
+                            else:
+                                opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
+                                opt_constraint_list.append(opt_constraint)
+                        
                         opt_drv.constraints = opt_constraint_list
                         opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
                         optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
@@ -2359,6 +2375,12 @@ class IMDatabasePointCollecter:
                     elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
 
                         optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+
+                        for constraint in self.identfy_relevant_int_coordinates[1]:
+                            if constraint in constraints:
+                                continue
+                            constraints.append(constraint)
+
                         optim_driver.constraints = constraints
                         opt_mol_string, energy = optim_driver.optimize(molecule)
                         optimized_molecule = Molecule.from_xyz_string(opt_mol_string)

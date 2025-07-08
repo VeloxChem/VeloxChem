@@ -1950,9 +1950,9 @@ class InterpolationDriver():
                 print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
                 if tuple(int(x) for x in coord) in constraints:
                     continue
-                if len(coord) == 2 and abs(ind_weight - max(weights)) < 1e-8:
+                if len(coord) == 2 and ind_weight > max(weights) * 0.7:
                     constraints.append(tuple(int(x) for x in coord))
-                elif len(coord) == 3 and abs(ind_weight - max(weights)) < 1e-8:
+                elif len(coord) == 3 and ind_weight > max(weights) * 0.7:
                     constraints.append(tuple(int(x) for x in coord))
                 elif len(coord) == 4 and ind_weight > max(weights) * 0.7 and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
                     constraints.append(tuple(int(x) for x in coord))
