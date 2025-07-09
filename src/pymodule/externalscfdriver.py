@@ -72,6 +72,7 @@ class ExternalScfDriver:
         self.spin = multiplicity
 
         self.xc_func = 'b3lyp'
+        self.dispersion = 'D3'
         self.basis_set_label = 'def2-svp'
         self.method = 'RKS'
 
@@ -396,7 +397,7 @@ conda activate vlxenv_simd_master
                 if self.path_on_cluster is not None:
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
                 with open(input_file, 'w') as file:
-                    file.write(f'!{self.method} {self.xc_func} {self.basis_set_label}\n')
+                    file.write(f'!{self.method} {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')
