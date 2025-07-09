@@ -694,7 +694,7 @@ class IMForceFieldGenerator:
                         im_database_driver.starting_state = state
                         im_database_driver.platform = 'CUDA'
 
-                        im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structure[1])
+                        im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])
                         im_database_driver.use_symmetry = self.use_symmetry
                         im_database_driver.ghost_atom = self.ghost_atom
 
@@ -981,7 +981,7 @@ class IMForceFieldGenerator:
                         
                         # set optimization features in the construction run
 
-                        im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structure[1])
+                        im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])
                         im_database_driver.use_symmetry = self.use_symmetry
 
                         im_database_driver.add_bayes_model = self.add_bayes_model

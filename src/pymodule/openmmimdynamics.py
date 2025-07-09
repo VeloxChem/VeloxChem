@@ -1612,7 +1612,7 @@ class OpenMMIMDynamics:
                     print('Energies', qm_energies[-1], im_energies[-1])
                     
                     print(f'\n\n ########## Step {i} ######### \n')
-                    print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol()} kj/mol --> 	{abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol() * 4,184} kcal/mol\n')
+                    print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol()} kj/mol --> 	{abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol() / 4.184} kcal/mol\n')
                     if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kjpermol() > self.energy_threshold * hartree_in_kjpermol():
                         
                         print(mol.get_xyz_string())
