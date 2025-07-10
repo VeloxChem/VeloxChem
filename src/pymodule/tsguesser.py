@@ -95,7 +95,8 @@ class TransitionStateGuesser():
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
-        reactant_partial_charges: list[float] | list[list[float]] = None,
+        reactant_partial_charges: list[float]
+        | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
         reactant_total_multiplicity=-1,
         product_total_multiplicity=-1,
@@ -104,7 +105,7 @@ class TransitionStateGuesser():
         scf_drv=None,
         constraints=None,
         reparameterize=True,
-        mm_opt_constrain_bonds=True
+        mm_opt_constrain_bonds=True,
     ):
         """Find a guess for the transition state using a force field scan.
 
@@ -141,7 +142,11 @@ class TransitionStateGuesser():
         if scf:
             molecule_sanity_check(self.evb_drv.reactant.molecule)
 
-        self.molecule = Molecule.read_xyz_string(self.evb_drv.reactant.molecule.get_xyz_string())
+        self.molecule = Molecule.read_xyz_string(
+            self.evb_drv.reactant.molecule.get_xyz_string())
+        self.molecule.set_charge(self.evb_drv.reactant.molecule.get_charge())
+        self.molecule.set_multiplicity(
+            self.evb_drv.reactant.molecule.get_multiplicity())
         print(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
@@ -153,35 +158,31 @@ class TransitionStateGuesser():
             constraints=constraints,
         )
         self.lambda_vec = self.evb_drv.Lambda
-        self.ostream.print_blank()
-        self.ostream.print_header("Starting MM scan")
-        self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
-        self.ostream.flush()
-        mm_energies, mm_geometries, ff_exception = self._scan_ff()
+        (mm_energies, E1, E2, md_energies, mm_geometries,
+         ff_exception) = self._scan_ff()
         xyz_geometries = []
         for mm_geom in mm_geometries:
-            xyz_geom = self._mm_to_xyz_geom(mm_geom,
-                                            self.molecule)
+            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.molecule)
             xyz_geometries.append(xyz_geom)
         self.results = {
             'mm_energies': mm_energies,
+            'mm_energies_reactant': E1,
+            'mm_energies_product': E2,
+            'int_energies': md_energies,
             'mm_geometries': mm_geometries,
             'xyz_geometries': xyz_geometries,
             'lambda_vec': self.lambda_vec,
             'broken_bonds': self.evb_drv.broken_bonds,
             'formed_bonds': self.evb_drv.formed_bonds,
         }
-        # for i, (E, P) in enumerate(zip(mm_energies, mm_geometries)):
-        #     self.results[self.lambda_vec[i]] = {
-        #         'mm_energy': E,
-        #         'mm_geometry': P,
-        #     }
+
         self.results['broken_bonds'] = self.evb_drv.broken_bonds
         self.results['formed_bonds'] = self.evb_drv.formed_bonds
         if ff_exception:
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
+            self.ostream.flush()
             raise ff_exception
 
         max_mm_index = np.argmax(mm_energies)
@@ -198,8 +199,6 @@ class TransitionStateGuesser():
         else:
             # assert False, 'Not implemented yet'
 
-            self.ostream.print_header(f"Starting SCF scan")
-            self.ostream.flush()
             scf_energies = self._scan_scf()
             max_scf_index = np.argmax(scf_energies)
             max_scf_geom = self.results['xyz_geometries'][max_scf_index]
@@ -212,8 +211,53 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
 
+        mult = self.molecule.get_multiplicity()
+        charge = self.molecule.get_charge()
+
         self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
+        self.molecule.set_multiplicity(mult)
+        self.molecule.set_charge(charge)
         return self.molecule, self.results
+
+    def _print_mm_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header("Starting MM scan")
+        self.ostream.print_blank()
+        valstr = '{} | {} | {} | {} | {}'.format(
+            'Lambda',
+            ' E_int',
+            '    E1',
+            '    E2',
+            '    Em',
+        )
+        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(45 * '-')
+        self.ostream.flush()
+
+    def _print_mm_iter(self, l, e1, e2, em, md_e):
+        valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
+            l, md_e, e1, e2, em)
+        self.ostream.print_header(valstr)
+        self.ostream.flush()
+
+    def _print_scf_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header(f"Starting SCF scan")
+        self.ostream.print_blank()
+        valsltr = '{} | {} | {}'.format(
+            'Lambda',
+            'SCF Energy [kJ/mol]',
+            'Difference',
+        )
+        self.ostream.print_header(valsltr)
+        self.ostream.print_header(40 * '-')
+        self.ostream.flush()
+
+    def _print_scf_iter(self, l, scf_E, dif):
+        valstr = "{:8.2f}  {:20.5f}  {:10.3f}".format(l, scf_E, dif)
+        self.ostream.print_header(valstr)
+        self.ostream.flush()
 
     #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
     #todo add option for recalculating charges from ts_mol
@@ -357,9 +401,15 @@ class TransitionStateGuesser():
         return atoms
 
     def _scan_ff(self):
+        self._print_mm_header()
         energies = []
+        E1 = []
+        E2 = []
+        md_energies = []
+
         positions = []
-        initial_positions = self.evb_drv.system_confs[0]['initial_positions']  #in nm
+        initial_positions = self.evb_drv.system_confs[0][
+            'initial_positions']  #in nm
 
         topology = self.evb_drv.system_confs[0]['topology']
         if self.save_mm_traj:
@@ -375,15 +425,31 @@ class TransitionStateGuesser():
             mmapp.PDBFile.writeFile(topology, initial_positions,
                                     str(ts_folder / 'topology.pdb'))
         exception = None
+
+        rea_int = mm.VerletIntegrator(1)
+        rea_sim = mmapp.Simulation(
+            topology,
+            self.evb_drv.system_confs[0]['systems']['reactant'],
+            rea_int,
+        )
+        pro_int = mm.VerletIntegrator(1)
+        pro_sim = mmapp.Simulation(
+            topology,
+            self.evb_drv.system_confs[0]['systems']['product'],
+            pro_int,
+        )
         mm_P = initial_positions
         try:
             for l in self.evb_drv.Lambda:
                 integrator = mm.VerletIntegrator(self.mm_step_size)
-                simulation = mmapp.Simulation(topology,
-                                              self.evb_drv.system_confs[0]['systems'][l],
-                                              integrator)
+                simulation = mmapp.Simulation(
+                    topology,
+                    self.evb_drv.system_confs[0]['systems'][l],
+                    integrator,
+                )
                 simulation.context.setPositions(mm_P)
-                simulation.context.setVelocitiesToTemperature(300 * mmunit.kelvin)
+                simulation.context.setVelocitiesToTemperature(300 *
+                                                              mmunit.kelvin)
 
                 simulation.minimizeEnergy()
                 if self.save_mm_traj:
@@ -407,7 +473,17 @@ class TransitionStateGuesser():
 
                 state = simulation.context.getState(getEnergy=True,
                                                     getPositions=True)
-                mm_E = state.getPotentialEnergy().value_in_unit(
+                pos = state.getPositions()
+                rea_sim.context.setPositions(pos)
+                pro_sim.context.setPositions(pos)
+                e1 = rea_sim.context.getState(
+                    getEnergy=True).getPotentialEnergy().value_in_unit(
+                        mmunit.kilojoules_per_mole)
+                e2 = pro_sim.context.getState(
+                    getEnergy=True).getPotentialEnergy().value_in_unit(
+                        mmunit.kilojoules_per_mole)
+                em = e1 * (1 - l) + e2 * l
+                md_e = state.getPotentialEnergy().value_in_unit(
                     mmunit.kilojoules_per_mole)
                 mm_P = state.getPositions(asNumpy=True).value_in_unit(
                     mmunit.bohr)
@@ -415,20 +491,21 @@ class TransitionStateGuesser():
                 avg_y = np.mean(mm_P[:, 1])
                 avg_z = np.mean(mm_P[:, 2])
                 mm_P -= [avg_x, avg_y, avg_z]
-
-                self.ostream.print_info(
-                    f"Lambda: {l}, MM Energy: {mm_E:.3f} kJ/mol")
-                self.ostream.flush()
-                energies.append(mm_E)
+                energies.append(em)
+                E1.append(e1)
+                E2.append(e2)
+                md_energies.append(md_e)
                 positions.append(mm_P)
                 bohr_to_nm = 0.0529177249
                 mm_P = mm_P * bohr_to_nm
+                self._print_mm_iter(l, e1, e2, em, md_e)
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
             exception = e
-        return energies, positions, exception
+        return energies, E1, E2, md_energies, positions, exception
 
     def _scan_scf(self):
+        self._print_scf_header()
         scf_energies = []
         ref = 0
         for i, l in enumerate(self.evb_drv.Lambda):
@@ -440,9 +517,7 @@ class TransitionStateGuesser():
             else:
                 dif = scf_E - ref
             scf_energies.append(scf_E)
-            self.ostream.print_info(
-                f"Lambda: {l}, SCF Energy: {scf_E:.3f} kJ/mol, difference: {dif:.3f} kJ/mol")
-            self.ostream.flush()
+            self._print_scf_iter(l, scf_E, dif)
 
         self.results['scf_energies'] = scf_energies
 

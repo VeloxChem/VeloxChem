@@ -150,18 +150,20 @@ class EvbForceFieldBuilder():
             self.reactant, self.product)
 
         if self.optimize_ff:
-            self.reactant.molecule = self._optimize_molecule(
-                self.reactant.molecule.get_element_ids(),
-                self.reactant,
-                formed_bonds,
-                note='reactant',
-            )
-            self.product.molecule = self._optimize_molecule(
-                self.product.molecule.get_element_ids(),
-                self.product,
-                broken_bonds,
-                note='product',
-            )
+            if len(reactant_input) > 1:
+                self.reactant.molecule = self._optimize_molecule(
+                    self.reactant.molecule.get_element_ids(),
+                    self.reactant,
+                    formed_bonds,
+                    note='reactant',
+                )
+            if len(product_input) > 1:
+                self.product.molecule = self._optimize_molecule(
+                    self.product.molecule.get_element_ids(),
+                    self.product,
+                    broken_bonds,
+                    note='product',
+                )
 
         return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products, product_mapping
 
@@ -198,12 +200,14 @@ class EvbForceFieldBuilder():
         molecule_sanity_check(combined_molecule)
         return combined_molecule
 
-    def _optimize_molecule(self,
-                           elemental_ids,
-                           forcefield,
-                           changing_bonds,
-                           name='MOL',
-                           note=None):
+    def _optimize_molecule(
+        self,
+        elemental_ids,
+        forcefield,
+        changing_bonds,
+        name='MOL',
+        note=None,
+    ):
 
         #merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
         #todo find a better way to do this
@@ -227,8 +231,9 @@ class EvbForceFieldBuilder():
         )
         mmsys_bak = copy.deepcopy(mmsys)
         if self.mm_opt_constrain_bonds:
-            mmsys = self._add_reaction_bonds( forcefield,mmsys,changing_bonds,note)
-        
+            mmsys = self._add_reaction_bonds(forcefield, mmsys, changing_bonds,
+                                             note)
+
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
         os.unlink(f'{name}.xml')
@@ -239,10 +244,12 @@ class EvbForceFieldBuilder():
         sim.context.setPositions(pos)
         self.ostream.print_info(f"Minimizing {note} molecule.")
         sim.minimizeEnergy()
-        sim.context.setVelocitiesToTemperature(300 * mmunit.kelvin)
-        self.ostream.print_info(f"Running 200 NVE steps with initial T at 300 K for {note} molecule.")
+        sim.context.setVelocitiesToTemperature(600 * mmunit.kelvin)
+        self.ostream.print_info(
+            f"Running 1000 NVE steps with initial T at 600 K for {note} molecule."
+        )
         self.ostream.flush()
-        sim.step(200)
+        sim.step(1000)
         self.ostream.print_info(f"Minimizing {note} molecule again.")
         self.ostream.flush()
         sim.minimizeEnergy()
@@ -251,7 +258,8 @@ class EvbForceFieldBuilder():
             integrator = mm.VerletIntegrator(0.001)
             sim = mmapp.Simulation(top, mmsys_bak, integrator)
             sim.context.setPositions(state.getPositions())
-            self.ostream.print_info(f"Minimizing {note} molecule without bond constraints.")
+            self.ostream.print_info(
+                f"Minimizing {note} molecule without bond constraints.")
             self.ostream.flush()
             sim.minimizeEnergy()
             state = sim.context.getState(getPositions=True)
@@ -266,15 +274,16 @@ class EvbForceFieldBuilder():
         new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         return new_molecule
 
-    def _add_reaction_bonds(self, forcefield,mmsys,changing_bonds,note):
-        self.ostream.print_info("Guessing intra-molecular constraints based on breaking bonds. This option can be turned off with mm_opt_constrain_bonds.")
+    def _add_reaction_bonds(self, forcefield, mmsys, changing_bonds, note):
+        self.ostream.print_info(
+            "Guessing intra-molecular constraints based on breaking bonds. This option can be turned off with mm_opt_constrain_bonds."
+        )
         morse_expr = "D*(1-exp(-a*(r-re)))^2;"
         morse_force = mm.CustomBondForce(morse_expr)
         morse_force.setName("Reaction morse bond")
         morse_force.addPerBondParameter("D")
         morse_force.addPerBondParameter("a")
         morse_force.addPerBondParameter("re")
-
 
         changing_atoms = []
         for bond in changing_bonds:
@@ -290,16 +299,10 @@ class EvbForceFieldBuilder():
             e = math.sqrt(e1 * e2)
 
             rmin = s * (2**(1 / 6))  # rmin = sigma * 2^(1/6)
-            # rmin *=0.8
             fc = 250000 * e  # force constant in kJ/mol/angstrom^2
             D = 500
             a = math.sqrt(fc / (2 * D))
-            morse_force.addBond(bond[0], bond[1], [D,a,rmin])
-            # forcefield.bonds.update(
-            #     {bond: {
-            #         'equilibrium': rmin,
-            #         'force_constant': fc
-            #     }})
+            morse_force.addBond(bond[0], bond[1], [D, a, rmin])
             self.ostream.print_info(
                 f"Replacing nonbonded interaction for atoms {bond} with Morse bond  with r {rmin:.3f} and fc {fc:.3f} for MM equilibration of the {note}"
             )
@@ -330,8 +333,6 @@ class EvbForceFieldBuilder():
                 index = nbforce.addException(bond[0], bond[1], 0, 1, 0)
                 added_exceptions.update({bond: index})
         return mmsys
-
-
 
     def get_forcefield(
         self,
