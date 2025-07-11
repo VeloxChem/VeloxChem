@@ -70,7 +70,7 @@ class SolvationFepDriver:
     Instance variables:
         - padding: The padding for the solvation box.
         - solvent_name: The name of the solvent.
-        - resname: The residue name for the solute. Only needed when using input files where solute is not at top of (i.e., index 0) .pdb/.gro.
+        - resname: The residue name for the solute. Only needed when using input files where solute is not at top of (i.e., index 0) .pdb/.gro. If solute is a protein, set to 'protein'.
         - temperature: The temperature for the simulation.
         - pressure: The pressure for the simulation.
         - timestep: The timestep for the simulation.
@@ -130,7 +130,8 @@ class SolvationFepDriver:
         # Options for the SolvationBuilder
         self.padding = 1.0
         self.solvent_name = 'spce'
-        self.resname = None
+        self.resname = None 
+        self.chain_ids = ['A'] # for protein systems - change if protein is containing multiple chains
         
         # Ensemble and MD options
         self.temperature = 298.15 * unit.kelvin
@@ -474,7 +475,6 @@ class SolvationFepDriver:
         """
         # Reading the system from files
         if self.solvent_name == 'omm_files':
-            # Under investigation!
             pdb = app.PDBFile(self.system_pdb)
             initial_system_ff = app.ForceField(self.solute_xml, *self.other_xml_files)
             topology = pdb.topology
@@ -516,7 +516,7 @@ class SolvationFepDriver:
             solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature))
 
             # Define alchemical regions
-            alchemical_region, chemical_region = self._get_alchemical_regions(topology)
+            alchemical_region, chemical_region = self._get_alchemical_region(topology)
 
             # Custom nonbonded force (Gaussian Softcore)
             gsc_force = self._get_gaussian_softcore_force(lambda_val)
@@ -744,7 +744,7 @@ class SolvationFepDriver:
 
         return delta_f
 
-    def _get_alchemical_regions(self, topology):
+    def _old_get_alchemical_region(self, topology):
         """
         Define alchemical (perturbed) and chemical (unperturbed) regions.
         """
@@ -762,3 +762,29 @@ class SolvationFepDriver:
 
         return alchemical_region, chemical_region
 
+    def _get_alchemical_region(self, topology):
+        """
+        Define alchemical (perturbed) and chemical (unperturbed) regions.
+
+        - If self.resname == 'protein', use self.chain_ids to select alchemical chains.
+        - if self.resname is set, e.g., for a ligand in a protein, select residues with that name.
+        - Default to selecting the first residue.
+        """
+        alchemical_region = []
+        chemical_region = []
+
+        for chain in topology.chains():
+            for res in chain.residues():
+                if self.resname == 'protein':
+                    condition = chain.id in self.chain_ids
+                elif self.resname:
+                    condition = res.name == self.resname
+                else:
+                    condition = res.index == 0
+
+                region = alchemical_region if condition else chemical_region
+
+                for atom in res.atoms():
+                    region.append(atom.index)
+
+        return alchemical_region, chemical_region

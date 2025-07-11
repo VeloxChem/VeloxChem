@@ -165,7 +165,7 @@ class SMDDriver:
             else:
                 # re-parametrize O radius dep. on the solvent
                 if atom == 'O':
-                    atom_radii.append(1.52 if alpha < 0.43 else round((1.52 + 1.8*(0.43 - alpha)), 2))
+                    atom_radii.append(1.52 if alpha >= 0.43 else round((1.52 + 1.8*(0.43 - alpha)), 4))
                 else:
                     atom_radii.append(smd_elements[atom])
                 
@@ -453,7 +453,7 @@ class SMDDriver:
         for k in range(len(self.solute.get_labels())):
             CDS_energy += sigma_k[k] * SASA_list[k]
         
-        if self.solvent != 'water': #sigma[M] = 0 for water
+        if self.solvent != 'water': # sigma[M] = 0 for water
             self._get_molecular_surface_tension()
             CDS_energy += self.sigma_M * sum(SASA_list)
 
