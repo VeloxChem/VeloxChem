@@ -40,6 +40,7 @@ from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .outputstream import OutputStream
+from .openmmdynamics import OpenMMDynamics
 from .errorhandler import assert_msg_critical
 from .sanitychecks import molecule_sanity_check
 from .mmforcefieldgenerator import MMForceFieldGenerator
@@ -90,6 +91,10 @@ class TransitionStateGuesser():
         self.scf_drv = None
         self.evb_drv: None | EvbDriver = None
         self.molecule = None
+        self.folder_name = 'ts_data'
+        self.force_conformer_search = False
+        self.conformer_steps = 10000
+        self.conformer_snapshots = 10
 
     def find_TS(
         self,
@@ -124,6 +129,14 @@ class TransitionStateGuesser():
             molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
         """
         evb_drv = EvbDriver()
+        if self.mute_evb:
+            evb_drv.ostream.mute()
+
+        if self.mute_evb:
+            self.ostream.print_info(
+                "Building forcefields. Disable mute_evb to see detailed output."
+            )
+            self.ostream.flush()
         evb_drv.build_ff_from_molecules(
             reactant,
             product,
@@ -135,8 +148,6 @@ class TransitionStateGuesser():
             reparameterize=reparameterize,
             mm_opt_constrain_bonds=mm_opt_constrain_bonds,
         )
-        if self.mute_evb:
-            evb_drv.ostream.mute()
         self.evb_drv = evb_drv
         self.scf_drv = scf_drv
         if scf:
@@ -147,11 +158,15 @@ class TransitionStateGuesser():
         self.molecule.set_charge(self.evb_drv.reactant.molecule.get_charge())
         self.molecule.set_multiplicity(
             self.evb_drv.reactant.molecule.get_multiplicity())
-        print(
+        self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
 
         self.evb_drv.temperature = self.mm_temperature
+        self.ostream.print_info(
+            "Building MM systems for the transition state guess. Disable mute_evb to see detailed output."
+        )
+        self.ostream.flush()
         self.evb_drv.build_systems(
             ['ts_guesser'],
             self.lambda_vec,
@@ -219,9 +234,9 @@ class TransitionStateGuesser():
         self.molecule.set_charge(charge)
         return self.molecule, self.results
 
-    def _print_mm_header(self):
+    def _print_initial_mm_header(self):
         self.ostream.print_blank()
-        self.ostream.print_header("Starting MM scan")
+        self.ostream.print_header("Starting initial MM scan")
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {}'.format(
             'Lambda',
@@ -235,9 +250,30 @@ class TransitionStateGuesser():
         self.ostream.print_header(45 * '-')
         self.ostream.flush()
 
-    def _print_mm_iter(self, l, e1, e2, em, md_e):
-        valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
-            l, md_e, e1, e2, em)
+    def _print_rescan_mm_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header("Scanning MM conformers")
+        self.ostream.print_blank()
+        valstr = '{} | {} | {} | {} | {} | {}'.format(
+            'Lambda',
+            ' E_int',
+            '    E1',
+            '    E2',
+            '    Em',
+            'n_conf',
+        )
+        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(50 * '-')
+        self.ostream.flush()
+
+    def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
+        if n_conf is None:
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
+                l, md_e, e1, e2, em)
+        else:
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
+                l, md_e, e1, e2, em, n_conf)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
@@ -247,7 +283,7 @@ class TransitionStateGuesser():
         self.ostream.print_blank()
         valsltr = '{} | {} | {}'.format(
             'Lambda',
-            'SCF Energy [kJ/mol]',
+            'SCF Energy',
             'Difference',
         )
         self.ostream.print_header(valsltr)
@@ -255,7 +291,7 @@ class TransitionStateGuesser():
         self.ostream.flush()
 
     def _print_scf_iter(self, l, scf_E, dif):
-        valstr = "{:8.2f}  {:20.5f}  {:10.3f}".format(l, scf_E, dif)
+        valstr = "{:8.2f}  {:15.5f}  {:8.3f}".format(l, scf_E, dif)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
@@ -401,29 +437,30 @@ class TransitionStateGuesser():
         return atoms
 
     def _scan_ff(self):
-        self._print_mm_header()
+
         energies = []
         E1 = []
         E2 = []
         md_energies = []
+        N_conf = []
 
         positions = []
         initial_positions = self.evb_drv.system_confs[0][
             'initial_positions']  #in nm
 
         topology = self.evb_drv.system_confs[0]['topology']
-        if self.save_mm_traj:
-            if not os.path.exists('ts_data'):
-                os.makedirs('ts_data')
-            else:
-                for file in os.listdir('ts_data'):
-                    file_path = os.path.join('ts_data', file)
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-            ts_folder = Path().cwd() / 'ts_data'
+        if not os.path.exists(self.folder_name):
+            os.makedirs(self.folder_name)
+        else:
+            for file in os.listdir(self.folder_name):
+                file_path = os.path.join(self.folder_name, file)
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+        self.folder = Path().cwd() / self.folder_name
 
+        if self.save_mm_traj:
             mmapp.PDBFile.writeFile(topology, initial_positions,
-                                    str(ts_folder / 'topology.pdb'))
+                                    str(self.folder / 'topology.pdb'))
         exception = None
 
         rea_int = mm.VerletIntegrator(1)
@@ -438,71 +475,170 @@ class TransitionStateGuesser():
             self.evb_drv.system_confs[0]['systems']['product'],
             pro_int,
         )
-        mm_P = initial_positions
+        pos = initial_positions
+        bohr_to_nm = 0.0529177249
         try:
-            for l in self.evb_drv.Lambda:
-                integrator = mm.VerletIntegrator(self.mm_step_size)
-                simulation = mmapp.Simulation(
-                    topology,
-                    self.evb_drv.system_confs[0]['systems'][l],
-                    integrator,
+            if self.force_conformer_search:
+                self.ostream.print_info(
+                    "Force conformer search is enabled, scanning conformers for all Lambda values."
                 )
-                simulation.context.setPositions(mm_P)
-                simulation.context.setVelocitiesToTemperature(300 *
-                                                              mmunit.kelvin)
+                self.ostream.flush()
+                self._print_rescan_mm_header()
+            else:
+                self._print_initial_mm_header()
+            for l in self.evb_drv.Lambda:
+                em, e1, e2, md_e, pos, n_conf = self._get_mm_energy(
+                    topology,
+                    l,
+                    pos,
+                    rea_sim,
+                    pro_sim,
+                    self.force_conformer_search,
+                )
+                if self.force_conformer_search:
+                    self._print_mm_iter(l, e1, e2, em, md_e, n_conf)
+                else:
+                    self._print_mm_iter(l, e1, e2, em, md_e)
 
-                simulation.minimizeEnergy()
-                if self.save_mm_traj:
-                    mmapp.PDBFile.writeFile(
-                        topology,
-                        simulation.context.getState(
-                            getPositions=True).getPositions(),
-                        str(ts_folder / f'{l}_begin_minim.pdb'),
-                    )
-                    simulation.reporters.append(
-                        mmapp.XTCReporter(str(ts_folder / f'{l}_traj.xtc'), 1))
-                simulation.step(self.mm_steps)
-                simulation.minimizeEnergy()
-                if self.save_mm_traj:
-                    mmapp.PDBFile.writeFile(
-                        topology,
-                        simulation.context.getState(
-                            getPositions=True).getPositions(),
-                        str(ts_folder / f'{l}_end_minim.pdb'),
-                    )
-
-                state = simulation.context.getState(getEnergy=True,
-                                                    getPositions=True)
-                pos = state.getPositions()
-                rea_sim.context.setPositions(pos)
-                pro_sim.context.setPositions(pos)
-                e1 = rea_sim.context.getState(
-                    getEnergy=True).getPotentialEnergy().value_in_unit(
-                        mmunit.kilojoules_per_mole)
-                e2 = pro_sim.context.getState(
-                    getEnergy=True).getPotentialEnergy().value_in_unit(
-                        mmunit.kilojoules_per_mole)
-                em = e1 * (1 - l) + e2 * l
-                md_e = state.getPotentialEnergy().value_in_unit(
-                    mmunit.kilojoules_per_mole)
-                mm_P = state.getPositions(asNumpy=True).value_in_unit(
-                    mmunit.bohr)
-                avg_x = np.mean(mm_P[:, 0])
-                avg_y = np.mean(mm_P[:, 1])
-                avg_z = np.mean(mm_P[:, 2])
-                mm_P -= [avg_x, avg_y, avg_z]
-                energies.append(em)
+                positions.append(pos)
+                pos = pos * bohr_to_nm
                 E1.append(e1)
                 E2.append(e2)
+                energies.append(em)
                 md_energies.append(md_e)
-                positions.append(mm_P)
-                bohr_to_nm = 0.0529177249
-                mm_P = mm_P * bohr_to_nm
-                self._print_mm_iter(l, e1, e2, em, md_e)
+                N_conf.append(n_conf)
+            self.ostream.print_blank()
+            #make sure E1 is monotonically increasing
+            #make sure E2 is monotonically decreasing
+            smooth_energy = False
+            initial_scan = True
+            printed_header = False
+            while not smooth_energy and not self.force_conformer_search:
+                if not initial_scan and not printed_header:
+                    self._print_rescan_mm_header()
+                    printed_header = True
+                smooth_energy = True
+
+                for i, l in enumerate(self.evb_drv.Lambda[:-1]):
+
+                    if E1[i] > E1[i + 1] or E2[i] < E2[i + 1]:
+                        smooth_energy = False
+                        if initial_scan:
+                            break
+                        em, e1, e2, md_e, pos, n_conf = self._get_mm_energy(
+                            topology,
+                            l,
+                            pos,
+                            rea_sim,
+                            pro_sim,
+                            True,
+                        )
+                        self._print_mm_iter(l, e1, e2, em, md_e, n_conf)
+                        positions[i] = pos
+                        energies[i] = em
+                        E1[i] = e1
+                        E2[i] = e2
+                        md_energies[i] = md_e
+                        N_conf[i] = n_conf
+                if initial_scan and smooth_energy:
+                    self.ostream.print_info(
+                        "Initial scan was smooth, skipping scanning of conformers."
+                    )
+                    self.ostream.flush()
+                initial_scan = False
+            self.ostream.print_blank()
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
             exception = e
         return energies, E1, E2, md_energies, positions, exception
+
+    def _get_mm_energy(
+        self,
+        topology,
+        l,
+        init_pos,
+        reasim,
+        prosim,
+        conformer_search,
+    ):
+        system = self.evb_drv.system_confs[0]['systems'][l]
+        if not conformer_search:
+            integrator = mm.VerletIntegrator(self.mm_step_size)
+            simulation = mmapp.Simulation(
+                topology,
+                system,
+                integrator,
+            )
+            simulation.context.setPositions(init_pos)
+            simulation.context.setVelocitiesToTemperature(300 * mmunit.kelvin)
+
+            simulation.minimizeEnergy()
+            if self.save_mm_traj:
+                mmapp.PDBFile.writeFile(
+                    topology,
+                    simulation.context.getState(
+                        getPositions=True).getPositions(),
+                    str(self.folder / f'{l}_begin_minim.pdb'),
+                )
+                simulation.reporters.append(
+                    mmapp.XTCReporter(str(self.folder / f'{l}_traj.xtc'), 1))
+            simulation.step(self.mm_steps)
+            simulation.minimizeEnergy()
+            if self.save_mm_traj:
+                mmapp.PDBFile.writeFile(
+                    topology,
+                    simulation.context.getState(
+                        getPositions=True).getPositions(),
+                    str(self.folder / f'{l}_end_minim.pdb'),
+                )
+
+            state = simulation.context.getState(getEnergy=True,
+                                                getPositions=True)
+            md_e = state.getPotentialEnergy().value_in_unit(
+                mmunit.kilojoules_per_mole)
+            pos_nm = state.getPositions(asNumpy=True).value_in_unit(
+                mmunit.nanometers)
+            pos_bohr = state.getPositions(asNumpy=True).value_in_unit(
+                mmunit.bohr)
+            n_conf = -1
+        else:
+            opm_dyn = OpenMMDynamics()
+            opm_dyn.ostream.mute()
+            # opm_dyn.create_system_from_molecule(mol, ff_gen)
+            pdb_name = self.folder_name + '/conf_top_{l}.pdb'
+
+            pdb = mmapp.PDBFile.writeFile(topology, init_pos, pdb_name)
+            opm_dyn.pdb = mmapp.PDBFile(pdb_name)
+            opm_dyn.system = system
+            conformers_dict = opm_dyn.conformational_sampling(ensemble='NVT',
+                                                              nsteps=500,
+                                                              snapshots=2)
+            n_conf = len(conformers_dict['energies'])
+            arg = np.argmin(conformers_dict['energies'])
+            md_e = conformers_dict['energies'][arg]
+            temp_mol = conformers_dict['molecules'][arg]
+            pos_nm = temp_mol.get_coordinates_in_angstrom() * 0.1
+            pos_bohr = temp_mol.get_coordinates_in_bohr()
+
+        em, e1, e2 = self._recalc_mm_energy(pos_nm, l, reasim, prosim)
+        avg_x = np.mean(pos_bohr[:, 0])
+        avg_y = np.mean(pos_bohr[:, 1])
+        avg_z = np.mean(pos_bohr[:, 2])
+        pos_bohr -= [avg_x, avg_y, avg_z]
+        return em, e1, e2, md_e, pos_bohr, n_conf
+
+    def _recalc_mm_energy(self, pos, l, rea_sim, pro_sim):
+        rea_sim.context.setPositions(pos)
+        pro_sim.context.setPositions(pos)
+        e1 = rea_sim.context.getState(
+            getEnergy=True).getPotentialEnergy().value_in_unit(
+                mmunit.kilojoules_per_mole)
+        e2 = pro_sim.context.getState(
+            getEnergy=True).getPotentialEnergy().value_in_unit(
+                mmunit.kilojoules_per_mole)
+        em = e1 * (1 - l) + e2 * l
+
+        return em, e1, e2
 
     def _scan_scf(self):
         self._print_scf_header()
@@ -518,7 +654,7 @@ class TransitionStateGuesser():
                 dif = scf_E - ref
             scf_energies.append(scf_E)
             self._print_scf_iter(l, scf_E, dif)
-
+        self.ostream.print_blank()
         self.results['scf_energies'] = scf_energies
 
         return scf_energies
