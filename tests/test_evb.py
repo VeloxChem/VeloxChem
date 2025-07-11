@@ -258,10 +258,6 @@ class TestEvb:
         options_file = folder / 'evb_options.json'
         specific, common = EVB._load_output_files(
             E_file,
-            #todo add forcegroup files
-            "nothing",
-            "nada",
-            "noppes",
             data_file,
             options_file,
         )
@@ -272,10 +268,6 @@ class TestEvb:
         options_file = folder / 'evb_options.json'
         specific, common = EVB._load_output_files(
             E_file,
-            #todo add forcegroup files
-            "nothing",
-            "nada",
-            "noppes",
             data_file,
             options_file,
         )

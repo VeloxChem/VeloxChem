@@ -521,7 +521,7 @@ class LinearResponseSolver(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x)
+                                final_h5_fname, solution_keys, x, self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions

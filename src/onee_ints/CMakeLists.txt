@@ -14,8 +14,12 @@ target_sources(vlxobjs
     LinearMomentumIntegrals.cpp
     NuclearPotentialErfGradient.cpp
     NuclearPotentialErfValues.cpp
+    NuclearPotentialHessian110.cpp
+    NuclearPotentialHessian101.cpp
     QuadrupoleIntegrals.cpp
     OldOneElecIntsDrivers.cpp
+    OverlapHessian101.cpp
+    KineticEnergyHessian101.cpp
   )
 
 target_include_directories(vlxobjs

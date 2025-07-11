@@ -82,13 +82,13 @@ def get_water_parameters():
 
         'bonds' : {
                 'type': 'harmonic',
-                'force_constant': 462750.4,
+                'force_constant': 502416.0,
                 'equilibrium': 0.09572,
                 'comment': 'TIP-3P water'
                 },
         'angles' : {
                 'type': 'harmonic',
-                'force_constant': 836.8,
+                'force_constant': 628.02,
                 'equilibrium': 104.52,
                 'comment': 'TIP-3P water'
                 },

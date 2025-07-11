@@ -712,7 +712,7 @@ class SolvationBuilder:
                                         )
         
         # Set the temperature and pressure
-        integrator = mm.LangevinIntegrator(self.temperature*unit.kelvin, 1.0/unit.picosecond, 1*unit.femtosecond)
+        integrator = mm.LangevinIntegrator(self.temperature*unit.kelvin, 1.0/unit.picosecond, 2*unit.femtosecond)
         barostat = mm.MonteCarloBarostat(self.pressure*unit.bar, self.temperature*unit.kelvin, 25)
         system.addForce(barostat)
 

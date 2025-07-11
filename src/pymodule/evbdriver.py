@@ -157,18 +157,19 @@ class EvbDriver():
         self.ostream.flush()
 
     def build_ff_from_molecules(
-        self,
-        reactant: Molecule | list[Molecule],
-        product: Molecule | list[Molecule],
-        reactant_partial_charges: list[float] | list[list[float]] = None,
-        product_partial_charges: list[float] | list[list[float]] = None,
-        reactant_total_multiplicity: int = -1,
-        product_total_multiplicity: int = -1,
-        reparameterize: bool = True,
-        optimize: bool = False,
-        ordered_input: bool = False,
-        breaking_bonds: set[tuple[int, int]] = set(),
-        name=None,
+            self,
+            reactant: Molecule | list[Molecule],
+            product: Molecule | list[Molecule],
+            reactant_partial_charges: list[float] | list[list[float]] = None,
+            product_partial_charges: list[float] | list[list[float]] = None,
+            reactant_total_multiplicity: int = -1,
+            product_total_multiplicity: int = -1,
+            reparameterize: bool = True,
+            optimize: bool = False,
+            mm_opt_constrain_bonds: bool = True,
+            ordered_input: bool = False,
+            breaking_bonds: set[tuple[int, int]] = set(),
+            name=None,
     ):
         if self.name is None:
             self.name = name
@@ -192,11 +193,12 @@ class EvbDriver():
         ffbuilder.water_model = self.water_model
         ffbuilder.reparameterize = reparameterize
         ffbuilder.optimize = optimize
+        ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
 
         if isinstance(breaking_bonds, tuple):
             breaking_bonds = [breaking_bonds]
 
-        self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
+        self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products, self.product_mapping = ffbuilder.build_forcefields(
             reactant_input=rea_input,
             product_input=pro_input,
             reactant_total_multiplicity=reactant_total_multiplicity,
@@ -215,6 +217,13 @@ class EvbDriver():
         elif isinstance(partial_charges[0], float) or isinstance(
                 partial_charges[0], int):
             partial_charges = [partial_charges]
+
+        # Casting to float is necessary for json serialization
+        for charge_list in partial_charges:
+            if charge_list is not None:
+                for i in range(len(charge_list)):
+                    if isinstance(charge_list[i], int):
+                        charge_list[i] = float(charge_list[i])
 
         assert len(molecules) == len(
             partial_charges
@@ -249,6 +258,7 @@ class EvbDriver():
         product_multiplicity: int | list[int] = 1,
         reparameterize: bool = True,
         optimize: bool = False,
+        mm_opt_constrain_bonds: bool = True,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] = [],
         save_output: bool = True,
@@ -267,10 +277,6 @@ class EvbDriver():
         else:
             combined_product_name = product
         combined_pro_input = self._get_input_files(combined_product_name)
-        # combined_pro_input = self._process_file_input(
-        #     combined_product_name,
-        #     product_charge,product_multiplicity,
-        # )[0]
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
@@ -305,6 +311,7 @@ class EvbDriver():
             ffbuilder.water_model = self.water_model
             ffbuilder.reparameterize = reparameterize
             ffbuilder.optimize = optimize
+            ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
@@ -317,12 +324,14 @@ class EvbDriver():
                     rea['forcefield'] = None
                 for pro in pro_input:
                     pro['forcefield'] = None
-            self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products = ffbuilder.build_forcefields(
-                rea_input,
-                pro_input,
-                ordered_input,
-                breaking_bonds,
-            )
+            (self.reactant, self.product, self.formed_bonds, self.broken_bonds,
+             self.reactants, self.products,
+             self.product_mapping) = ffbuilder.build_forcefields(
+                 rea_input,
+                 pro_input,
+                 ordered_input,
+                 breaking_bonds,
+             )
             if save_output:
                 self.ostream.print_info(
                     f"Saving forcefield and structure data to {self.input_folder} folder"
@@ -1007,11 +1016,11 @@ class EvbDriver():
         fg_data = []
         rea_fg_data = []
         pro_fg_data = []
-        if Path(fg_file).exists():
+        if fg_file is not None and Path(fg_file).exists():
             fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
-        if Path(fg_rea_file).exists():
+        if fg_rea_file is not None and Path(fg_rea_file).exists():
             rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
-        if Path(fg_pro_file).exists():
+        if fg_pro_file is not None and Path(fg_pro_file).exists():
             pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
 
@@ -1037,7 +1046,6 @@ class EvbDriver():
             "E1_int": E1_int,
             "E2_int": E2_int,
             "E_m_pes": E_m_pes,
-            "E_m_int": E_m_int,
             "Ep": Ep,
             "Ek": Ek,
             "Temp_step": Temp,
@@ -1113,6 +1121,8 @@ class EvbDriver():
                         save_group(v, subgroup)
                     elif isinstance(v, np.ndarray) or isinstance(v, list):
                         group.create_dataset(k, data=v)
+                    elif isinstance(v, set):
+                        group.create_dataset(k, data=list(v))
                     else:
                         group[k] = v
 
@@ -1120,85 +1130,79 @@ class EvbDriver():
 
     def create_viamd_environment_files(self):
         for conf in self.system_confs:
-            base = (
-                "[Files]\n"
-                "MoleculeFile=./topology.pdb\n"
-                "TrajectoryFile=./trajectory.xtc\n"
-                "CoarseGrained=0\n"
-                "\n"
-                "[RenderSettings]\n"
-                "SsaoEnabled=0\n"
-                "DofEnabled=0\n"
-                "\n"
-                "[Representation]\n"
-                "Name=Reaction\n"
-                'Filter=resname("REA")\n'
-                "Enabled=1\n"
-                "Type=2\n"
-                "ColorMapping=1\n"
-                "Saturation=1.000000\n"
-                "Param=1.000000,1.000000,1.000000,1.000000\n"
-                "DynamicEval=0\n")
+            base = ("[Files]\n"
+                    "MoleculeFile=./topology.pdb\n"
+                    "TrajectoryFile=./trajectory.xtc\n"
+                    "CoarseGrained=0\n"
+                    "\n"
+                    "[RenderSettings]\n"
+                    "SsaoEnabled=0\n"
+                    "DofEnabled=0\n"
+                    "\n"
+                    "[Representation]\n"
+                    "Name=Reaction\n"
+                    'Filter=resname("REA")\n'
+                    "Enabled=1\n"
+                    "Type=2\n"
+                    "ColorMapping=1\n"
+                    "Saturation=1.000000\n"
+                    "Param=1.000000,1.000000,1.000000,1.000000\n"
+                    "DynamicEval=0\n")
 
-            script = (
-            "[Script]\n"
-            'Text="""\n'
-            'rea = resname("REA");\n')
+            script = ("[Script]\n"
+                      'Text="""\n'
+                      'rea = resname("REA");\n')
             if conf.get("solvent", None) is not None:
-                script+=(
-                    'sol = resname("SOL");\n'
-                    'close_sol = (within(5, rea) and resname("SOL"));\n')
+                script += ('sol = resname("SOL");\n'
+                           'close_sol = (within(5, rea) and resname("SOL"));\n')
             if conf.get('pdb', None) is not None:
-                script+="pocket = residue(protein and within(3,rea)) and not element('H');\n"
+                script += "pocket = residue(protein and within(3,rea)) and not element('H');\n"
 
-            script+= '"""'
+            script += '"""'
 
-            solvent_rep = (
-                "[Representation]\n"
-                "Name=Solvent\n"
-                "Filter=close_sol\n"
-                "Enabled=1\n"
-                "Type=1\n"
-                "ColorMapping=1\n"
-                "Saturation=1.000000\n"
-                "Param=0.354000,1.000000,1.000000,1.000000\n"
-                "DynamicEval=1\n")
+            solvent_rep = ("[Representation]\n"
+                           "Name=Solvent\n"
+                           "Filter=close_sol\n"
+                           "Enabled=1\n"
+                           "Type=1\n"
+                           "ColorMapping=1\n"
+                           "Saturation=1.000000\n"
+                           "Param=0.354000,1.000000,1.000000,1.000000\n"
+                           "DynamicEval=1\n")
 
-            protein_rep = (
-                "[Representation]\n"
-                "Name=Protein\n"
-                "Filter=protein\n"
-                "Enabled=1\n"
-                "Type=4\n"
-                "ColorMapping=8\n"
-                "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                "Saturation=1.000000\n"
-                "Param=1.000000,1.000000,1.000000,1.000000\n"
-                "DynamicEval=0\n"
-                "\n"
-                "[Representation]\n"
-                "Name=pocket\n"
-                "Filter=pocket\n"
-                "Enabled=1\n"
-                "Type=0\n"
-                "ColorMapping=1\n"
-                "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
-                "Saturation=0.570000\n"
-                "Param=1.000000,1.000000,1.000000,1.000000\n"
-                "DynamicEval=0\n")
-            
-            carbon_rep = (
-                "[Representation]\n"
-                "Name=Carbon\n"
-                'Filter=resname("CCC")\n'
-                "Enabled=1\n"
-                "Type=2\n"
-                "ColorMapping=1\n"
-                "Saturation=1.000000\n"
-                "Param=1.000000,1.000000,1.000000,1.000000\n"
-                "DynamicEval=0\n")
+            protein_rep = ("[Representation]\n"
+                           "Name=Protein\n"
+                           "Filter=protein\n"
+                           "Enabled=1\n"
+                           "Type=4\n"
+                           "ColorMapping=8\n"
+                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
+                           "Saturation=1.000000\n"
+                           "Param=1.000000,1.000000,1.000000,1.000000\n"
+                           "DynamicEval=0\n"
+                           "\n"
+                           "[Representation]\n"
+                           "Name=pocket\n"
+                           "Filter=pocket\n"
+                           "Enabled=1\n"
+                           "Type=0\n"
+                           "ColorMapping=1\n"
+                           "StaticColor=1.000000,1.000000,1.000000,1.000000\n"
+                           "Saturation=0.570000\n"
+                           "Param=1.000000,1.000000,1.000000,1.000000\n"
+                           "DynamicEval=0\n")
 
-            string = base + "\n" 
+            carbon_rep = ("[Representation]\n"
+                          "Name=Carbon\n"
+                          'Filter=resname("CCC")\n'
+                          "Enabled=1\n"
+                          "Type=2\n"
+                          "ColorMapping=1\n"
+                          "Saturation=1.000000\n"
+                          "Param=1.000000,1.000000,1.000000,1.000000\n"
+                          "DynamicEval=0\n")
+
+            string = base + "\n"
             if conf.get("solvent", None) is not None:
                 string += solvent_rep + "\n"
             if conf.get('pdb', None) is not None:
@@ -1210,8 +1214,6 @@ class EvbDriver():
 
             with open(f"{conf['data_folder']}/workspace.via", "w") as file:
                 file.write(string)
-            
-
 
     def default_system_configurations(self, name: str) -> dict:
         """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.

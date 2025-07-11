@@ -215,6 +215,9 @@ class LinearSolver:
         self.serial_ratio = 0.05
         self.use_subcomms = False
 
+        # group label used to save the response results in a checkpoint file
+        self.group_label = 'rsp'
+
         # input keywords
         self._input_keywords = {
             'response': {
