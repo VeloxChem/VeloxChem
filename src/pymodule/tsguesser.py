@@ -610,9 +610,11 @@ class TransitionStateGuesser():
             pdb = mmapp.PDBFile.writeFile(topology, init_pos, pdb_name)
             opm_dyn.pdb = mmapp.PDBFile(pdb_name)
             opm_dyn.system = system
-            conformers_dict = opm_dyn.conformational_sampling(ensemble='NVT',
-                                                              nsteps=500,
-                                                              snapshots=2)
+            conformers_dict = opm_dyn.conformational_sampling(
+                ensemble='NVT',
+                nsteps=self.conformer_steps,
+                snapshots=self.conformer_snapshots,
+            )
             n_conf = len(conformers_dict['energies'])
             arg = np.argmin(conformers_dict['energies'])
             md_e = conformers_dict['energies'][arg]
