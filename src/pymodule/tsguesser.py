@@ -93,6 +93,7 @@ class TransitionStateGuesser():
         self.molecule = None
         self.folder_name = 'ts_data'
         self.force_conformer_search = False
+        self.skip_conformer_search = False
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
 
@@ -105,7 +106,7 @@ class TransitionStateGuesser():
         product_partial_charges: list[float] | list[list[float]] = None,
         reactant_total_multiplicity=-1,
         product_total_multiplicity=-1,
-        breaking_bonds: set[tuple[int, int]] = set(),
+        breaking_bonds: set[tuple[int, int]] | tuple = set(),
         scf=True,
         scf_drv=None,
         constraints=None,
@@ -441,7 +442,7 @@ class TransitionStateGuesser():
         energies = []
         E1 = []
         E2 = []
-        md_energies = []
+        energies_int = []
         N_conf = []
 
         positions = []
@@ -487,7 +488,7 @@ class TransitionStateGuesser():
             else:
                 self._print_initial_mm_header()
             for l in self.evb_drv.Lambda:
-                em, e1, e2, md_e, pos, n_conf = self._get_mm_energy(
+                em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
                     topology,
                     l,
                     pos,
@@ -496,61 +497,81 @@ class TransitionStateGuesser():
                     self.force_conformer_search,
                 )
                 if self.force_conformer_search:
-                    self._print_mm_iter(l, e1, e2, em, md_e, n_conf)
+                    self._print_mm_iter(l, e1, e2, em, e_int, n_conf)
                 else:
-                    self._print_mm_iter(l, e1, e2, em, md_e)
+                    self._print_mm_iter(l, e1, e2, em, e_int)
 
                 positions.append(pos)
                 pos = pos * bohr_to_nm
                 E1.append(e1)
                 E2.append(e2)
                 energies.append(em)
-                md_energies.append(md_e)
+                energies_int.append(e_int)
                 N_conf.append(n_conf)
             self.ostream.print_blank()
             #make sure E1 is monotonically increasing
             #make sure E2 is monotonically decreasing
-            smooth_energy = False
-            initial_scan = True
-            printed_header = False
-            while not smooth_energy and not self.force_conformer_search:
-                if not initial_scan and not printed_header:
-                    self._print_rescan_mm_header()
-                    printed_header = True
-                smooth_energy = True
+            if not self.skip_conformer_search:
+                smooth_energy = False
+                initial_scan = True
+                printed_header = False
+                while not smooth_energy and not self.force_conformer_search:
+                    if not initial_scan and not printed_header:
+                        self._print_rescan_mm_header()
+                        printed_header = True
+                    smooth_energy = True
 
-                for i, l in enumerate(self.evb_drv.Lambda[:-1]):
+                    for i, l in enumerate(self.evb_drv.Lambda):
+                        if i < len(self.evb_drv.Lambda) - 1:
+                            if E1[i] > E1[i + 1]:
+                                smooth_energy = False
+                        if i > 0:
+                            if E2[i - 1] < E2[i]:
+                                smooth_energy = False
 
-                    if E1[i] > E1[i + 1] or E2[i] < E2[i + 1]:
-                        smooth_energy = False
-                        if initial_scan:
-                            break
-                        em, e1, e2, md_e, pos, n_conf = self._get_mm_energy(
-                            topology,
-                            l,
-                            pos,
-                            rea_sim,
-                            pro_sim,
-                            True,
+                        if not smooth_energy:
+                            if initial_scan:
+                                break
+                            em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
+                                topology,
+                                l,
+                                pos,
+                                rea_sim,
+                                pro_sim,
+                                True,
+                            )
+                            if e_int < energies_int[i]:
+                                self.ostream.print_info(
+                                    f"Found lower integration energy for lambda {l} ({e_int:.3f} kJ/mol) than before ({energies_int[i]:.3f} kJ/mol). Updating results."
+                                )
+                                self.ostream.flush()
+                                positions[i] = pos
+                                energies[i] = em
+                                E1[i] = e1
+                                E2[i] = e2
+                                energies_int[i] = e_int
+                                N_conf[i] = n_conf
+                        for i, l in enumerate(self.evb_drv.Lambda):
+                            self._print_mm_iter(
+                                l,
+                                E1[i],
+                                E2[i],
+                                energies[i],
+                                energies_int[i],
+                                N_conf[i],
+                            )
+
+                    if initial_scan and smooth_energy:
+                        self.ostream.print_info(
+                            "Initial scan was smooth, skipping scanning of conformers."
                         )
-                        self._print_mm_iter(l, e1, e2, em, md_e, n_conf)
-                        positions[i] = pos
-                        energies[i] = em
-                        E1[i] = e1
-                        E2[i] = e2
-                        md_energies[i] = md_e
-                        N_conf[i] = n_conf
-                if initial_scan and smooth_energy:
-                    self.ostream.print_info(
-                        "Initial scan was smooth, skipping scanning of conformers."
-                    )
-                    self.ostream.flush()
-                initial_scan = False
-            self.ostream.print_blank()
+                        self.ostream.flush()
+                    initial_scan = False
+                self.ostream.print_blank()
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
             exception = e
-        return energies, E1, E2, md_energies, positions, exception
+        return energies, E1, E2, energies_int, positions, exception
 
     def _get_mm_energy(
         self,
@@ -594,7 +615,7 @@ class TransitionStateGuesser():
 
             state = simulation.context.getState(getEnergy=True,
                                                 getPositions=True)
-            md_e = state.getPotentialEnergy().value_in_unit(
+            e_int = state.getPotentialEnergy().value_in_unit(
                 mmunit.kilojoules_per_mole)
             pos_nm = state.getPositions(asNumpy=True).value_in_unit(
                 mmunit.nanometers)
@@ -617,17 +638,21 @@ class TransitionStateGuesser():
             )
             n_conf = len(conformers_dict['energies'])
             arg = np.argmin(conformers_dict['energies'])
-            md_e = conformers_dict['energies'][arg]
+            e_int = conformers_dict['energies'][arg]
             temp_mol = conformers_dict['molecules'][arg]
             pos_nm = temp_mol.get_coordinates_in_angstrom() * 0.1
             pos_bohr = temp_mol.get_coordinates_in_bohr()
+            self.ostream.print_info(
+                f"Found {len(conformers_dict['energies'])} conformers for lambda {l}. Energies: {conformers_dict['energies']}, index of minimum: {arg}"
+            )
+            self.ostream.flush()
 
         em, e1, e2 = self._recalc_mm_energy(pos_nm, l, reasim, prosim)
         avg_x = np.mean(pos_bohr[:, 0])
         avg_y = np.mean(pos_bohr[:, 1])
         avg_z = np.mean(pos_bohr[:, 2])
         pos_bohr -= [avg_x, avg_y, avg_z]
-        return em, e1, e2, md_e, pos_bohr, n_conf
+        return em, e1, e2, e_int, pos_bohr, n_conf
 
     def _recalc_mm_energy(self, pos, l, rea_sim, pro_sim):
         rea_sim.context.setPositions(pos)

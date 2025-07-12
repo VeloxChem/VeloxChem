@@ -102,7 +102,7 @@ class EvbForceFieldBuilder():
             reactant_total_multiplicity: int,
             product_total_multiplicity: int,
             ordered_input: bool = False,
-            breaking_bonds: set[tuple[int, int]] = set(),
+            breaking_bonds: set[tuple[int, int]]|tuple = set(),
     ):
 
         reactants: list[MMForceFieldGenerator] = []
@@ -142,6 +142,8 @@ class EvbForceFieldBuilder():
             self.ostream.print_info(
                 "Matching reactant and product force fields")
             self.ostream.flush()
+            if isinstance(breaking_bonds, tuple):
+                breaking_bonds = {breaking_bonds} 
             self.product, product_mapping = self._match_reactant_and_product(
                 self.reactant, reamol.get_element_ids(), self.product,
                 promol.get_element_ids(), breaking_bonds)
@@ -400,6 +402,7 @@ class EvbForceFieldBuilder():
 
                 if self.mute_scf:
                     self.ostream.print_info("Calculating SCF for RESP charges")
+                    self.ostream.flush()
                     self.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
@@ -412,6 +415,7 @@ class EvbForceFieldBuilder():
                 self.ostream.flush()
                 if self.mute_scf:
                     self.ostream.print_info("Calculating RESP charges")
+                    self.ostream.flush()
                     self.ostream.mute()
                 forcefield.partial_charges = resp_drv.compute(
                     molecule, basis, scf_results, 'resp')

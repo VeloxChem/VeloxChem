@@ -168,7 +168,7 @@ class EvbDriver():
             optimize: bool = False,
             mm_opt_constrain_bonds: bool = True,
             ordered_input: bool = False,
-            breaking_bonds: set[tuple[int, int]] = set(),
+            breaking_bonds: set[tuple[int, int]] |tuple = set(),
             name=None,
     ):
         if self.name is None:
@@ -260,7 +260,7 @@ class EvbDriver():
         optimize: bool = False,
         mm_opt_constrain_bonds: bool = True,
         ordered_input: bool = False,
-        breaking_bonds: list[tuple[int, int]] = [],
+        breaking_bonds: set[tuple[int, int]] |tuple= set(),
         save_output: bool = True,
         force_recalculation: bool = False,
     ):
@@ -295,13 +295,13 @@ class EvbDriver():
             self.product = combined_pro_input["forcefield"]
             self.ostream.flush()
         else:
-            rea_input = self._process_file_input(
+            rea_input, reactant_total_multiplicity = self._process_file_input(
                 reactant,
                 reactant_charge,
                 reactant_multiplicity,
             )
 
-            pro_input = self._process_file_input(
+            pro_input, product_total_multiplicity = self._process_file_input(
                 product,
                 product_charge,
                 product_multiplicity,
@@ -313,8 +313,6 @@ class EvbDriver():
             ffbuilder.optimize = optimize
             ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
 
-            if isinstance(breaking_bonds, tuple):
-                breaking_bonds = [breaking_bonds]
 
             if force_recalculation:
                 self.ostream.print_warning(
@@ -329,6 +327,8 @@ class EvbDriver():
              self.product_mapping) = ffbuilder.build_forcefields(
                  rea_input,
                  pro_input,
+                 reactant_total_multiplicity,
+                product_total_multiplicity,
                  ordered_input,
                  breaking_bonds,
              )
@@ -362,6 +362,10 @@ class EvbDriver():
                 multiplicity = [multiplicity] * len(filenames)
             else:
                 multiplicity = [multiplicity]
+        total_multiplicity = 0
+        for mult in multiplicity:
+            total_multiplicity += mult-1
+        total_multiplicity+=1
 
         assert len(filenames) == len(
             charge), "Number of reactants and charges must match"
@@ -386,7 +390,7 @@ class EvbDriver():
             assert inp['molecule'] is not None or inp[
                 'forcefield'] is not None, f"Could not load {filename} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
 
-        return input
+        return input, total_multiplicity
 
     def _get_input_files(self, filename: str):
         # Build a molecule from a (possibly optimized) geometry
