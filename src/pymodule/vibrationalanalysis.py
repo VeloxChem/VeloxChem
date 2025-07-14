@@ -980,6 +980,9 @@ class VibrationalAnalysis:
 
             fout.write('\n\n')
 
+        if self.do_resonance_raman and (self.raman_activities is not None):
+            self.print_resonance_raman()
+
         fout.close()
 
     def get_dominant_modes(self, n_targets):
