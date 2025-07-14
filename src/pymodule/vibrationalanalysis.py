@@ -719,7 +719,7 @@ class VibrationalAnalysis:
         if self.do_resonance_raman:
             self.print_resonance_raman()
 
-        if self.vib_results_txt_file is not None:
+        if (number_of_modes > n_dom_modes) and (self.vib_results_txt_file is not None):
             fulltxt_msg = 'Full vibrational analysis results written to: '
             fulltxt_msg += f'{self.vib_results_txt_file}'
             self.ostream.print_info(fulltxt_msg)
