@@ -344,10 +344,6 @@ class VibrationalAnalysis:
             # print the vibrational properties
             self.print_vibrational_analysis(molecule)
 
-            # print resonance Raman grid at the end
-            if self.do_resonance_raman:
-                self.print_resonance_raman()
-
             # create binary file and save vibrational analysis results
             self._write_final_hdf5(molecule)
 
@@ -658,6 +654,8 @@ class VibrationalAnalysis:
             lr_drv = ComplexResponse(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
+            # get absorption cross section from CPP calculations
+            lr_drv.cpp_flag = 'absorption'
             # save response results in the vib sub-folder of the checkpoint file
             lr_drv.group_label = 'vib/rsp'
             if 'frequencies' not in self.rsp_dict:
@@ -717,6 +715,10 @@ class VibrationalAnalysis:
         if number_of_modes > n_dom_modes:
             self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
+        # print resonance Raman grid at the end
+        if self.do_resonance_raman:
+            self.print_resonance_raman()
+
         if self.vib_results_txt_file is not None:
             fulltxt_msg = 'Full vibrational analysis results written to: '
             fulltxt_msg += f'{self.vib_results_txt_file}'
@@ -743,7 +745,7 @@ class VibrationalAnalysis:
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-       
+
         width = 52
         for k in idx_lst:
 
@@ -823,9 +825,6 @@ class VibrationalAnalysis:
     def print_resonance_raman(self):
         """
         Prints the results for resonance Raman.
-
-        :param molecule:
-            The molecule.
         """
 
         if self.do_raman:
@@ -861,6 +860,52 @@ class VibrationalAnalysis:
             self.ostream.print_blank()
 
         self.ostream.flush()
+
+    def print_resonance_raman_to_file(self):
+        """
+        Prints the results for resonance Raman to the .out file.
+        """
+
+        if self.do_raman:
+            pass
+
+        # check output file
+        if self.vib_results_txt_file is None:
+            return
+
+        number_of_modes = len(self.vib_frequencies)
+        freqs = list(self.raman_activities.keys())
+
+        # open output file
+        with open(self.vib_results_txt_file, 'a') as fout:
+
+            title = 'Resonance Raman\n'
+            fout.write(title)
+            fout.write('=' * (len(title) + 2))
+            fout.write('\n\n')
+
+            width = 52
+            for k in range(number_of_modes):
+                # print normal mode indices
+                #index_string = '{:22s}{:d}\n'.format('Vibrational Mode', k + 1)
+                index_string = f'{"Vibrational Mode":22s}{k+1:d}\n'
+                fout.write(index_string)#.ljust(width))
+                fout.write('-' * width)
+                fout.write('\n')
+
+                column_string = '{:>16s}  {:>24s}\n'.format('Frequency',
+                                                            'Raman activity')
+                fout.write(column_string)#.ljust(width))
+                fout.write('-' * width)
+                fout.write('\n')
+
+                # loop through the external frequencies
+                for freq in freqs:
+                    raman_str = '{:16.6f}  {:4s}  {:18.4f}  {:8s}\n'.format(
+                        freq, 'a.u.', self.raman_activities[freq][k], 'A**4/amu')
+                    fout.write(raman_str)#.ljust(width))
+
+                fout.write('\n\n')
 
     def print_vibrational_analysis_file(self,
                                         molecule,
@@ -980,10 +1025,10 @@ class VibrationalAnalysis:
 
             fout.write('\n\n')
 
-        if self.do_resonance_raman and (self.raman_activities is not None):
-            self.print_resonance_raman()
-
         fout.close()
+
+        if self.do_resonance_raman and (self.raman_activities is not None):
+            self.print_resonance_raman_to_file()
 
     def get_dominant_modes(self, n_targets):
         """
