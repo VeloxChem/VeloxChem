@@ -37,11 +37,12 @@ from pathlib import Path
 import numpy as np
 import sys
 import time
-import h5py
 
 from .veloxchemlib import mpi_master
 from .solvationbuilder import SolvationBuilder
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .outputstream import OutputStream
+from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -82,6 +83,8 @@ class SolvationFepDriver:
         - solute_ff: The solute force field.
         - platform: The platform for the openMM simulation.
         - save_trajectory_xtc: If True, save the trajectories in XTC format.
+        - save_system_xml: If True, save the system in XML format.
+        - save_energies_txt: If True, save the energies from each simulation in txt format.
         - alpha: The alpha parameter for the Gaussian softcore potential.
         - beta: The beta parameter for the Gaussian softcore potential.
         - x: The x parameter for the Gaussian softcore potential.
@@ -125,7 +128,7 @@ class SolvationFepDriver:
         self.output_folder = Path("solvation_fep_output")
 
         # Options for the SolvationBuilder
-        self.padding = 2.0
+        self.padding = 1.0
         self.solvent_name = 'spce'
         self.resname = None
         
@@ -133,8 +136,8 @@ class SolvationFepDriver:
         self.temperature = 298.15 * unit.kelvin
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
-        self.num_equil_steps = 10000 #10 ps
-        self.num_steps = 1000000 # 1 ns
+        self.num_equil_steps = 5000 #10 ps
+        self.num_steps = 500000 # 1 ns
         self.number_of_snapshots = 1000
         self.cutoff = 1.0 * unit.nanometers
         self.constraints = app.HBonds  
@@ -144,6 +147,8 @@ class SolvationFepDriver:
         self.solute_ff = None
         self.platform = None
         self.save_trajectory_xtc = False
+        self.save_system_xml = False
+        self.save_energies_txt = False
 
         # Alchemical parameters
         self.alpha = 5 * unit.kilocalories_per_mole
@@ -152,7 +157,7 @@ class SolvationFepDriver:
         # Single parameter for lambdas for stage 1
         # Set to 6 to be on the safe side
         self.lambdas_stage1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Asymetric lambdas for stage 2
+        # Asymetric lambdas for stage 2 
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
         # Fixed lambda vector for stage 3 with 6 lambdas
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
@@ -178,7 +183,7 @@ class SolvationFepDriver:
         :param solvent:
             The solvent to use for solvation. Default is spce water.
             Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
-            'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'other' or 'itself'.
+            'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf','other' or 'itself'.
         :param solvent_molecule:
             The VeloxChem molecule object for the solvent. Mandatory for 'other'.
         :param ff_gen_solvent:
@@ -190,7 +195,7 @@ class SolvationFepDriver:
         """
         
         sol_builder = SolvationBuilder()
-        sol_builder.steps = 10000
+        sol_builder.steps = 50000
 
         sol_builder.solvate(solute=molecule, 
                             solvent=solvent,
@@ -201,9 +206,11 @@ class SolvationFepDriver:
                             equilibrate=True)
         
         self.solvent_name = solvent
-        self.output_folder.mkdir(parents=True, exist_ok=True)
         # Note: GROMACS files will be used instead of OpenMM files.
         sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
+        
+        if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
+            self.output_folder.mkdir(parents=True, exist_ok=True)
 
         if not ff_gen_solute:
             self.solute_ff = sol_builder.solute_ff
@@ -214,34 +221,77 @@ class SolvationFepDriver:
 
         return delta_f, final_free_energy
         
-    def compute_solvation_from_omm_files(self, system_pdb, solute_pdb, solute_xml, other_xml_files):
+    def compute_solvation_from_omm_files(self, solute_pdb, solute_xml, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None):
         """
         Run the solvation free energy calculation using OpenMM.
-        :param system_pdb:
-            The PDB file with the system coordinates.
         :param solute_pdb:
             The PDB file with the solute coordinates.
         :param solute_xml:
             The XML file with the solute force field.
         :param other_xml_files:
             A list with the XML files needed for the rest of the system.
+        :param system_pdb:
+            The PDB file with the solvated system coordinates. If not provided, the system will be built. 
+        :param solvent:
+            The solvent to use for solvation. Default is spce water.
+            Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
+            'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf', 'other' or 'itself'.
+        :param solvent_molecule:
+            The VeloxChem molecule object for the solvent. Mandatory for 'other'.
+        :param ff_gen_solvent:
+            The force field generator for the solvent. If None, it will be calculated.
+        :param target_density:
+            The target density for the solvent. Mandatory for 'other' or 'itself' solvent options.
+
         :return:
             A dictionary containing the free energy calculations and the uncertainty for each stage, and the final free energy.
         """
 
+        if system_pdb == None:
+            self.ostream.print_info(f"No system_pdb provided, using SolvationBuilder to solvate the system with {solvent} solvent")
+            self.ostream.flush()
+            molecule = Molecule.read_pdb_file(solute_pdb)
+
+            ffgen_solute = MMForceFieldGenerator()
+            ffgen_solute.ostream.mute()
+            ffgen_solute.create_topology(molecule, resp=False)
+
+            sol_builder = SolvationBuilder()
+            sol_builder.steps = 50000
+            sol_builder.write_pdb_only = True
+
+            sol_builder.solvate(solute=molecule, 
+                                solvent=solvent,
+                                solvent_molecule=solvent_molecule, 
+                                padding=self.padding,
+                                target_density=target_density, 
+                                neutralize=False, 
+                                equilibrate=True)
+            
+            sol_builder.write_openmm_files(solute_ff=ffgen_solute,solvent_ffs=ff_gen_solvent)
+            self.system_pdb = 'system.pdb'
+            self.other_xml_files = ['solvent_1.xml']
+            if other_xml_files:
+                self.other_xml_files.extend(other_xml_files)
+            
+        else: 
+            self.system_pdb = system_pdb
+            assert_msg_critical(other_xml_files is not None,
+                "SolvationFepDriver: other_xml_files must be provided if system_pdb is provided")
+            self.other_xml_files = other_xml_files    
+
+        self.solute_pdb = solute_pdb
+        self.solute_xml = solute_xml
         # Special name for the solvent
         self.solvent_name = 'omm_files'
 
-        self.system_pdb = system_pdb
-        self.solute_pdb = solute_pdb
-        self.solute_xml = solute_xml
-        self.other_xml_files = other_xml_files
-        self.output_folder.mkdir(parents=True, exist_ok=True)
+        if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
+            self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
 
         return delta_f, final_free_energy
-        
+                
     def compute_solvation_from_gromacs_files(self, system_gro, system_top, solute_gro, solute_top):
         """
         Run the solvation free energy calculation using OpenMM.
@@ -265,7 +315,9 @@ class SolvationFepDriver:
         self.system_top = system_top
         self.solute_gro = solute_gro
         self.solute_top = solute_top
-        self.output_folder.mkdir(parents=True, exist_ok=True)
+
+        if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
+            self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
 
@@ -310,7 +362,7 @@ class SolvationFepDriver:
         delta_f_1, free_en_s1 = self._run_lambda_simulations(stage=1)
         self.ostream.flush()
         
-        self.ostream.print_info("Starting removing GSC potential (Stage 2)...\n")
+        self.ostream.print_info("Removing GSC potential (Stage 2)...\n")
         delta_f_2, free_en_s2 = self._run_lambda_simulations(stage=2)
         self.ostream.flush()
 
@@ -318,7 +370,7 @@ class SolvationFepDriver:
         delta_f_3, free_en_s3 = self._run_lambda_simulations(stage=3, vacuum=True)
         self.ostream.flush()
 
-        self.ostream.print_info("Starting removing GSC potential in vacuum (Stage 4)...\n")
+        self.ostream.print_info("Removing GSC potential in vacuum (Stage 4)...\n")
         delta_f_4, free_en_s4 = self._run_lambda_simulations(stage=4, vacuum=True)
         self.ostream.flush()
 
@@ -328,7 +380,7 @@ class SolvationFepDriver:
         self.ostream.flush()
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
-        
+        #rename
         delta_f = {i+1: {'Delta_f': self.delta_f[i]['Delta_f'][-1,0],
                 'Uncertainty': self.delta_f[i]['dDelta_f'][-1,0]}
           for i in range(4)}
@@ -361,26 +413,29 @@ class SolvationFepDriver:
         elif stage == 4:
             lambdas = self.lambdas_stage4
 
-        for lam in lambdas:
+        self.ostream.print_info(f"Generating systems for stage {stage}")
+        self.ostream.flush()
+        # Create systems, topology and initial positions
+        if vacuum:
+            systems, topology, positions = self._create_vacuum_systems(lambdas)
+        else:
+            systems, topology, positions = self._create_solvated_systems(lambdas)
+
+        snapshots = []
+        for l, lam in enumerate(lambdas):
             lam = round(lam, 2)
             self.ostream.print_info(f"Running lambda = {lam}, stage = {stage}...")
             self.ostream.flush()
 
             # Run the simulation for the current lambda
-            if vacuum:
-                system, topology, positions = self._create_vacuum_system(lam)
-            else:
-                system, topology, positions = self._create_solvated_system(lam)
-
-            ns_simulated, sim_time = self._run_simulation(system, topology, positions, lam)
+            conformations, ns_simulated, sim_time = self._run_simulation(systems[l], topology, positions, lam)
             
             total_ns_simulated += ns_simulated
             total_sim_time += sim_time
 
             # Performance calculation in ns/hour
-            ns_per_hour = (ns_simulated / sim_time) * 3600
-            self.ostream.print_info(f'Lambda = {lam} completed. Performance: {ns_per_hour:.2f} ns/hour')
-            self.ostream.flush()
+            snapshots.append(conformations)
+
 
         # Print total performance metrics for the stage
         overall_ns_per_hour = (total_ns_simulated / total_sim_time) * 3600
@@ -393,9 +448,8 @@ class SolvationFepDriver:
         self.ostream.print_info(f"Recalculating energies for stage {stage}...")
         self.ostream.flush()
         recalculation_start = time.time()
-        trajectories, forcefields = self._fetch_files(lambdas=lambdas, stage=stage)
 
-        u_kln = self._recalculate_energies(trajectories, forcefields, topology)
+        u_kln = self._recalculate_energies(snapshots, systems, topology)
 
         self.u_kln_matrices.append(u_kln)
 
@@ -414,25 +468,7 @@ class SolvationFepDriver:
 
         return delta_f, free_energy
     
-    # This could be deleted
-    def _run_single_lambda_simulation(self, args):
-        """
-        Runs a single lambda simulation. Can be run in parallel.
-
-        """
-        lam, stage, vacuum = args
-        lam = round(lam, 2)
-        self.ostream.print_info(f"Running lambda = {lam}, stage = {stage}...")
-        self.ostream.flush()
-
-        if vacuum:
-            system, topology, positions = self._create_vacuum_system(lam)
-        else:
-            system, topology, positions = self._create_solvated_system(lam)
-
-        self._run_simulation(system, topology, positions, lam)
-
-    def _create_solvated_system(self, lambda_val):
+    def _create_solvated_systems(self, lambdas):
         """
         Create solvated system with alchemical scaling.
         """
@@ -472,45 +508,49 @@ class SolvationFepDriver:
         else:
             sys_arguments = [self.nonbondedMethod, self.cutoff, self.constraints]
 
-        solvated_system = initial_system_ff.createSystem(*sys_arguments)
+        solvated_systems = []
+        for lambda_val in lambdas:
+            solvated_system = initial_system_ff.createSystem(*sys_arguments)
 
-        # Add barostat
-        solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature))
+            # Add barostat
+            solvated_system.addForce(mm.MonteCarloBarostat(self.pressure, self.temperature))
 
-        # Define alchemical regions
-        alchemical_region, chemical_region = self._get_alchemical_regions(topology)
+            # Define alchemical regions
+            alchemical_region, chemical_region = self._get_alchemical_regions(topology)
 
-        # Custom nonbonded force (Gaussian Softcore)
-        gsc_force = self._get_gaussian_softcore_force(lambda_val)
+            # Custom nonbonded force (Gaussian Softcore)
+            gsc_force = self._get_gaussian_softcore_force(lambda_val)
 
-        # Scaling the nonbonded interactions
-        for force in solvated_system.getForces():
-            if isinstance(force, mm.NonbondedForce):
-                gsc_force.setNonbondedMethod(mm.CustomNonbondedForce.CutoffPeriodic)
-                gsc_force.setCutoffDistance(self.cutoff)
+            # Scaling the nonbonded interactions
+            for force in solvated_system.getForces():
+                if isinstance(force, mm.NonbondedForce):
+                    gsc_force.setNonbondedMethod(mm.CustomNonbondedForce.CutoffPeriodic)
+                    gsc_force.setCutoffDistance(self.cutoff)
 
-                for i in range(force.getNumParticles()):
-                    charge, sigma, epsilon = force.getParticleParameters(i)
-                    gsc_force.addParticle([sigma])
+                    for i in range(force.getNumParticles()):
+                        charge, sigma, epsilon = force.getParticleParameters(i)
+                        gsc_force.addParticle([sigma])
 
-                    if i in alchemical_region:
-                        if self.stage == 1:
-                            force.setParticleParameters(i, charge * (1 - lambda_val), sigma, epsilon * (1 - lambda_val))
-                        elif self.stage == 2:
-                            force.setParticleParameters(i, 0, 0, 0)
-                
-                # Handle exceptions (interaction exclusions)
-                for i in range(force.getNumExceptions()):
-                    p1, p2, ch, si, ep = force.getExceptionParameters(i)
-                    gsc_force.addExclusion(p1, p2)
+                        if i in alchemical_region:
+                            if self.stage == 1:
+                                force.setParticleParameters(i, charge * (1 - lambda_val), sigma, epsilon * (1 - lambda_val))
+                            elif self.stage == 2:
+                                force.setParticleParameters(i, 0, 0, 0)
+                    
+                    # Handle exceptions (interaction exclusions)
+                    for i in range(force.getNumExceptions()):
+                        p1, p2, ch, si, ep = force.getExceptionParameters(i)
+                        gsc_force.addExclusion(p1, p2)
 
-        # Add interaction group for GSC potential
-        gsc_force.addInteractionGroup(chemical_region, alchemical_region)
-        solvated_system.addForce(gsc_force)
+            # Add interaction group for GSC potential
+            gsc_force.addInteractionGroup(alchemical_region, chemical_region)
+            gsc_force.addInteractionGroup(alchemical_region, alchemical_region) # To avoid self-collapse in flexible molecules
+            solvated_system.addForce(gsc_force)
+            solvated_systems.append(solvated_system)
 
-        return solvated_system, topology, positions
+        return solvated_systems, topology, positions
 
-    def _create_vacuum_system(self, lambda_val):
+    def _create_vacuum_systems(self, lambdas):
         """
         Create vacuum system with alchemical scaling.
         """
@@ -535,33 +575,36 @@ class SolvationFepDriver:
             topology = forcefield_solute.topology
             positions = gro.positions
 
-        if self.solvent_name == 'omm_files':
-            vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
 
-        else:
-            vacuum_system = forcefield_solute.createSystem(nonbondedMethod=app.NoCutoff, constraints=self.constraints)
+        vacuum_systems = []
+        for lambda_val in lambdas:
+            if self.solvent_name == 'omm_files':
+                vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
+            else:
+                vacuum_system = forcefield_solute.createSystem(nonbondedMethod=app.NoCutoff, constraints=self.constraints)
         
-        gsc_force = self._get_gaussian_softcore_force(lambda_val)
+            gsc_force = self._get_gaussian_softcore_force(lambda_val)
 
-        for force in vacuum_system.getForces():
-            if isinstance(force, mm.NonbondedForce):
-                for i in range(force.getNumParticles()):
-                    charge, sigma, epsilon = force.getParticleParameters(i)
-                    gsc_force.addParticle([sigma])
+            for force in vacuum_system.getForces():
+                if isinstance(force, mm.NonbondedForce):
+                    for i in range(force.getNumParticles()):
+                        charge, sigma, epsilon = force.getParticleParameters(i)
+                        gsc_force.addParticle([sigma])
 
-                    if self.stage == 3:
-                        force.setParticleParameters(i, charge * (1 - lambda_val), sigma, epsilon * (1 - lambda_val))
-                    elif self.stage == 4:
-                        force.setParticleParameters(i, 0, 0, 0)
-                
-                # Handle exceptions (interaction exclusions)
-                for i in range(force.getNumExceptions()):
-                    p1, p2, ch, si, ep = force.getExceptionParameters(i)
-                    gsc_force.addExclusion(p1, p2)
+                        if self.stage == 3:
+                            force.setParticleParameters(i, charge * (1 - lambda_val), sigma, epsilon * (1 - lambda_val))
+                        elif self.stage == 4:
+                            force.setParticleParameters(i, 0, 0, 0)
+                    
+                    # Handle exceptions (interaction exclusions)
+                    for i in range(force.getNumExceptions()):
+                        p1, p2, ch, si, ep = force.getExceptionParameters(i)
+                        gsc_force.addExclusion(p1, p2)
 
-        vacuum_system.addForce(gsc_force)
+            vacuum_system.addForce(gsc_force)
+            vacuum_systems.append(vacuum_system)
 
-        return vacuum_system, topology, positions
+        return vacuum_systems, topology, positions
 
     def _get_gaussian_softcore_force(self, lambda_val):
         """
@@ -582,19 +625,15 @@ class SolvationFepDriver:
         Run the simulation using OpenMM. Return simulated time in ns and real elapsed time in seconds.
         """
         integrator = mm.LangevinIntegrator(self.temperature, 1.0 / unit.picoseconds, self.timestep)
-
-        if self.platform:
-            platform = mm.Platform.getPlatformByName(self.platform)
-            simulation = app.Simulation(topology, system, integrator, platform)
-        else:
-            simulation = app.Simulation(topology, system, integrator)
-        
+        platform = mm.Platform.getPlatformByName(self.platform) if self.platform else None
+        simulation = app.Simulation(topology, system, integrator, platform=platform)
         simulation.context.setPositions(positions)
 
         # Minimize energy
         simulation.minimizeEnergy()
 
         # Equilibration
+        # TODO: Consider running longer equilibration (evaluate whether it is necessary)
         simulation.step(self.num_equil_steps)
 
         # Calculate production run time and interval
@@ -609,129 +648,70 @@ class SolvationFepDriver:
             simulation.reporters.append(app.XTCReporter(str(trajectory_filename), interval))
             self.ostream.print_info(f"Trajectory will be saved in {str(trajectory_filename)}")
             self.ostream.flush()
-        # State data reporter
-        energy_filename = output_folder / f'energy_{lambda_value}_stage{self.stage}.txt'
-        simulation.reporters.append(app.StateDataReporter(str(energy_filename), interval,
-                                                        step=True, potentialEnergy=True, temperature=True))
-
-        # Write the system to a file
-        if self.stage in [1, 2]:
-            system_filename = output_folder / f'solvated_system_{lambda_value}_stage{self.stage}.xml'
+        # Save system xml
+        if self.save_system_xml:
+            system_filename = output_folder / f'system_{lambda_value}_stage{self.stage}.xml'
             with open(system_filename, 'w') as f:
                 f.write(mm.XmlSerializer.serialize(system))
-            self.ostream.print_info(f"System XML written to {system_filename}")
+            self.ostream.print_info(f"System will be saved in {str(system_filename)}")
             self.ostream.flush()
-            # Name for the hdf5 file
-            hdf5_filename = output_folder / f'positions_{lambda_value}_stage{self.stage}.h5'
+        # State data reporter
+        if self.save_energies_txt:
+            energy_filename = output_folder / f'energy_{lambda_value}_stage{self.stage}.txt'
+            simulation.reporters.append(app.StateDataReporter(str(energy_filename), interval,
+                                                            step=True, potentialEnergy=True, temperature=True))
+            self.ostream.print_info(f"Energies will be saved in {str(energy_filename)}")
+            self.ostream.flush()
 
-        
-        elif self.stage in [3, 4]:
-            system_filename = output_folder / f'vacuum_system_{lambda_value}_stage{self.stage}.xml'
-            with open(system_filename, 'w') as f:
-                f.write(mm.XmlSerializer.serialize(system))
-            self.ostream.print_info(f"System XML written to {system_filename}")
-            
-            # Name for the hdf5 file
-            hdf5_filename = output_folder / f'positions_{lambda_value}_stage{self.stage}.h5'
-            
         # Start the production run
         time_start = time.time()
-        # Create the hdf5 file
-        hf = h5py.File(hdf5_filename, 'w')
         
         # Snapshot counter for the hdf5 file labels
-        snapshot = 0
-        for s in range(self.num_steps):
-            simulation.step(1)
-            if (s + 1) % interval == 0:
-                # Save the positions in the hdf5 file after stepping
-                snapshot += 1
-                state = simulation.context.getState(getPositions=True)
-                positions = state.getPositions().value_in_unit(unit.nanometers)
-                label = f'positions_{snapshot}'
-                hf.create_dataset(label, data=positions) 
-        hf.close()
+        conformations = []
+        for _ in range(self.number_of_snapshots):
+            simulation.step(interval)
+            state = simulation.context.getState(getPositions=True)
+            positions = state.getPositions().value_in_unit(unit.nanometers)
+            conformations.append(positions)
 
         time_end = time.time()
 
         elapsed_time = time_end - time_start  # Elapsed real-world time in seconds
-
-        self.ostream.print_info(f'Lambda {lambda_value} simulation time: {simulated_ns:.2f} ns. Elapsed time: {elapsed_time:.2f} s')
-        self.ostream.flush()
-        # Performance in ns/hour
+        
         ns_per_hour = (simulated_ns / elapsed_time) * 3600
+        self.ostream.print_info(f'Lambda = {lambda_value} completed. Elapsed time: {elapsed_time:.2f} s')
         self.ostream.print_info(f'Performance: {ns_per_hour:.2f} ns/hour')
         self.ostream.flush()
 
-        return simulated_ns, elapsed_time
+        return conformations, simulated_ns, elapsed_time
+    
+    def _recalculate_energies(self, conformations, forcefields, topology):
+        
+        # TODO: Change from U_kln to U_kn (where n is snapshots*lambdas) since pymbar is phasing this out
+        num_snapshots = self.number_of_snapshots
+        u_kln = np.zeros((len(conformations), len(forcefields), num_snapshots))
 
-    def _fetch_files(self, lambdas, stage):
-        """
-        Fetch trajectories and forcefields generated during the simulation.
-        """
-        trajectories = []
-        forcefields = []
-        for lam in lambdas:
-            lam = round(lam, 2)
-            positions_path = self.output_folder / f'positions_{lam}_stage{stage}.h5'
-            trajectories.append(str(positions_path))
-
-            if stage in [1, 2]:
-                forcefield_path = self.output_folder / f'solvated_system_{lam}_stage{stage}.xml'
-            elif stage in [3, 4]:
-                forcefield_path = self.output_folder / f'vacuum_system_{lam}_stage{stage}.xml'
-            
-            forcefields.append(str(forcefield_path))
-
-        return trajectories, forcefields
-
-    def _recalculate_energies(self, trajectories, forcefields, topology):
-
-        u_kln = np.zeros((len(trajectories), len(forcefields), self.number_of_snapshots))
-
-        # k loop for U_kln
-        for k, trajectory in enumerate(trajectories):
-            time_start_trajectory = time.time()
-            self.ostream.print_info(f"Recalculating energies for trajectory {trajectory}...")
+        # l loop for U_kln
+        for l, forcefield in enumerate(forcefields):
+            self.ostream.print_info(f"Recalculating energies for Forcefield {l}...")
             self.ostream.flush()
-            # Load the positions from the hdf5 file for recalculation
-            positions = []
-            with h5py.File(trajectory, 'r') as hf:
-                positions = [hf[f'positions_{n+1}'][:] for n in range(self.number_of_snapshots)]
-
-            # l loop for U_kln
-            for l in range(len(forcefields)):
-                time_start_forcefield = time.time()
-                self.ostream.print_info(f"Recalculating energies for forcefield {l}...") 
-                self.ostream.flush()
-                integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
-
-                if self.platform:
-                    platform = mm.Platform.getPlatformByName(self.platform)
-                    simulation = app.Simulation(topology, forcefields[l], integrator, platform)
-                else:
-                    simulation = app.Simulation(topology, forcefields[l], integrator)
-
+            time_start_forcefield = time.time()
+            
+            integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
+            platform = mm.Platform.getPlatformByName(self.platform) if self.platform else None
+            simulation = app.Simulation(topology, forcefield, integrator, platform=platform)
+            
+            # k loop for U_kln
+            for k, conformation in enumerate(conformations):
                 # n loop for U_kln
-                for n in range(self.number_of_snapshots):
-                    positions_with_units = positions[n] * unit.nanometers
-                    simulation.context.setPositions(positions_with_units)
+                for n in range(num_snapshots):
+                    simulation.context.setPositions(conformation[n])
                     state = simulation.context.getState(getEnergy=True)
                     u_kln[k, l, n] = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-
-                time_end_forcefield = time.time()
-                elapsed_time_forcefield = time_end_forcefield - time_start_forcefield
-                self.ostream.print_info(f"Forcefield {forcefields[l]} energy recalculation took {elapsed_time_forcefield:.2f} seconds.")
-                self.ostream.flush()
-
                 
-            time_end_trajectory = time.time()
-            elapsed_time_trajectory = time_end_trajectory - time_start_trajectory
-            self.ostream.print_info(f"Trajectory {trajectory} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
+            elapsed_time_trajectory = time.time() - time_start_forcefield
+            self.ostream.print_info(f"Forcefield {l} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
             self.ostream.flush()
-
-            # Delete the pdb file to save space
-            Path.unlink(trajectory)
 
         return u_kln
 
@@ -739,7 +719,7 @@ class SolvationFepDriver:
         n_states = u_kln.shape[0]
         N_k = np.zeros(n_states)
         subsample_indices = []
-
+        # TODO: change this, subsampling is not recommended. 
         for k in range(n_states):
             t0, g, Neff_max = timeseries.detect_equilibration(u_kln[k, k, :])
             u_equil = u_kln[k, k, t0:]
@@ -771,22 +751,14 @@ class SolvationFepDriver:
         alchemical_region = []
         chemical_region = []
         
-        if self.resname:
-            for res in topology.residues():
-                if res.name == self.resname:
-                    for atom in res.atoms():
-                        alchemical_region.append(atom.index)
-                else:
-                    for atom in res.atoms():
-                        chemical_region.append(atom.index)
-        else:
-            for res in topology.residues():
-                if res.index == 0:
-                    for atom in res.atoms():
-                        alchemical_region.append(atom.index)
-                else:
-                    for atom in res.atoms():
-                        chemical_region.append(atom.index)
+        for res in topology.residues():
+            condition = res.name == self.resname if self.resname else res.index == 0
+            if condition:
+                for atom in res.atoms():
+                    alchemical_region.append(atom.index)
+            else:
+                for atom in res.atoms():
+                    chemical_region.append(atom.index)
 
         return alchemical_region, chemical_region
 

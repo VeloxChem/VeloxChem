@@ -43,12 +43,12 @@ def _get_list_of_features():
 
     list_of_features = []
 
-    tests_path = Path(__file__).parent / 'tests'
-    tests_files = sorted((f for f in tests_path.iterdir() if f.is_file()))
+    vlx_py_path = Path(__file__).parent / 'tests'
+    vlx_py_files = sorted((f for f in vlx_py_path.iterdir() if f.is_file()))
 
-    for f in tests_files:
-        with f.open('r') as f_test:
-            for line in f_test:
+    for f in vlx_py_files:
+        with f.open('r') as fh:
+            for line in fh:
                 if line.strip().startswith('# vlxtag:'):
                     tags = line.strip().split(':')[1]
                     tags = tuple(tags.replace(',', ' ').split())

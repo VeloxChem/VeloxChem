@@ -45,14 +45,21 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .inputparser import parse_seq_fixed
 
 
 class ComplexResponse(LinearSolver):
     """
     Implements the complex linear response solver.
+
+    # vlxtag: RHF, Absorption, CPP
+    # vlxtag: RKS, Absorption, CPP
+    # vlxtag: RHF, ECD, CPP
+    # vlxtag: RKS, ECD, CPP
 
     :param comm:
         The MPI communicator.
@@ -296,6 +303,24 @@ class ComplexResponse(LinearSolver):
             a non-linear response module.
         """
 
+        # take care of quadrupole components
+        if self.is_quadrupole(self.a_operator):
+            if isinstance(self.a_components, str):
+                self.a_components = parse_seq_fixed(self.a_components, 'str')
+        if self.is_quadrupole(self.b_operator):
+            if isinstance(self.b_components, str):
+                self.b_components = parse_seq_fixed(self.b_components, 'str')
+
+        # check operator components
+        for comp in self.a_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.a_operator),
+                'ComplexResponse: Undefined or invalid a_component')
+        for comp in self.b_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.b_operator),
+                'ComplexResponse: Undefined or invalid b_component')
+
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -326,11 +351,8 @@ class ComplexResponse(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation model setup
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                'solvation_model' not in scf_tensors,
-                type(self).__name__ + ': Solvation model not implemented')
+        # check solvation setup
+        solvation_model_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -375,6 +397,9 @@ class ComplexResponse(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -796,6 +821,10 @@ class ComplexResponse(LinearSolver):
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
+                            # Note: flip sign for imaginary a_operator
+                            if self.is_imag(self.a_operator):
+                                rsp_funcs[(aop, bop, w)] *= -1.0
+
                         # write to h5 file for response solutions
                         if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
@@ -803,7 +832,7 @@ class ComplexResponse(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x)
+                                final_h5_fname, solution_keys, x, self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -1027,9 +1056,9 @@ class ComplexResponse(LinearSolver):
             elif x_unit.lower() == 'nm':
                 spectrum['x_data'].append(auxnm / w)
 
-            Gxx = -rsp_funcs[('x', 'x', w)].imag / (-w)
-            Gyy = -rsp_funcs[('y', 'y', w)].imag / (-w)
-            Gzz = -rsp_funcs[('z', 'z', w)].imag / (-w)
+            Gxx = -rsp_funcs[('x', 'x', w)].imag / w
+            Gyy = -rsp_funcs[('y', 'y', w)].imag / w
+            Gzz = -rsp_funcs[('z', 'z', w)].imag / w
 
             beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
             Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()
@@ -1083,6 +1112,9 @@ class ComplexResponse(LinearSolver):
             'dipole': 'Dipole',
             'electric dipole': 'Dipole',
             'electric_dipole': 'Dipole',
+            'quadrupole': 'Quadru',
+            'electric quadrupole': 'Quadru',
+            'electric_quadrupole': 'Quadru',
             'linear_momentum': 'LinMom',
             'linear momentum': 'LinMom',
             'angular_momentum': 'AngMom',
@@ -1245,20 +1277,24 @@ class ComplexResponse(LinearSolver):
             hf = h5py.File(fname, 'a')
 
             # Write frequencies
-            xlabel = 'rsp/frequencies'
+            xlabel = self.group_label + '/frequencies'
             if xlabel in hf:
                 del hf[xlabel]
             hf.create_dataset(xlabel, data=rsp_results['frequencies'])
 
             spectrum = self.get_spectrum(rsp_results, 'au')
-            y_data = np.array(spectrum['y_data'])
 
-            if self.cpp_flag == 'absorption':
-                ylabel = 'rsp/sigma'
-            elif self.cpp_flag == 'ecd':
-                ylabel = 'rsp/delta-epsilon'
-            if ylabel in hf:
-                del hf[ylabel]
-            hf.create_dataset(ylabel, data=y_data)
+            # Write spectrum if an absorption or ecd calculation
+            # has been performed. Otherwise there is nothing to write.
+            if spectrum is not None:
+                y_data = np.array(spectrum['y_data'])
+
+                if self.cpp_flag == 'absorption':
+                    ylabel = self.group_label + '/sigma'
+                elif self.cpp_flag == 'ecd':
+                    ylabel = self.group_label + '/delta-epsilon'
+                if ylabel in hf:
+                    del hf[ylabel]
+                hf.create_dataset(ylabel, data=y_data)
 
             hf.close()

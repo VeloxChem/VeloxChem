@@ -67,7 +67,6 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
-from .veloxchemlib import RIFockDriver
 from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
@@ -118,6 +117,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
+from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
@@ -191,6 +191,7 @@ from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
+from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
@@ -200,6 +201,7 @@ from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
+from .tsguesser import TransitionStateGuesser
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
@@ -213,6 +215,7 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
+from .checkpoint import read_results
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,

@@ -42,7 +42,8 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
@@ -50,6 +51,9 @@ from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 class C6Driver(LinearSolver):
     """
     Implements the C6 value response solver.
+
+    # vlxtag: RHF, C6, LR
+    # vlxtag: RKS, C6, LR
 
     :param comm:
         The MPI communicator.
@@ -92,10 +96,6 @@ class C6Driver(LinearSolver):
         self.conv_thresh = 1.0e-3
 
         self._input_keywords['response'].update({
-            'a_operator': ('str_lower', 'A operator'),
-            'a_components': ('str_lower', 'Cartesian components of A operator'),
-            'b_operator': ('str_lower', 'B operator'),
-            'b_components': ('str_lower', 'Cartesian components of B operator'),
             'n_points': ('int', 'number of integration points'),
             'w0': ('float', 'transformation function prefactor'),
         })
@@ -264,6 +264,9 @@ class C6Driver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
+        # check solvation setup
+        solvation_model_sanity_check(self)
+
         # check solvation model setup
         if self.rank == mpi_master():
             assert_msg_critical(
@@ -312,6 +315,9 @@ class C6Driver(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule)
 
         # right-hand side (gradient)
         b_grad = self.get_complex_prop_grad(self.b_operator, self.b_components,

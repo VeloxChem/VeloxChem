@@ -31,6 +31,9 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import sys
+
+from .errorhandler import assert_msg_critical
 
 try:
     from scipy.optimize import minimize
@@ -42,7 +45,8 @@ except ImportError:
 def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
     pi = np.pi
     """Convert unit cell parameters to a Cartesian transformation matrix."""
-    aL, bL, cL, alpha, beta, gamma = list(map(float, (aL, bL, cL, alpha, beta, gamma)))
+    aL, bL, cL, alpha, beta, gamma = list(
+        map(float, (aL, bL, cL, alpha, beta, gamma)))
     ax = aL
     ay = 0.0
     az = 0.0
@@ -51,7 +55,7 @@ def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
     bz = 0.0
     cx = cL * np.cos(beta * pi / 180.0)
     cy = (cL * bL * np.cos(alpha * pi / 180.0) - bx * cx) / by
-    cz = (cL**2.0 - cx**2.0 - cy**2.0) ** 0.5
+    cz = (cL**2.0 - cx**2.0 - cy**2.0)**0.5
     unit_cell = np.asarray([[ax, ay, az], [bx, by, bz], [cx, cy, cz]]).T
     return unit_cell
 
@@ -102,9 +106,8 @@ def reorthogonalize_matrix(matrix):
     return R
 
 
-def objective_function_pre(
-    params, G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict
-):
+def objective_function_pre(params, G, static_atom_positions, sorted_nodes,
+                           sorted_edges, pname_set_dict):
     """
     Objective function to minimize distances between paired node to paired node_com along edges.
 
@@ -117,11 +120,10 @@ def objective_function_pre(
     Returns:
         float: Total distance metric to minimize.
     """
-    num_nodes = len(G.nodes())
+    # num_nodes = len(G.nodes())
     set_rotation_matrices = params.reshape(len(pname_set_dict), 3, 3)
-    rotation_matrices = expand_setrots(
-        pname_set_dict, set_rotation_matrices, sorted_nodes
-    )
+    rotation_matrices = expand_setrots(pname_set_dict, set_rotation_matrices,
+                                       sorted_nodes)
     total_distance = 0.0
 
     for i, j in sorted_edges:
@@ -131,8 +133,7 @@ def objective_function_pre(
         com_j = G.nodes[sorted_nodes[j]]["ccoords"]
         # Rotate positions around their mass center
         rotated_i_positions = (
-            np.dot(static_atom_positions[i][:, 1:] - com_i, R_i.T) + com_i
-        )
+            np.dot(static_atom_positions[i][:, 1:] - com_i, R_i.T) + com_i)
 
         dist_matrix = np.empty((len(rotated_i_positions), 1))
         for idx_i in range(len(rotated_i_positions)):
@@ -142,7 +143,7 @@ def objective_function_pre(
         if np.argmin(dist_matrix) > 1:
             total_distance += 1e4  # penalty for the distance difference
         else:
-            total_distance += np.min(dist_matrix) ** 2
+            total_distance += np.min(dist_matrix)**2
         #
         for idx_i in range(len(rotated_i_positions)):
             # second min and min distance difference not max
@@ -155,16 +156,14 @@ def objective_function_pre(
             if diff < 4:
                 total_distance += 1e4
 
-        total_distance += 1e3 / (
-            np.max(dist_matrix) - np.min(dist_matrix)
-        )  # reward for the distance difference
+        total_distance += 1e3 / (np.max(dist_matrix) - np.min(dist_matrix)
+                                )  # reward for the distance difference
 
     return total_distance
 
 
-def objective_function_after(
-    params, G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict
-):
+def objective_function_after(params, G, static_atom_positions, sorted_nodes,
+                             sorted_edges, pname_set_dict):
     """
     Objective function to minimize distances between paired atoms along edges. just use minimum distance
 
@@ -177,11 +176,10 @@ def objective_function_after(
     Returns:
         float: Total distance metric to minimize.
     """
-    num_nodes = len(G.nodes())
+    # num_nodes = len(G.nodes())
     set_rotation_matrices = params.reshape(len(pname_set_dict), 3, 3)
-    rotation_matrices = expand_setrots(
-        pname_set_dict, set_rotation_matrices, sorted_nodes
-    )
+    rotation_matrices = expand_setrots(pname_set_dict, set_rotation_matrices,
+                                       sorted_nodes)
     total_distance = 0.0
 
     for i, j in sorted_edges:
@@ -193,24 +191,22 @@ def objective_function_after(
 
         # Rotate positions around their mass center
         rotated_i_positions = (
-            np.dot(static_atom_positions[i][:, 1:] - com_i, R_i.T) + com_i
-        )
+            np.dot(static_atom_positions[i][:, 1:] - com_i, R_i.T) + com_i)
         rotated_j_positions = (
-            np.dot(static_atom_positions[j][:, 1:] - com_j, R_j.T) + com_j
-        )
+            np.dot(static_atom_positions[j][:, 1:] - com_j, R_j.T) + com_j)
 
-        dist_matrix = np.empty((len(rotated_i_positions), len(rotated_j_positions)))
+        dist_matrix = np.empty(
+            (len(rotated_i_positions), len(rotated_j_positions)))
         for idx_i in range(len(rotated_i_positions)):
             for idx_j in range(len(rotated_j_positions)):
-                dist = np.linalg.norm(
-                    rotated_i_positions[idx_i] - rotated_j_positions[idx_j]
-                )
+                dist = np.linalg.norm(rotated_i_positions[idx_i] -
+                                      rotated_j_positions[idx_j])
                 dist_matrix[idx_i, idx_j] = dist
 
         if np.argmin(dist_matrix) > 1:
             total_distance += 1e4  # penalty for the distance difference
 
-        total_distance += np.min(dist_matrix) ** 2
+        total_distance += np.min(dist_matrix)**2
 
     # for idx_i in range(len(rotated_i_positions)):
     #    # second min and min distance difference not max
@@ -263,9 +259,8 @@ def optimize_rotations_pre(
         list: Optimized rotation matrices for all nodes.
     """
 
-    assert_msg_critical(
-        "scipy" in sys.modules, "scipy is required for optimize_rotations_pre."
-    )
+    assert_msg_critical("scipy" in sys.modules,
+                        "scipy is required for optimize_rotations_pre.")
 
     print("optimize_rotations_step1")
     # initial_rotations = np.tile(np.eye(3), (num_nodes, 1)).flatten()
@@ -278,7 +273,8 @@ def optimize_rotations_pre(
     result = minimize(
         objective_function_pre,
         initial_set_rotations.flatten(),
-        args=(G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict),
+        args=(G, static_atom_positions, sorted_nodes, sorted_edges,
+              pname_set_dict),
         method=opt_method,
         options={
             "maxfun": maxfun,
@@ -332,9 +328,8 @@ def optimize_rotations_after(
         list: Optimized rotation matrices for all nodes.
     """
 
-    assert_msg_critical(
-        "scipy" in sys.modules, "scipy is required for optimize_rotations_after."
-    )
+    assert_msg_critical("scipy" in sys.modules,
+                        "scipy is required for optimize_rotations_after.")
 
     print("optimize_rotations information:")
     print("opt_method:", opt_method)
@@ -349,7 +344,8 @@ def optimize_rotations_after(
     result = minimize(
         objective_function_after,
         initial_rotations.flatten(),
-        args=(G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict),
+        args=(G, static_atom_positions, sorted_nodes, sorted_edges,
+              pname_set_dict),
         method=opt_method,
         options={
             "maxfun": maxfun,
@@ -361,7 +357,9 @@ def optimize_rotations_after(
     )
 
     optimized_rotations = result.x.reshape(-1, 3, 3)
-    optimized_rotations = [reorthogonalize_matrix(R) for R in optimized_rotations]
+    optimized_rotations = [
+        reorthogonalize_matrix(R) for R in optimized_rotations
+    ]
     optimized_rotations = np.array(optimized_rotations)
 
     ## # Print the optimized pairings after optimization
@@ -375,9 +373,8 @@ def optimize_rotations_after(
     return optimized_rotations, static_atom_positions
 
 
-def apply_rotations_to_atom_positions(
-    optimized_rotations, G, sorted_nodes, atom_positions
-):
+def apply_rotations_to_atom_positions(optimized_rotations, G, sorted_nodes,
+                                      atom_positions):
     """
     Apply the optimized rotation matrices to the atom positions.
 
@@ -417,9 +414,8 @@ def find_optimal_pairings(node_i_positions, node_j_positions):
     cost_matrix = np.zeros((num_i, num_j))
     for i in range(num_i):
         for j in range(num_j):
-            cost_matrix[i, j] = np.linalg.norm(
-                node_i_positions[i, 1:] - node_j_positions[j, 1:]
-            )
+            cost_matrix[i, j] = np.linalg.norm(node_i_positions[i, 1:] -
+                                               node_j_positions[j, 1:])
 
     # row_ind, col_ind = linear_sum_assignment(cost_matrix)
     # print(cost_matrix.shape) #DEBUG
@@ -433,32 +429,31 @@ def find_optimal_pairings(node_i_positions, node_j_positions):
 
 
 # scale optimizer for the cif parameters update
-def scale_objective_function(
-    params, old_cell_params, old_cartesian_coords, new_cartesian_coords
-):
+def scale_objective_function(params, old_cell_params, old_cartesian_coords,
+                             new_cartesian_coords):
     a_new, b_new, c_new, _, _, _ = params
     a_old, b_old, c_old, alpha_old, beta_old, gamma_old = old_cell_params
 
     # Compute transformation matrix for the old unit cell, T is the unit cell matrix
-    T_old = unit_cell_to_cartesian_matrix(
-        a_old, b_old, c_old, alpha_old, beta_old, gamma_old
-    )
+    T_old = unit_cell_to_cartesian_matrix(a_old, b_old, c_old, alpha_old,
+                                          beta_old, gamma_old)
     T_old_inv = np.linalg.inv(T_old)
-    old_fractional_coords = cartesian_to_fractional(old_cartesian_coords, T_old_inv)
+    old_fractional_coords = cartesian_to_fractional(old_cartesian_coords,
+                                                    T_old_inv)
 
     # backup
     # old_fractional_coords = cartesian_to_fractional(old_cartesian_coords,T_old_inv)
 
     # Compute transformation matrix for the new unit cell
-    T_new = unit_cell_to_cartesian_matrix(
-        a_new, b_new, c_new, alpha_old, beta_old, gamma_old
-    )
+    T_new = unit_cell_to_cartesian_matrix(a_new, b_new, c_new, alpha_old,
+                                          beta_old, gamma_old)
     T_new_inv = np.linalg.inv(T_new)
 
     # Convert the new Cartesian coordinates to fractional coordinate using the old unit cell
 
     # Recalculate fractional coordinates from updated Cartesian coordinates
-    new_fractional_coords = cartesian_to_fractional(new_cartesian_coords, T_new_inv)
+    new_fractional_coords = cartesian_to_fractional(new_cartesian_coords,
+                                                    T_new_inv)
 
     # Compute difference from original fractional coordinates
     diff = new_fractional_coords - old_fractional_coords
@@ -468,20 +463,19 @@ def scale_objective_function(
 # Example usage
 def optimize_cell_parameters(cell_info, original_ccoords, updated_ccoords):
 
-    assert_msg_critical(
-        "scipy" in sys.modules, "scipy is required for optimize_cell_parameters."
-    )
+    assert_msg_critical("scipy" in sys.modules,
+                        "scipy is required for optimize_cell_parameters.")
 
     # Old cell parameters (example values)
     old_cell_params = cell_info  # [a, b, c, alpha, beta, gamma]
 
     # Old Cartesian coordinates of points (example values)
-    old_cartesian_coords = np.vstack(
-        list(original_ccoords.values())
-    )  # original_ccoords
+    old_cartesian_coords = np.vstack(list(
+        original_ccoords.values()))  # original_ccoords
 
     # New Cartesian coordinates of the same points (example values)
-    new_cartesian_coords = np.vstack(list(updated_ccoords.values()))  # updated_ccoords
+    new_cartesian_coords = np.vstack(list(
+        updated_ccoords.values()))  # updated_ccoords
     # Initial guess for new unit cell parameters (e.g., slightly modified cell)
     initial_params = cell_info
 
@@ -580,9 +574,8 @@ def apply_rotations_to_Xatoms_positions(
         translated_positions = original_positions - com
         rotated_translated_positions = np.dot(translated_positions, R.T)
         rotated_positions[i][:, 1:] = rotated_translated_positions + com
-    edge_pair = find_edge_pairings(
-        sorted_nodes, sorted_edges_of_sortednodeidx, rotated_positions
-    )
+    edge_pair = find_edge_pairings(sorted_nodes, sorted_edges_of_sortednodeidx,
+                                   rotated_positions)
     # print("Optimized Pairings (after optimization):") #DEBUG
 
     optimized_pair = {}
@@ -591,7 +584,8 @@ def apply_rotations_to_Xatoms_positions(
         # print(f"Node {sorted_nodes[i]} and Node {sorted_nodes[j]}:") #DEBUG
         idx_i, idx_j = pair
         # print(f"  node{sorted_nodes[i]}_{int(idx_i)} -- node{sorted_nodes[j]}_{int(idx_j)}") #DEBUG
-        optimized_pair[sorted_nodes[i], sorted_nodes[j]] = (int(idx_i), int(idx_j))
+        optimized_pair[sorted_nodes[i],
+                       sorted_nodes[j]] = (int(idx_i), int(idx_j))
 
     return rotated_positions, optimized_pair
 
@@ -603,8 +597,7 @@ def update_ccoords_by_optimized_cell_params(G, optimized_params):
     T_unitcell = unit_cell_to_cartesian_matrix(a, b, c, alpha, beta, gamma)
     updated_ccoords = {}
     for n in sG.nodes():
-        updated_ccoords[n] = fractional_to_cartesian(
-            T_unitcell, sG.nodes[n]["fcoords"].T
-        ).T
+        updated_ccoords[n] = fractional_to_cartesian(T_unitcell,
+                                                     sG.nodes[n]["fcoords"].T).T
         sG.nodes[n]["ccoords"] = updated_ccoords[n]
     return sG, updated_ccoords

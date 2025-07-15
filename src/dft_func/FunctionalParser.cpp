@@ -44,7 +44,7 @@ getAvailableFunctionals()
 {
     return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
-                                     "LRC-WPBEH", "CAM-B3LYP", "CAM-QTP00", "CAM-QTP01", "CAM-QTP02", "RCAM-B3LYP", "WB97X-V", "WB97X-D", "WB97X-D3",
+                                     "LRC-WPBEH", "CAM-B3LYP", "CAM-QTP00", "CAM-QTP01", "CAM-QTP02", "RCAM-B3LYP", "WB97X-V", "WB97X-D", "WB97X-D3", "WB97X-D4", "WB97M-D4",
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
                                      "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
 }
@@ -100,7 +100,11 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (format::upper_case(xcLabel) == "B97-3") return CXCFunctional("B97-3", {"HYB_GGA_XC_B97_3"}, {1.0});
 
+        if (format::upper_case(xcLabel) == "WB97X-D4") return CXCFunctional("WB97X-D4", {"HYB_GGA_XC_WB97X_V"}, {1.0});
+
         // range-separated GGA
+
+        if (format::upper_case(xcLabel) == "WB97M-D4") return CXCFunctional("WB97M-D4", {"HYB_MGGA_XC_WB97M_V"}, {1.0});
 
         if (format::upper_case(xcLabel) == "LRC-WPBEH") return CXCFunctional("LRC-WPBEH", {"HYB_GGA_XC_LRC_WPBEH"}, {1.0});
 

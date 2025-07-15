@@ -44,10 +44,12 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
                          write_rsp_solution_with_multiple_keys)
+from .inputparser import parse_seq_fixed
 
 
 class ComplexResponseTDA(LinearSolver):
@@ -267,6 +269,24 @@ class ComplexResponseTDA(LinearSolver):
             a non-linear response module.
         """
 
+        # take care of quadrupole components
+        if self.is_quadrupole(self.a_operator):
+            if isinstance(self.a_components, str):
+                self.a_components = parse_seq_fixed(self.a_components, 'str')
+        if self.is_quadrupole(self.b_operator):
+            if isinstance(self.b_components, str):
+                self.b_components = parse_seq_fixed(self.b_components, 'str')
+
+        # check operator components
+        for comp in self.a_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.a_operator),
+                'ComplexResponse: Undefined or invalid a_component')
+        for comp in self.b_components:
+            assert_msg_critical(
+                self.is_valid_component(comp, self.b_operator),
+                'ComplexResponse: Undefined or invalid b_component')
+
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -294,11 +314,8 @@ class ComplexResponseTDA(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation model setup
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                'solvation_model' not in scf_tensors,
-                type(self).__name__ + ': Solvation model not implemented')
+        # check solvation setup
+        solvation_model_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -343,6 +360,9 @@ class ComplexResponseTDA(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -720,6 +740,10 @@ class ComplexResponseTDA(LinearSolver):
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
+                            # Note: flip sign for imaginary a_operator
+                            if self.is_imag(self.a_operator):
+                                rsp_funcs[(aop, bop, w)] *= -1.0
+
                         # write to h5 file for response solutions
                         if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
@@ -1042,9 +1066,9 @@ class ComplexResponseTDA(LinearSolver):
             elif x_unit.lower() == 'nm':
                 spectrum['x_data'].append(auxnm / w)
 
-            Gxx = -rsp_funcs[('x', 'x', w)].imag / (-w)
-            Gyy = -rsp_funcs[('y', 'y', w)].imag / (-w)
-            Gzz = -rsp_funcs[('z', 'z', w)].imag / (-w)
+            Gxx = -rsp_funcs[('x', 'x', w)].imag / w
+            Gyy = -rsp_funcs[('y', 'y', w)].imag / w
+            Gzz = -rsp_funcs[('z', 'z', w)].imag / w
 
             beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
             Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()
@@ -1173,6 +1197,9 @@ class ComplexResponseTDA(LinearSolver):
             'dipole': 'Dipole',
             'electric dipole': 'Dipole',
             'electric_dipole': 'Dipole',
+            'quadrupole': 'Quadru',
+            'electric quadrupole': 'Quadru',
+            'electric_quadrupole': 'Quadru',
             'linear_momentum': 'LinMom',
             'linear momentum': 'LinMom',
             'angular_momentum': 'AngMom',
@@ -1257,6 +1284,7 @@ class ComplexResponseTDA(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+        ostream.flush()
 
     def _print_ecd_results(self, rsp_results, ostream=None):
         """
@@ -1313,6 +1341,7 @@ class ComplexResponseTDA(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+        ostream.flush()
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
