@@ -1326,6 +1326,7 @@ class PolarizabilityGradient:
         # setup orbital response driver
         orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+
         # inherit profiler settings from polarizability gradient driver
         for key in cphf_keywords:
             setattr(orbrsp_drv, key, getattr(self, key))
