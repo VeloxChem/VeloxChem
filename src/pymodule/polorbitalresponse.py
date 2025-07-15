@@ -38,7 +38,8 @@ from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master, denmat
 from .cphfsolver import CphfSolver
 from .inputparser import parse_input
-from .sanitychecks import polorbrsp_sanity_check_1, polorbrsp_sanity_check_2#polgrad_sanity_check
+from .sanitychecks import polorbrsp_sanity_check_1, polorbrsp_sanity_check_2
+from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .oneeints import compute_electric_dipole_integrals
 from .distributedarray import DistributedArray
 from .profiler import Profiler
@@ -67,6 +68,9 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         super().__init__(comm, ostream)
+
+        # for checkpoint array labeling
+        self.orbrsp_type = 'pol'
 
         self.flag = 'Polarizability Orbital Response'
 
@@ -100,6 +104,12 @@ class PolOrbitalResponse(CphfSolver):
         }
 
         parse_input(self, orbrsp_keywords, orbrsp_dict)
+
+        # NOTE WIP
+        if 'filename' in orbrsp_dict:
+            self.filename = orbrsp_dict['filename']
+            if 'checkpoint_file' not in orbrsp_dict:
+                self.checkpoint_file = f'{self.filename}_polorbrsp.h5'
 
     def get_full_solution_vector(self, solution):
         """ Gets a full solution vector from a general distributed solution.
@@ -542,7 +552,7 @@ class PolOrbitalResponse(CphfSolver):
                         'fock_gxc_ao_imre': fock_gxc_ao_imre,
                     }, self.ostream)
 
-            # save intermediates in distributes array
+            # save intermediates in distributed array
             dist_fock_ao_rhs_re = []
             dist_fock_ao_rhs_im = []
             for k in range(dof**2 + 2 * dof):
