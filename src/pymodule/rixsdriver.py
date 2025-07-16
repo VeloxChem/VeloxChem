@@ -80,14 +80,15 @@ class RixsDriver:
         # method settings
         self.photon_energy = None
         self.theta = 0
-        self.gamma = .124/hartree_in_ev() # a.u.
+        # a.u., FWHM
+        self.gamma = .124/hartree_in_ev() 
+        self.gamma_hwhm = self.gamma / 2
 
         # input keywords
         self.input_keywords = {
             'rixs': {
                 'theta': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
                 'gamma': ('float', 'broadening term (FWHM)'),
-                #'nr_CO': ('int', 'number of involved core-orbitals'),
                 'photon_energy': ('float', 'incoming photon energy'),
             },
         }
@@ -133,7 +134,7 @@ class RixsDriver:
             print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
     
-    def scattering_amplitude_tensor(self, omega, core_eigenvalues, val_eigenvalues,
+    def scattering_amplitude_tensor(self, omega, core_eigenvalue, val_eigenvalue,
                                     intermediate_tdens, final_tdens, dipole_integrals, elastic=False):
         """
         The RIXS scattering amptlitude (sum-over-states transition amplitude).
@@ -157,50 +158,45 @@ class RixsDriver:
         :return: 
             The scattering amplitude tensor; shape: (3,3)
         """
-        gamma_hwhm = self.gamma / 2
-        e_n = 1 / (omega - (core_eigenvalues + 1j * gamma_hwhm))
-        omega_product = (val_eigenvalues[:, np.newaxis] - core_eigenvalues) * core_eigenvalues
+        
+        e_n = 1 / (omega - (core_eigenvalue + 1j * self.gamma_hwhm))
 
         if elastic:
-            core_eigvals_2 = core_eigenvalues**2
-            scatt_amp = np.einsum('n, xij, ijn, yab, abn -> nxy', core_eigvals_2 * e_n, dipole_integrals, intermediate_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
+            core_eigvals2 = core_eigenvalue**2
+            scatt_amp = core_eigvals2 * e_n * np.einsum('xij, ij, yab, ab -> xy', dipole_integrals, intermediate_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
 
         else:
+            omega_product = (val_eigenvalue - core_eigenvalue) * core_eigenvalue
             #scatt_amp = np.einsum('n, xij, ijfn, yab, abn -> fxy', e_n, dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
-            scatt_amp = np.einsum('n, fn, xij, ijfn, yab, abn -> fxy', e_n, omega_product, dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
+            scatt_amp = e_n * omega_product * np.einsum('xij, ij, yab, ab -> xy', dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
 
         return scatt_amp
 
-    def cross_section(self, F, prefactor_ratio=1):
+    def cross_section(self, F, omegaprime_omega=1):
         """
-        Computes the cross section
+        Computes the RIXS cross-section.
         
         :param F:
-            The scattering amplitude tensor
-
+            The scattering amplitude tensor.
+        :param omegaprime_omega:
+            The ratio between outgoing- and incoming frequencies, w'/w.
+            
         :return:
-            The scattering cross section
+            The scattering cross-section.
         """
-        FF_T_conj = np.sum(F * F.transpose(0,2,1).conjugate(), axis=(1, 2))
-        trace_F_2 = np.sum(np.diagonal(np.abs(F)**2, axis1=1, axis2=2), axis=-1)
+        
+        # F_xy (F^(yx))^*
+        FF_T_conj = np.sum(F * F.T.conjugate())
+        # F_xx (F^(yy))^*
+        trace_F2 = np.abs(np.trace(F))**2
+        # F_xy (F^(xy))^*
+        F2 = np.sum(np.abs(F)**2)
 
-        # Combine into cross section for each final state
-        sigma_f = prefactor_ratio * (1.0 / 15.0) * (
-            (2.0 - 0.5 * np.sin(self.theta)**2) * np.sum(np.abs(F)**2, axis=(1, 2)) +
-            (0.75 * np.sin(self.theta)**2 - 0.5) * (FF_T_conj + trace_F_2))
-
-        #sigma = 1/15 * ((2 - (1/2) * np.sin(self.theta) ** 2) * np.sum(np.abs(F)**2) 
-        #           + ((3/4) * np.sin(self.theta) ** 2 - 1/2) * (np.sum(F * F.T.conj())
-        #                                           + np.trace(np.abs(F)**2)))
+        sigma_f = omegaprime_omega * (1.0/15.0) * (
+                    (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
+                    (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + trace_F2))
+        
         return sigma_f
-
-    def compute_from_h5(self, scf_tensors, 
-                rsp_tensors, cvs_rsp_tensors=None,
-                fulldiag_thresh=None, tda=False, 
-                final_cutoff=None):
-        # unpack h5
-        self.compute()
-        pass
     
     def compute(self, molecule, basis, scf_tensors, 
                 rsp_tensors, cvs_rsp_tensors=None,
@@ -222,35 +218,32 @@ class RixsDriver:
         :num_core_orbitals:
             Defines the split between intermediate and final states
             (not yet implemented)
-            NOTE: To run full diagonalization, do a subspace-restricted calculation
-                  with the full space, indicating which orbitals define the core
+        NOTE: To run full diagonalization, do a subspace-restricted calculation
+                with the full space, indicating which orbitals define the core.
 
         :return:
-            Dictionary with outgoing photon energy in energy loss and full energy (emisison)
-            as well as scattering amplitudes and cross-sections
+            Dictionary with cross-sections, outgoing photon energy in (energy loss and full energy (emission)),
+            and the scattering amplitude tensor.
         """
 
         norb = scf_tensors['C_alpha'].shape[0]
         nocc = molecule.number_of_alpha_electrons()
         nvir = norb - nocc
 
-        self.cvs = False
-        #self.rsa = False
+        self.twoshot = False
         self.tda = tda
         
-        num_vir_orbitals  = np.squeeze(rsp_tensors['num_vir'])
-        # TODO: add safeguards for when both num_intermediate_states and cvs is given
+        num_vir_orbitals  = rsp_tensors['num_vir']
 
         if cvs_rsp_tensors is not None:
-            #self.ostream.print_info(
-            #    'Running RIXS with CVS approximation.')
-            self.cvs = True
+            self.twoshot = True
             # TODO: improve the handling of these types
-            #num_core_orbitals = cvs_rsp_tensors['num_core']
-            num_core_orbitals = np.squeeze(cvs_rsp_tensors['num_core'])
+            num_core_orbitals = cvs_rsp_tensors['num_core']
             num_val_orbitals  = nocc - num_core_orbitals # self.get_num_val_orbs(rsp_tensors) # = nocc
 
             num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
+            self.ostream.print_info(f'Running RIXS in the two-shot approach with {num_intermediate_states}'
+                                    ' intermediate states')
             num_final_states = len(rsp_tensors['eigenvalues'])
             num_tot_states = num_final_states + num_intermediate_states
 
@@ -368,8 +361,6 @@ class RixsDriver:
         
         if self.photon_energy is None:
             # assume first core resonance
-            #self.ostream.print_info(
-            #    'Incoming photon energy not set; calculating only for the first core resonance.')
             if cvs_rsp_tensors is None:
                 osc_arr = rsp_tensors['oscillator_strengths']
             else:
@@ -378,10 +369,21 @@ class RixsDriver:
             for k, osc in enumerate(osc_arr[core_states]):
                 if osc > 1e-3:
                     self.photon_energy = [core_eigvals[k]]
+                    self.ostream.print_info(
+                        'Incoming photon energy not set; computing ' \
+                        'only for the first core resonance at: ' \
+                        f'{self.photon_energy[0]:.4f} a.u. = ' \
+                        f'{self.photon_energy[0] * hartree_in_ev():.2f} eV')
                     break
-
-        elif type(self.photon_energy) == float or type(self.photon_energy) == np.float64:
+        elif isinstance(self.photon_energy, (float, int, np.floating)):
+            self.ostream.print_info(
+                f'Incoming photon energy: {self.photon_energy:.2f} a.u. = ' \
+                f'{self.photon_energy*hartree_in_ev():.2f} eV')
             self.photon_energy = [self.photon_energy]
+        else:
+            formatted_au = ', '.join(f'{enes:.2f}' for enes in self.photon_energy)
+            formatted_ev = ', '.join(f'{enes * hartree_in_ev():.2f}' for enes in self.photon_energy)
+            self.ostream.print_info(f'Incoming photon energies: ({formatted_au}) a.u. = ({formatted_ev}) eV')
 
         dipole_integrals = compute_electric_dipole_integrals(
                 molecule, basis, [0.0,0.0,0.0])
@@ -389,81 +391,74 @@ class RixsDriver:
         ene_losses = np.zeros((num_final_states, len(self.photon_energy)))
         emission_enes = np.zeros((num_final_states, len(self.photon_energy)))
         cross_sections = np.zeros((num_final_states, len(self.photon_energy)))
-        elastic_cross_sections = np.zeros((num_intermediate_states, len(self.photon_energy)))
+        elastic_cross_sections = np.zeros((len(self.photon_energy)))
         scattering_amplitudes = np.zeros((num_final_states, len(self.photon_energy),
                                            3, 3), dtype=np.complex128)
 
         for w_ind, omega in enumerate(self.photon_energy):
+            F_elastic = np.zeros((3,3), dtype=np.complex128)
+            for f in range(num_final_states):
+                F_inelastic = np.zeros((3,3), dtype=np.complex128)
+
+                if self.tda:
+                    valence_z_mat = valence_eigvecs[f].reshape(num_core_orbitals + num_val_orbitals, num_vir_orbitals)
+                    valence_y_mat = np.zeros_like(valence_z_mat)
+                else:
+                    half_val = valence_eigvecs.shape[1] // 2
+                    valence_z_mat = valence_eigvecs[f, :half_val].reshape(
+                                                    num_core_orbitals + num_val_orbitals, num_vir_orbitals)
+                    valence_y_mat = valence_eigvecs[f, half_val:].reshape(
+                                                    num_core_orbitals + num_val_orbitals, num_vir_orbitals)
                     
-            if self.tda:
-                valence_z_mat = valence_eigvecs.reshape(num_final_states,
-                            num_core_orbitals + num_val_orbitals, num_vir_orbitals)
-                valence_y_mat = np.zeros_like(valence_z_mat)
-    
-                core_z_mat = core_eigvecs.reshape(num_intermediate_states, occupied_core, num_vir_orbitals)
-                core_y_mat = np.zeros_like(core_z_mat)
+                for n in range(num_intermediate_states):
+                    
+                    if self.tda:
+                        core_z_mat = core_eigvecs[n].reshape(occupied_core, num_vir_orbitals)
+                        core_y_mat = np.zeros_like(core_z_mat)
+                    else:
+                        half_core = core_eigvecs.shape[1] // 2
+                        core_z_mat = core_eigvecs[n, :half_core].reshape(occupied_core, num_vir_orbitals)
+                        core_y_mat = core_eigvecs[n, half_core:].reshape(occupied_core, num_vir_orbitals)
 
-            else:
-                half_val = valence_eigvecs.shape[1] // 2
-                valence_z_mat = valence_eigvecs[:, :half_val].reshape(num_final_states,
-                                                num_core_orbitals + num_val_orbitals, num_vir_orbitals)
-                valence_y_mat = valence_eigvecs[:, half_val:].reshape(num_final_states,
-                                                num_core_orbitals + num_val_orbitals, num_vir_orbitals)
-            
-                half_core = core_eigvecs.shape[1] // 2
-                core_z_mat = core_eigvecs[:, :half_core].reshape(num_intermediate_states,
-                                                                 occupied_core, num_vir_orbitals)
-                core_y_mat = core_eigvecs[:, half_core:].reshape(num_intermediate_states,
-                                                                 occupied_core, num_vir_orbitals)
+                    if self.twoshot:
+                        # pad with zeroes
+                        padding = ((0, num_val_orbitals), (0, 0))
 
-            if self.cvs:
-                new_shape = (
-                    num_intermediate_states,
-                    occupied_core + num_val_orbitals,
-                    core_z_mat.shape[2],
-                )
-                tmp_z = np.zeros(new_shape, dtype=core_z_mat.dtype)
-                tmp_y = np.zeros(new_shape, dtype=core_y_mat.dtype)
+                        core_z_mat = np.pad(core_z_mat, padding)
+                        core_y_mat = np.pad(core_y_mat, padding)
+ 
+                    gs_to_core_tdens = mo_occ @ (core_z_mat - core_y_mat) @ mo_vir.T  
+                    gs_to_core_tdens *= np.sqrt(2)
 
-                tmp_z[:, :occupied_core, :] = core_z_mat
-                tmp_y[:, :occupied_core, :] = core_y_mat
+                    core_to_val_tdens = (
+                                np.linalg.multi_dot(
+                                    [mo_vir, valence_z_mat.T, core_z_mat, mo_vir.T]) -
+                                np.linalg.multi_dot(
+                                    [mo_occ, valence_z_mat, core_z_mat.T, mo_occ.T]))
 
-                core_z_mat = tmp_z
-                core_y_mat = tmp_y
-
-            mo_occ_expanded  = mo_occ[np.newaxis, :, :]
-            mo_vir_expanded = mo_vir[:, :, np.newaxis] 
-
-            # want a + sign here but
-            difference_mat  = core_z_mat - core_y_mat
-            gs_core = mo_occ_expanded @ difference_mat @ mo_vir_expanded.T  
-
-            # rearrange to (norb, norb, num_intermediate_states)
-            gs_to_core_tdens = np.sqrt(2) * gs_core.transpose(1, 2, 0)
-
-            core_to_val_tdens  = np.einsum('ui, ijf, njk, kv -> uvfn', mo_vir, valence_z_mat.T, core_z_mat, mo_vir.T, optimize=True)
-            core_to_val_tdens -= np.einsum('ui, fij, jkn, kv -> uvfn', mo_occ, valence_z_mat, core_z_mat.T, mo_occ.T, optimize=True)
-            core_to_val_tdens += np.einsum('ui, fij, jkn, kv -> uvfn', mo_occ, valence_y_mat, core_y_mat.T, mo_occ.T, optimize=True)
-            core_to_val_tdens -= np.einsum('ui, ijf, njk, kv -> uvfn', mo_vir, valence_y_mat.T, core_y_mat, mo_vir.T, optimize=True)
+                    core_to_val_tdens += (
+                                np.linalg.multi_dot(
+                                    [mo_occ, valence_y_mat, core_y_mat.T, mo_occ.T]) -
+                                np.linalg.multi_dot(
+                                    [mo_vir, valence_y_mat.T, core_y_mat, mo_vir.T]))
+                    
+                    F_inelastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], valence_eigvals[f], gs_to_core_tdens,
+                                                            core_to_val_tdens, dipole_integrals)
+                    F_elastic  += self.scattering_amplitude_tensor(omega, core_eigvals[n], None, gs_to_core_tdens,
+                                                            None, dipole_integrals, elastic=True)
                 
-            # TODO: improve results dictionary structure
-            emission_ene = omega - valence_eigvals #[f]
-            emission_enes[..., w_ind] = emission_ene
-            prefactor_ratio = emission_ene / omega #w'/w
-            energy_loss = valence_eigvals #omega - emission_ene # independent of intermediate state, but 
-            ene_losses[..., w_ind] = energy_loss # keeping it like this for consistency
-            
-            F = self.scattering_amplitude_tensor(omega, core_eigvals, valence_eigvals, gs_to_core_tdens,
-                                                    core_to_val_tdens, dipole_integrals)
-            F_elastic = self.scattering_amplitude_tensor(omega, core_eigvals, valence_eigvals, gs_to_core_tdens,
-                                                    core_to_val_tdens, dipole_integrals, elastic=True)
-            
-            sigma = self.cross_section(F, prefactor_ratio)
-            sigma_elastic = self.cross_section(F_elastic)
+                # TODO: improve results dictionary structure
+                emission_enes[f, w_ind] = omega - valence_eigvals[f]
+                ene_losses[f, w_ind] = valence_eigvals[f] # keeping it like this for consistency
+                prefactor_ratio = emission_enes[f, w_ind] / omega # w'/w
+                #energy_loss = valence_eigvals[f] #omega - emission_ene # independent of intermediate state, but 
 
-            scattering_amplitudes[:, w_ind, ...] = F
-            cross_sections[..., w_ind] = sigma.real
-            elastic_cross_sections[..., w_ind] = sigma_elastic.real
+                sigma = self.cross_section(F_inelastic, prefactor_ratio)
+                sigma_elastic = self.cross_section(F_elastic)
+
+                elastic_cross_sections[w_ind] = sigma_elastic.real
+                scattering_amplitudes[f, w_ind] = F_inelastic
+                cross_sections[f, w_ind] = sigma.real
         
         return_dict = {
                     'cross_sections': cross_sections,
@@ -472,7 +467,8 @@ class RixsDriver:
                     'scattering_amplitudes': scattering_amplitudes,
                     'emission_energies': emission_enes,
                     'energy_losses': ene_losses,
-                    'excitation_energies': core_eigvals}
+                    'excitation_energies': core_eigvals,
+                    }
 
         return return_dict
     
