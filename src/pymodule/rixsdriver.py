@@ -167,7 +167,6 @@ class RixsDriver:
 
         else:
             omega_product = (val_eigenvalue - core_eigenvalue) * core_eigenvalue
-            #scatt_amp = np.einsum('n, xij, ijfn, yab, abn -> fxy', e_n, dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
             scatt_amp = e_n * omega_product * np.einsum('xij, ij, yab, ab -> xy', dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
 
         return scatt_amp
@@ -449,9 +448,8 @@ class RixsDriver:
                 
                 # TODO: improve results dictionary structure
                 emission_enes[f, w_ind] = omega - valence_eigvals[f]
-                ene_losses[f, w_ind] = valence_eigvals[f] # keeping it like this for consistency
+                ene_losses[f, w_ind] = valence_eigvals[f]
                 prefactor_ratio = emission_enes[f, w_ind] / omega # w'/w
-                #energy_loss = valence_eigvals[f] #omega - emission_ene # independent of intermediate state, but 
 
                 sigma = self.cross_section(F_inelastic, prefactor_ratio)
                 sigma_elastic = self.cross_section(F_elastic)
@@ -471,23 +469,6 @@ class RixsDriver:
                     }
 
         return return_dict
-    
-    @staticmethod
-    def read_from_h5(filename):
-        """ 
-        Reads the data from a checkpoint file and returns it as a dictionary.
-
-            :param filename: the name of the checkpoint file
-        """
-        res_dict = {}
-        h5f = h5py.File(filename, "r")
-        
-        for key in h5f.keys():
-            data = np.array(h5f.get(key))
-            res_dict[key] = data
-        h5f.close()
-        
-        return res_dict
     
     @staticmethod
     def get_full_solution_vector(solution):
