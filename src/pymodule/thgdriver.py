@@ -2044,7 +2044,7 @@ class ThgDriver(NonlinearSolver):
         Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
 
         if inp_dict['flag'] == 'CD':
-            Ncd = 2.0  * ComplexResponse.get_full_solution_vector(inp_dict['Ncd'])
+            Ncd = ComplexResponse.get_full_solution_vector(inp_dict['Ncd'])
             Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
 
         elif inp_dict['flag'] == 'BD':
@@ -2054,12 +2054,12 @@ class ThgDriver(NonlinearSolver):
         if self.rank == mpi_master():
 
             if inp_dict['flag'] == 'CD':
-                kcd = self.complex_lrvec2mat(Ncd, nocc, norb)
+                kcd = self.complex_lrvec2mat(2.0  * Ncd, nocc, norb)
                 kb = self.complex_lrvec2mat(Nb, nocc, norb)
                 B = inp_dict['B']
 
                 na_x2_nyz += np.dot(Na.T,self._x2_contract(kcd, B, da, nocc, norb))
-                nx_a2_nyz += np.dot(self._a2_contract(kb, A, da, nocc, norb), Ncd)
+                nx_a2_nyz += np.dot(self._a2_contract(kb, A, da, nocc, norb), 2.0  * Ncd)
                 nx_a2_nyz += np.dot(self._a2_contract(kcd, A, da, nocc, norb),Nb)
 
             elif inp_dict['flag'] == 'BD':
