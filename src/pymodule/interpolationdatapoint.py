@@ -224,9 +224,11 @@ class InterpolationDatapoint:
                 self.original_b_matrix[i, :derivative.shape[0]] = derivative
             else:
                 self.b_matrix[i, :derivative.shape[0]] = derivative
+                if self.use_inverse_bond_length:
+                    self.original_b_matrix[i] = derivative
 
             # self.b_matrix[i] = derivative
-            self.original_b_matrix[i] = derivative
+                
 
 
     def calculate_b2_matrix(self):
