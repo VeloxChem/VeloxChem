@@ -38772,8 +38772,6 @@ CDensityGridCubic::DensityProdForMGGA_THGRED(const CDensityGrid& rwDensityGrid,
                 auto gamx_ZZ_r = gamZZ(3 * j);
 
 
-
-
                 auto gamy_r = gam(3 * j + 1);
                 auto rt_gamy_r = rt_gam(3 * j + 1);
                 auto rl_gamy_r = rl_gam(3 * j + 1);
@@ -39180,20 +39178,20 @@ CDensityGridCubic::DensityProdForMGGA_THGRED(const CDensityGrid& rwDensityGrid,
                 auto gradBx_z_r = rwDensityGrid.alphaDensityGradientZ(3 * j);
 
 
-                auto rhoBy_r =    rwDensityGrid.alphaDensity(3 * j + 2);
-                auto tauBy_r =    rwDensityGrid.alphaDensitytau(3 * j + 2);
-                auto laplBy_r =   rwDensityGrid.alphaDensitylapl(3 * j + 2);
-                auto gradBy_x_r = rwDensityGrid.alphaDensityGradientX(3 * j + 2);
-                auto gradBy_y_r = rwDensityGrid.alphaDensityGradientY(3 * j + 2);
-                auto gradBy_z_r = rwDensityGrid.alphaDensityGradientZ(3 * j + 2);
+                auto rhoBy_r =    rwDensityGrid.alphaDensity(3 * j + 1);
+                auto tauBy_r =    rwDensityGrid.alphaDensitytau(3 * j + 1);
+                auto laplBy_r =   rwDensityGrid.alphaDensitylapl(3 * j + 1);
+                auto gradBy_x_r = rwDensityGrid.alphaDensityGradientX(3 * j + 1);
+                auto gradBy_y_r = rwDensityGrid.alphaDensityGradientY(3 * j + 1);
+                auto gradBy_z_r = rwDensityGrid.alphaDensityGradientZ(3 * j + 1);
 
 
-                auto rhoBz_r =    rwDensityGrid.alphaDensity(3 * j + 4);
-                auto tauBz_r =    rwDensityGrid.alphaDensitytau(3 * j + 4);
-                auto laplBz_r =   rwDensityGrid.alphaDensitylapl(3 * j + 4);
-                auto gradBz_x_r = rwDensityGrid.alphaDensityGradientX(3 * j + 4);
-                auto gradBz_y_r = rwDensityGrid.alphaDensityGradientY(3 * j + 4);
-                auto gradBz_z_r = rwDensityGrid.alphaDensityGradientZ(3 * j + 4);
+                auto rhoBz_r =    rwDensityGrid.alphaDensity(3 * j + 2);
+                auto tauBz_r =    rwDensityGrid.alphaDensitytau(3 * j + 2);
+                auto laplBz_r =   rwDensityGrid.alphaDensitylapl(3 * j + 2);
+                auto gradBz_x_r = rwDensityGrid.alphaDensityGradientX(3 * j + 2);
+                auto gradBz_y_r = rwDensityGrid.alphaDensityGradientY(3 * j + 2);
+                auto gradBz_z_r = rwDensityGrid.alphaDensityGradientZ(3 * j + 2);
 
 
                 auto rhosig_xx_r =    rw2DensityGrid.alphaDensity(6 * j + 0);
@@ -39204,44 +39202,44 @@ CDensityGridCubic::DensityProdForMGGA_THGRED(const CDensityGrid& rwDensityGrid,
                 auto gradsig_xx_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 0);
 
 
-                auto rhosig_yy_r =    rw2DensityGrid.alphaDensity(6 * j + 2);
-                auto tausig_yy_r =    rw2DensityGrid.alphaDensitytau(6 * j + 2);
-                auto laplsig_yy_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 2);
-                auto gradsig_yy_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 2);
-                auto gradsig_yy_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 2);
-                auto gradsig_yy_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 2);
+                auto rhosig_yy_r =    rw2DensityGrid.alphaDensity(6 * j + 1);
+                auto tausig_yy_r =    rw2DensityGrid.alphaDensitytau(6 * j + 1);
+                auto laplsig_yy_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 1);
+                auto gradsig_yy_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 1);
+                auto gradsig_yy_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 1);
+                auto gradsig_yy_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 1);
 
 
-                auto rhosig_zz_r =    rw2DensityGrid.alphaDensity(6 * j + 4);
-                auto tausig_zz_r =    rw2DensityGrid.alphaDensitytau(6 * j + 4);
-                auto laplsig_zz_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 4);
-                auto gradsig_zz_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 4);
-                auto gradsig_zz_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 4);
-                auto gradsig_zz_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 4);
+                auto rhosig_zz_r =    rw2DensityGrid.alphaDensity(6 * j + 2);
+                auto tausig_zz_r =    rw2DensityGrid.alphaDensitytau(6 * j + 2);
+                auto laplsig_zz_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 2);
+                auto gradsig_zz_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 2);
+                auto gradsig_zz_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 2);
+                auto gradsig_zz_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 2);
 
 
-                auto rhosig_xy_r =    rw2DensityGrid.alphaDensity(6 * j + 6);
-                auto tausig_xy_r =    rw2DensityGrid.alphaDensitytau(6 * j + 6);
-                auto laplsig_xy_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 6);
-                auto gradsig_xy_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 6);
-                auto gradsig_xy_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 6);
-                auto gradsig_xy_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 6);
+                auto rhosig_xy_r =    rw2DensityGrid.alphaDensity(6 * j + 3);
+                auto tausig_xy_r =    rw2DensityGrid.alphaDensitytau(6 * j + 3);
+                auto laplsig_xy_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 3);
+                auto gradsig_xy_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 3);
+                auto gradsig_xy_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 3);
+                auto gradsig_xy_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 3);
 
 
-                auto rhosig_xz_r =    rw2DensityGrid.alphaDensity(6 * j + 8);
-                auto tausig_xz_r =    rw2DensityGrid.alphaDensitytau(6 * j + 8);
-                auto laplsig_xz_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 8);
-                auto gradsig_xz_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 8);
-                auto gradsig_xz_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 8);
-                auto gradsig_xz_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 8);
+                auto rhosig_xz_r =    rw2DensityGrid.alphaDensity(6 * j + 4);
+                auto tausig_xz_r =    rw2DensityGrid.alphaDensitytau(6 * j + 4);
+                auto laplsig_xz_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 4);
+                auto gradsig_xz_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 4);
+                auto gradsig_xz_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 4);
+                auto gradsig_xz_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 4);
 
 
-                auto rhosig_yz_r =    rw2DensityGrid.alphaDensity(6 * j + 10);
-                auto tausig_yz_r =    rw2DensityGrid.alphaDensitytau(6 * j + 10);
-                auto laplsig_yz_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 10);
-                auto gradsig_yz_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 10);
-                auto gradsig_yz_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 10);
-                auto gradsig_yz_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 10);
+                auto rhosig_yz_r =    rw2DensityGrid.alphaDensity(6 * j + 5);
+                auto tausig_yz_r =    rw2DensityGrid.alphaDensitytau(6 * j + 5);
+                auto laplsig_yz_r =   rw2DensityGrid.alphaDensitylapl(6 * j + 5);
+                auto gradsig_yz_x_r = rw2DensityGrid.alphaDensityGradientX(6 * j + 5);
+                auto gradsig_yz_y_r = rw2DensityGrid.alphaDensityGradientY(6 * j + 5);
+                auto gradsig_yz_z_r = rw2DensityGrid.alphaDensityGradientZ(6 * j + 5);
 
                 for (int i = 0; i < npoints; i++)
                 {
