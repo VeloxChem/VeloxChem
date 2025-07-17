@@ -52,7 +52,7 @@ from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class ThgDriver(NonlinearSolver):
+class ThgRedDriver(NonlinearSolver):
     """
     Implements the isotropic cubic response driver for Third-harmonic gerneration
     (thg)
@@ -151,7 +151,7 @@ class ThgDriver(NonlinearSolver):
         })
 
         if self.rank == mpi_master():
-            self._print_header('Two-Photon Absorbtion Driver Setup')
+            self._print_header('Third-Harmonic Generation Driver Setup')
 
         start_time = time.time()
 
@@ -449,6 +449,12 @@ class ThgDriver(NonlinearSolver):
 
             self._print_results2(ret_dict)
 
+
+
+            
+        
+        
+
         profiler.check_memory_usage('End of thg')
 
         return ret_dict
@@ -577,35 +583,23 @@ class ThgDriver(NonlinearSolver):
 
                 dist_den_1_freq = np.hstack((
                     Dx.real.reshape(-1, 1),
-                    Dx.imag.reshape(-1, 1),
                     Dy.real.reshape(-1, 1),
-                    Dy.imag.reshape(-1, 1),
                     Dz.real.reshape(-1, 1),
-                    Dz.imag.reshape(-1, 1),
                 ))
 
                 dist_den_2_freq = np.hstack((
                     D_sig_xx.real.reshape(-1, 1),
-                    D_sig_xx.imag.reshape(-1, 1),
                     D_sig_yy.real.reshape(-1, 1),
-                    D_sig_yy.imag.reshape(-1, 1),
                     D_sig_zz.real.reshape(-1, 1),
-                    D_sig_zz.imag.reshape(-1, 1),
                     D_sig_xy.real.reshape(-1, 1),
-                    D_sig_xy.imag.reshape(-1, 1),
                     D_sig_xz.real.reshape(-1, 1),
-                    D_sig_xz.imag.reshape(-1, 1),
                     D_sig_yz.real.reshape(-1, 1),
-                    D_sig_yz.imag.reshape(-1, 1),
                 ))
 
                 dist_den_3_freq = np.hstack((
                     D_lam_sig_tau_x.real.reshape(-1, 1),
-                    D_lam_sig_tau_x.imag.reshape(-1, 1),
                     D_lam_sig_tau_y.real.reshape(-1, 1),
-                    D_lam_sig_tau_y.imag.reshape(-1, 1),
                     D_lam_sig_tau_z.real.reshape(-1, 1),
-                    D_lam_sig_tau_z.imag.reshape(-1, 1),
                 ))
 
             else:
@@ -691,7 +685,7 @@ class ThgDriver(NonlinearSolver):
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + '_thg_fock_1_full.h5'
+            fock_file = str(fpath) + '_thg_red_fock_1_full.h5'
         else:
             fock_file = None
 
@@ -709,19 +703,19 @@ class ThgDriver(NonlinearSolver):
 
             if self._dft:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
+                                                 'real', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, density_list3,
-                                                 'thg', profiler)
+                                                 'thgred', profiler)
             else:
                 density_list_23 = DistributedArray(density_list2.data,
                                                    self.comm,
                                                    distribute=False)
                 density_list_23.append(density_list3, axis=1)
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
+                                                 'real', eri_dict,
                                                  None, None, None,
-                                                 density_list_23, 'thg',
+                                                 density_list_23, 'thgred',
                                                  profiler)
 
             self._print_fock_time(time.time() - time_start_fock)
@@ -1030,14 +1024,6 @@ class ThgDriver(NonlinearSolver):
                 k_sig_yz = self.complex_lrvec2mat(n_sig_yz, nocc, norb)
 
 
-                k_lamtau_xx =  2.0 * k_sig_xx
-                k_lamtau_yy =  2.0 * k_sig_yy
-                k_lamtau_zz =  2.0 * k_sig_zz
-                k_lamtau_xy =  2.0 * k_sig_xy
-                k_lamtau_xz =  2.0 * k_sig_xz
-                k_lamtau_yz =  2.0 * k_sig_yz
-
-
                 kx = self.complex_lrvec2mat(nx, nocc, norb)
                 ky = self.complex_lrvec2mat(ny, nocc, norb)
                 kz = self.complex_lrvec2mat(nz, nocc, norb)
@@ -1048,23 +1034,12 @@ class ThgDriver(NonlinearSolver):
                 Dc_y = self.commut_mo_density(ky, nocc)
                 Dc_z = self.commut_mo_density(kz, nocc)
 
-                Db_x = Dc_x
-                Db_y = Dc_y
-                Db_z = Dc_z
-
                 D_sig_xx = self.commut_mo_density(k_sig_xx, nocc)
                 D_sig_yy = self.commut_mo_density(k_sig_yy, nocc)
                 D_sig_zz = self.commut_mo_density(k_sig_zz, nocc)
                 D_sig_xy = self.commut_mo_density(k_sig_xy, nocc)
                 D_sig_xz = self.commut_mo_density(k_sig_xz, nocc)
                 D_sig_yz = self.commut_mo_density(k_sig_yz, nocc)
-
-                D_lamtau_xx =  2.0 * D_sig_xx
-                D_lamtau_yy =  2.0 * D_sig_yy
-                D_lamtau_zz =  2.0 * D_sig_zz
-                D_lamtau_xy =  2.0 * D_sig_xy
-                D_lamtau_xz =  2.0 * D_sig_xz
-                D_lamtau_yz =  2.0 * D_sig_yz
 
 
                 # x #
@@ -1075,12 +1050,6 @@ class ThgDriver(NonlinearSolver):
                 Dx += 3.0 * self.commut(kz, D_sig_xz)
                 Dx += 3.0 * self.commut(k_sig_xz, Dc_z)
 
-                #Dx += self.commut(kx, D_lamtau_xx)
-                #Dx += self.commut(k_lamtau_xx, Db_x)
-                #Dx += self.commut(ky, D_lamtau_xy)
-                #Dx += self.commut(k_lamtau_xy, Db_y)
-                #Dx += self.commut(kz, D_lamtau_xz)
-                #Dx += self.commut(k_lamtau_xz, Db_z)
 
                 # y #
                 Dy =  3.0 * self.commut(kx, D_sig_xy)
@@ -1090,12 +1059,6 @@ class ThgDriver(NonlinearSolver):
                 Dy += 3.0 * self.commut(kz, D_sig_yz)
                 Dy += 3.0 * self.commut(k_sig_yz, Dc_z)
 
-                #Dy += self.commut(kx, D_lamtau_xy)
-                #Dy += self.commut(k_lamtau_xy, Db_x)
-                #Dy += self.commut(ky, D_lamtau_yy)
-                #Dy += self.commut(k_lamtau_yy, Db_y)
-                #Dy += self.commut(kz, D_lamtau_yz)
-                #Dy += self.commut(k_lamtau_yz, Db_z)
 
                 # z #
                 Dz =  3.0 * self.commut(kx, D_sig_xz)
@@ -1104,13 +1067,6 @@ class ThgDriver(NonlinearSolver):
                 Dz += 3.0 * self.commut(k_sig_yz, Dc_y)
                 Dz += 3.0 * self.commut(kz, D_sig_zz)
                 Dz += 3.0 * self.commut(k_sig_zz, Dc_z)
-
-                #Dz += self.commut(kx, D_lamtau_xz)
-                #Dz += self.commut(k_lamtau_xz, Db_x)
-                #Dz += self.commut(ky, D_lamtau_yz)
-                #Dz += self.commut(k_lamtau_yz, Db_y)
-                #Dz += self.commut(kz, D_lamtau_zz)
-                #Dz += self.commut(k_lamtau_zz, Db_z)
 
 
                 # density transformation from MO to AO basis
@@ -1133,32 +1089,20 @@ class ThgDriver(NonlinearSolver):
 
                 dist_den_1_freq = np.hstack((
                     Dc_x.real.reshape(-1, 1),
-                    Dc_x.imag.reshape(-1, 1),
                     Dc_y.real.reshape(-1, 1),
-                    Dc_y.imag.reshape(-1, 1),
                     Dc_z.real.reshape(-1, 1),
-                    Dc_z.imag.reshape(-1, 1),
                     D_sig_xx.real.reshape(-1, 1),
-                    D_sig_xx.imag.reshape(-1, 1),
                     D_sig_yy.real.reshape(-1, 1),
-                    D_sig_yy.imag.reshape(-1, 1),
                     D_sig_zz.real.reshape(-1, 1),
-                    D_sig_zz.imag.reshape(-1, 1),
                     D_sig_xy.real.reshape(-1, 1),
-                    D_sig_xy.imag.reshape(-1, 1),
                     D_sig_xz.real.reshape(-1, 1),
-                    D_sig_xz.imag.reshape(-1, 1),
                     D_sig_yz.real.reshape(-1, 1),
-                    D_sig_yz.imag.reshape(-1, 1),
                 ))
 
                 dist_den_2_freq = np.hstack((
                     Dx.real.reshape(-1, 1),
-                    Dx.imag.reshape(-1, 1),
                     Dy.real.reshape(-1, 1),
-                    Dy.imag.reshape(-1, 1),
                     Dz.real.reshape(-1, 1),
-                    Dz.imag.reshape(-1, 1),
                 ))
 
             else:
@@ -1351,7 +1295,7 @@ class ThgDriver(NonlinearSolver):
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + '_thg_fock_2_full.h5'
+            fock_file = str(fpath) + '_thg_red_fock_2_full.h5'
         else:
             fock_file = None
 
@@ -1371,15 +1315,15 @@ class ThgDriver(NonlinearSolver):
 
             if self._dft:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
+                                                 'real', eri_dict,
                                                  dft_dict, density_list1,
-                                                 density_list2, None, 'thg_ii',
+                                                 density_list2, None, 'thgred_ii',
                                                  profiler)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
+                                                 'real', eri_dict,
                                                  None, None, density_list2,
-                                                 None, 'thg_ii', profiler)
+                                                 None, 'thgred_ii', profiler)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -2081,6 +2025,48 @@ class ThgDriver(NonlinearSolver):
             return {}
 
 
+    def _print_results(self, rsp_results):
+        """
+        Prints the results from the TPA calculation.
+
+        :param rsp_results:
+            A dictionary containing the results of response calculation.
+        """
+
+        freqs = rsp_results['frequencies']
+        component = 'THG'
+
+        self.ostream.print_blank()
+
+        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Thid-Harmonic Generation (THG) intensities'
+        self.ostream.print_header(w_str)
+        self.ostream.print_header('=' * (len(w_str) + 2))
+        self.ostream.print_blank()
+
+        # Updated header with only two columns
+        title = '{:>12s} {:>25s}'.format('Frequency', 'THG intensity (a.u.)')
+        width = len(title)
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('-' * len(title)).ljust(width))
+
+        tensor = rsp_results.get(component)
+        if tensor is not None:
+            for w in freqs:
+                key = (w, w, w)
+                val = tensor.get(key)
+                if val is not None:
+                    intensity = val.real if hasattr(val, 'real') else val
+                    line = '{:>12.4f} {:>25.8f}'.format(w, intensity)
+                    self.ostream.print_header(line.ljust(width))
+                else:
+                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Reference:'.ljust(width))
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+
 
     def _print_results2(self, rsp_results):
         """
@@ -2132,47 +2118,6 @@ class ThgDriver(NonlinearSolver):
             self.ostream.print_blank()
 
         # Reference footer
-        self.ostream.print_header('Reference:'.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def _print_results(self, rsp_results):
-        """
-        Prints the results from the TPA calculation.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
-        """
-
-        freqs = rsp_results['frequencies']
-        component = 'THG'
-
-        self.ostream.print_blank()
-
-        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Thid-Harmonic Generation (THG) intensities'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
-
-        # Updated header with only two columns
-        title = '{:>12s} {:>25s}'.format('Frequency', 'THG intensity (a.u.)')
-        width = len(title)
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
-
-        tensor = rsp_results.get(component)
-        if tensor is not None:
-            for w in freqs:
-                key = (w, w, w)
-                val = tensor.get(key)
-                if val is not None:
-                    intensity = val.real if hasattr(val, 'real') else val
-                    line = '{:>12.4f} {:>25.8f}'.format(w, intensity)
-                    self.ostream.print_header(line.ljust(width))
-                else:
-                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
-
-        self.ostream.print_blank()
         self.ostream.print_header('Reference:'.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()

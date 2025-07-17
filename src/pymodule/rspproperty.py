@@ -43,6 +43,7 @@ from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .shgdriver import ShgDriver
 from .thgdriver import ThgDriver
+from .thgreddriver import ThgRedDriver
 from .tpatransitiondriver import TpaTransitionDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
@@ -231,6 +232,13 @@ class ResponseProperty:
               self._rsp_dict['is_complex'] == 'yes'):    
              
              self._rsp_driver = ThgDriver(self.comm, self.ostream)
+
+        elif (self._rsp_dict['property'] == 'thgred' and 
+              self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'none' and
+              self._rsp_dict['is_complex'] == 'yes'):    
+             
+             self._rsp_driver = ThgRedDriver(self.comm, self.ostream)
 
         # TPA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and

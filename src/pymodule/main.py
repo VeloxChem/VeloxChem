@@ -57,6 +57,7 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rspthg import THG
+from .rspthgred import THGRed
 from .rsptpatransition import TpaTransition
 from .rspthreepatransition import ThreePATransition
 
@@ -183,6 +184,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'thg':
         rsp_prop = THG(rsp_dict, method_dict)
+
+    elif prop_type == 'thgred':
+        rsp_prop = THGRed(rsp_dict, method_dict)
 
     elif prop_type == '3pa transition':
         rsp_prop = ThreePATransition(rsp_dict, method_dict)
