@@ -81,6 +81,7 @@ class ExternalScfDriver:
         self.spin_flip = False
         self.NAC = False
         self.cluster = False
+        self.solvation = (False, 'CPCM', 'water')
         self.add_ghost_atom = False
         self.path_on_cluster = path_on_cluster
         
@@ -397,7 +398,10 @@ conda activate vlxenv_simd_master
                 if self.path_on_cluster is not None:
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
                 with open(input_file, 'w') as file:
-                    file.write(f'!{self.method} {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
+                    if self.solvation[0] is True:
+                        file.write(f'!{self.method} {self.xc_func} {self.dispersion} {self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
+                    else:
+                        file.write(f'!{self.method} {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')
@@ -443,5 +447,6 @@ conda activate vlxenv_simd_master
             print(f"Input file '{self.input_filename}' created successfully.")
         except Exception as e:
             print(f"Error creating input file: {e}")
+
 
 
