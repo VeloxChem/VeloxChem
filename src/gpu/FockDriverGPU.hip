@@ -7713,7 +7713,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DDDD");
 
-        unrollCalls<14>::callDDDD(
+        unrollCalls<15>::callDDDD(
                         num_blocks,
                         threads_per_block,
                         streamList[0].stream,
