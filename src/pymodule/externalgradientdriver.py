@@ -424,11 +424,8 @@ conda activate vlxenv_new_compile
 
                 full_path = os.path.abspath(self.qm_driver.xyz_filename)
                 with open(input_file, 'w') as file:
-                    if self.qm_driver.solvation[0] is True:
-                        file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
-                    else:
-                        file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD\n')
-                    
+                    file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD\n')
+                    file.write(f'%moinp {self.qm_driver.mo_input_filename}\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.qm_driver.nprocs * 2}\n')
@@ -467,5 +464,4 @@ conda activate vlxenv_new_compile
             print(f"Input file '{self.input_filename}' created successfully.")
         except Exception as e:
             print(f"Error creating input file: {e}")
-
 

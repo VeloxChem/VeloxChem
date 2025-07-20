@@ -286,6 +286,7 @@ class IMDatabasePointCollecter:
         self.current_gradient = 0
         self.current_energy = 0
         self.point_checker = 1
+        self.last_added = 0
         self.allowed_molecule_deviation = None
         self.last_point_added = None
         self.im_labels = None
@@ -873,13 +874,14 @@ class IMDatabasePointCollecter:
         self.impes_drivers = {root: None for root in self.roots_to_follow}
         self.sampled_molecules = {root: {'molecules': [], 'im_energies': [], 'qm_energies': [], 'distances': []} for root in self.roots_to_follow}
         print(self.reference_struc_energies_file)
-        last_added = 0
+        
         if self.reference_struc_energies_file is not None:
             self.sampled_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
             self.allowed_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
-            last_added += len(self.sampled_molecules[self.roots_to_follow[0]]['molecules'])
+            self.last_added += len(self.sampled_molecules[self.roots_to_follow[0]]['molecules'])
         else:
              self.reference_struc_energies_file = 'ref_struc_energy.xyz'
+        
 
         for root in self.roots_to_follow:
             # Dynamically create an attribute name
@@ -1007,25 +1009,6 @@ class IMDatabasePointCollecter:
 
             self.simulation.step(1)
             
-            if step % 100 == 0 and step != 0:
-                self.simulation.saveCheckpoint('checkpoint')
-                
-                # self.output_file_writer(self.summary_output)
-                state_spec_dict = {'pot_energies':[], 'gradients':[]}
-                self.gloabal_sim_informations = {f'state_{root}':state_spec_dict for root in self.roots_to_follow}
-                self.gloabal_sim_informations['coordinates_ang'] = []
-                self.gloabal_sim_informations['state'] = []
-                self.gloabal_sim_informations['temperatures'] = []
-
-                for root in self.roots_to_follow:
-
-                    self.write_qm_energy_determined_points(self.allowed_molecules[root]['molecules'][last_added: ],
-                                                           self.allowed_molecules[root]['qm_energies'][last_added:],
-                                                           self.allowed_molecules[root]['qm_gradients'][last_added:],
-                                                           self.allowed_molecules[root]['im_energies'][last_added:],
-                                                           [],
-                                                           root)
-                    last_added = len(self.allowed_molecules[root]['molecules'])
                 #print('cooridnates', simulation.context.getState(getPositions=True).getPositions())
 
             # if step == self.nsteps and self.density_around_data_point[0] != self.desired_datpoint_density:
@@ -2257,8 +2240,8 @@ class IMDatabasePointCollecter:
             else:
                 self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
-            print('len of molecules', len(self.sampled_molecules[self.current_state]['molecules']), self.use_opt_confidence_radius)
-            if energy_difference * hartree_in_kcalpermol() > self.energy_threshold or rmsd_gradient > self.energy_threshold or cos_theta < 0.9:
+            print('len of molecules', len(self.allowed_molecules[self.current_state]['molecules']), self.use_opt_confidence_radius)
+            if energy_difference * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < 0.9 and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
                 
                 
                 
@@ -2765,6 +2748,33 @@ class IMDatabasePointCollecter:
                             if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 1:
                                 
                                 trust_radius = None
+
+                                sym_dict = self.non_core_symmetry_groups['gs']
+                                if state + number > 0:
+                                    sym_dict = self.non_core_symmetry_groups['es']
+                                
+                                indices = [i for i in range(len(self.allowed_molecules[state + number]) - 1)]
+                                
+                                if len(self.qm_data_point_dict[state + number]) > 2 and len(self.allowed_molecules[state + number]['molecules']) > 20:
+                                    alphas = [dp.confidence_radius for dp in self.qm_data_point_dict[state + number]]
+                                    indices = self.per_structure_grads(alphas, 
+                                                                        self.allowed_molecules[state + number]['molecules'], 
+                                                                        self.allowed_molecules[state + number]['qm_energies'],
+                                                                        self.allowed_molecules[state + number]['qm_gradients'],
+                                                                        self.allowed_molecules[state + number]['im_energies'], 
+                                                                        self.qm_data_point_dict[state + number], 
+                                                                        self.interpolation_settings[state + number],
+                                                                        self.qm_symmetry_datapoint_dict[state + number],
+                                                                        sym_dict)
+                                    
+                                print('indices matrix', indices, self.allowed_molecules[state + number]['molecules'])
+            
+                                
+
+                                chosen_structures = [self.allowed_molecules[state + number]['molecules'][idx] for idx in indices]
+                                chosen_qm_energies = [self.allowed_molecules[state + number]['qm_energies'][idx] for idx in indices]
+                                chosen_im_energies = [self.allowed_molecules[state + number]['im_energies'][idx] for idx in indices]
+                                chosen_qm_gradients = [self.allowed_molecules[state + number]['qm_gradients'][idx] for idx in indices]
                                 if self.use_opt_confidence_radius[1] == 'single':
                                     sym_dict = self.non_core_symmetry_groups['gs']
                                     if state + number > 0:
@@ -2772,9 +2782,9 @@ class IMDatabasePointCollecter:
                                         
                                     
                                     print(len(self.qm_data_point_dict[state + number][:-1]), len(self.qm_data_point_dict[state + number][:]))
-                                    trust_radius = self.determine_trust_radius_single(self.allowed_molecules[state + number]['molecules'], 
-                                                                                    self.allowed_molecules[state + number]['qm_energies'],
-                                                                                    self.allowed_molecules[state + number]['im_energies'], 
+                                    trust_radius = self.determine_trust_radius_single(chosen_structures, 
+                                                                                    chosen_qm_energies,
+                                                                                    chosen_im_energies, 
                                                                                     self.qm_data_point_dict[state + number][:-1], 
                                                                                     self.qm_data_point_dict[state + number][-1], 
                                                                                     self.interpolation_settings[state + number],
@@ -2785,9 +2795,9 @@ class IMDatabasePointCollecter:
                                     sym_dict = self.non_core_symmetry_groups['gs']
                                     if state + number > 0:
                                         sym_dict = self.non_core_symmetry_groups['es']
-                                    trust_radius = self.determine_trust_radius(self.allowed_molecules[state + number]['molecules'], 
-                                                                            self.allowed_molecules[state + number]['qm_energies'], 
-                                                                            self.allowed_molecules[state + number]['im_energies'], 
+                                    trust_radius = self.determine_trust_radius(chosen_structures, 
+                                                                            chosen_qm_energies, 
+                                                                            chosen_im_energies, 
                                                                             self.qm_data_point_dict[state + number], 
                                                                             self.interpolation_settings[state + number],
                                                                             self.qm_symmetry_datapoint_dict[state + number],
@@ -2799,10 +2809,10 @@ class IMDatabasePointCollecter:
                                     if state + number > 0:
                                         sym_dict = self.non_core_symmetry_groups['es']
                                     
-                                    trust_radius = self.determine_trust_radius_gradient(self.allowed_molecules[state + number]['molecules'], 
-                                                                            self.allowed_molecules[state + number]['qm_energies'],
-                                                                            self.allowed_molecules[state + number]['qm_gradients'],
-                                                                            self.allowed_molecules[state + number]['im_energies'], 
+                                    trust_radius = self.determine_trust_radius_gradient(chosen_structures, 
+                                                                            chosen_qm_energies,
+                                                                            chosen_qm_gradients,
+                                                                            chosen_im_energies, 
                                                                             self.qm_data_point_dict[state + number], 
                                                                             self.interpolation_settings[state + number],
                                                                             self.qm_symmetry_datapoint_dict[state + number],
@@ -2822,8 +2832,164 @@ class IMDatabasePointCollecter:
                                     print(self.sorted_state_spec_im_labels[state + number][idx])
                                     self.qm_data_point_dict[state + number][idx].update_confidence_radius(self.interpolation_settings[state + number]['imforcefield_file'], self.sorted_state_spec_im_labels[state + number][idx], trust_radius)
                                     self.qm_data_point_dict[state + number][idx].confidence_radius = trust_radius
-                            
-                    
+
+                                self.simulation.saveCheckpoint('checkpoint')
+                                
+                                # self.output_file_writer(self.summary_output)
+                                state_spec_dict = {'pot_energies':[], 'gradients':[]}
+                                self.gloabal_sim_informations = {f'state_{root}':state_spec_dict for root in self.roots_to_follow}
+                                self.gloabal_sim_informations['coordinates_ang'] = []
+                                self.gloabal_sim_informations['state'] = []
+                                self.gloabal_sim_informations['temperatures'] = []
+                                for root in self.roots_to_follow:
+                                    self.write_qm_energy_determined_points(self.allowed_molecules[root]['molecules'][self.last_added: ],
+                                                                        self.allowed_molecules[root]['qm_energies'][self.last_added:],
+                                                                        self.allowed_molecules[root]['qm_gradients'][self.last_added:],
+                                                                        self.allowed_molecules[root]['im_energies'][self.last_added:],
+                                                                        [],
+                                                                        root)
+                                    self.last_added = len(self.allowed_molecules[root]['molecules'])
+
+
+    def per_structure_grads(self, alphas, mols, qmE, qmG, imE,
+                        dps, impes_dict, sym_dps, sym_dict):
+        
+        def obj_gradient_function(alphas, structure_list, qm_e, qm_gradients, im_e, dps, impes_dict, sym_datapoints, sym_dict):
+
+            n_points = len(dps[:])
+            natms = len(structure_list[0].get_labels())
+            dF_dalphas = np.zeros(n_points, dtype=float)
+            e_x = self.use_opt_confidence_radius[3]
+
+            for i, dp in enumerate(dps[:]):
+                dp.confidence_radius = alphas[i]
+
+            interpolation_driver = InterpolationDriver(self.z_matrix)
+            interpolation_driver.update_settings(impes_dict)
+            interpolation_driver.symmetry_information = sym_dict
+            interpolation_driver.qm_symmetry_data_points = sym_datapoints
+            interpolation_driver.distance_thrsh = 1000
+            interpolation_driver.exponent_p = 2
+            interpolation_driver.qm_data_points = dps[:]
+            
+            interpolation_driver.compute(mol)
+            # num_g, num_s_prime = fd(interpolation_driver, mol)
+            
+            new_im_energy = interpolation_driver.get_energy()
+            new_im_gradient = interpolation_driver.get_gradient()
+            
+            # print('g_prime', num_g, new_im_gradient, num_g - new_im_gradient)
+            S = interpolation_driver.sum_of_weights 
+            S_prime = interpolation_driver.sum_of_weights_grad
+            
+            # print('S prime', num_s_prime, S_prime, num_s_prime - S_prime)
+            
+            # residuals
+            dE_res = (new_im_energy - qm_e)          # kcal already
+            dG_res = (new_im_gradient - qm_gradients[0])    # (natms,3)
+            sum_of_weight_grad_num = np.zeros_like(mol.get_coordinates_in_bohr())
+            sum_of_weight_grad = np.zeros_like(mol.get_coordinates_in_bohr())
+            # print('DPS', len(dps), i)
+            
+            for j, dp in enumerate(dps[:]):
+                
+                # num_weight_prime, num_Gj, num_dwprime_dalpha = fd_dp(interpolation_driver, mol, dp)
+                # anal_grad_weight = interpolation_driver.shepard_weight_gradient_test(dp.confidence_radius, dp)
+
+                # print('weight_prime', anal_grad_weight, num_weight_prime, anal_grad_weight - num_weight_prime)
+                
+                # sum_of_weight_grad += anal_grad_weight
+                # sum_of_weight_grad_num += num_weight_prime
+            
+                dw        = interpolation_driver.trust_radius_weight_gradient(dp)          # scalar
+                dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient(dp) # (natms,3)
+                # print('dwprime_dalpha', num_dwprime_dalpha, dw_prime, num_dwprime_dalpha - dw_prime)
+                P_j  = interpolation_driver.potentials[j]             # kcal
+                G_j  = interpolation_driver.gradients[j]             # (natms,3)
+                # print('G_j', G_j, num_Gj, G_j - num_Gj)
+                
+                # ---- derivative of gradient wrt α_j --------------------------
+                term1 = dw_prime * (P_j - new_im_energy) / S              # (natms,3)
+                term2 = dw       * (G_j - new_im_gradient) / S            # (natms,3)
+                term3 = dw       * (P_j - new_im_energy) * S_prime / S**2 # (natms,3)  MINUS sign later
+                dG_dα = (term1 + term2 - term3) 
+
+                dot_G = np.tensordot(dG_res, dG_dα, axes=((0,1),(0,1)))  # scalar
+                
+                dE_dα = dw * (P_j - new_im_energy) / S                    # scalar
+                norm_res   = np.linalg.norm(dG_res)
+                norm_dGdα  = np.linalg.norm(dG_dα)
+                
+                                 # scalar
+                # dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G
+                if (np.linalg.norm(qm_gradients[0]) * np.linalg.norm(new_im_gradient)) < 1e-5:
+                    dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + 0.0
+                else:
+                    dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + dot_G / (norm_res * norm_dGdα)
+                dF_dalphas[j] += 2*e_x    * dE_res * dE_dα \
+                            + 1 /(natms * 3) * 2*(1-e_x)* dot_G
+  
+                # print(sum_of_weight_grad, sum_of_weight_grad_num, S)
+            return dF_dalphas 
+        
+        def d_optimal_rows(G, target_size, max_iter=100):
+            """
+            Greedy–exchange D-optimal selection of 'target_size' rows from G.
+            Returns indices of the chosen rows.
+            """
+            n_rows, n_par = G.shape
+            assert target_size >= n_par, "need at least n_par rows"
+
+            # ---- 1. initialise with p rows of largest norms -------------
+            row_norms = np.linalg.norm(G, axis=1)
+            S = list(np.argsort(row_norms)[-target_size:])   # initial subset
+            M = G[S].T @ G[S]                                # information matrix
+            sign, logdet = np.linalg.slogdet(M)
+
+            for _ in range(max_iter):
+                improved = False
+                for i in range(n_rows):
+                    if i in S:
+                        continue
+                    g_new = G[i]                   # candidate row
+                    # try replacing each row in S with g_new
+                    for j, old_idx in enumerate(S):
+                        g_old = G[old_idx]
+                        M_trial = M - np.outer(g_old, g_old) + np.outer(g_new, g_new)
+                        sign_t, logdet_t = np.linalg.slogdet(M_trial)
+                        if sign_t > 0 and logdet_t > logdet + 1e-12:
+                            # accept the exchange
+                            S[j] = i
+                            M = M_trial
+                            logdet = logdet_t
+                            improved = True
+                            break       # restart search with updated S
+                    if improved:
+                        break
+                if not improved:
+                    break              # no further improvement → optimum reached
+            return sorted(S), logdet
+        
+        rows = []
+        for i, mol in enumerate(mols):
+            g_i = obj_gradient_function(
+                alphas,
+                [mol],              # isolate this structure
+                [qmE[i]],
+                [qmG[i]],
+                [imE[i]],
+                dps, impes_dict,
+                sym_dps, sym_dict
+            )
+            rows.append(g_i)
+        
+        G = np.vstack(rows)
+        print('G matrix shape', G)
+        structure_idx, _ = d_optimal_rows(G, 15)
+
+        return structure_idx
+    
+        
 
     def determine_beysian_trust_radius(self, molecules, qm_energies, current_datapoints, interpolation_setting, sym_datapoints, sym_dict):
     
@@ -3139,88 +3305,6 @@ class IMDatabasePointCollecter:
             return sum_sq_error
         
         def obj_gradient_function(alphas, structure_list, qm_e, qm_gradients, im_e, dps, impes_dict, sym_datapoints, sym_dict):
-            
-            # use Cliaruat's theorem: the symmetry of diffentiation meaning that
-            # the operators commute so the order does not matter but makes it easier
-
-            def fd(func, mol, h=1e-6):
-                # func : callable(X) returning scalar or array
-                # x    : ndarray (natms,3)  current Cartesian geometry'
-                labels = mol.get_labels()
-                x = mol.get_coordinates_in_bohr()
-                out_g = np.zeros_like(x)
-                out_s_prime = np.zeros_like(x)
-                dG_norm_out = np.zeros_like(x)
-
-                for atom in range(x.shape[0]):
-                    for xyz in range(3):
-                        dx        = np.zeros_like(x)
-                        dx[atom, xyz] = h
-                        new_coords_plus = x + dx
-                        new_mol = Molecule(labels, new_coords_plus, 'bohr')
-
-                        func.compute(new_mol)
-                        out_e_plus  = func.get_energy()
-                        out_s_plus = func.sum_of_weights
-
-                        new_coords_minus = x - dx
-                        new_mol = Molecule(labels, new_coords_minus, 'bohr')
-                        func.compute(new_mol)
- 
-                        out_e_minus  = func.get_energy()
-                        out_s_minus = func.sum_of_weights
-                        # print(out_s_minus, out_s_plus)
-                        out_g[atom, xyz] += (out_e_plus - out_e_minus) / (2*h)
-                        out_s_prime[atom, xyz] += (out_s_plus - out_s_minus) / (2*h)
-
-
-                return out_g, out_s_prime
-            
-            def fd_dp(func, mol, dp, h=1e-6):
-                # func : callable(X) returning scalar or array
-                # x    : ndarray (natms,3)  current Cartesian geometry'
-                labels = mol.get_labels()
-                x = mol.get_coordinates_in_bohr()
-                out_g = np.zeros_like(x)
-                out_s_prime = np.zeros_like(x)
-                out_weight = np.zeros_like(x)
-                out_g_j = np.zeros_like(x)
-                out_dwprime_dalpha = np.zeros_like(x)
-
-                for atom in range(x.shape[0]):
-                    for xyz in range(3):
-                        dx        = np.zeros_like(x)
-                        dx[atom, xyz] = h
-                        new_coords_plus = x + dx
-                        new_mol = Molecule(labels, new_coords_plus, 'bohr')
-
-                        func.compute(new_mol)
-                        out_e_plus  = func.get_energy()
-                        out_s_plus = func.sum_of_weights
-                        weight_plus = func.shepard_weight_test(dp.confidence_radius, dp)
-                        out_p_j_plus, _, _ = func.compute_potential(dp, func.impes_coordinate.internal_coordinates_values)
-                        out_dwprime_dalpha_plus = func.trust_radius_weight_gradient(dp)
-
-                        new_coords_minus = x - dx
-                        new_mol = Molecule(labels, new_coords_minus, 'bohr')
-                        func.compute(new_mol)
- 
-                        out_e_minus  = func.get_energy()
-                        out_s_minus = func.sum_of_weights
-                        weight_minus = func.shepard_weight_test(dp.confidence_radius, dp)
-                        out_p_j_minus, _, _ = func.compute_potential(dp, func.impes_coordinate.internal_coordinates_values)
-                        out_dwprime_dalpha_minus = func.trust_radius_weight_gradient(dp)
-
-
-
-                        # print(out_s_minus, out_s_plus)
-                        out_g[atom, xyz] += (out_e_plus - out_e_minus) / (2*h)
-                        out_s_prime[atom, xyz] += (out_s_plus - out_s_minus) / (2*h)
-                        out_weight[atom, xyz] += (weight_plus - weight_minus) / (2*h)
-                        out_g_j[atom, xyz] += (out_p_j_plus - out_p_j_minus) / (2*h)
-                        out_dwprime_dalpha[atom, xyz] += (out_dwprime_dalpha_plus - out_dwprime_dalpha_minus) / (2*h)
-
-                return out_weight, out_g_j, out_dwprime_dalpha
 
             n_points = len(dps[:])
             natms = len(structure_list[0].get_labels())

@@ -91,6 +91,7 @@ class ExternalScfDriver:
         self.xyz_structures = 'xyz_structures'
         self.input_filename = 'current_input.inp'
         self.output_filename = 'current_output.out'
+        self.mo_input_filename = 'current_input.gbw'
         self.input_files.append(self.input_filename)
         self.output_files.append(self.output_filename)
         
