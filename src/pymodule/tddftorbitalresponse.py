@@ -390,6 +390,7 @@ class TddftOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs[2 * dof + ifock]
 
         # Transform to MO basis:
+        rhs_mo = []
         for i in range(dof):
             if self.rank == mpi_master():
                 fmo_rhs_1pdm = 0.5 * np.linalg.multi_dot(
@@ -425,6 +426,7 @@ class TddftOrbitalResponse(CphfSolver):
                 rhs_mo_i = rhs_mo_i.reshape(nocc * nvir)
             else:
                 rhs_mo_i = None
+            rhs_mo.append(rhs_mo_i)
             dist_rhs_mo.append(DistributedArray(rhs_mo_i, self.comm))
 
         profiler.stop_timer('RHS_MO')
@@ -439,6 +441,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             return {
+                'rhs_mo': rhs_mo,
                 'dist_cphf_rhs': dist_rhs_mo,
                 'density_occ_occ': dm_oo,
                 'density_vir_vir': dm_vv,
