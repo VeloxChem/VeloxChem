@@ -2938,6 +2938,8 @@ class IMDatabasePointCollecter:
             Returns indices of the chosen rows.
             """
             n_rows, n_par = G.shape
+
+            print('G shape', G.shape, 'target size', target_size, 'max iter', max_iter)
             assert target_size >= n_par, "need at least n_par rows"
 
             # ---- 1. initialise with p rows of largest norms -------------
@@ -2985,7 +2987,7 @@ class IMDatabasePointCollecter:
         
         G = np.vstack(rows)
         print('G matrix shape', G)
-        structure_idx, _ = d_optimal_rows(G, 15)
+        structure_idx, _ = d_optimal_rows(G, len(alphas))
 
         return structure_idx
     
