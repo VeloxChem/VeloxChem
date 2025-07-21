@@ -1976,7 +1976,7 @@ class ScfDriver:
 
         return fock_mat, vxc_mat, e_emb, V_emb
 
-    def _comp_2e_fock_single_comm(self,
+    def     _comp_2e_fock_single_comm(self,
                                   den_mat,
                                   molecule,
                                   basis,

@@ -32,6 +32,9 @@
 
 from mpi4py import MPI
 import numpy as np
+import networkx as nx
+from networkx.algorithms.isomorphism import GraphMatcher
+from networkx.algorithms.isomorphism import categorical_node_match
 import typing
 import copy
 import math
@@ -136,6 +139,8 @@ class EvbSystemBuilder():
         self.data_folder: str | None = None
         self.run_folder: str | None = None
         self.pdb: str | None = None
+        self.pdb_active_res: list[
+            dict] | None = None  # Residue ids of the residues active in the reaction in the PDB file
 
         self.no_force_groups: bool = False
         self.nb_switching_function: bool = True
@@ -145,6 +150,7 @@ class EvbSystemBuilder():
         self.CNT = False
         self.CNT_radius_nm = 0.5
 
+        self.begin_index = 0
         self.water_model: str
         self.decompose_bonded = None
         self.decompose_nb: list | None = None
@@ -209,18 +215,9 @@ class EvbSystemBuilder():
             "posres_k": {
                 "type": float
             },
-            # "centroid_k": {
-            #     "type": float
-            # },
-            # "centroid_offset":{
-            #     "type":float
-            # },
             "posres_residue_radius": {
                 "type": float
             },
-            # "centroid_complete_ligand":{
-            #     "type":bool
-            # },
             "coul14_scale": {
                 "type": float
             },
@@ -229,6 +226,9 @@ class EvbSystemBuilder():
             },
             "pdb": {
                 "type": str
+            },
+            "pdb_active_res": {
+                "type": list
             },
             "no_force_groups": {
                 "type": bool
@@ -284,6 +284,7 @@ class EvbSystemBuilder():
             else:
                 self.ostream.print_info(
                     f"{keyword}: {getattr(self, keyword)} (default)")
+        self.ostream.flush()
         self.reactant = reactant
         self.product = product
         self.constraints = constraints
@@ -297,9 +298,11 @@ class EvbSystemBuilder():
             cmm_remover = mm.CMMotionRemover()
             system.addForce(nb_force)
             system.addForce(cmm_remover)
-            system_mol = Molecule(reactant.molecule)
+            vlx_mol = Molecule(reactant.molecule)
+            self.positions = vlx_mol.get_coordinates_in_angstrom()
+            self.reaction_atoms = dict()
         else:
-            system, topology, system_mol, pdb_atoms, env_center = self._system_from_pdb(
+            system, topology, vlx_mol, self.reaction_atoms = self._system_from_pdb(
             )
             nb_force = [
                 force for force in system.getForces()
@@ -317,24 +320,20 @@ class EvbSystemBuilder():
             nb_force.setForceGroup(EvbForceGroup.NB_FORCE_INT.value)
             cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
 
-        self.reaction_atoms = self._add_reactant(system, topology, nb_force)
-        self.positions = system_mol.get_coordinates_in_angstrom()
-
-        if self.pdb:
-            self._add_posres(system, pdb_atoms)
+        self._add_reactant(system, topology, nb_force)
 
         # Set the positions and make a box for it
 
         box = None
         if self.CNT or self.graphene:
-            box = self._add_CNT_graphene(system, nb_force, topology, system_mol)
+            box = self._add_CNT_graphene(system, nb_force, topology, vlx_mol)
         box = self._configure_pbc(system, topology, nb_force, box)  # A
 
         # assert False, "Rethink CNT/graphene input"
 
         if self.solvent:
             #todo what about the box, and especially giving it to the solvator
-            box = self._add_solvent(system, system_mol, self.solvent, topology,
+            box = self._add_solvent(system, vlx_mol, self.solvent, topology,
                                     nb_force, self.neutralize, self.padding,
                                     box)
 
@@ -360,38 +359,174 @@ class EvbSystemBuilder():
     def _system_from_pdb(self):
         pdb_file = mmapp.PDBFile(self.pdb)
         topology = pdb_file.getTopology()
-        chains = [chain for chain in topology.chains()]
         system_mol = Molecule.read_pdb_file(self.pdb)
-        env_modeller = mmapp.Modeller(topology, pdb_file.positions)
-        if not self.no_reactant:
-            env_modeller.delete([chains[1]])
-        env_topology = env_modeller.getTopology()
-        # env_positions = env_modeller.getPositions()
-        env_positions = np.array(env_modeller.getPositions().value_in_unit(
-            mmunit.angstrom))
-        env_center = np.average(env_positions, axis=0)
+        posres_atoms = [atom for atom in topology.atoms()]
+
         forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
+        templates, residues = forcefield.generateTemplatesForUnmatchedResidues(topology)
+
+        for t, template in enumerate(templates):
+            for i, atom in enumerate(template.atoms):
+                forcefield.registerAtomType({
+                    'name':
+                    f'evb_{atom.name}_{t}',
+                    'class':
+                    'evb_placeholder',
+                    'mass':
+                    atom.element.mass.value_in_unit(mmunit.dalton),
+                    'element':
+                    atom.element
+                })
+                template.atoms[i].type = f'evb_{atom.name}_{t}'
+            forcefield.registerResidueTemplate(template)
+
+        nbforce = forcefield.getGenerators()[2]
+        nbforce.registerAtom({
+            'class': 'evb_placeholder',
+            'charge': 0.0,
+            'epsilon': 0.0,
+            'sigma': 1.0,
+        })
 
         system = forcefield.createSystem(
-            env_topology,
-            nonbondedMethod=mmapp.PME,
-            nonbondedCutoff=1 * mmunit.nanometer,
-            constraints=mmapp.HBonds,
+            topology,
+            removeCMMotion=True,
         )
-        pdb_atoms = [atom for atom in env_topology.atoms()]
-        if not self.no_reactant:
-            rea_modeller = mmapp.Modeller(topology, pdb_file.positions)
-            rea_modeller.delete([chains[0]])
-            rea_topology = rea_modeller.getTopology()
-            # rea_positions = np.array(rea_modeller.getPositions().value_in_unit(mmunit.angstrom))
-            # rea_center = np.average(rea_positions,axis=0)
-            # env_rea_dist = np.linalg.norm(env_center-rea_center)
-            # pass
-            assert len(self.reactant.atoms) == rea_topology.getNumAtoms(
-            ), "Number of atoms in the reactant and the topology do not match"
 
-            topology = env_topology
-        return system, topology, system_mol, pdb_atoms, env_center
+        self.positions = system_mol.get_coordinates_in_angstrom()
+        self._add_posres(system, posres_atoms, self.positions)
+
+        reaction_atoms = {}
+        if self.no_reactant:
+            return system, topology, system_mol, reaction_atoms
+
+        for res_dict in self.pdb_active_res:
+            # all atoms already exist in the topology, pdb: top, matching chain id with removed_chain
+            # the pdb residue should be checked against the reactant, and an index mapping should be found out #todo
+            # these should be added to the reaction_atoms
+            chain = [
+                c for c in topology.chains() if c.id == res_dict['chain']
+            ][0]
+            residue = [
+                r for r in chain.residues()
+                if int(r.id) == res_dict['residue']
+            ][0]
+            
+            mapping = self._get_mapped_atom_ids_from_residue(residue)
+            res_atoms = [atom for atom in residue.atoms()]
+            
+            for id in mapping.keys():
+                self.reactant.atoms[id]['pdb'] = 'sys'
+            for vlx_id, res_id in mapping.items():
+                reaction_atoms.update({
+                    vlx_id: [atom for atom in res_atoms if atom.index == res_id][0]
+                })
+
+            system = self._delete_pdb_forces(system,[atom.index for atom in res_atoms])
+
+            self.ostream.print_info(
+                f"Reacting residue {residue.name} {residue.id} with {len(res_atoms)} atoms added to reaction_atoms"
+            )
+            self.ostream.flush()
+                
+        return system, topology, system_mol, reaction_atoms
+
+    def _get_mapped_atom_ids_from_residue(self, residue: mmapp.Residue):
+        # create a graph of the residue
+        # if the bonds are not available, create them based on proximity from the positions
+
+        # figure out a mapping from self.reactant.atoms to the atoms in the residue with networkx
+        vlx_elements = self.reactant.molecule.get_element_ids()
+        vlx_ids = list(self.reactant.atoms.keys())
+        vlx_bonds = list(self.reactant.bonds.keys())
+        residue_elements = [atom.element.atomic_number for atom in residue.atoms()]
+        residue_ids = [atom.index for atom in residue.atoms()]
+
+        # Depending on how the residue is stored in the PDB, the bonds might not be available.
+        # In that case, the bonds are derived from the connectivity-matrix of a newly created molecule
+        residue_bonds = [bond for bond in residue.bonds()]
+        if len(residue_bonds) == 0:
+            residue_bonds = []
+            mol = Molecule()
+            for id,element in zip(residue_ids,residue_elements):
+                coord = self.positions[id]
+                mol.add_atom(int(element), Point(coord),'angstrom')
+            connectivity_matrix = mol.get_connectivity_matrix()
+            for i, id in enumerate(residue_ids):
+                for j, jd in enumerate(residue_ids):
+                    if i >= j:
+                        continue
+                    if connectivity_matrix[i, j] == 1:
+                        residue_bonds.append((id, jd))
+        else:
+            residue_bonds = [(bond.atom1.index,bond.atom2.index) for bond in residue.bonds() if bond.atom1.index in residue_ids and bond.atom2.index in residue_ids]
+        
+        vlx_graph = nx.Graph()
+        vlx_graph.add_nodes_from(vlx_ids)
+        vlx_graph.add_edges_from(vlx_bonds)
+        for i, elem in zip(vlx_ids,vlx_elements):
+            vlx_graph.nodes[i]['elem'] = elem
+
+        res_graph = nx.Graph()
+        res_graph.add_nodes_from(residue_ids)
+        res_graph.add_edges_from(residue_bonds)
+        for i, elem in zip(residue_ids,residue_elements):
+            res_graph.nodes[i]['elem'] = elem
+
+        GM = GraphMatcher(vlx_graph,res_graph, categorical_node_match('elem', ''))
+        if not GM.subgraph_is_isomorphic():
+            raise ValueError(f"Could not find subgraph isomorphism between the residue {residue.name} {residue.index} and the reactant molecule")
+        mapping = next(GM.subgraph_isomorphisms_iter())
+        return mapping
+        begin_index = 0
+        res_atoms = [atom for atom in residue.atoms()]
+        end_index = begin_index + len(res_atoms)
+        atom_ids = list(range(begin_index, end_index))
+        begin_index = end_index
+        return atom_ids
+
+    def _delete_pdb_forces(self, system, del_indices):
+        # set the right force groups, give descriptive names to the pdb forces, and delete all contributions that solely have the given indices
+        pdb_forces = system.getForces()
+        bond_force = [
+            force for force in pdb_forces
+            if isinstance(force, mm.HarmonicBondForce)
+        ][0]
+        angle_force = [
+            force for force in pdb_forces
+            if isinstance(force, mm.HarmonicAngleForce)
+        ][0]
+        torsion_force = [
+            force for force in pdb_forces
+            if isinstance(force, mm.PeriodicTorsionForce)
+        ][0]
+        bond_force.setForceGroup(EvbForceGroup.PDB.value)
+        angle_force.setForceGroup(EvbForceGroup.PDB.value)
+        torsion_force.setForceGroup(EvbForceGroup.PDB.value)
+        bond_force.setName("PDB Bond Force")
+        angle_force.setName("PDB Angle Force")
+        torsion_force.setName("PDB Torsion Force")
+
+        for i in range(bond_force.getNumBonds()):
+            params = bond_force.getBondParameters(i)
+            if params[0] in del_indices and params[1] in del_indices:
+                bond_force.setBondParameters(i, params[0], params[1], 1, 0)
+
+        for i in range(angle_force.getNumAngles()):
+            params = angle_force.getAngleParameters(i)
+            if params[0] in del_indices and params[1] in del_indices and params[
+                    2] in del_indices:
+                angle_force.setAngleParameters(i, params[0], params[1],
+                                               params[2], 1, 0)
+
+        for i in range(torsion_force.getNumTorsions()):
+            params = torsion_force.getTorsionParameters(i)
+            if params[0] in del_indices and params[1] in del_indices and params[
+                    2] in del_indices and params[3] in del_indices:
+                torsion_force.setTorsionParameters(i, params[0], params[1],
+                                                   params[2], params[3], 1, 0,
+                                                   0)
+        return system
 
     def _configure_pbc(self, system, topology, nb_force, box=None):
         if box is None:
@@ -447,44 +582,72 @@ class EvbSystemBuilder():
     def _add_reactant(self, system, topology, nb_force):
         reaction_chain = topology.addChain()
         reaction_residue = topology.addResidue(name="REA", chain=reaction_chain)
-        reaction_atoms = []
         if not self.no_reactant:
             # add atoms of the solute to the topology and the system
             elements = self.reactant.molecule.get_labels()
 
-            for i, atom in enumerate(self.reactant.atoms.values()):
-                mm_element = mmapp.Element.getBySymbol(elements[i])
-                name = f"{elements[i]}{i}"
+            for id, atom in self.reactant.atoms.items():
+                # if the pdb field is sys, the atom is already in the system and added to the nbforce
+                if atom.get('pdb') == 'sys':
+                    continue
+                mm_element = mmapp.Element.getBySymbol(elements[id])
+                name = f"{elements[id]}{id}"
+                system.addParticle(mm_element.mass)
+                nb_force.addParticle(
+                    0, 1, 0
+                )  #Placeholder values, actual values depend on lambda and will be set later
+
+                # If a pdb field is defined, the atom is already in the topoolgy and hence also in the reaction_atoms
+                if not atom.get('pdb') == None:
+                    continue
                 reaction_atom = topology.addAtom(
                     name,
                     mm_element,
                     reaction_residue,
                 )
-                reaction_atoms.append(reaction_atom)
-                system.addParticle(mm_element.mass)
-                nb_force.addParticle(
-                    0, 1, 0
-                )  #Placeholder values, actual values depend on lambda and will be set later
-            #Make sure the solute does not interact with itself through, as there will be another nonbonded force to take care of this
-            for i, atom in enumerate(self.reactant.atoms.values()):
-                for j in range(len(self.reactant.atoms.values())):
-                    if j > i:
-                        nb_force.addException(
-                            reaction_atoms[i].index,
-                            reaction_atoms[j].index,
-                            0.0,
-                            1.0,
-                            0.0,
-                        )
+                self.reaction_atoms[id] = reaction_atom
+
+            #Make sure the solute does not interact with itself through the default nonbonded force, as there will be another nonbonded force to take care of this
+            # exception_params = [{nb_force.getExceptionParameters(i)[0],nb_force.getExceptionParameters(i)[1]} for i in range(nb_force.getNumExceptions())]
+            atom_indices = [atom.index for atom in self.reaction_atoms.values()]
+            set_exceptions = []
+            for i in range(nb_force.getNumExceptions()):
+                [atom_i, atom_j, charge, sigma, epsilon] = nb_force.getExceptionParameters(i)
+                if atom_i in atom_indices and atom_j in atom_indices:
+                    nb_force.setExceptionParameters(i, atom_i, atom_j, 0.0, 1.0, 0.0)
+                    set_exceptions.append((atom_i, atom_j))
+                    
+            for atom_i in atom_indices:
+                for atom_j in atom_indices:
+                    # Skip any capping hydrogens, because they are not in the topology
+                    if atom_i >= atom_j:
+                        continue
+                    
+                    if (atom_i, atom_j) in set_exceptions or (atom_j, atom_i) in set_exceptions:
+                        
+                        continue
+                    nb_force.addException(
+                        atom_i,
+                        atom_j,
+                        0.0,
+                        1.0,
+                        0.0,
+                    )
+                    
+            self.ostream.flush()
+
             for bond in self.reactant.bonds.keys():
+                if not (self.reactant.atoms[bond[0]].get('pdb') == None
+                        and self.reactant.atoms[bond[1]].get('pdb') == None):
+                    continue
                 topology.addBond(
-                    reaction_atoms[bond[0]],
-                    reaction_atoms[bond[1]],
+                    self.reaction_atoms[bond[0]],
+                    self.reaction_atoms[bond[1]],
                 )
 
-        return reaction_atoms
+        return
 
-    def _add_posres(self, system, pdb_atoms):
+    def _add_posres(self, system, atoms, positions):
         posres_expr = "posres_k*periodicdistance(x, y, z, x0, y0, z0)^2"
         posres_force = mm.CustomExternalForce(posres_expr)
         posres_force.setName("protein_ligand_posres")
@@ -493,7 +656,6 @@ class EvbSystemBuilder():
         posres_force.addPerParticleParameter('x0')
         posres_force.addPerParticleParameter('y0')
         posres_force.addPerParticleParameter('z0')
-        atoms = self.reaction_atoms + pdb_atoms
         count = 0
         for atom in atoms:
             if atom.element is not mmapp.element.hydrogen:
@@ -1082,6 +1244,8 @@ class EvbSystemBuilder():
                 for i, (reactant_atom, product_atom) in enumerate(
                         zip(self.reactant.atoms.values(),
                             self.product.atoms.values())):
+                    if reactant_atom.get('pdb') == 'cap':
+                        continue
                     charge = (1 - lam) * reactant_atom[
                         "charge"] + lam * product_atom["charge"]
                     total_charge += charge
@@ -1096,6 +1260,7 @@ class EvbSystemBuilder():
                             raise ValueError(
                                 "Sigma is 0 while epsilon is not, which will cause division by 0"
                             )
+
                     nb_force.setParticleParameters(self.reaction_atoms[i].index,
                                                    charge, sigma, epsilon)
 
@@ -1367,6 +1532,8 @@ class EvbSystemBuilder():
         bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
         for key in bond_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
+            if atom_ids is None:
+                continue
             eq = 0
             fc = 0
             if key in self.reactant.bonds and key in self.product.bonds:
@@ -1491,6 +1658,8 @@ class EvbSystemBuilder():
         angle_keys = list(set(self.reactant.angles) | set(self.product.angles))
         for key in angle_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
+            if atom_ids is None:
+                continue
             if (key in self.reactant.angles.keys()
                     and key in self.product.angles.keys()):
                 angleA = self.reactant.angles[key]
@@ -1553,6 +1722,8 @@ class EvbSystemBuilder():
             set(self.reactant.dihedrals) | set(self.product.dihedrals))
         for key in dihedral_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
+            if atom_ids is None:
+                continue
             if (key in self.reactant.dihedrals.keys()
                     and key in self.product.dihedrals.keys()):
                 dihedA = self.reactant.dihedrals[key]
@@ -1600,6 +1771,8 @@ class EvbSystemBuilder():
             set(self.reactant.impropers) | set(self.product.impropers))
         for key in dihedral_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
+            if atom_ids is None:
+                continue
             if (key in self.reactant.impropers.keys()
                     and key in self.product.impropers.keys()):
                 dihedA = self.reactant.impropers[key]
@@ -1850,6 +2023,9 @@ class EvbSystemBuilder():
             for j in self.reactant.atoms.keys():
                 if i < j:
                     key = (i, j)
+                    atom_ids = self._key_to_id(key, self.reaction_atoms)
+                    if atom_ids is None:
+                        continue
                     # Remove any exception from the nonbondedforce
                     # and add it instead to the exception bond force
                     if key in reactant_exceptions.keys():
@@ -1894,7 +2070,6 @@ class EvbSystemBuilder():
                             sigmaB = 1.0
                             epsilonA = 0.0
                             epsilonB = 0.0
-                    atom_ids = self._key_to_id(key, self.reaction_atoms)
                     if not (qqA == 0.0 and qqB == 0.0):
                         coulomb_force.addBond(
                             atom_ids[0],
@@ -2042,8 +2217,12 @@ class EvbSystemBuilder():
                 )
         return bond_constraint, constant_force, angle_constraint, torsion_constraint
 
-    def _key_to_id(self, key: tuple[int, ...], atom_list: list) -> list[int]:
-        return [atom_list[key[i]].index for i in range(len(key))]
+    def _key_to_id(self, key: tuple[int, ...], atoms: dict) -> list[int]:
+        for i in key:
+            if i not in atoms.keys():
+                return None
+
+        return [atoms[key[i]].index for i in range(len(key))]
 
     @staticmethod
     def measure_length(v1, v2):

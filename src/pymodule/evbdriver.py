@@ -168,7 +168,7 @@ class EvbDriver():
             optimize: bool = False,
             mm_opt_constrain_bonds: bool = True,
             ordered_input: bool = False,
-            breaking_bonds: set[tuple[int, int]] |tuple = set(),
+            breaking_bonds: set[tuple[int, int]] | tuple = set(),
             name=None,
     ):
         if self.name is None:
@@ -181,11 +181,13 @@ class EvbDriver():
         rea_input, reactant_total_charge = self._process_molecule_input(
             reactant,
             reactant_partial_charges,
+            "REA",
         )
 
         pro_input, product_total_charge = self._process_molecule_input(
             product,
             product_partial_charges,
+            "PRO",
         )
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
@@ -208,7 +210,7 @@ class EvbDriver():
         )
 
     @staticmethod
-    def _process_molecule_input(molecules, partial_charges):
+    def _process_molecule_input(molecules, partial_charges, name="mol"):
         if isinstance(molecules, Molecule):
             molecules = [molecules]
 
@@ -236,15 +238,17 @@ class EvbDriver():
             if partial_charge is not None:
                 assert abs(
                     sum(partial_charge) - charge
-                ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total foral charge of the system {charge} for input {i+1}"
+                ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total formal charge of the system {charge} for input {i+1}"
 
         input = [{
             "molecule": mol,
             "optimize": None,
             "forcefield": None,
             "hessian": None,
-            "charges": charge
-        } for mol, charge in zip(molecules, partial_charges)]
+            "charges": charge,
+            "name": f"{name}_{i+1}",
+        } for mol, charge, i in zip(molecules, partial_charges,
+                                    range(len(molecules)))]
         total_charge = sum([mol.get_charge() for mol in molecules])
         return input, total_charge
 
@@ -260,7 +264,7 @@ class EvbDriver():
         optimize: bool = False,
         mm_opt_constrain_bonds: bool = True,
         ordered_input: bool = False,
-        breaking_bonds: set[tuple[int, int]] |tuple= set(),
+        breaking_bonds: set[tuple[int, int]] | tuple = set(),
         save_output: bool = True,
         force_recalculation: bool = False,
     ):
@@ -313,7 +317,6 @@ class EvbDriver():
             ffbuilder.optimize = optimize
             ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
 
-
             if force_recalculation:
                 self.ostream.print_warning(
                     f"Forcing recalculation of forcefields, even though they might all be present"
@@ -328,7 +331,7 @@ class EvbDriver():
                  rea_input,
                  pro_input,
                  reactant_total_multiplicity,
-                product_total_multiplicity,
+                 product_total_multiplicity,
                  ordered_input,
                  breaking_bonds,
              )
@@ -364,8 +367,8 @@ class EvbDriver():
                 multiplicity = [multiplicity]
         total_multiplicity = 0
         for mult in multiplicity:
-            total_multiplicity += mult-1
-        total_multiplicity+=1
+            total_multiplicity += mult - 1
+        total_multiplicity += 1
 
         assert len(filenames) == len(
             charge), "Number of reactants and charges must match"
@@ -373,9 +376,11 @@ class EvbDriver():
             multiplicity), "Number of reactants and multiplicities must match"
 
         input = []
-        for rea, charge, mult in zip(filenames, charge, multiplicity):
+        for rea, charge, mult,name in zip(filenames, charge, multiplicity, filenames):
             input.append(self._get_input_files(rea))
             if input[-1]['molecule'] is not None:
+                self.ostream.print_info(f"Processing molecule input for {name}")
+                self.ostream.flush()
                 input[-1]['molecule'].set_charge(charge)
                 input[-1]['molecule'].set_multiplicity(mult)
                 molecule_sanity_check(input[-1]['molecule'])
@@ -384,11 +389,12 @@ class EvbDriver():
             if partial_charge is not None:
                 assert abs(
                     sum(partial_charge) - charge
-                ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total foral charge of the system {charge} for input {i+1}"
+                ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total formal charge of the system {charge} for input {name}"
 
-        for inp, filename in zip(input, filenames):
+        for inp, name in zip(input, filenames):
             assert inp['molecule'] is not None or inp[
-                'forcefield'] is not None, f"Could not load {filename} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
+                'forcefield'] is not None, f"Could not load {name} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
+            inp['name'] = name
 
         return input, total_multiplicity
 
@@ -1154,13 +1160,27 @@ class EvbDriver():
                     "DynamicEval=0\n")
 
             script = ("[Script]\n"
-                      'Text="""\n'
-                      'rea = resname("REA");\n')
+                      'Text="""\n')
+            rea_script = 'rea = resname("REA");'
+            sol_script = ""
             if conf.get("solvent", None) is not None:
-                script += ('sol = resname("SOL");\n'
-                           'close_sol = (within(5, rea) and resname("SOL"));\n')
+
+                sol_script = (
+                    f'sol = resname("SOL");\n'
+                    'close_sol = (within(5, rea) and resname("SOL"));\n')
+            pdb_script = ""
             if conf.get('pdb', None) is not None:
-                script += "pocket = residue(protein and within(3,rea)) and not element('H');\n"
+                resids = [
+                    res['residue'] for res in conf.get("pdb_active_res", [])
+                ]
+
+                if len(resids) > 0:
+                    s = "".join([f" or resid({id})" for id in resids])
+                    rea_script = rea_script[:-1] + s + ";"
+                pdb_script = "pocket = residue(protein and within(3,rea)) and not element('H');\n"
+            script += rea_script + "\n"
+            script += sol_script + "\n"
+            script += pdb_script + "\n"
 
             script += '"""'
 

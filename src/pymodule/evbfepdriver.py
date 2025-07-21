@@ -116,13 +116,15 @@ class EvbFepDriver():
         self.save_equil_traj: bool = True
         self.xml_crash_save_interval: int = 50
         self.pdb_crash_save_interval: int = 1
+        self.pdb_equil_start_temp = 10  #kelvin
+        self.pdb_equil_temp_step = 50  # kelvin
+        self.pdb_temperatures = []
         self.NVT_integrator = "nose-hoover"
 
         self.pdb = None
-        self.pdb_equil_start_temp = 10  #kelvin
-        self.pdb_equil_temp_step = 50  # kelvin
-        self.pdb_posres_equil = False
+        self.pdb_posres_equil = False # if True, an extra equilibration will be performed every lambda with posres turned on
         self.posres_k = -1
+        self._safe_step_batch = 10
 
         self.keywords = {
             "langevin_friction": {
@@ -212,6 +214,9 @@ class EvbFepDriver():
             "pdb": {
                 "type": str
             },
+            "pdb_temperatures": {
+                "type": list
+            },
             "pdb_equil_temp_step": {
                 "type": int
             },
@@ -251,7 +256,7 @@ class EvbFepDriver():
             else:
                 self.ostream.print_info(
                     f"{keyword}: {getattr(self, keyword)} (default)")
-
+        self.ostream.flush()
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbFepDriver.')
         systems = configuration["systems"]
@@ -271,6 +276,17 @@ class EvbFepDriver():
         if self.pressure > 0:
             self.isobaric = True
 
+        if self.pdb is not None:
+            if len(self.pdb_temperatures) == 0 :
+                self.pdb_temperatures = list(
+                    np.arange(self.pdb_equil_start_temp, self.temperature,
+                            self.pdb_equil_temp_step))
+            
+            if self.pdb_temperatures [-1] != self.temperature:
+                self.pdb_temperatures.append(self.temperature)
+            self.ostream.print_info(
+                f"Set PDB equilibration temperatures to {self.pdb_temperatures}")
+
         self.ostream.flush()
 
         assert (
@@ -278,6 +294,8 @@ class EvbFepDriver():
             self.write_step == 0), "write_step must be a factor of sample_steps"
         assert (self.sample_steps >= 2 *
                 self.write_step), "sample_steps must be at least 2*write_step"
+
+
 
         self.total_snapshots = self.sample_steps / self.write_step * len(
             self.Lambda)
@@ -288,10 +306,24 @@ class EvbFepDriver():
         self.ostream.print_info(
             f"Ensemble info: Isobaric {self.isobaric}, Isothermal {self.isothermal}"
         )
+        self.total_steps = 0
+        self.run_steps = 0
+        self.total_steps += self.initial_equil_NVT_steps + (self.equil_NVT_steps + self.sample_steps)* len(self.Lambda)
+        if self.isobaric:
+            self.total_steps += self.initial_equil_NPT_steps + (self.equil_NPT_steps *
+                                                           len(self.Lambda))
+            
+        if self.pdb is not None:
+            self.total_steps += self.initial_equil_NVT_steps * len(self.pdb_temperatures)
+            if self.isobaric:
+                self.total_steps += self.initial_equil_NPT_steps * len(
+                    self.pdb_temperatures)
+
+
         self.ostream.print_info(info)
         self.ostream.flush()
 
-        timer = Timer(len(self.Lambda))
+        timer = Timer(self.total_steps)
 
         self.traj_roporter = mmapp.XTCReporter(
             str(self.data_folder / "trajectory.xtc"),
@@ -302,9 +334,8 @@ class EvbFepDriver():
         velocities = None
         for i, l in enumerate(self.Lambda):
             if l > 0:
-                estimated_time_remaining = timer.calculate_remaining(i)
-                time_estimate_str = ", " + timer.get_time_str(
-                    estimated_time_remaining)
+                estimated_time_remaining,elapsed_time = timer.calculate_remaining(self.run_steps)
+                time_estimate_str = ", " + timer.get_time_str(estimated_time_remaining,elapsed_time)
                 self.ostream.print_info(f"lambda = {l}" + time_estimate_str)
             else:
                 self.ostream.print_info(f"lambda = {l}")
@@ -361,27 +392,24 @@ class EvbFepDriver():
                 self._safe_step(simulation, self.initial_equil_NVT_steps,
                                 "initial equilibration")
         else:
-            temperatures = list(
-                np.arange(self.pdb_equil_start_temp, self.temperature,
-                          self.pdb_equil_temp_step))
-            temperatures.append(self.temperature)
             self.ostream.print_info(
-                f"Perfoming PDB warmup with T-vector {np.array(temperatures)}")
+                f"Perfoming PDB warmup with T-vector {np.array(self.pdb_temperatures)}")
             self.ostream.flush()
-            if self.isobaric:
-                barostat = self._get_barostat(simulation)
-                barostat.setFrequency(0)
-            for T in temperatures:
+            for T in self.pdb_temperatures:
                 simulation.integrator.setTemperature(T)
+
                 if self.isobaric:
+                    barostat = self._get_barostat(simulation)
+                    barostat.setFrequency(0)
                     self._safe_step(simulation, self.initial_equil_NVT_steps,
                                     f"PDB warmup NVT equilibration T = {T}")
-
-            if self.isobaric:
-                barostat.setFrequency(25)
-                simulation.integrator.setTemperature(T)
-                self._safe_step(simulation, self.initial_equil_NPT_steps,
-                                f"PDB warmup NPT equilibration T = {T}")
+                    barostat.setFrequency(25)
+                    self._safe_step(simulation, self.initial_equil_NPT_steps,
+                                    f"PDB warmup NPT equilibration T = {T}")
+                else:
+                    self._safe_step(simulation, self.initial_equil_NVT_steps,
+                                    f"PDB warmup NVT equilibration T = {T}")
+                                    
 
             self.ostream.print_info("Turning posres force off")
             simulation.context.setParameter('posres_k', 0)
@@ -438,7 +466,7 @@ class EvbFepDriver():
 
         sz = self.equil_step_size * mmunit.picoseconds
         simulation.integrator.setStepSize(sz)
-        self.ostream.print_info(f"Equilibration with step size {sz}")
+        # self.ostream.print_info(f"Equilibration with step size {sz}")
 
         equil_reporter = self._get_data_reporter(
             self.run_folder,
@@ -679,13 +707,19 @@ class EvbFepDriver():
 
     def _safe_step(self, simulation, steps, name=""):
         self.ostream.print_info(
-            f"Running {name} for {steps} steps, {steps*self.step_size} ps")
+            f"Running {name} for {steps} steps for total time: {steps*self.step_size} ps with step size {self.step_size} ps")
         self.ostream.flush()
         states = []
         potwarning = False
-        for i in range(steps):
+        if steps % self._safe_step_batch != 0:
+            self.ostream.print_warning(
+                f"Steps {steps} is not a multiple of safe step batch {self._safe_step_batch}, rounding down to {steps - steps % self._safe_step_batch}"
+            )
+            steps -= steps % self._safe_step_batch
+        for i in range(steps//self._safe_step_batch):
             try:
-                simulation.step(1)
+                self.run_steps += self._safe_step_batch
+                simulation.step(self._safe_step_batch)
             except Exception as e:
                 self.ostream.print_warning(
                     f"Error during simulation step {i}: {e}")
@@ -806,35 +840,50 @@ class EvbFepDriver():
 
 class Timer:
 
-    def __init__(self, total_iterations):
+    def __init__(self, total_steps):
         self.start_time = time.time()
-        self.total_iterations = total_iterations
+        self.total_steps = total_steps
         self.times = []
+        self.steps = []
+        self.step = 0
 
     def start(self):
         self.start_time = time.time()
 
-    def calculate_remaining(self, iteration):
+    def calculate_remaining(self, step):
         end_time = time.time()
+        self.step = step
+        self.steps.append(step)
         elapsed_time = end_time - self.start_time
 
         self.times.append(elapsed_time)
 
-        avg_time_per_iteration = sum(self.times) / len(self.times)
-        remaining_iterations = self.total_iterations - iteration
-        estimated_time_remaining = avg_time_per_iteration * remaining_iterations
+        avg_time_per_step = elapsed_time / step
+        # avg_time_per_step = sum(self.times) / len(self.times)
+        remaining_steps = self.total_steps - self.step
+        estimated_time_remaining = avg_time_per_step * remaining_steps
 
-        self.start_time = time.time()  # reset start time for next iteration
-        return estimated_time_remaining
+        self.start_time = time.time()  # reset start time for next step
+        return estimated_time_remaining,elapsed_time
 
-    def get_time_str(self, estimated_time_remaining):
+    def get_time_str(self, estimated_time_remaining, elapsed_time):
+
+        hours, minutes, seconds = self.convert_seconds(elapsed_time)
+        time_str = "elapsed time: "
+        if hours > 0:
+            time_str += f"{hours} hour(s), "
+        if minutes > 0:
+            time_str += f"{minutes} minute(s), "
+        time_str += f"{seconds} second(s), "
+
         hours, minutes, seconds = self.convert_seconds(estimated_time_remaining)
         time_str = "estimated time remaining: "
         if hours > 0:
-            time_str += "{} hour(s), ".format(hours)
+            time_str += f"{hours} hour(s), "
         if minutes > 0:
-            time_str += "{} minute(s), ".format(minutes)
-        time_str += "{} second(s)".format(seconds)
+            time_str += f"{minutes} minute(s), "
+        time_str += f"{seconds} second(s), "
+        time_str += f" (step {self.step} of {self.total_steps} total steps)"
         return time_str
 
     @staticmethod

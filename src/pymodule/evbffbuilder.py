@@ -102,7 +102,7 @@ class EvbForceFieldBuilder():
             reactant_total_multiplicity: int,
             product_total_multiplicity: int,
             ordered_input: bool = False,
-            breaking_bonds: set[tuple[int, int]]|tuple = set(),
+            breaking_bonds: set[tuple[int, int]] | tuple = set(),
     ):
 
         reactants: list[MMForceFieldGenerator] = []
@@ -143,7 +143,7 @@ class EvbForceFieldBuilder():
                 "Matching reactant and product force fields")
             self.ostream.flush()
             if isinstance(breaking_bonds, tuple):
-                breaking_bonds = {breaking_bonds} 
+                breaking_bonds = {breaking_bonds}
             self.product, product_mapping = self._match_reactant_and_product(
                 self.reactant, reamol.get_element_ids(), self.product,
                 promol.get_element_ids(), breaking_bonds)
@@ -280,12 +280,15 @@ class EvbForceFieldBuilder():
         self.ostream.print_info(
             "Guessing intra-molecular constraints based on breaking bonds. This option can be turned off with mm_opt_constrain_bonds."
         )
-        morse_expr = "D*(1-exp(-a*(r-re)))^2;"
+        morse_expr = "D*(1-exp(-a*(r-re)))^2 + b*(r-rb)/(1-exp(-k*(r-rb)));"
         morse_force = mm.CustomBondForce(morse_expr)
         morse_force.setName("Reaction morse bond")
         morse_force.addPerBondParameter("D")
         morse_force.addPerBondParameter("a")
         morse_force.addPerBondParameter("re")
+        morse_force.addPerBondParameter("b")
+        morse_force.addPerBondParameter("rb")
+        morse_force.addPerBondParameter("k")
 
         changing_atoms = []
         for bond in changing_bonds:
@@ -304,7 +307,10 @@ class EvbForceFieldBuilder():
             fc = 250000 * e  # force constant in kJ/mol/angstrom^2
             D = 500
             a = math.sqrt(fc / (2 * D))
-            morse_force.addBond(bond[0], bond[1], [D, a, rmin])
+            b = 100
+            rb = 3 * rmin
+            k = 100
+            morse_force.addBond(bond[0], bond[1], [D, a, rmin, b, rb, k])
             self.ostream.print_info(
                 f"Replacing nonbonded interaction for atoms {bond} with Morse bond  with r {rmin:.3f} and fc {fc:.3f} for MM equilibration of the {note}"
             )
@@ -342,7 +348,10 @@ class EvbForceFieldBuilder():
         reparameterize: bool,
         optimize: bool,
     ) -> MMForceFieldGenerator:
-
+        self.ostream.print_blank()
+        self.ostream.print_header(f"Building force field for {input['name']}")
+        self.ostream.print_blank()
+        self.ostream.flush()
         molecule = input["molecule"]
 
         # # If charges exist, load them into the forcefield object before creating the topology
@@ -359,11 +368,14 @@ class EvbForceFieldBuilder():
                 opt_drv.hessian = "last"
                 if self.mute_scf:
                     self.ostream.print_info("Optimising the geometry with xtb.")
+                    self.ostream.flush()
                     self.ostream.mute()
                 opt_results = opt_drv.compute(molecule)
                 self.ostream.unmute()
                 molecule = Molecule.from_xyz_string(
                     opt_results["final_geometry"])
+                molecule.set_charge(input["molecule"].get_charge())
+                molecule.set_multiplicity(input["molecule"].get_multiplicity())
 
             forcefield = MMForceFieldGenerator(ostream=self.ostream)
 
@@ -396,14 +408,14 @@ class EvbForceFieldBuilder():
                                                 "6-31G*",
                                                 ostream=None)
                 if molecule.get_multiplicity() == 1:
-                    scf_drv = ScfRestrictedDriver(ostream=self.ostream)
+                    scf_drv = ScfRestrictedDriver()
                 else:
-                    scf_drv = ScfUnrestrictedDriver(ostream=self.ostream)
+                    scf_drv = ScfUnrestrictedDriver()
 
                 if self.mute_scf:
+                    scf_drv.ostream.mute()
                     self.ostream.print_info("Calculating SCF for RESP charges")
                     self.ostream.flush()
-                    self.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
                     scf_drv.conv_thresh = 1.0e-4
@@ -411,16 +423,16 @@ class EvbForceFieldBuilder():
                     scf_results = scf_drv.compute(molecule, basis)
                 self.ostream.unmute()
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
-                resp_drv = RespChargesDriver(ostream=self.ostream)
+                resp_drv = RespChargesDriver()
                 self.ostream.flush()
                 if self.mute_scf:
+                    resp_drv.ostream.mute()
                     self.ostream.print_info("Calculating RESP charges")
                     self.ostream.flush()
-                    self.ostream.mute()
                 forcefield.partial_charges = resp_drv.compute(
                     molecule, basis, scf_results, 'resp')
-
-                self.ostream.unmute()
+                self.ostream.print_info(
+                    f"RESP charges: {forcefield.partial_charges}")
                 self.ostream.flush()
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(
@@ -452,12 +464,13 @@ class EvbForceFieldBuilder():
             ]
             if reparameterize and unknowns_params:
                 self.ostream.print_info("Reparameterising force field.")
-
+                self.ostream.flush()
                 if input["hessian"] is not None:
                     hessian = input["hessian"]
                 else:
                     xtb_drv = XtbDriver()
                     xtb_hessian_drv = XtbHessianDriver(xtb_drv)
+                    xtb_hessian_drv.ostream.mute()
                     self.ostream.flush()
                     xtb_hessian_drv.compute(molecule)
                     hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
@@ -515,14 +528,15 @@ class EvbForceFieldBuilder():
         forcefield.unique_atom_types = []
         forcefield.pairs = {}
 
-        for i, ff in enumerate(forcefields):
+        
+        for l, ff in enumerate(forcefields):
             # Shift all atom keys by the current atom count so that every atom has a unique ID
             shift = atom_count
             mapping = {atom_key: atom_key + shift for atom_key in ff.atoms}
             EvbForceFieldBuilder._apply_mapping_to_forcefield(ff, mapping)
             atom_count += len(ff.atoms)
             for atom in ff.atoms.values():
-                atom['name'] = f"{atom['name']}{i+1}"
+                atom['name'] = f"{atom['name']}{l+1}"
             forcefield.atoms.update(ff.atoms)
             forcefield.bonds.update(ff.bonds)
             forcefield.angles.update(ff.angles)
