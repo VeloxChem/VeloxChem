@@ -376,10 +376,10 @@ class EvbDriver():
             multiplicity), "Number of reactants and multiplicities must match"
 
         input = []
-        for rea, charge, mult,name in zip(filenames, charge, multiplicity, filenames):
+        for rea, charge, mult, name in zip(filenames, charge, multiplicity):
             input.append(self._get_input_files(rea))
             if input[-1]['molecule'] is not None:
-                self.ostream.print_info(f"Processing molecule input for {name}")
+                self.ostream.print_info(f"Processing molecule input for {rea}")
                 self.ostream.flush()
                 input[-1]['molecule'].set_charge(charge)
                 input[-1]['molecule'].set_multiplicity(mult)

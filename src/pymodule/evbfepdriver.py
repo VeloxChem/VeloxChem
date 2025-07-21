@@ -339,9 +339,7 @@ class EvbFepDriver():
         velocities = None
         for i, l in enumerate(self.Lambda):
             if l > 0:
-                estimated_time_remaining,elapsed_time = timer.calculate_remaining(self.run_steps)
-                time_estimate_str = ", " + timer.get_time_str(estimated_time_remaining,elapsed_time)
-                self.ostream.print_info(f"lambda = {l}" + time_estimate_str)
+                timer.print_time_str(self.run_steps, self.ostream,f"lambda = {l}")
             else:
                 self.ostream.print_info(f"lambda = {l}")
             system = systems[l]
@@ -855,6 +853,19 @@ class Timer:
     def start(self):
         self.start_time = time.time()
 
+    def print_time_str(self, step,ostream, message=""):
+        time_remaining, elapsed_time = self.calculate_remaining(step)
+        total_time = sum(self.times)
+        remain_str = self.get_time_str(time_remaining)
+        elapsed_str = self.get_time_str(elapsed_time)
+        total_elapsed_str = self.get_time_str(total_time)
+        print_str = f"Estimated remaining time: {remain_str}, elapsed time since last timing: {elapsed_str}, total elapsed time: {total_elapsed_str}"
+        if message:
+            print_str = f"{message} {print_str}"
+        print_str += f"(step {step} of {self.total_steps} total steps)"
+        ostream.print_info(print_str)
+        ostream.flush()
+
     def calculate_remaining(self, step):
         end_time = time.time()
         self.step = step
@@ -863,7 +874,7 @@ class Timer:
 
         self.times.append(elapsed_time)
 
-        avg_time_per_step = elapsed_time / step
+        avg_time_per_step = sum(self.times) / step
         # avg_time_per_step = sum(self.times) / len(self.times)
         remaining_steps = self.total_steps - self.step
         estimated_time_remaining = avg_time_per_step * remaining_steps
@@ -871,24 +882,15 @@ class Timer:
         self.start_time = time.time()  # reset start time for next step
         return estimated_time_remaining,elapsed_time
 
-    def get_time_str(self, estimated_time_remaining, elapsed_time):
+    def get_time_str(self, time):
 
-        hours, minutes, seconds = self.convert_seconds(elapsed_time)
-        time_str = "elapsed time: "
+        hours, minutes, seconds = self.convert_seconds(time)
+        time_str = ""
         if hours > 0:
             time_str += f"{hours} hour(s), "
         if minutes > 0:
             time_str += f"{minutes} minute(s), "
-        time_str += f"{seconds} second(s), "
-
-        hours, minutes, seconds = self.convert_seconds(estimated_time_remaining)
-        time_str = "estimated time remaining: "
-        if hours > 0:
-            time_str += f"{hours} hour(s), "
-        if minutes > 0:
-            time_str += f"{minutes} minute(s), "
-        time_str += f"{seconds} second(s), "
-        time_str += f" (step {self.step} of {self.total_steps} total steps)"
+        time_str += f"{seconds} second(s)"
         return time_str
 
     @staticmethod
