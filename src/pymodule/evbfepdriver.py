@@ -236,10 +236,17 @@ class EvbFepDriver():
         Lambda,
         configuration,
         platform,
+        platform_properties,
     ):
         #todo add this to the configuration keywords
 
         self.platform = platform
+        self.platform_properties = platform_properties
+        if self.platform is None and self.platform_properties is not None:
+            self.ostream.print_warning(
+                "Platform properties are set, but no platform is specified. Platform properties will be ignored."
+            )
+            self.platform_properties = None
 
         for keyword, value in self.keywords.items():
             if keyword in configuration:
@@ -295,10 +302,8 @@ class EvbFepDriver():
         assert (self.sample_steps >= 2 *
                 self.write_step), "sample_steps must be at least 2*write_step"
 
-
-
         self.total_snapshots = self.sample_steps / self.write_step * len(
-            self.Lambda)
+            self.Lambda)    
         self.ostream.print_info(f"Lambda: {np.array(self.Lambda)}")
         info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {self.equil_NVT_steps}, NPT equiliberation steps: {self.equil_NPT_steps}, total sample steps: {self.sample_steps}, write step: {self.write_step}, step size: {self.step_size}\n"
         info += f"Snapshots per lambda: {self.sample_steps / self.write_step}, snapshots to be recorded: {self.total_snapshots}\n"
@@ -600,22 +605,22 @@ class EvbFepDriver():
                 assert False, "NVT-integrator should be either 'langevin' or 'nose-hoover'"
         else:
             integrator = mm.VerletIntegrator(step_size)
-        # integrator.setIntegrationForceGroups(
-        #     EvbForceGroup.integration_force_groups())
 
         if self.platform is not None:
             simulation = mmapp.Simulation(
                 self.topology,
                 system,
                 integrator,
-                mm.Platform.getPlatformByName(self.platform),
-            )
+                platform = mm.Platform.getPlatformByName(self.platform),
+                platformProperties = self.platform_properties,
+            )       
         else:
             simulation = mmapp.Simulation(
                 self.topology,
                 system,
                 integrator,
             )
+
         return simulation
 
     def _get_data_reporter(

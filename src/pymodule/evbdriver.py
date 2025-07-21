@@ -807,6 +807,7 @@ class EvbDriver():
     def run_FEP(
         self,
         platform=None,
+        platform_properties=None,
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
 
@@ -829,6 +830,7 @@ class EvbDriver():
                 Lambda=self.Lambda,
                 configuration=conf,
                 platform=platform,
+                platform_properties=platform_properties,
             )
 
     def update_options_json(self, dict, conf):
