@@ -165,8 +165,8 @@ class RixsDriver:
         :return: 
             The scattering amplitude tensor: shape = (3,3)
         """
-        
-        e_n = 1 / (omega - (core_eigenvalue + 1j * self.gamma_hwhm))
+        gamma_hwhm = self.gamma / 2
+        e_n = 1 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
 
         if elastic:
             core_eigvals2 = core_eigenvalue**2
@@ -202,12 +202,12 @@ class RixsDriver:
             The scattering cross-section.
         """
         
+        # F_xy (F^(xy))^*
+        F2 = np.sum(np.abs(F)**2)
         # F_xy (F^(yx))^*
         FF_T_conj = np.sum(F * F.T.conjugate())
         # F_xx (F^(yy))^*
         trace_F2 = np.abs(np.trace(F))**2
-        # F_xy (F^(xy))^*
-        F2 = np.sum(np.abs(F)**2)
 
         sigma_f = omegaprime_omega * (1.0/15.0) * (
                     (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
@@ -216,7 +216,8 @@ class RixsDriver:
         return sigma_f
     
     def compute(self, molecule, basis, scf_tensors, 
-                rsp_tensors, cvs_rsp_tensors=None):
+                rsp_tensors, cvs_rsp_tensors=None,
+                cvs_scf_tensors=None):
         """
         Computes RIXS properties.
         
@@ -230,8 +231,13 @@ class RixsDriver:
         :rsp_tensors:
             The linear-response results dictionary.
         :cvs_rsp_tensors:
-            The core-valence-separated linear-response 
-            results dictionary
+            The core-valence-separated (CVS) linear-response 
+            results dictionary.
+        :cvs_scf_tensors:
+            The dictionary of tensors from converged CVS SCF 
+            wavefunction. If given -- assumes that the CVS response
+            was obtained from an independent SCF wavefunction.
+            
         NOTE: To run full diagonalization, do a restricted
               subspace calculation with the full space, 
               indicating which orbitals define the core.
@@ -246,6 +252,7 @@ class RixsDriver:
         nocc = molecule.number_of_alpha_electrons()
 
         self.twoshot = False
+        init_photon_set = True
         
         num_vir_orbitals  = rsp_tensors['num_vir']
 
@@ -256,12 +263,13 @@ class RixsDriver:
 
             num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
             num_final_states = len(rsp_tensors['eigenvalues'])
-            self.ostream.print_info('Running RIXS in the two-shot approach '\
-                                    f'with {num_intermediate_states} intermediate states')
 
             occupied_core = num_core_orbitals
             core_states = list(range(num_intermediate_states))
             val_states = list(range(num_final_states))
+
+            self.ostream.print_info('Running RIXS in the two-shot approach '\
+                                    f'with {num_intermediate_states} intermediate states.')
 
         else:
             num_core_orbitals = rsp_tensors['num_core']
@@ -278,7 +286,7 @@ class RixsDriver:
             detuning = rsp_tensors['eigenvalues'] - first_core_ene
             tol = 1e-10
             mask = (detuning >= -tol) & (detuning <= self.fulldiag_threshold)
-            #mask = (detuning >= 0) & (detuning <= self.fulldiag_threshold)
+
             init_core_states = np.where(mask)[0]
             core_states = []
             for state in init_core_states:
@@ -299,7 +307,9 @@ class RixsDriver:
 
             cvs_rsp_tensors = rsp_tensors
             occupied_core = num_core_orbitals + num_val_orbitals
-        
+
+            self.ostream.print_info(f'Running RIXS with {num_intermediate_states} intermediate states.')
+
         mo_core_indices = list(range(num_core_orbitals))
         mo_val_indices  = list(range(nocc - num_val_orbitals, nocc))
         mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
@@ -313,7 +323,18 @@ class RixsDriver:
         core_eigvecs    = self.get_eigvecs(cvs_rsp_tensors, core_states, "core")
         valence_eigvecs = self.get_eigvecs(rsp_tensors, val_states, "valence")
 
-        # For bookkeeping
+        # get transformation matrices from valence to core basis
+        # returns identity if cvs_scf_tensors are not given (None)
+        U_occ, U_vir = None, None
+        if cvs_scf_tensors is not None:
+            U_occ, U_vir = self.get_transformation_mats(scf_tensors, cvs_scf_tensors, 
+                                                    mo_core_indices + mo_val_indices, mo_vir_indices)
+        core_mats = self.preprocess_core_eigvecs(core_eigvecs, occupied_core,
+                                                 num_val_orbitals, num_vir_orbitals, U_occ, U_vir)
+        
+        dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+
+        # store state and orbital information used in computation
         self.orb_and_state_dict = {
             'num_intermediate_states': num_intermediate_states,
             'num_final_states': num_final_states,
@@ -325,6 +346,7 @@ class RixsDriver:
         }
         
         if self.photon_energy is None:
+            init_photon_set = False
             # assume first core resonance
             if cvs_rsp_tensors is None:
                 osc_arr = rsp_tensors['oscillator_strengths']
@@ -349,9 +371,6 @@ class RixsDriver:
             formatted_ev = ', '.join(f'{enes * hartree_in_ev():.2f}' for enes in self.photon_energy)
             self.ostream.print_info(f'Incoming photon energies: ({formatted_au}) a.u. = ({formatted_ev}) eV')
 
-        dipole_integrals = compute_electric_dipole_integrals(
-                molecule, basis, [0.0,0.0,0.0])
-
         ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
         emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
         cross_sections         = np.zeros((num_final_states, len(self.photon_energy)))
@@ -366,14 +385,26 @@ class RixsDriver:
                 F_inelastic = np.zeros((3,3), dtype=complex)
                 z_val, y_val = self.split_eigvec(valence_eigvecs[f], num_core_orbitals + num_val_orbitals,
                                             num_vir_orbitals, self.tda)
+                
+                # transform valence-vectors to core basis
+                #z_val = U_occ.T @ z_val @ U_vir
+                #y_val = U_occ.T @ y_val @ U_vir
                     
                 for n in range(num_intermediate_states):
+                    """
                     z_core, y_core = self.split_eigvec(core_eigvecs[n], occupied_core,
                                             num_vir_orbitals, self.tda)
+                    
                     if self.twoshot:
-                        z_core, y_core = self.pad_if_twoshot(z_core, y_core, num_val_orbitals)
+                        z_core, y_core = self.pad_matrices(z_core, y_core, num_val_orbitals)
 
-                    gs2core, core2val = self.build_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
+                    if cvs_scf_tensors is not None:
+                        z_core = U_occ.T @ z_core @ U_vir
+                        y_core = U_occ.T @ y_core @ U_vir
+                    """
+                    z_core, y_core = core_mats[n]
+
+                    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
                     
                     F_inelastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], valence_eigvals[f],
                                                                     gs2core, core2val, dipole_integrals)
@@ -392,6 +423,9 @@ class RixsDriver:
                 elastic_cross_sections[w_ind]   = sigma_elastic.real
                 cross_sections[f, w_ind] = sigma.real
                 scattering_amplitudes[f, w_ind] = F_inelastic
+            self.ostream.print_blank()
+            self.ostream.print_info(f'Computed RIXS cross-sections for {num_final_states} ' \
+                                    f'final states at photon energy: {omega*hartree_in_ev():.1f} eV.')
         
         results_dict = {
                     'cross_sections': cross_sections,
@@ -402,6 +436,9 @@ class RixsDriver:
                     'energy_losses': ene_losses,
                     'excitation_energies': core_eigvals,
                     }
+
+        if not init_photon_set:
+            self.photon_energy = None
 
         return results_dict
     
@@ -443,23 +480,95 @@ class RixsDriver:
             return None
     
     @staticmethod
-    def split_eigvec(eigvec, n_occ, n_vir, tda=False):
+    def split_eigvec(eigvec, nocc, nvir, tda=False):
+        """
+        Gets the excitation and deexcitation matrices 
+        from the eigenvectors. 
+        
+        :param eigvec:
+            The eigenvector from a response calculation,
+            either from TDA or RPA.
+        :param nocc:
+            Number of occupied orbitals.
+        :param nvir:
+            Number of virtual orbitals.
+        :param tda:
+            Flag for if the Tamm-Dancoff approximation is used.
+        
+        :return:
+            The excitation and deexcitation vectors
+            as matrices, in shape: (nocc, nvir).
+        """
         if tda:
-            z = eigvec.reshape(n_occ, n_vir)
+            z = eigvec.reshape(nocc, nvir)
             y = np.zeros_like(z)
         else:
             half = eigvec.shape[0] // 2
-            z = eigvec[:half].reshape(n_occ, n_vir)
-            y = eigvec[half:].reshape(n_occ, n_vir)
+            z = eigvec[:half].reshape(nocc, nvir)
+            y = eigvec[half:].reshape(nocc, nvir)
         return z, y
     
     @staticmethod
-    def pad_if_twoshot(z_mat, y_mat, pad_occ):
+    def pad_matrices(z_mat, y_mat, pad_occ):
+        """
+        Pad matrices (e.g., from a CVS computation) with zeros
+        to get them in full size.
+
+        :param z_mat:
+            The excitation matrix.
+        :param y_mat:
+            The deexcitation matrix.
+        :pad_occ:
+            The number of missing orbitals.
+
+        :return:
+            The padded, full-size matrices z and y.
+        """
         padding = ((0, pad_occ), (0, 0))
         return np.pad(z_mat, padding), np.pad(y_mat, padding)
     
+    def preprocess_core_eigvecs(self, core_eigvecs, occ_core,
+                                num_val_orbs, num_vir_orbs, U_occ=None, U_vir=None):
+        """
+        Split, optionally pad and transform core eigenvectors.
+        """
+        transformed = []
+
+        for vec in core_eigvecs:
+            z, y = self.split_eigvec(vec, occ_core,
+                                        num_vir_orbs, self.tda)
+            
+            if self.twoshot:
+                z, y = self.pad_matrices(z, y, num_val_orbs)
+
+            if U_occ is not None and U_vir is not None:
+                z = U_occ.T @ z @ U_vir
+                y = U_occ.T @ y @ U_vir
+
+            transformed.append((z, y))
+
+        return transformed
+    
     @staticmethod
-    def build_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core):
+    def get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core):
+        """
+        Get the transition density matrices, both from ground-state
+        to excited state, and between two excited states (here between)
+        core-excited and valence-excited states.
+
+        :param mo_occ:
+            The occupied molecular orbitals.
+        :param mo_vir:
+            The unoccupied/virtual molecular orbitals.
+        :z_val:
+            The excitation matrix (valence-excited state).
+        :y_val:
+            The dexcitation matrix (valence-excited state).
+        :z_core:
+            The excitation matrix (core-excited state).
+        :y_core:
+            The dexcitation matrix (core-excited state).
+        """
         gs_to_core = mo_occ @ (z_core - y_core) @ mo_vir.T
         gs_to_core *= np.sqrt(2)
 
@@ -470,5 +579,43 @@ class RixsDriver:
             np.linalg.multi_dot([mo_vir, y_val.T, y_core, mo_vir.T])
         )
         return gs_to_core, core_to_val
+
+    @staticmethod
+    def get_transformation_mats(target_scf_tensors, initial_scf_tensors, nocc, nvir):
+        """
+        Gets the transformation matrices of the excitation spaces between
+        two -- up-to a phase -- equal SCF wavefunctions, i.e.,
+        from "initial" space to "target" space.
+
+        :param target_scf_tensors:
+            SCF tensors of the target space.
+        :param initial_scf_tensors:
+            SCF tensors of the initial space.
+        :param nocc:
+            Number of occupied orbitals.
+        :param nvir:
+            Number of virtual orbitals.
+        
+        :return:
+            Transformation matrices for the occupied, U_occ, and
+            for the virtual, U_vir.
+        """
+        if initial_scf_tensors is None:
+            return np.eye(len(nocc)), np.eye(len(nvir))
+
+        S      = target_scf_tensors['S']
+        C_val  = target_scf_tensors['C_alpha']
+        C_core = initial_scf_tensors['C_alpha']
+
+        C_occ_val  = C_val[:, nocc]
+        C_vir_val  = C_val[:, nvir]
+        C_occ_core = C_core[:, nocc]
+        C_vir_core = C_core[:, nvir]
+
+        U_occ = C_occ_val.T @ S @ C_occ_core
+        U_vir = C_vir_val.T @ S @ C_vir_core
+
+        return U_occ, U_vir
+    
 
 
