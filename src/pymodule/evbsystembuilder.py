@@ -2217,10 +2217,14 @@ class EvbSystemBuilder():
                 )
         return bond_constraint, constant_force, angle_constraint, torsion_constraint
 
-    def _key_to_id(self, key: tuple[int, ...], atoms: dict) -> list[int]:
+    def _key_to_id(self, key: tuple[int, ...], atoms: dict | list) -> list[int] | None:
         for i in key:
-            if i not in atoms.keys():
-                return None
+            if isinstance(atoms, dict):
+                if i not in atoms.keys():
+                    return None
+            elif isinstance(atoms, list):
+                if i >= len(atoms):
+                    return None
 
         return [atoms[key[i]].index for i in range(len(key))]
 
