@@ -716,3 +716,209 @@ class TddftOrbitalResponse(CphfSolver):
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    # TODO: temporaryt solution to be able to calculate the non-eq gradient
+    # (skip CPCM contribution for the xpy and xmy, only contract the 1PDM)
+    def _comp_lr_fock(self,
+                      dens,
+                      molecule,
+                      basis,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None,
+                      comm=None):
+        """
+        Computes Fock/Fxc matrix (2e part) for linear response calculation.
+
+        :param dens:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param profiler:
+            The profiler.
+
+        :return:
+            The Fock matrix (2e part).
+        """
+
+        if comm is None:
+            comm = self.comm
+            redistribute_xc_molgrid = False
+        else:
+            # use subcommunicators
+            redistribute_xc_molgrid = True
+
+        comm_rank = comm.Get_rank()
+
+        screening = eri_dict['screening']
+
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
+        if comm_rank == mpi_master():
+            dof = len(self.state_deriv_index)
+            num_densities = len(dens)
+        else:
+            num_densities = None
+        num_densities = comm.bcast(num_densities, root=mpi_master())
+
+        if comm_rank != mpi_master():
+            dens = [None for idx in range(num_densities)]
+
+        for idx in range(num_densities):
+            dens[idx] = comm.bcast(dens[idx], root=mpi_master())
+
+        thresh_int = int(-math.log10(self.eri_thresh))
+
+        t0 = tm.time()
+
+        fock_drv = FockDriver(comm)
+        fock_drv._set_block_size_factor(self._block_size_factor)
+
+        # determine fock_type and exchange_scaling_factor
+        fock_type = '2jk'
+        exchange_scaling_factor = 1.0
+        if self._dft:
+            if self.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+
+        # further determine exchange_scaling_factor, erf_k_coef and omega
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
+
+        fock_arrays = []
+
+        for idx in range(num_densities):
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'TddftOrbitalResponse: RI is only applicable to pure DFT functional'
+                )
+
+            if self.ri_coulomb and fock_type == 'j':
+                # symmetrize density for RI-J
+                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
+
+                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+            else:
+                den_mat_for_fock = make_matrix(basis, mat_t.general)
+                den_mat_for_fock.set_values(dens[idx])
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
+
+            fock_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            if fock_type == 'j':
+                # for pure functional
+                fock_np *= 2.0
+
+            if need_omega:
+                # for range-separated functional
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            'kx_rs', erf_k_coef, omega,
+                                            thresh_int)
+
+                fock_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            fock_arrays.append(fock_np)
+
+        if profiler is not None:
+            profiler.add_timing_info('FockERI', tm.time() - t0)
+
+        if self._dft:
+            t0 = tm.time()
+
+            if redistribute_xc_molgrid:
+                molgrid.re_distribute_counts_and_displacements(
+                    comm.Get_rank(), comm.Get_size())
+
+            xc_drv = XCIntegrator()
+            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
+                                      gs_density, molgrid, self.xcfun)
+
+            if profiler is not None:
+                profiler.add_timing_info('FockXC', tm.time() - t0)
+
+        if self._pe:
+            t0 = tm.time()
+            for idx in range(num_densities):
+                # Note: only closed shell density for now
+                dm = dens[idx] * 2.0
+                V_emb = self._embedding_drv.compute_pe_contributions(
+                    density_matrix=dm)
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += V_emb
+
+            if profiler is not None:
+                profiler.add_timing_info('FockPE', tm.time() - t0)
+
+        if self._cpcm:
+
+            t0 = tm.time()
+
+            for idx in range(num_densities):
+                Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
+                                                   self._cpcm_grid,
+                                                   dens[idx] * 2.0)
+                if comm_rank == mpi_master():
+                    if self.non_equilibrium_solv:
+                        scale_f = -(self.cpcm_optical_epsilon - 1) / (
+                            self.cpcm_optical_epsilon + self.cpcm_drv.x)
+                    else:
+                        scale_f = -(self.cpcm_drv.epsilon - 1) / (
+                            self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                    rhs = scale_f * (Cvec)
+                else:
+                    rhs = None
+
+                rhs = self.comm.bcast(rhs, root=mpi_master())
+
+                cpcm_rsp_q = self.cpcm_drv.cg_solve_parallel_direct(
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
+                    rhs, None, self.cpcm_cg_thresh)
+
+                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
+                    molecule, basis, self._cpcm_grid, cpcm_rsp_q)
+
+                if comm_rank == mpi_master():
+                    if self.non_equilibrium_solv:
+                        if idx < dof:
+                            fock_arrays[idx] += Fock_sol
+                    else:
+                        fock_arrays[idx] += Fock_sol
+
+            if profiler is not None:
+                profiler.add_timing_info('FockCPCM', tm.time() - t0)
+
+        for idx in range(len(fock_arrays)):
+            fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
+
+        if comm_rank == mpi_master():
+            return fock_arrays
+        else:
+            return None
+
