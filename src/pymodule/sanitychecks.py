@@ -135,6 +135,33 @@ def scf_results_sanity_check(obj, scf_results):
             obj.ostream.flush()
 
 
+def rsp_results_solvation_sanity_check(obj, rsp_results):
+    """
+    Checks response results for C-PCM information.
+
+    :param obj:
+        The object (TDDFT orbital response driver) that is being updated.
+    :param rsp_results:
+        A dictionary containing the linear response results.
+    """
+
+    updated_rsp_info = {}
+
+    if obj.rank == mpi_master():
+        if rsp_results.get('solvation_model', None) is not None:
+            if hasattr(obj, 'solvation_model'):
+                for key in [
+                        'solvation_model',
+                        'cpcm_optical_epsilon',
+                        'non_equilibrium_solv',
+                ]:
+                    updated_rsp_info[key] = rsp_results[key]
+
+    updated_rsp_info = obj.comm.bcast(updated_rsp_info, root=mpi_master())
+
+    for key, val in updated_rsp_info.items():
+        setattr(obj, key, val)
+
 def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
     """
     Checks DFT settings and updates relevant attributes.

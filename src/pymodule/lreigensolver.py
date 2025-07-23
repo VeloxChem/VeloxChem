@@ -764,6 +764,12 @@ class LinearResponseEigenSolver(LinearSolver):
                         'number_of_states': self.nstates,
                     }
 
+                    # save C-PCM response settings (needed in tddftgradientdriver)
+                    if self._cpcm:
+                        ret_dict['solvation_model'] = self.solvation_model
+                        ret_dict['cpcm_optical_epsilon'] = self.cpcm_optical_epsilon
+                        ret_dict['non_equilibrium_solv'] = self.non_equilibrium_solv
+
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
                         if self.nto_cubes:

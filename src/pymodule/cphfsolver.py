@@ -43,7 +43,8 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check,
+                           rsp_results_solvation_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
@@ -392,12 +393,6 @@ class CphfSolver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        if self.rank == mpi_master():
-            if self._dft:
-                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
-            else:
-                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
-
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -436,6 +431,13 @@ class CphfSolver(LinearSolver):
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, *args)
+
+        # Print after sanity checks in compute_rhs
+        if self.rank == mpi_master():
+            if self._dft:
+                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
+            else:
+                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         dist_rhs = cphf_rhs_dict['dist_cphf_rhs']
         dof = len(dist_rhs)
@@ -1071,12 +1073,6 @@ class CphfSolver(LinearSolver):
         # check solvation setup
         solvation_model_sanity_check(self)
 
-        if self.rank == mpi_master():
-            if self._dft:
-                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
-            else:
-                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
-
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -1115,6 +1111,13 @@ class CphfSolver(LinearSolver):
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, *args)
+
+        # Print after sanity checks in compute_rhs
+        if self.rank == mpi_master():
+            if self._dft:
+                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
+            else:
+                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         if self.rank == mpi_master():
             list_rhs = []

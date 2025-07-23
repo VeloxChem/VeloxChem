@@ -31,7 +31,8 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import time
+import time as tm
+import math
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import XCIntegrator
@@ -42,7 +43,16 @@ from .dftutils import get_default_grid_level
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check,
+                           rsp_results_solvation_sanity_check)
+
+# Temporary for comp_lr_fock
+from .veloxchemlib import make_matrix, mat_t
+from .matrix import Matrix
+from .distributedarray import DistributedArray
+from .subcommunicators import SubCommunicators
+from .rifockdriver import RIFockDriver
+from .fockdriver import FockDriver
 
 
 class TddftOrbitalResponse(CphfSolver):
@@ -167,6 +177,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         # check solvation setup
         solvation_model_sanity_check(self)
+        rsp_results_solvation_sanity_check(self, rsp_results)
 
         # TODO: replace with a sanity check?
         if 'eigenvectors' in rsp_results:
@@ -196,7 +207,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.set_timing_key('RHS')
 
-        rhs_t0 = time.time()
+        rhs_t0 = tm.time()
 
         self.ostream.print_info(
             "Computing the right-hand side (RHS) of CPHF/CPKS equations...")
@@ -435,7 +446,7 @@ class TddftOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         self.ostream.print_info("RHS of CPHF/CPKS equations computed in " +
-                                f"{time.time() - rhs_t0:.2f} sec.")
+                                f"{tm.time() - rhs_t0:.2f} sec.")
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -480,7 +491,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.set_timing_key('Omega')
 
-        omega_t0 = time.time()
+        omega_t0 = tm.time()
 
         self.ostream.print_info("Computing the omega Lagrange multipliers...")
         self.ostream.print_blank()
@@ -669,7 +680,7 @@ class TddftOrbitalResponse(CphfSolver):
         profiler.print_profiling_summary(self.ostream)
 
         self.ostream.print_info("The omega Lagrange multipliers computed in " +
-                                f"{time.time() - omega_t0:.2f} sec.")
+                                f"{tm.time() - omega_t0:.2f} sec.")
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -713,6 +724,27 @@ class TddftOrbitalResponse(CphfSolver):
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._cpcm:
+            cur_str = 'Solvation Model                 : '
+            cur_str += 'C-PCM'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per Hydrogen Sphere: '
+            cur_str += f'{self.cpcm_grid_per_sphere[1]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per non-H Sphere   : '
+            cur_str += f'{self.cpcm_grid_per_sphere[0]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Non-Equilibrium solvation       : '
+            cur_str += f'{self.non_equilibrium_solv}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Dielectric Constant       : '
+            cur_str += f'{self.cpcm_epsilon}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            if self.non_equilibrium_solv:
+                cur_str = 'C-PCM Optical Dielectric Const. : '
+                cur_str += f'{self.cpcm_optical_epsilon}'
+                self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()

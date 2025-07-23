@@ -1724,7 +1724,7 @@ class LinearSolver:
             cur_str += f'{self.cpcm_epsilon}'
             self.ostream.print_header(cur_str.ljust(str_width))
             if self.non_equilibrium_solv:
-                cur_str = 'C-PCM Optical Dielectric Constant: '
+                cur_str = 'C-PCM Optical Dielectric Const. : '
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
 
