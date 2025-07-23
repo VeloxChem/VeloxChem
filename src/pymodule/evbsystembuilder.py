@@ -114,8 +114,11 @@ class EvbSystemBuilder():
         self.E_field: list[float] = [0, 0, 0]
         self.neutralize: bool = False
 
-        self.soft_core_coulomb_pes = True
-        self.soft_core_lj_pes = True
+        self.soft_core_coulomb_pes_static = False
+        self.soft_core_lj_pes_static = False
+
+        self.soft_core_coulomb_pes_dynamic = True
+        self.soft_core_lj_pes_dynamic = True
 
         self.soft_core_coulomb_int = False
         self.soft_core_lj_int = False
@@ -173,10 +176,16 @@ class EvbSystemBuilder():
             "torsion_lambda_switch": {
                 "type": float
             },
-            "soft_core_coulomb_pes": {
+            "soft_core_coulomb_pes_static": {
                 "type": bool
             },
-            "soft_core_lj_pes": {
+            "soft_core_lj_pes_static": {
+                "type": bool
+            },
+            "soft_core_coulomb_pes_dynamic": {
+                "type": bool
+            },
+            "soft_core_lj_pes_dynamic": {
                 "type": bool
             },
             "soft_core_coulomb_int": {
@@ -1325,42 +1334,66 @@ class EvbSystemBuilder():
         torsion = self._create_proper_torsion_forces(lam)
         improper = self._create_improper_torsion_forces(lam)
 
-        if pes:
-            sclj = self.soft_core_lj_pes
-            sccoul = self.soft_core_coulomb_pes
+        # if pes:
+        #     sclj = self.soft_core_lj_pes_dynamic
+        #     sccoul = self.soft_core_coulomb_pes_dynamic
+        #     syslj, syscoul = self._create_nonbonded_forces(
+        #         lam,
+        #         merge_exceptions=False,
+        #         broken_exceptions=False,
+        #         lj_soft_core=sclj,
+        #         coul_soft_core=sccoul,
+        #     )
+        # else:
+        #     sclj = self.soft_core_lj_int
+        #     sccoul = self.soft_core_coulomb_int
+        #     syslj, syscoul = self._create_nonbonded_forces(
+        #         lam,
+        #         broken_exceptions=True,
+        #         lj_soft_core=sclj,
+        #         coul_soft_core=sccoul,
+        #     )
+        # system.addForce(syslj)
+        # system.addForce(syscoul)
+        if not pes:
+            syslj, syscoul = self._create_nonbonded_forces(
+                lam,
+                lj_soft_core=self.soft_core_lj_int,
+                coul_soft_core=self.soft_core_coulomb_int,
+                broken_exceptions=True,
+            )
+            syslj.setForceGroup(EvbForceGroup.SYSLJ_STATIC.value)
+            syscoul.setForceGroup(EvbForceGroup.SYSCOUL_STATIC.value)
+            system.addForce(syslj)
+            system.addForce(syscoul)
         else:
-            sclj = self.soft_core_lj_int
-            sccoul = self.soft_core_coulomb_int
-        syslj, syscoul = self._create_nonbonded_forces(
-            lam,
-            merge_exceptions=False,
-            broken_exceptions=True,
-            lj_soft_core=sclj,
-            coul_soft_core=sccoul,
-        )
+            syslj_static, syscoul_static = self._create_nonbonded_forces(
+                lam,
+                lj_soft_core=self.soft_core_lj_pes_static,
+                coul_soft_core=self.soft_core_coulomb_pes_static,
+                exclude_changing_bonds=True,
+            )
+            syslj_static.setForceGroup(EvbForceGroup.SYSLJ_STATIC.value)
+            syscoul_static.setForceGroup(EvbForceGroup.SYSCOUL_STATIC.value)
+            syslj_static.setName('Reaction internal LJ static')
+            syscoul_static.setName('Reaction internal Coul static')
+            system.addForce(syslj_static)
+            system.addForce(syscoul_static)
+            syslj_dynamic, syscoul_dynamic = self._create_nonbonded_forces(
+                lam,
+                lj_soft_core=self.soft_core_lj_pes_dynamic,
+                coul_soft_core=self.soft_core_coulomb_pes_dynamic,
+                only_changing_bonds=True,
+            )
+            syslj_dynamic.setForceGroup(EvbForceGroup.SYSLJ_DYNAMIC.value)
+            syscoul_dynamic.setForceGroup(EvbForceGroup.SYSCOUL_DYNAMIC.value)
+            syslj_dynamic.setName('Reaction internal LJ dynamic')
+            syscoul_dynamic.setName('Reaction internal Coul dynamic')
+            system.addForce(syslj_dynamic)
+            system.addForce(syscoul_dynamic)
 
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
-
-        if not self.no_force_groups:
-            static_bonded_harmonic.setForceGroup(
-                EvbForceGroup.REA_HARM_BOND_STATIC.value)
-            dynamic_bonded_harmonic.setForceGroup(
-                EvbForceGroup.REA_HARM_BOND_DYNAMIC.value)
-            angle.setForceGroup(EvbForceGroup.REA_ANGLE.value)
-            torsion.setForceGroup(EvbForceGroup.REA_TORSION.value)
-            improper.setForceGroup(EvbForceGroup.REA_IMP.value)
-
-            bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
-            constant_force.setForceGroup(EvbForceGroup.CONSTRAINT.value)
-            angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
-            torsion_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
-
-            syslj.setForceGroup(EvbForceGroup.SYSLJ.value)
-            syscoul.setForceGroup(EvbForceGroup.SYSCOUL.value)
-
-            morse.setForceGroup(EvbForceGroup.REA_MORSE_BOND.value)
-
         if not pes:
             system.addForce(dynamic_bonded_harmonic)
         else:
@@ -1369,8 +1402,6 @@ class EvbSystemBuilder():
         system.addForce(angle)
         system.addForce(torsion)
         system.addForce(improper)
-        system.addForce(syslj)
-        system.addForce(syscoul)
         system.addForce(bond_constraint)
         system.addForce(constant_force)
         system.addForce(angle_constraint)
@@ -1528,14 +1559,15 @@ class EvbSystemBuilder():
 
         harmonic_force = mm.HarmonicBondForce()
         harmonic_force.setName("Static reaction harmonic bond")
+        if not self.no_force_groups:
+            harmonic_force.setForceGroup(
+                EvbForceGroup.REA_HARM_BOND_STATIC.value)
 
         bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
         for key in bond_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
                 continue
-            eq = 0
-            fc = 0
             if key in self.reactant.bonds and key in self.product.bonds:
                 bondA = self.reactant.bonds[key]
                 fcA = bondA['force_constant']
@@ -1546,7 +1578,6 @@ class EvbSystemBuilder():
                 eq = eqA * (1 - lam) + eqB * lam
                 fc = fcA * (1 - lam) + fcB * lam
                 self._add_bond(harmonic_force, atom_ids, eq, fc)
-
         return harmonic_force
 
     def _create_dynamic_harmonic_bond_forces(self, lam):
@@ -1557,6 +1588,9 @@ class EvbSystemBuilder():
         harmonic_force = mm.HarmonicBondForce()
         harmonic_force.setName("Dynamic reaction harmonic bond")
         bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
+        if not self.no_force_groups:
+            harmonic_force.setForceGroup(
+                EvbForceGroup.REA_HARM_BOND_DYNAMIC.value)
         for key in bond_keys:
             atom_ids = self._key_to_id(key, self.reaction_atoms)
             fcA = fcB = 0
@@ -1566,9 +1600,6 @@ class EvbSystemBuilder():
                 fcA = bondA['force_constant']
                 eqA = bondA['equilibrium']
 
-                # coords = self.product.molecule.get_coordinates_in_angstrom()
-                # eqB = self.measure_length(coords[key[0]],
-                #                             coords[key[1]]) * 0.1
                 s1 = self.product.atoms[key[0]]['sigma']
                 s2 = self.product.atoms[key[1]]['sigma']
                 eqB = 0.5 * (s1 + s2)
@@ -1579,10 +1610,6 @@ class EvbSystemBuilder():
                 fcB = bondB['force_constant']
                 eqB = bondB['equilibrium']
 
-                # coords = self.reactant.molecule.get_coordinates_in_angstrom(
-                # )
-                # eqA = self.measure_length(coords[key[0]],
-                #                             coords[key[1]]) * 0.1
                 s1 = self.product.atoms[key[0]]['sigma']
                 s2 = self.product.atoms[key[1]]['sigma']
                 eqA = 0.5 * (s1 + s2)
@@ -1601,6 +1628,8 @@ class EvbSystemBuilder():
         morse_force.addPerBondParameter("D")
         morse_force.addPerBondParameter("a")
         morse_force.addPerBondParameter("re")
+        if not self.no_force_groups:
+            morse_force.setForceGroup(EvbForceGroup.REA_MORSE_BOND.value)
 
         bond_keys = list(set(self.reactant.bonds) | set(self.product.bonds))
 
@@ -1654,6 +1683,8 @@ class EvbSystemBuilder():
 
         harmonic_force = mm.HarmonicAngleForce()
         harmonic_force.setName("Reaction angle")
+        if not self.no_force_groups:
+            harmonic_force.setForceGroup(EvbForceGroup.REA_ANGLE.value)
 
         angle_keys = list(set(self.reactant.angles) | set(self.product.angles))
         for key in angle_keys:
@@ -1717,6 +1748,8 @@ class EvbSystemBuilder():
 
         fourier_force = mm.PeriodicTorsionForce()
         fourier_force.setName("Reaction proper fourier torsion")
+        if not self.no_force_groups:
+            fourier_force.setForceGroup(EvbForceGroup.REA_TORSION.value)
 
         dihedral_keys = list(
             set(self.reactant.dihedrals) | set(self.product.dihedrals))
@@ -1766,6 +1799,8 @@ class EvbSystemBuilder():
 
         fourier_force = mm.PeriodicTorsionForce()
         fourier_force.setName("Reaction improper fourier torsion")
+        if not self.no_force_groups:
+            fourier_force.setForceGroup(EvbForceGroup.REA_IMP.value)
 
         dihedral_keys = list(
             set(self.reactant.impropers) | set(self.product.impropers))
@@ -1968,13 +2003,18 @@ class EvbSystemBuilder():
     # This causes all exceptdions to be constant. This will include constant 1-4 interactions between atoms that bonded in either the reactant or the product, but not in the other.
 
     # Broken exceptions will add exceptions for bonds that are changing between the reactant and product.
-    # This is weaker then merge_exceptions, as it will not include 1-4 interactions between atoms that are not bonded, evn if they are bonded on the other side of the reaction.
+    # This is weaker then merge_exceptions, as it will not include 1-4 interactions between atoms that are not bonded, even if they are bonded on the other side of the reaction.
+    # This is used to remove the nonbonded interactions that are modelled by other forces
+
+    # Turning both off gives the proper reactant or product for lam=0 or 1
     def _create_nonbonded_forces(self,
                                  lam,
                                  merge_exceptions=False,
                                  broken_exceptions=False,
                                  lj_soft_core=False,
-                                 coul_soft_core=False):
+                                 coul_soft_core=False,
+                                 only_changing_bonds=False,
+                                 exclude_changing_bonds=False,):
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
@@ -2014,18 +2054,29 @@ class EvbSystemBuilder():
         product_exceptions = self._create_exceptions_from_bonds(
             self.product.atoms, product_bonds)
 
-        if broken_exceptions:
-            changing_bonds = list(
-                (set(self.reactant.bonds) ^ set(self.product.bonds)))
+        changing_bonds = list(
+            (set(self.reactant.bonds) ^ set(self.product.bonds)))
+        
+        atom_keys = self.reactant.atoms.keys()
+
 
         #Loop over all atoms, and check if their id's are part of any exceptions
-        for i in self.reactant.atoms.keys():
-            for j in self.reactant.atoms.keys():
+        for i in atom_keys:
+            for j in atom_keys:
                 if i < j:
                     key = (i, j)
                     atom_ids = self._key_to_id(key, self.reaction_atoms)
                     if atom_ids is None:
                         continue
+
+                    if only_changing_bonds and key not in changing_bonds:
+                        continue
+                    if exclude_changing_bonds and key in changing_bonds:
+                        continue
+
+                    if broken_exceptions:
+                        if key in changing_bonds:
+                            continue
                     # Remove any exception from the nonbondedforce
                     # and add it instead to the exception bond force
                     if key in reactant_exceptions.keys():
@@ -2058,18 +2109,6 @@ class EvbSystemBuilder():
                     elif sigmaB == 1.0:
                         sigmaB = sigmaA
 
-                    if broken_exceptions:
-                        if key in changing_bonds:
-                            # self.ostream.print_info(
-                            #     f"Bond {key} is changing, setting NB parameters to 0"
-                            # )
-                            # If the bond is changing, we set the parameters to 0
-                            qqA = 0.0
-                            qqB = 0.0
-                            sigmaA = 1.0
-                            sigmaB = 1.0
-                            epsilonA = 0.0
-                            epsilonB = 0.0
                     if not (qqA == 0.0 and qqB == 0.0):
                         coulomb_force.addBond(
                             atom_ids[0],
@@ -2160,6 +2199,12 @@ class EvbSystemBuilder():
         torsion_constraint.setName("Harmonic torsion constraint")
         torsion_constraint.addPerTorsionParameter("theta0")
         torsion_constraint.addPerTorsionParameter("k")
+        if not self.no_force_groups:
+            bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+            constant_force.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+            angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+            torsion_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+
         if len(self.constraints) > 0:
             if self.verbose:
                 self.ostream.print_info(
@@ -2261,8 +2306,10 @@ class EvbForceGroup(Enum):
     DEFAULT = auto(
     )  # Default force group, included for both integration and energy calculations
     # THERMOSTAT = auto()  # Thermostat
-    SYSLJ = auto()  # Integration lennard-jones potential
-    SYSCOUL = auto()  # Integration coulombic potential
+    SYSLJ_STATIC = auto()  # Integration lennard-jones potential
+    SYSCOUL_STATIC = auto()  # Integration coulombic potential
+    SYSLJ_DYNAMIC = auto()  # Dynamic lennard-jones potential
+    SYSCOUL_DYNAMIC = auto()  # Dynamic coulombic potential
     CONSTRAINT = auto()
 
     CMM_REMOVER = auto()  # Center of mass motion remover
