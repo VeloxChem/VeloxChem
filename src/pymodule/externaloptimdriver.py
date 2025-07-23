@@ -92,6 +92,8 @@ class ExternalOptimDriver:
         self.final_opt_structure_filename = 'current_input_opt.xyz'
         self.input_files.append(self.input_filename)
         self.output_files.append(self.output_structure_filename)
+
+        self.solvation = qm_driver.solvation
         
         self.jobscript = 'jobscript'
         self.program = qm_driver.program
@@ -399,7 +401,10 @@ conda activate vlxenv_simd_master
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
 
                 with open(input_file, 'w') as file:
-                    file.write(f'!{self.method} {self.xc_func} {self.basis_set_label} OPT\n')
+                    if self.solvation[0] is True:
+                        file.write(f'!{self.method} {self.xc_func} {self.basis_set_label} OPT {self.solvation[1]}({self.solvation[2]})\n')
+                    else:
+                        file.write(f'!{self.method} {self.xc_func} {self.basis_set_label} OPT\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')

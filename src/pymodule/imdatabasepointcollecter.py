@@ -106,6 +106,35 @@ def _worker_error_func(mol, qm_e_i, alphas, z_matrix,
 
     return sum_sq_error
 
+def _worker_error_func_grad(mol, qm_e_i, qm_grad_i, alphas, z_matrix,
+             dps, impes_dict, sym_datapoints, sym_dict, e_x):
+    """
+    Compute the contribution to dF_dalphas from a single molecule.
+    Assumes that each dp.confidence_radius has already been set to alphas.
+    """
+    # Reconstruct the driver
+    interpolation_driver = InterpolationDriver(z_matrix)
+    interpolation_driver.update_settings(impes_dict)
+    interpolation_driver.symmetry_information = sym_dict
+    interpolation_driver.qm_symmetry_data_points = sym_datapoints
+    interpolation_driver.distance_thrsh = 1000
+    interpolation_driver.exponent_p = 2
+    interpolation_driver.qm_data_points = dps
+    # Run the interpolation
+    interpolation_driver.compute(mol)
+
+    new_im_energy = interpolation_driver.get_energy()
+    new_im_gradient = interpolation_driver.get_gradient()
+    diff_e_kcal = (new_im_energy - qm_e_i) 
+    diff_g_kcal = (new_im_gradient - qm_grad_i) 
+    cos_theta = np.dot(qm_grad_i.ravel(), new_im_gradient.ravel()) / (np.linalg.norm(qm_grad_i) * np.linalg.norm(new_im_gradient))
+    
+    if (np.linalg.norm(qm_grad_i) * np.linalg.norm(new_im_gradient)) < 1e-5:                    # 'zero-vector' branch
+        cos_theta   = 1.0
+    diff = e_x * (diff_e_kcal)**2 + (1.0 - e_x) * (diff_g_kcal**2).mean() + (1 - cos_theta)
+    sum_sq_error += (diff)
+    return sum_sq_error
+
 def _worker_gradient(mol, qm_e_i, alphas, z_matrix,
              dps, impes_dict, sym_datapoints, sym_dict):
     """
@@ -137,6 +166,85 @@ def _worker_gradient(mol, qm_e_i, alphas, z_matrix,
         # ∂F/∂α_j contribution
         dF_loc[j] = 2.0 * diff * dE_dalpha
     return dF_loc
+
+def _worker_gradient_grad(mol, qm_e_i, qm_grad_i, alphas, z_matrix,
+             dps, impes_dict, sym_datapoints, sym_dict, e_x):
+    """
+    Compute the contribution to dF_dalphas from a single molecule.
+    Assumes that each dp.confidence_radius has already been set to alphas.
+    """
+    # Reconstruct the driver
+    natms = len(mol.get_labels())
+    interpolation_driver = InterpolationDriver(z_matrix)
+    interpolation_driver.update_settings(impes_dict)
+    interpolation_driver.symmetry_information = sym_dict
+    interpolation_driver.qm_symmetry_data_points = sym_datapoints
+    interpolation_driver.distance_thrsh = 1000
+    interpolation_driver.exponent_p = 2
+    interpolation_driver.qm_data_points = dps
+    # Run the interpolation
+    interpolation_driver.compute(mol)
+    E_hat = interpolation_driver.get_energy()
+    G_hat = interpolation_driver.get_gradient()
+    hart2kcal = hartree_in_kcalpermol()
+    
+    S = interpolation_driver.sum_of_weights
+    S_prime = interpolation_driver.sum_of_weights_grad
+    # Build this molecule’s partial gradient
+    n = len(dps)
+    dF_loc = np.empty(n, dtype=float)
+    dE_res = (E_hat - qm_e_i)          # kcal already
+    dG_res = (G_hat - qm_grad_i)    # (natms,3)
+    sum_of_weight_grad_num = np.zeros_like(mol.get_coordinates_in_bohr())
+    sum_of_weight_grad = np.zeros_like(mol.get_coordinates_in_bohr())
+    # print('DPS', len(dps), i)
+
+    for j, dp in enumerate(dps[:]):
+        
+        # num_weight_prime, num_Gj, num_dwprime_dalpha = fd_dp(interpolation_driver, mol, dp)
+        # anal_grad_weight = interpolation_driver.shepard_weight_gradient_test(dp.confidence_radius, dp)
+
+  
+        # print('weight_prime', anal_grad_weight, num_weight_prime, anal_grad_weight - num_weight_prime)
+        
+        # sum_of_weight_grad += anal_grad_weight
+        # sum_of_weight_grad_num += num_weight_prime
+               
+        dw        = interpolation_driver.trust_radius_weight_gradient(dp)          # scalar
+        dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient(dp) # (natms,3)
+
+        # print('dwprime_dalpha', num_dwprime_dalpha, dw_prime, num_dwprime_dalpha - dw_prime)
+        P_j  = interpolation_driver.potentials[j]             # kcal
+        G_j  = interpolation_driver.gradients[j]             # (natms,3)
+        # print('G_j', G_j, num_Gj, G_j - num_Gj)
+        
+        # ---- derivative of gradient wrt α_j --------------------------
+        term1 = dw_prime * (P_j - E_hat) / S              # (natms,3)
+        term2 = dw       * (G_j - G_hat) / S            # (natms,3)
+        term3 = dw       * (P_j - E_hat) * S_prime / S**2 # (natms,3)  MINUS sign later
+        dG_dα = (term1 + term2 - term3) 
+
+        dot_G = np.tensordot(dG_res, dG_dα, axes=((0,1),(0,1)))  # scalar
+
+        dE_dα = dw * (P_j - E_hat) / S                    # scalar
+
+        norm_res   = np.linalg.norm(dG_res)
+        norm_dGdα  = np.linalg.norm(dG_dα)
+        
+                         # scalar
+        # dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G
+        if (np.linalg.norm(qm_grad_i) * np.linalg.norm(G_hat)) < 1e-5:
+            dF_loc[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + 0.0
+        else:
+            dF_loc[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + dot_G / (norm_res * norm_dGdα)
+
+        # dF_dalphas[j] += 2*e_x    * dE_res * dE_dα \
+        #             + 1 /(natms * 3) * 2*(1-e_x)* dot_G
+    
+    
+    
+    return dF_loc
+
 
 class IMDatabasePointCollecter:
     """
@@ -3244,26 +3352,27 @@ class IMDatabasePointCollecter:
     
     def determine_trust_radius_gradient(self, molecules, qm_energies, qm_gradients, im_energies, datapoints, interpolation_setting, sym_datapoints, sym_dict):
 
-        def obj_energy_function_parallel(alphas, structure_list, qm_e, im_e, dps, impes_dict, sym_datapoints, sym_dict):
+        def obj_energy_function_parallel_gradient(alphas, structure_list, qm_e, qm_grad, im_e, dps, impes_dict, sym_datapoints, sym_dict):
                 
             for alpha, dp in zip(alphas, dps):
                 dp.confidence_radius = alpha
 
             # 2) Prepare the worker with all constant arguments baked in
-            worker = partial(_worker_error_func,
+            worker = partial(_worker_error_func_grad,
                             alphas=alphas,
                             z_matrix=self.z_matrix,
                             dps=dps,
                             impes_dict=impes_dict,
                             sym_datapoints=sym_datapoints,
-                            sym_dict=sym_dict)
+                            sym_dict=sym_dict,
+                            e_x=self.use_opt_confidence_radius[3])
 
             # 3) Launch a process pool
             sum_sq_error = 0
             with ProcessPoolExecutor() as executor:
                 futures = []
-                for mol, qe in zip(structure_list, qm_e):
-                    futures.append(executor.submit(worker, mol, qe))
+                for mol, qe, qgrad in zip(structure_list, qm_e, qm_grad):
+                    futures.append(executor.submit(worker, mol, qe, qgrad))
 
                 # 4) As each worker finishes, accumulate its contribution
                 for fut in as_completed(futures):
@@ -3385,16 +3494,17 @@ class IMDatabasePointCollecter:
                     else:
                         dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + dot_G / (norm_res * norm_dGdα)
 
-                    dF_dalphas[j] += 2*e_x    * dE_res * dE_dα \
-                                + 1 /(natms * 3) * 2*(1-e_x)* dot_G
+                    # dF_dalphas[j] += 2*e_x    * dE_res * dE_dα \
+                    #             + 1 /(natms * 3) * 2*(1-e_x)* dot_G
   
                 # print(sum_of_weight_grad, sum_of_weight_grad_num, S)
             return dF_dalphas
 
                         
-        def obj_gradient_function_parallel(alphas,
+        def obj_gradient_function_parallel_gradient(alphas,
                                    structure_list,
                                    qm_e,
+                                   qm_grad,
                                    im_e,       # unused in original? but kept for signature
                                    dps,
                                    impes_dict,
@@ -3405,21 +3515,22 @@ class IMDatabasePointCollecter:
                 dp.confidence_radius = alpha
 
             # 2) Prepare the worker with all constant arguments baked in
-            worker = partial(_worker_gradient,
+            worker = partial(_worker_gradient_grad,
                             alphas=alphas,
                             z_matrix=self.z_matrix,
                             dps=dps,
                             impes_dict=impes_dict,
                             sym_datapoints=sym_datapoints,
-                            sym_dict=sym_dict)
+                            sym_dict=sym_dict,
+                            e_x=self.use_opt_confidence_radius[3])
 
             # 3) Launch a process pool
             n_alpha = len(dps)
             dF_dalphas = np.zeros(n_alpha, dtype=float)
             with ProcessPoolExecutor() as executor:
                 futures = []
-                for mol, qe in zip(structure_list, qm_e):
-                    futures.append(executor.submit(worker, mol, qe))
+                for mol, qe, qgrad in zip(structure_list, qm_e, qm_grad):
+                    futures.append(executor.submit(worker, mol, qe, qgrad))
 
                 # 4) As each worker finishes, accumulate its contribution
                 for fut in as_completed(futures):
@@ -3497,11 +3608,11 @@ class IMDatabasePointCollecter:
             if len(alphas) > 50 and len(geom_list) > 100:
             
                 res = minimize(
-                    fun = obj_energy_function_parallel,
+                    fun = obj_energy_function_parallel_gradient,
                     x0 = alphas,
                     args = args,
                     method='L-BFGS-B',
-                    jac = obj_gradient_function_parallel,
+                    jac = obj_gradient_function_parallel_gradient,
                     bounds=[(-10.0, 10.0)],
                     options={'disp': True}
                 )

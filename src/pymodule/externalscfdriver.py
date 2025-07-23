@@ -81,6 +81,7 @@ class ExternalScfDriver:
         self.spin_flip = False
         self.NAC = False
         self.cluster = False
+        self.solvation = (False, 'CPCM', 'water')
         self.add_ghost_atom = False
         self.path_on_cluster = path_on_cluster
         
@@ -90,7 +91,6 @@ class ExternalScfDriver:
         self.xyz_structures = 'xyz_structures'
         self.input_filename = 'current_input.inp'
         self.output_filename = 'current_output.out'
-        self.mo_input_filename = 'current_input.gbw'
         self.input_files.append(self.input_filename)
         self.output_files.append(self.output_filename)
         
@@ -398,7 +398,10 @@ conda activate vlxenv_simd_master
                 if self.path_on_cluster is not None:
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
                 with open(input_file, 'w') as file:
-                    file.write(f'!{self.method} {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
+                    if self.solvation[0] is True:
+                        file.write(f'!{self.method} {self.xc_func} {self.dispersion} {self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
+                    else:
+                        file.write(f'!{self.method} {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')
