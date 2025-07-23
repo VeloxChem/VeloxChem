@@ -94,13 +94,9 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text, orbital_de
             hf.create_dataset('eigenvalues', data=eigenvals)
         
         if orbital_details is not None:
-            #grp = hf.create_group('orbital_details')
             for key, val in orbital_details.items():
                 hf.create_dataset(key, data=np.array([val]))
 
-        #if excitation_details is not None:
-        #    for item in excitation_details:
-        #        hf.create_dataset(key, data=item)
         if excitation_details is not None:
             grp = hf.create_group('excitation_details')
             for i, item in enumerate(excitation_details):

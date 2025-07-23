@@ -82,25 +82,31 @@ class RixsDriver:
         self.theta = 0
         # a.u., FWHM
         self.gamma = .124/hartree_in_ev() 
-        self.gamma_hwhm = self.gamma / 2
 
         self.tda = False
-        self.fulldiag_threshold = np.inf
+        self.orb_and_state_dict = None
+
+        #self.rixs_dict = {}
+        self.filename = None
+
+        # TODO?: define both in terms of either nr. of states or energy
         self.num_final_states = None
-        self.core_cutoff = None
+        self.core_cutoff = np.inf
 
         # input keywords
         self.input_keywords = {
             'rixs': {
                 'theta': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
                 'gamma': ('float', 'broadening term (FWHM)'),
-                'photon_energy': ('float', 'incoming photon energy'),
+                'photon_energy': ('list', 'list of incoming photon energies'),
+                'num_final_states': ('int', 'number of final states to include'),
+                'core_cutoff': ('float', 'energy threshold, above first core excited, for which to include core-excited states'),
             },
         }
 
-    def update_settings(self, rixs_dict):
+    def update_settings(self, rixs_dict, method_dict=None):
         """
-        Updates settings in SCF driver.
+        Updates settings in RIXS driver.
 
         :param rixs_dict:
             The dictionary of rixs input.
@@ -110,7 +116,7 @@ class RixsDriver:
             method_dict = {}
 
         rixs_keywords = {
-            key: val[0] for key, val in self._input_keywords['rixs'].items()
+            key: val[0] for key, val in self.input_keywords['rixs'].items()
         }
 
         parse_input(self, rixs_keywords, rixs_dict)
@@ -124,8 +130,8 @@ class RixsDriver:
         """
         Prints relevant orbital and state information
         """
-        if self.photon_energy is None:
-            print('Compute first!')
+        if self.orb_and_state_dict is None:
+            self.ostream.print_warning('Compute first!')
         else:
             info = self.orb_and_state_dict
             intermed_states = info['num_intermediate_states']
@@ -140,7 +146,7 @@ class RixsDriver:
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
     
     def scattering_amplitude_tensor(self, omega, core_eigenvalue, val_eigenvalue,
-                                    intermediate_tdens, final_tdens, dipole_integrals, elastic=False):
+                                    intermediate_tdens, final_tdens, dipole_integrals):
         """
         The RIXS scattering amptlitude (sum-over-states) transition amplitude.
         
@@ -168,7 +174,7 @@ class RixsDriver:
         gamma_hwhm = self.gamma / 2
         e_n = 1 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
 
-        if elastic:
+        if val_eigenvalue is None or intermediate_tdens is None:
             core_eigvals2 = core_eigenvalue**2
             gs_exc_tdipole = np.array([
                                 np.sum(intermediate_tdens * dipole_integrals[i])
@@ -285,7 +291,11 @@ class RixsDriver:
 
             detuning = rsp_tensors['eigenvalues'] - first_core_ene
             tol = 1e-10
-            mask = (detuning >= -tol) & (detuning <= self.fulldiag_threshold)
+            mask = (detuning >= -tol) & (detuning <= self.core_cutoff)
+            if self.core_cutoff != np.inf:
+                self.ostream.print_info(f'Cutoff applied: only core-excited states within '
+                                        f'{self.core_cutoff:.2f} a.u. = {self.core_cutoff*hartree_in_ev():.2f}'
+                                        f' eV above the lowest core-excited state.')
 
             init_core_states = np.where(mask)[0]
             core_states = []
@@ -302,13 +312,18 @@ class RixsDriver:
             val_states = np.where(detuning < 0)[0]
             num_final_states = len(val_states)
             if self.num_final_states is not None:
+                self.ostream.print_info('Running RIXS in the restricted-subspace approximation '
+                                        f'approach with {num_intermediate_states} intermediate states,'
+                                        f'restricted to {self.num_final_states} out of possible {num_final_states}.')
                 num_final_states = self.num_final_states
                 val_states = val_states[:self.num_final_states]
+            else:
+                self.ostream.print_info('Running RIXS in the restricted-subspace approximation '
+                                        f'approach with {num_intermediate_states} intermediate states.')
 
             cvs_rsp_tensors = rsp_tensors
             occupied_core = num_core_orbitals + num_val_orbitals
 
-            self.ostream.print_info(f'Running RIXS with {num_intermediate_states} intermediate states.')
 
         mo_core_indices = list(range(num_core_orbitals))
         mo_val_indices  = list(range(nocc - num_val_orbitals, nocc))
@@ -356,14 +371,14 @@ class RixsDriver:
                 if osc > 1e-3:
                     self.photon_energy = [eig]
                     self.ostream.print_info(
-                        'Incoming photon energy not set; computing ' \
-                        'RIXS for the first core resonance at: ' \
-                        f'{self.photon_energy[0]:.4f} a.u. = ' \
+                        'Incoming photon energy not set; computing ' 
+                        'RIXS for the first core resonance at: ' 
+                        f'{self.photon_energy[0]:.4f} a.u. = ' 
                         f'{self.photon_energy[0] * hartree_in_ev():.2f} eV')
                     break
         elif isinstance(self.photon_energy, (float, int, np.floating)):
             self.ostream.print_info(
-                f'Incoming photon energy: {self.photon_energy:.2f} a.u. = ' \
+                f'Incoming photon energy: {self.photon_energy:.2f} a.u. = ' 
                 f'{self.photon_energy*hartree_in_ev():.2f} eV')
             self.photon_energy = [self.photon_energy]
         else:
@@ -371,11 +386,11 @@ class RixsDriver:
             formatted_ev = ', '.join(f'{enes * hartree_in_ev():.2f}' for enes in self.photon_energy)
             self.ostream.print_info(f'Incoming photon energies: ({formatted_au}) a.u. = ({formatted_ev}) eV')
 
-        ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
-        emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
-        cross_sections         = np.zeros((num_final_states, len(self.photon_energy)))
-        elastic_cross_sections = np.zeros((len(self.photon_energy)))
-        scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
+        self.ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
+        self.emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
+        self.cross_sections         = np.zeros((num_final_states, len(self.photon_energy)))
+        self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
+        self.scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
                                            3, 3), dtype=complex)
 
         for w_ind, omega in enumerate(self.photon_energy):
@@ -385,57 +400,47 @@ class RixsDriver:
                 F_inelastic = np.zeros((3,3), dtype=complex)
                 z_val, y_val = self.split_eigvec(valence_eigvecs[f], num_core_orbitals + num_val_orbitals,
                                             num_vir_orbitals, self.tda)
-                
-                # transform valence-vectors to core basis
-                #z_val = U_occ.T @ z_val @ U_vir
-                #y_val = U_occ.T @ y_val @ U_vir
                     
                 for n in range(num_intermediate_states):
-                    """
-                    z_core, y_core = self.split_eigvec(core_eigvecs[n], occupied_core,
-                                            num_vir_orbitals, self.tda)
-                    
-                    if self.twoshot:
-                        z_core, y_core = self.pad_matrices(z_core, y_core, num_val_orbitals)
-
-                    if cvs_scf_tensors is not None:
-                        z_core = U_occ.T @ z_core @ U_vir
-                        y_core = U_occ.T @ y_core @ U_vir
-                    """
                     z_core, y_core = core_mats[n]
 
                     gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
                     
                     F_inelastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], valence_eigvals[f],
                                                                     gs2core, core2val, dipole_integrals)
-                    F_elastic   += self.scattering_amplitude_tensor(omega, core_eigvals[n], None, gs2core,
-                                                                    None, dipole_integrals, elastic=True)
+                    if f == 0:
+                        F_elastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], None,
+                                                                      gs2core, None, dipole_integrals)
                 
-
-                emission_enes[f, w_ind] = omega - valence_eigvals[f]
-                ene_losses[f, w_ind] = valence_eigvals[f]
+                self.emission_enes[f, w_ind] = omega - valence_eigvals[f]
+                self.ene_losses[f, w_ind] = valence_eigvals[f]
                 # w'/w
-                prefactor_ratio = emission_enes[f, w_ind] / omega
+                prefactor_ratio = self.emission_enes[f, w_ind] / omega
 
                 sigma = self.cross_section(F_inelastic, prefactor_ratio)
-                sigma_elastic = self.cross_section(F_elastic)
 
-                elastic_cross_sections[w_ind]   = sigma_elastic.real
-                cross_sections[f, w_ind] = sigma.real
-                scattering_amplitudes[f, w_ind] = F_inelastic
+                self.cross_sections[f, w_ind] = sigma.real
+                self.scattering_amplitudes[f, w_ind] = F_inelastic
+
+            sigma_elastic = self.cross_section(F_elastic)
+            self.elastic_cross_sections[w_ind] = sigma_elastic.real
+
             self.ostream.print_blank()
-            self.ostream.print_info(f'Computed RIXS cross-sections for {num_final_states} ' \
-                                    f'final states at photon energy: {omega*hartree_in_ev():.1f} eV.')
+            self.ostream.print_info(f'Computed RIXS cross-sections for {num_final_states} ' 
+                                    f'final states at photon energy: {omega*hartree_in_ev():.2f} eV.')
         
         results_dict = {
-                    'cross_sections': cross_sections,
-                    'elastic_cross_sections': elastic_cross_sections,
+                    'cross_sections': self.cross_sections,
+                    'elastic_cross_sections': self.elastic_cross_sections,
                     'elastic_emission': self.photon_energy,
-                    'scattering_amplitudes': scattering_amplitudes,
-                    'emission_energies': emission_enes,
-                    'energy_losses': ene_losses,
-                    'excitation_energies': core_eigvals,
+                    'scattering_amplitudes': self.scattering_amplitudes,
+                    'emission_energies': self.emission_enes,
+                    'energy_losses': self.ene_losses,
+                    #'excitation_energies': self.core_eigvals,
                     }
+
+        if self.filename is not None:
+            self.write_hdf5(self.filename + '_rixs')
 
         if not init_photon_set:
             self.photon_energy = None
@@ -530,13 +535,13 @@ class RixsDriver:
     def preprocess_core_eigvecs(self, core_eigvecs, occ_core,
                                 num_val_orbs, num_vir_orbs, U_occ=None, U_vir=None):
         """
-        Split, optionally pad and transform core eigenvectors.
+        Split, pad with zeros (if twoshot) and transform core eigenvectors.
         """
-        transformed = []
+        pp_core_eigvecs = []
 
         for vec in core_eigvecs:
             z, y = self.split_eigvec(vec, occ_core,
-                                        num_vir_orbs, self.tda)
+                                    num_vir_orbs, self.tda)
             
             if self.twoshot:
                 z, y = self.pad_matrices(z, y, num_val_orbs)
@@ -545,9 +550,9 @@ class RixsDriver:
                 z = U_occ.T @ z @ U_vir
                 y = U_occ.T @ y @ U_vir
 
-            transformed.append((z, y))
+            pp_core_eigvecs.append((z, y))
 
-        return transformed
+        return pp_core_eigvecs
     
     @staticmethod
     def get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core):
@@ -617,5 +622,39 @@ class RixsDriver:
 
         return U_occ, U_vir
     
+    def write_hdf5(self, fname):
+        """
+        Writes the Pulsed response vectors to the specified output file in h5
+        format. The h5 file saved contains the following datasets:
 
+        - amplitudes
+            The pulse amplitudes for the calculated truncated_freqs
+        - zero_padded
+            Is the dataset zero padded or not
+        - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
+            =>  Amplitudes for all directions
+
+        :param fname:
+            Name of the checkpoint file.
+        """
+
+        if not fname:
+            raise ValueError('No filename given to write_hdf5()')
+
+        # Add the .h5 extension if not given
+        if not fname[-3:] == '.h5':
+            fname += '.h5'
+
+        # Save all the internal data to the h5 datafile named 'fname'
+        try:
+            with h5py.File(fname, 'w') as hf:
+                hf.create_dataset('photon_energies', data=self.photon_energy)
+                hf.create_dataset('cross_sections', data=self.cross_sections)
+                hf.create_dataset('energy_losses', data=self.ene_losses)
+                hf.create_dataset('emission_energies', data=self.emission_enes)
+                hf.create_dataset('elastic_cross_sections', data=self.elastic_cross_sections)
+
+        except Exception as e:
+            print('Failed to create h5 data file: {}'.format(e),
+                  file=sys.stdout)
 

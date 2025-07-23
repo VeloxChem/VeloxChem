@@ -319,7 +319,7 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient', 'rixs'
     ]
 
     scf_type = 'restricted'
@@ -656,20 +656,42 @@ def main():
         pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_results)
 
-    # Resonant Inelastic X-ray scattering
+    # Resonant inelastic X-ray scattering
     if task_type == 'rixs':# and scf_drv.scf_type == 'restricted':
         rixs_dict = (task.input_dict['rixs']
                      if 'rixs' in task.input_dict else {})
         rixs_dict['program_end_time'] = program_end_time
         rixs_dict['filename'] = task.input_dict['filename']
+        
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
+        rsp_dict['program_end_time'] = program_end_time
+        rsp_dict['filename'] = task.input_dict['filename']
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
-        cvs_rsp = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        cvs_rsp.init_driver(task.mpi_comm, task.ostream)
-        cvs_rsp_res = cvs_rsp.compute(task.molecule, task.ao_basis, scf_results)
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+
+        cvs_rsp_dict = (dict(task.input_dict['cvs_response'])
+                    if 'cvs_response' in task.input_dict else {})
+        if cvs_rsp_dict == {}:
+            # RSA
+            cvs_rsp_prop = None
+        else:
+            # Two-shot approach
+            cvs_rsp_dict['program_end_time'] = program_end_time
+            cvs_rsp_dict['filename'] = task.input_dict['filename'] + '_cvs'
+            cvs_rsp_dict = updated_dict_with_eri_settings(cvs_rsp_dict, scf_drv)
+            
+            cvs_rsp = select_rsp_property(task, mol_orbs, cvs_rsp_dict, method_dict)
+            cvs_rsp.init_driver(task.mpi_comm, task.ostream)
+            cvs_rsp.compute(task.molecule, task.ao_basis, scf_results)
+            cvs_rsp_prop = cvs_rsp._rsp_property
 
         rixs_drv = RixsDriver(task.mpi_comm, task.ostream)
-        rixs_drv.update_settings(method_dict, rixs_dict)
-        rixs_drv.compute(task.molecule, task.ao_basis, scf_results, valence, cvs_rsp_res)
+        rixs_drv.update_settings(rixs_dict, method_dict)
+        rixs_drv.compute(task.molecule, task.ao_basis, scf_results, rsp_prop._rsp_property, cvs_rsp_prop)
     
 
     # MP2 perturbation theory

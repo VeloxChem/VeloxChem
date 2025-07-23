@@ -269,13 +269,7 @@ class LinearResponseEigenSolver(LinearSolver):
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
-        """
-        if getattr(self, 'rsa', False) and not self.core_excitation:
-            norb = self.num_core_orbitals + self.num_val_orbitals + self.num_vir_orbitals
-            core_val_exc_inds = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, nocc)) + list(range(nocc, nocc+self.num_vir_orbitals))
-            orb_ene = scf_tensors['E_alpha'][core_val_exc_inds]
-            nocc = self.num_core_orbitals + self.num_val_orbitals
-        """
+
         if self.rank == mpi_master():
             assert_msg_critical(
                 self.nstates <= nocc * (norb - nocc),
