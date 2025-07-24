@@ -371,6 +371,9 @@ class TddftGradientDriver(GradientDriver):
         gs_grad_drv = ScfGradientDriver(self._scf_drv)
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
+        if self.unrelaxed:
+            gs_grad_drv.unrelaxed = True
+
         gs_grad_drv.ostream.mute()
         gs_grad_drv.compute(molecule, basis, scf_tensors)
         gs_grad_drv.ostream.unmute()

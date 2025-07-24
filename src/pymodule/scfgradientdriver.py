@@ -90,7 +90,6 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
-
     def compute(self, molecule, basis, scf_results=None):
         """
         Performs calculation of gradient.
