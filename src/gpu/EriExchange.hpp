@@ -2187,8 +2187,11 @@ computeExchangeFockDDDD(double*         mat_K,
                                     + (delta[a0][a1] * delta[b0][c0] * delta[b1][c1] + delta[a0][a1] * delta[b0][c1] * delta[b1][c0] + delta[a0][b0] * delta[a1][c0] * delta[b1][c1] + delta[a0][b0] * delta[a1][c1] * delta[b1][c0] + delta[a0][b1] * delta[a1][c0] * delta[b0][c1] + delta[a0][b1] * delta[a1][c1] * delta[b0][c0] + delta[a0][c0] * delta[a1][b0] * delta[b1][c1] + delta[a0][c0] * delta[a1][b1] * delta[b0][c1] + delta[a0][c0] * delta[a1][c1] * delta[b0][b1] + delta[a0][c1] * delta[a1][b0] * delta[b1][c0] + delta[a0][c1] * delta[a1][b1] * delta[b0][c0] + delta[a0][c1] * delta[a1][c0] * delta[b0][b1]) * (QD_0 * QD_1)
                                 )
 
-                            )
-                            +
+                            );
+                        }
+                        else if constexpr(part == 18)
+                        {
+                            return
                             F8_t[2] * (
 
                                 + 0.125 * inv_S2 * inv_S4 * inv_S4 * (
