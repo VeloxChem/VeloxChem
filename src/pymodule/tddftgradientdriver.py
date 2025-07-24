@@ -229,6 +229,8 @@ class TddftGradientDriver(GradientDriver):
 
         # NOTE: the numerical gradient is calculated for the first state only.
         if self.numerical:
+            assert_msg_critical(not self.unrelaxed,
+                            'TddftGradientDriver: Numerical unrelaxed gradient not available')
             scf_drv.ostream.mute()
             rsp_drv.ostream.mute()
             self.compute_numerical(molecule, basis, scf_drv, rsp_drv,
@@ -398,8 +400,12 @@ class TddftGradientDriver(GradientDriver):
                 gmat = gmats.matrix_to_numpy(label)
                 for s in range(dof):
                     # Sum of alpha + beta already in relaxed_density_ao
-                    self.gradient[s, iatom, i] += np.sum(
-                        (gmat + gmat.T) * relaxed_density_ao[s])
+                    if self.unrelaxed:
+                        self.gradient[s, iatom, i] += np.sum(
+                            (gmat + gmat.T) * unrelaxed_density_ao[s])
+                    else:
+                        self.gradient[s, iatom, i] += np.sum(
+                            (gmat + gmat.T) * relaxed_density_ao[s])
 
             gmats = Matrices()
 
@@ -424,33 +430,40 @@ class TddftGradientDriver(GradientDriver):
                 for s in range(dof):
                     # summation of alpha and beta already included
                     # in relaxed_density_ao
-                    self.gradient[s, iatom, i] -= np.sum(
-                        (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
-                    self.gradient[s, iatom,
-                                  i] -= np.sum(gmat_010 * relaxed_density_ao[s])
+                    if self.unrelaxed:
+                        self.gradient[s, iatom, i] -= np.sum(
+                            (gmat_100 + gmat_100.T) * unrelaxed_density_ao[s])
+                        self.gradient[s, iatom,
+                                      i] -= np.sum(gmat_010 * unrelaxed_density_ao[s])
+                    else:
+                        self.gradient[s, iatom, i] -= np.sum(
+                            (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
+                        self.gradient[s, iatom,
+                                      i] -= np.sum(gmat_010 * relaxed_density_ao[s])
 
             gmats_100 = Matrices()
             gmats_010 = Matrices()
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
-        # orbital response contribution to gradient
+        if not self.unrelaxed:
+            # orbital response contribution to gradient
 
-        t0 = time.time()
+            t0 = time.time()
 
-        ovl_grad_drv = OverlapGeom100Driver()
+            ovl_grad_drv = OverlapGeom100Driver()
 
-        for iatom in local_atoms:
-            gmats = ovl_grad_drv.compute(molecule, basis, iatom)
+            for iatom in local_atoms:
+                gmats = ovl_grad_drv.compute(molecule, basis, iatom)
 
-            for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix_to_numpy(label)
-                for s in range(dof):
-                    self.gradient[s, iatom, i] += 2.0 * np.sum(
-                        (gmat + gmat.T) * omega_ao[s])
-            gmats = Matrices()
+                for i, label in enumerate(['X', 'Y', 'Z']):
+                    gmat = gmats.matrix_to_numpy(label)
+                    for s in range(dof):
+                        self.gradient[s, iatom, i] += 2.0 * np.sum(
+                            (gmat + gmat.T) * omega_ao[s])
+                gmats = Matrices()
 
-        grad_timing['Overlap_grad'] += time.time() - t0
+            grad_timing['Overlap_grad'] += time.time() - t0
 
         # ERI contribution to gradient
 
@@ -521,8 +534,12 @@ class TddftGradientDriver(GradientDriver):
 
             for idx in range(dof):
 
-                sym_den_mat_for_fock_rel.set_values(
-                    self.get_sym_mat(relaxed_density_ao[idx]))
+                if self.unrelaxed:
+                    sym_den_mat_for_fock_rel.set_values(
+                        self.get_sym_mat(unrelaxed_density_ao[idx]))
+                else:
+                    sym_den_mat_for_fock_rel.set_values(
+                        self.get_sym_mat(relaxed_density_ao[idx]))
 
                 sym_den_mat_for_fock_xmy.set_values(
                     self.get_sym_mat(x_minus_y_ao[idx]))
@@ -573,7 +590,10 @@ class TddftGradientDriver(GradientDriver):
 
                 for idx in range(dof):
 
-                    den_mat_for_fock_rel.set_values(relaxed_density_ao[idx])
+                    if self.unrelaxed:
+                        den_mat_for_fock_rel.set_values(unrelaxed_density_ao[idx])
+                    else:
+                        den_mat_for_fock_rel.set_values(relaxed_density_ao[idx])
 
                     den_mat_for_fock_xpy.set_values(x_plus_y_ao[idx])
                     den_mat_for_fock_xpy_m_xpyT.set_values(x_plus_y_ao[idx] -
@@ -616,7 +636,10 @@ class TddftGradientDriver(GradientDriver):
 
             for s in range(dof):
                 if self.rank == mpi_master():
-                    rhow_dm = 0.5 * relaxed_density_ao[s]
+                    if self.unrelaxed:
+                        rhow_dm = 0.5 * unrelaxed_density_ao[s]
+                    else:
+                        rhow_dm = 0.5 * relaxed_density_ao[s]
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
                     xmy_sym = 0.5 * (x_minus_y_ao[s] + x_minus_y_ao[s].T)
                 else:
