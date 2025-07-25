@@ -128,7 +128,7 @@ class EvbDataProcessing:
             self.alpha, self.H12 = self._fit_EVB_parameters()
         else:
             self.ostream.print_info("Using provided H12 and alpha")
-        results.update({'alpha':self.alpha,'H12':self.H12})
+        results.update({'alpha': self.alpha, 'H12': self.H12})
         self.ostream.print_info("Calculating FEP and EVB curves")
         self.ostream.flush()
         self._get_FEP_and_EVB()
@@ -158,7 +158,7 @@ class EvbDataProcessing:
             xi = np.linspace(-10000, 10000, 20000)
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
-            dGevb_smooth, barrier, free_energy,_,_ = self._get_free_energies(
+            dGevb_smooth, barrier, free_energy, _, _ = self._get_free_energies(
                 dGevb_ana, fitting=True)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
@@ -339,7 +339,7 @@ class EvbDataProcessing:
         free_energy = Epro - Erea
         dGevb_smooth -= Erea
         self.ostream.flush()
-        return dGevb_smooth, barrier, free_energy,min_arg,max_arg
+        return dGevb_smooth, barrier, free_energy, min_arg, max_arg
 
     def _get_FEP_and_EVB(self):
 
@@ -402,8 +402,8 @@ class EvbDataProcessing:
                         "barrier": barrier_discretised,
                         "pns": pns,
                         "dGcor": dGcor,
-                        "min_arg":min_arg,
-                        "max_arg":max_arg,
+                        "min_arg": min_arg,
+                        "max_arg": max_arg,
                     }
                 })
 
@@ -430,8 +430,8 @@ class EvbDataProcessing:
                         "fep": fepxi,
                         "free_energy": reaction_free_energy_analytical,
                         "barrier": barrier_analytical,
-                        "min_arg":min_arg,
-                        "max_arg":max_arg,
+                        "min_arg": min_arg,
+                        "max_arg": max_arg,
                     }
                 })
 
@@ -692,48 +692,65 @@ class EvbDataProcessing:
 
                     #mark the zero-point
                     ax[1].plot(
-                        [bin_indicators[max(0,zero_ind-25)],
-                        bin_indicators[min(len(bin_indicators)-1,zero_ind+25)]],
-                        [0,0],
+                        [
+                            bin_indicators[max(0, zero_ind - 25)],
+                            bin_indicators[min(
+                                len(bin_indicators) - 1, zero_ind + 25)]
+                        ],
+                        [0, 0],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
                     ax[1].plot(
-                        [bin_indicators[zero_ind]]*2,
-                        [-10,+10],
+                        [bin_indicators[zero_ind]] * 2,
+                        [-10, +10],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
 
                     ax[1].plot(
-                        [bin_indicators[max(0,barrier_ind-25)],
-                        bin_indicators[min(len(bin_indicators)-1,barrier_ind+25)]],
-                        [barrier,barrier],
+                        [
+                            bin_indicators[max(0, barrier_ind - 25)],
+                            bin_indicators[min(
+                                len(bin_indicators) - 1, barrier_ind + 25)]
+                        ],
+                        [barrier, barrier],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
                     ax[1].plot(
-                        [bin_indicators[barrier_ind]]*2,
-                        [barrier-10,barrier+10],
+                        [bin_indicators[barrier_ind]] * 2,
+                        [barrier - 10, barrier + 10],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
-                    ax[1].text(bin_indicators[barrier_ind],barrier,f"{barrier:.0f}",ha='left', va='bottom')
+                    ax[1].text(bin_indicators[barrier_ind],
+                               barrier,
+                               f"{barrier:.0f}",
+                               ha='left',
+                               va='bottom')
 
                     ax[1].plot(
-                        [bin_indicators[max(0,free_ind-25)],
-                        bin_indicators[min(len(bin_indicators)-1,free_ind+25)]],
-                        [free_energy,free_energy],
+                        [
+                            bin_indicators[max(0, free_ind - 25)],
+                            bin_indicators[min(
+                                len(bin_indicators) - 1, free_ind + 25)]
+                        ],
+                        [free_energy, free_energy],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
                     ax[1].plot(
-                        [bin_indicators[free_ind]]*2,
-                        [free_energy-10,free_energy+10],
+                        [bin_indicators[free_ind]] * 2,
+                        [free_energy - 10, free_energy + 10],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
-                    ax[1].text(bin_indicators[free_ind],free_energy,f"{free_energy:.0f}",ha='left', va='bottom')
+                    ax[1].text(bin_indicators[free_ind],
+                               free_energy,
+                               f"{free_energy:.0f}",
+                               ha='left',
+                               va='bottom')
                     # #Add barrier
                     # ax[1].plot(
 
@@ -850,7 +867,9 @@ class EvbDataProcessing:
         lam = results['Lambda']
         bins = results['coordinate_bins']
         config_results = results['configuration_results']
+        relevant_column = []
         relevant_fgs = []
+        relevant_decomps = []
 
         dp = EvbDataProcessing()
         dp.Lambda_frame = results["Lambda_frame"]
@@ -859,20 +878,32 @@ class EvbDataProcessing:
         dp.alpha = results['alpha']
         dp.H12 = results['H12']
 
-        for fg in EvbForceGroup.pes_forcegroups():
-            for result in config_results.values():
+        for result in config_results.values():
+            for fg in EvbForceGroup.pes_forcegroups():
                 if not np.all(result['E1_fg'][fg - 1] == 0) or not np.all(
                         result['E2_fg'][fg - 1] == 0):
                     if fg not in relevant_fgs:
                         relevant_fgs.append(fg)
                     continue
+            if 'decompositions' in result.keys():
+                for name in result['decompositions']['names']:
+                    if name not in relevant_decomps:
+                        relevant_decomps.append(name)
 
-        checkboxes = [
+        fg_checkboxes = [
             widgets.Checkbox(
                 True,
                 description=f"{EvbForceGroup(fg_val).name} ({fg_val})",
             ) for fg_val in relevant_fgs
         ]
+
+        decomp_checkboxes = [
+            widgets.Checkbox(
+                False,
+                description=decomp,
+            ) for decomp in relevant_decomps
+        ]
+        checkboxes = fg_checkboxes + decomp_checkboxes
         plot_output = widgets.Output()
 
         def update_plot(change=None):
@@ -885,15 +916,35 @@ class EvbDataProcessing:
                     print(name)
                     clear_output(wait=True)
 
-                    to_sum = []
-                    for fg, cb in zip(relevant_fgs, checkboxes):
+                    fg_to_sum = []
+                    for fg, cb in zip(relevant_fgs, fg_checkboxes):
                         if cb.value:
-                            to_sum.append(fg - 1)
-                    E1_fg = np.sum(result['E1_fg'][to_sum], axis=0)
-                    E2_fg = np.sum(result['E2_fg'][to_sum], axis=0)
+                            fg_to_sum.append(fg - 1)
+                    E1_fg = np.sum(result['E1_fg'][fg_to_sum], axis=0)
+                    E2_fg = np.sum(result['E2_fg'][fg_to_sum], axis=0)
+
+                    if 'decompositions' in result.keys():
+
+                        decomp_to_sum = []
+                        for i, cb in enumerate(decomp_checkboxes):
+                            if cb.value:
+                                decomp_to_sum.append(i)
+                        E1_decomp = np.sum(
+                            result['decompositions']['E1'][decomp_to_sum],
+                            axis=0)
+                        E2_decomp = np.sum(
+                            result['decompositions']['E2'][decomp_to_sum],
+                            axis=0)
+                        #todo does the minus sign here work?
+                        E1 = E1_fg - E1_decomp
+                        E2 = E2_fg - E2_decomp
+                    else:
+                        E1 = E1_fg
+                        E2 = E2_fg
+
                     E2_shifted, V, dE, Eg = dp._calculate_Eg_V_dE(
-                        E1_fg,
-                        E2_fg,
+                        E1,
+                        E2,
                         dp.alpha,
                         dp.H12,
                     )
@@ -904,17 +955,18 @@ class EvbDataProcessing:
                         dp.H12,
                         bins,
                     )
-                    dGevb,_,_,min_arg,max_arg=dp._get_free_energies(dGevb)
+                    dGevb, _, _, min_arg, max_arg = dp._get_free_energies(dGevb)
                     evbs.append(dGevb)
                     ax1[0].plot(lam, dGfep)
 
                     ax1[1].plot(bins, dGevb, label=name)
 
-                    ax2.plot(E1_fg - np.min(E1_fg), label=f'rea {name}')
-                    ax2.plot(E2_fg - np.min(E2_fg), label=f'pro {name}')
-                for i, (name, evb) in enumerate(zip(config_results.keys(), evbs)):
+                    ax2.plot(E1 - np.min(E1), label=f'rea {name}', alpha=0.7)
+                    ax2.plot(E2 - np.min(E2), label=f'pro {name}', alpha=0.7)
+                for i, (name, evb) in enumerate(zip(config_results.keys(),
+                                                    evbs)):
                     if not i == dif_to:
-                        dif = evb-evbs[dif_to]
+                        dif = evb - evbs[dif_to]
                         ax1[2].plot(bins, dif, label=f"dif {name}")
 
                 fig1.legend()
@@ -929,7 +981,7 @@ class EvbDataProcessing:
         grid = widgets.GridBox(
             checkboxes,
             layout=widgets.Layout(
-                grid_template_columns="repeat(5, 180px)",
+                grid_template_columns="repeat(5, 220px)",
                 grid_gap="5px",
             ),
         )

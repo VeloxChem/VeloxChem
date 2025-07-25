@@ -188,12 +188,12 @@ class TransitionStateGuesser():
             'mm_geometries': mm_geometries,
             'xyz_geometries': xyz_geometries,
             'lambda_vec': self.lambda_vec,
-            'broken_bonds': self.evb_drv.broken_bonds,
-            'formed_bonds': self.evb_drv.formed_bonds,
+            'broken_bonds': self.evb_drv.breaking_bonds,
+            'formed_bonds': self.evb_drv.forming_bonds,
         }
 
-        self.results['broken_bonds'] = self.evb_drv.broken_bonds
-        self.results['formed_bonds'] = self.evb_drv.formed_bonds
+        self.results['broken_bonds'] = self.evb_drv.breaking_bonds
+        self.results['formed_bonds'] = self.evb_drv.forming_bonds
         if ff_exception:
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"

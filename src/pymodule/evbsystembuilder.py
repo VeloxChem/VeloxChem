@@ -49,7 +49,7 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .atomtypeidentifier import AtomTypeIdentifier
 from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_arccos
 from .waterparameters import get_water_parameters
 
 try:
@@ -155,7 +155,7 @@ class EvbSystemBuilder():
 
         self.begin_index = 0
         self.water_model: str
-        self.decompose_bonded = None
+        self.decompose_bonded = True
         self.decompose_nb: list | None = None
         self.keywords = {
             "temperature": {
@@ -261,7 +261,7 @@ class EvbSystemBuilder():
                 "type": list
             },
             "decompose_bonded": {
-                "type": list
+                "type": bool
             },
         }
 
@@ -372,7 +372,8 @@ class EvbSystemBuilder():
         posres_atoms = [atom for atom in topology.atoms()]
 
         forcefield = mmapp.ForceField('amber14-all.xml', 'amber14/tip3pfb.xml')
-        templates, residues = forcefield.generateTemplatesForUnmatchedResidues(topology)
+        templates, residues = forcefield.generateTemplatesForUnmatchedResidues(
+            topology)
 
         for t, template in enumerate(templates):
             for i, atom in enumerate(template.atoms):
@@ -413,31 +414,31 @@ class EvbSystemBuilder():
             # all atoms already exist in the topology, pdb: top, matching chain id with removed_chain
             # the pdb residue should be checked against the reactant, and an index mapping should be found out #todo
             # these should be added to the reaction_atoms
-            chain = [
-                c for c in topology.chains() if c.id == res_dict['chain']
-            ][0]
+            chain = [c for c in topology.chains()
+                     if c.id == res_dict['chain']][0]
             residue = [
-                r for r in chain.residues()
-                if int(r.id) == res_dict['residue']
+                r for r in chain.residues() if int(r.id) == res_dict['residue']
             ][0]
-            
+
             mapping = self._get_mapped_atom_ids_from_residue(residue)
             res_atoms = [atom for atom in residue.atoms()]
-            
+
             for id in mapping.keys():
                 self.reactant.atoms[id]['pdb'] = 'sys'
             for vlx_id, res_id in mapping.items():
                 reaction_atoms.update({
-                    vlx_id: [atom for atom in res_atoms if atom.index == res_id][0]
+                    vlx_id:
+                    [atom for atom in res_atoms if atom.index == res_id][0]
                 })
 
-            system = self._delete_pdb_forces(system,[atom.index for atom in res_atoms])
+            system = self._delete_pdb_forces(system,
+                                             [atom.index for atom in res_atoms])
 
             self.ostream.print_info(
                 f"Reacting residue {residue.name} {residue.id} with {len(res_atoms)} atoms added to reaction_atoms"
             )
             self.ostream.flush()
-                
+
         return system, topology, system_mol, reaction_atoms
 
     def _get_mapped_atom_ids_from_residue(self, residue: mmapp.Residue):
@@ -448,7 +449,9 @@ class EvbSystemBuilder():
         vlx_elements = self.reactant.molecule.get_element_ids()
         vlx_ids = list(self.reactant.atoms.keys())
         vlx_bonds = list(self.reactant.bonds.keys())
-        residue_elements = [atom.element.atomic_number for atom in residue.atoms()]
+        residue_elements = [
+            atom.element.atomic_number for atom in residue.atoms()
+        ]
         residue_ids = [atom.index for atom in residue.atoms()]
 
         # Depending on how the residue is stored in the PDB, the bonds might not be available.
@@ -457,9 +460,9 @@ class EvbSystemBuilder():
         if len(residue_bonds) == 0:
             residue_bonds = []
             mol = Molecule()
-            for id,element in zip(residue_ids,residue_elements):
+            for id, element in zip(residue_ids, residue_elements):
                 coord = self.positions[id]
-                mol.add_atom(int(element), Point(coord),'angstrom')
+                mol.add_atom(int(element), Point(coord), 'angstrom')
             connectivity_matrix = mol.get_connectivity_matrix()
             for i, id in enumerate(residue_ids):
                 for j, jd in enumerate(residue_ids):
@@ -468,31 +471,31 @@ class EvbSystemBuilder():
                     if connectivity_matrix[i, j] == 1:
                         residue_bonds.append((id, jd))
         else:
-            residue_bonds = [(bond.atom1.index,bond.atom2.index) for bond in residue.bonds() if bond.atom1.index in residue_ids and bond.atom2.index in residue_ids]
-        
+            residue_bonds = [(bond.atom1.index, bond.atom2.index)
+                             for bond in residue.bonds()
+                             if bond.atom1.index in residue_ids
+                             and bond.atom2.index in residue_ids]
+
         vlx_graph = nx.Graph()
         vlx_graph.add_nodes_from(vlx_ids)
         vlx_graph.add_edges_from(vlx_bonds)
-        for i, elem in zip(vlx_ids,vlx_elements):
+        for i, elem in zip(vlx_ids, vlx_elements):
             vlx_graph.nodes[i]['elem'] = elem
 
         res_graph = nx.Graph()
         res_graph.add_nodes_from(residue_ids)
         res_graph.add_edges_from(residue_bonds)
-        for i, elem in zip(residue_ids,residue_elements):
+        for i, elem in zip(residue_ids, residue_elements):
             res_graph.nodes[i]['elem'] = elem
 
-        GM = GraphMatcher(vlx_graph,res_graph, categorical_node_match('elem', ''))
+        GM = GraphMatcher(vlx_graph, res_graph,
+                          categorical_node_match('elem', ''))
         if not GM.subgraph_is_isomorphic():
-            raise ValueError(f"Could not find subgraph isomorphism between the residue {residue.name} {residue.index} and the reactant molecule")
+            raise ValueError(
+                f"Could not find subgraph isomorphism between the residue {residue.name} {residue.index} and the reactant molecule"
+            )
         mapping = next(GM.subgraph_isomorphisms_iter())
         return mapping
-        begin_index = 0
-        res_atoms = [atom for atom in residue.atoms()]
-        end_index = begin_index + len(res_atoms)
-        atom_ids = list(range(begin_index, end_index))
-        begin_index = end_index
-        return atom_ids
 
     def _delete_pdb_forces(self, system, del_indices):
         # set the right force groups, give descriptive names to the pdb forces, and delete all contributions that solely have the given indices
@@ -621,19 +624,22 @@ class EvbSystemBuilder():
             atom_indices = [atom.index for atom in self.reaction_atoms.values()]
             set_exceptions = []
             for i in range(nb_force.getNumExceptions()):
-                [atom_i, atom_j, charge, sigma, epsilon] = nb_force.getExceptionParameters(i)
+                [atom_i, atom_j, charge, sigma,
+                 epsilon] = nb_force.getExceptionParameters(i)
                 if atom_i in atom_indices and atom_j in atom_indices:
-                    nb_force.setExceptionParameters(i, atom_i, atom_j, 0.0, 1.0, 0.0)
+                    nb_force.setExceptionParameters(i, atom_i, atom_j, 0.0, 1.0,
+                                                    0.0)
                     set_exceptions.append((atom_i, atom_j))
-                    
+
             for atom_i in atom_indices:
                 for atom_j in atom_indices:
                     # Skip any capping hydrogens, because they are not in the topology
                     if atom_i >= atom_j:
                         continue
-                    
-                    if (atom_i, atom_j) in set_exceptions or (atom_j, atom_i) in set_exceptions:
-                        
+
+                    if (atom_i, atom_j) in set_exceptions or (
+                            atom_j, atom_i) in set_exceptions:
+
                         continue
                     nb_force.addException(
                         atom_i,
@@ -642,7 +648,7 @@ class EvbSystemBuilder():
                         1.0,
                         0.0,
                     )
-                    
+
             self.ostream.flush()
 
             for bond in self.reactant.bonds.keys():
@@ -1296,10 +1302,7 @@ class EvbSystemBuilder():
 
         self._add_reaction_forces(rea_system, 0, pes=True)
         self._add_reaction_forces(pro_system, 1, pes=True)
-        if self.decompose_bonded is not None:
-            # self._add_bonded_decompositions(rea_system, 0)
-            # self._add_bonded_decompositions(pro_system, 1)
-            pass
+
         if self.decompose_nb is not None:
             if self.solvent:
                 self.ostream.print_info(
@@ -1309,9 +1312,14 @@ class EvbSystemBuilder():
                 systems.update(self._add_nb_decompositions(pro_system, 'pro'))
             else:
                 self.ostream.print_info(
-                    f"Skipping nonbonded force decompositions for vacuum system"
-                )
+                    f"Skipping nonbonded force decompositions")
             self.ostream.flush()
+
+        if self.decompose_bonded:
+            rea_bond_decomp = self._add_bonded_decompositions(rea_system)
+            pro_bond_decomp = self._add_bonded_decompositions(pro_system)
+            systems['reactant_bonded'] = rea_bond_decomp
+            systems['product_bonded'] = pro_bond_decomp
 
         # rea_system = self._split_nb_force(rea_system)
         # pro_system = self._split_nb_force(pro_system)
@@ -1334,27 +1342,6 @@ class EvbSystemBuilder():
         torsion = self._create_proper_torsion_forces(lam)
         improper = self._create_improper_torsion_forces(lam)
 
-        # if pes:
-        #     sclj = self.soft_core_lj_pes_dynamic
-        #     sccoul = self.soft_core_coulomb_pes_dynamic
-        #     syslj, syscoul = self._create_nonbonded_forces(
-        #         lam,
-        #         merge_exceptions=False,
-        #         broken_exceptions=False,
-        #         lj_soft_core=sclj,
-        #         coul_soft_core=sccoul,
-        #     )
-        # else:
-        #     sclj = self.soft_core_lj_int
-        #     sccoul = self.soft_core_coulomb_int
-        #     syslj, syscoul = self._create_nonbonded_forces(
-        #         lam,
-        #         broken_exceptions=True,
-        #         lj_soft_core=sclj,
-        #         coul_soft_core=sccoul,
-        #     )
-        # system.addForce(syslj)
-        # system.addForce(syscoul)
         if not pes:
             syslj, syscoul = self._create_nonbonded_forces(
                 lam,
@@ -1409,7 +1396,48 @@ class EvbSystemBuilder():
 
         return system
 
-    def _add_bonded_decompositions(self, system, lam):
+    def _add_bonded_decompositions(self, system):
+        system = copy.deepcopy(system)
+        bonded_fgs = [
+            EvbForceGroup.REA_HARM_BOND_STATIC.
+            value,  # Bonded forces for the reaction atoms
+            EvbForceGroup.REA_HARM_BOND_DYNAMIC.
+            value,  # Static bonded forces for the reaction atoms
+            EvbForceGroup.REA_MORSE_BOND.value,
+            EvbForceGroup.REA_ANGLE.value,
+            EvbForceGroup.REA_TORSION.value,
+            EvbForceGroup.REA_IMP.value,
+        ]
+        to_remove = []
+        for i, force in enumerate(system.getForces()):
+            if force.getForceGroup() not in bonded_fgs:
+                to_remove.append(i)
+        for i in reversed(to_remove):
+            system.removeForce(i)
+
+        for force in system.getForces():
+            if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
+                for i in range(force.getNumBonds()):
+                    p1, p2, (D, a, r) = force.getBondParameters(i)
+                    force.setBondParameters(i, p1, p2, [0, 0, r])
+            if force.getForceGroup(
+            ) == EvbForceGroup.REA_HARM_BOND_STATIC.value or force.getForceGroup(
+            ) == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value:
+                for i in range(force.getNumBonds()):
+                    p1, p2, r, k = force.getBondParameters(i)
+                    force.setBondParameters(i, p1, p2, r, 0)
+            if force.getForceGroup() == EvbForceGroup.REA_ANGLE.value:
+                for i in range(force.getNumAngles()):
+                    p1, p2, p3, theta, k = force.getAngleParameters(i)
+                    force.setAngleParameters(i, p1, p2, p3, theta, 0)
+            if force.getForceGroup(
+            ) == EvbForceGroup.REA_TORSION.value or force.getForceGroup(
+            ) == EvbForceGroup.REA_IMP.value:
+                for i in range(force.getNumTorsions()):
+                    p1, p2, p3, p4, periodicity, phase, barrier = force.getTorsionParameters(
+                        i)
+                    force.setTorsionParameters(i, p1, p2, p3, p4, periodicity,
+                                               phase, 0)
 
         return system
 
@@ -1709,8 +1737,10 @@ class EvbSystemBuilder():
 
                 if model_broken:
                     coords = self.product.molecule.get_coordinates_in_angstrom()
-                    eqB = self.measure_angle(coords[key[0]], coords[key[1]],
-                                             coords[key[2]])
+                    eqB = self.measure_angle(coords[key[0]],
+                                             coords[key[1]],
+                                             coords[key[2]],
+                                             angle_unit='degree')
                     fcB = fcA * self.bonded_integration_angle_fac
                     self.ostream.print_warning(
                         f"Using product structure to determine angle {key} in reactant, with equilibrium {eqB} and force constant {fcB} for lambda {lam}. Check if this is indeed correct."
@@ -1727,8 +1757,10 @@ class EvbSystemBuilder():
                 if model_broken:
                     coords = self.reactant.molecule.get_coordinates_in_angstrom(
                     )
-                    eqA = self.measure_angle(coords[key[0]], coords[key[1]],
-                                             coords[key[2]])
+                    eqA = self.measure_angle(coords[key[0]],
+                                             coords[key[1]],
+                                             coords[key[2]],
+                                             angle_unit='degree')
                     fcA = fcB * self.bonded_integration_angle_fac
                     self.ostream.print_warning(
                         f"Using reactant structure to determine angle {key} in reactant, with equilibrium {eqB} and force constant {fcB} for lambda {lam}. Check if this is indeed correct."
@@ -2007,14 +2039,16 @@ class EvbSystemBuilder():
     # This is used to remove the nonbonded interactions that are modelled by other forces
 
     # Turning both off gives the proper reactant or product for lam=0 or 1
-    def _create_nonbonded_forces(self,
-                                 lam,
-                                 merge_exceptions=False,
-                                 broken_exceptions=False,
-                                 lj_soft_core=False,
-                                 coul_soft_core=False,
-                                 only_changing_bonds=False,
-                                 exclude_changing_bonds=False,):
+    def _create_nonbonded_forces(
+        self,
+        lam,
+        merge_exceptions=False,
+        broken_exceptions=False,
+        lj_soft_core=False,
+        coul_soft_core=False,
+        only_changing_bonds=False,
+        exclude_changing_bonds=False,
+    ):
 
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
@@ -2056,9 +2090,8 @@ class EvbSystemBuilder():
 
         changing_bonds = list(
             (set(self.reactant.bonds) ^ set(self.product.bonds)))
-        
-        atom_keys = self.reactant.atoms.keys()
 
+        atom_keys = self.reactant.atoms.keys()
 
         #Loop over all atoms, and check if their id's are part of any exceptions
         for i in atom_keys:
@@ -2262,7 +2295,8 @@ class EvbSystemBuilder():
                 )
         return bond_constraint, constant_force, angle_constraint, torsion_constraint
 
-    def _key_to_id(self, key: tuple[int, ...], atoms: dict | list) -> list[int] | None:
+    def _key_to_id(self, key: tuple[int, ...],
+                   atoms: dict | list) -> list[int] | None:
         for i in key:
             if isinstance(atoms, dict):
                 if i not in atoms.keys():
@@ -2282,7 +2316,7 @@ class EvbSystemBuilder():
         return np.linalg.norm(np.array(v1) - np.array(v2))
 
     @staticmethod
-    def measure_angle(v1, v2, v3):
+    def measure_angle(v1, v2, v3, angle_unit='radian'):
         """
         Calculates the angle between v1 and v2 and v3
         """
@@ -2296,6 +2330,43 @@ class EvbSystemBuilder():
         angle = angle * 180 / np.pi  # Convert to degrees
 
         return angle
+
+    @staticmethod
+    def measure_dihedral(v1, v2, v3, v4, angle_unit='radian'):
+        """
+        Calculates the dihedral angle between v1, v2, v3 and v4
+        """
+
+        v21 = v2 - v1
+        v32 = v3 - v2
+        v43 = v4 - v3
+
+        u21 = v21 / np.linalg.norm(v21)
+        u32 = v32 / np.linalg.norm(v32)
+        u43 = v43 / np.linalg.norm(v43)
+
+        cos_theta_123 = -np.vdot(u21, u32)
+        cos_theta_234 = -np.vdot(u32, u43)
+
+        sin_theta_123 = math.sqrt(1.0 - cos_theta_123**2)
+        sin_theta_234 = math.sqrt(1.0 - cos_theta_234**2)
+
+        cos_phi = ((cos_theta_123 * cos_theta_234 - np.vdot(u21, u43)) /
+                   (sin_theta_123 * sin_theta_234))
+        sin_phi = -(np.vdot(u43, np.cross(u21, u32)) /
+                    (sin_theta_123 * sin_theta_234))
+
+        phi_in_radian = safe_arccos(cos_phi)
+        if sin_phi < 0.0:
+            phi_in_radian *= -1.0
+
+        assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                            'Molecule.get_dihedral: Invalid angle unit')
+
+        if angle_unit.lower() == 'degree':
+            return 180.0 * phi_in_radian / math.pi
+        else:
+            return phi_in_radian
 
 
 # The EVB procedure uses two different potentials, one for the integration of the EOMs to explore phase space, and another one for the calculation of the PES

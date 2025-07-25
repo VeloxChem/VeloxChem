@@ -200,7 +200,7 @@ class EvbDriver():
         if isinstance(breaking_bonds, tuple):
             breaking_bonds = [breaking_bonds]
 
-        self.reactant, self.product, self.formed_bonds, self.broken_bonds, self.reactants, self.products, self.product_mapping = ffbuilder.build_forcefields(
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = ffbuilder.build_forcefields(
             reactant_input=rea_input,
             product_input=pro_input,
             reactant_total_multiplicity=reactant_total_multiplicity,
@@ -325,8 +325,8 @@ class EvbDriver():
                     rea['forcefield'] = None
                 for pro in pro_input:
                     pro['forcefield'] = None
-            (self.reactant, self.product, self.formed_bonds, self.broken_bonds,
-             self.reactants, self.products,
+            (self.reactant, self.product, self.forming_bonds,
+             self.breaking_bonds, self.reactants, self.products,
              self.product_mapping) = ffbuilder.build_forcefields(
                  rea_input,
                  pro_input,
@@ -671,6 +671,8 @@ class EvbDriver():
             conf["systems"] = systems
             conf["topology"] = topology
             conf["initial_positions"] = initial_positions
+            conf['forming_bonds'] = list(self.forming_bonds)
+            conf['breaking_bonds'] = list(self.breaking_bonds)
 
             self.ostream.print_info(f"Saving files to {data_folder_path}")
             self.ostream.flush()
@@ -692,10 +694,6 @@ class EvbDriver():
             self.update_options_json(
                 {
                     "Lambda": Lambda,
-                    # "integration forcegroups":
-                    # list(EvbForceGroup.integration_force_groups()),
-                    # "pes forcegroups":
-                    # list(EvbForceGroup.pes_force_groups()),
                 },
                 conf,
             )
@@ -886,7 +884,7 @@ class EvbDriver():
         results = dp.compute(results, barrier, free_energy)
         self.results = results
         self.print_results()
-        self._save_dict_as_h5(results, f"results_{self.name}")
+        # self._save_dict_as_h5(results, f"results_{self.name}")
         self.ostream.flush()
         return self.results
 
@@ -957,6 +955,7 @@ class EvbDriver():
             fg_file = str(cwd / folder / "ForceGroups.csv")
             rea_fg_file = str(cwd / folder / "ForceGroups_rea.csv")
             pro_fg_file = str(cwd / folder / "ForceGroups_pro.csv")
+            decomp_file = str(cwd / folder / "NB_decompositions.csv")
             specific, common = self._load_output_files(
                 E_file,
                 data_file,
@@ -964,6 +963,7 @@ class EvbDriver():
                 fg_file,
                 rea_fg_file,
                 pro_fg_file,
+                decomp_file,
                 lambda_sub_sample,
                 lambda_sub_sample_ends,
                 time_sub_sample,
@@ -995,6 +995,7 @@ class EvbDriver():
         fg_file=None,
         fg_rea_file=None,
         fg_pro_file=None,
+        decomp_file=None,
         lambda_sub_sample=1,
         lambda_sub_sample_ends=False,
         time_sub_sample=1,
@@ -1028,12 +1029,7 @@ class EvbDriver():
         fg_data = []
         rea_fg_data = []
         pro_fg_data = []
-        if fg_file is not None and Path(fg_file).exists():
-            fg_data = np.loadtxt(fg_file, skiprows=1, delimiter=',').T
-        if fg_rea_file is not None and Path(fg_rea_file).exists():
-            rea_fg_data = np.loadtxt(fg_rea_file, skiprows=1, delimiter=',').T
-        if fg_pro_file is not None and Path(fg_pro_file).exists():
-            pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
+
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
 
         sub_indices = l_sub_indices[::time_sub_sample]
@@ -1076,6 +1072,21 @@ class EvbDriver():
         if fg_pro_file is not None and Path(fg_pro_file).is_file():
             pro_fg_data = np.loadtxt(fg_pro_file, skiprows=1, delimiter=',').T
             specific_result.update({"E2_fg": pro_fg_data})
+        if decomp_file is not None and Path(decomp_file).exists():
+            decomp_data = np.loadtxt(decomp_file, skiprows=1, delimiter=',').T
+            decomp_rea = decomp_data[decomp_data.shape[0] // 2:, :]
+            decomp_pro = decomp_data[:decomp_data.shape[0] // 2, :]
+            with open(decomp_file, "r") as file:
+                decomp_names = file.readline().strip().split(",")
+            decomp_names = [name.replace("_rea", "") for name in decomp_names]
+            decomp_names = decomp_names[:len(decomp_names) // 2]
+            specific_result.update({
+                "decompositions": {
+                    "E1": decomp_rea,
+                    "E2": decomp_pro,
+                    "names": decomp_names,
+                }
+            })
 
         lambda_indices = [
             np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame
