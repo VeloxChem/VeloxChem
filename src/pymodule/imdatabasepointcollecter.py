@@ -2626,8 +2626,9 @@ class IMDatabasePointCollecter:
 
                     for number in range(len(energies)):
                         
-                        if number != self.current_state:
-                            continue
+                        if self.current_state > 0:
+                            if number != self.current_state - 1:
+                                continue
 
                             
                         grad = gradients[number].copy()
