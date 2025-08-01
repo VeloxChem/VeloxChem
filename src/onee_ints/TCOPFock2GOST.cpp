@@ -376,6 +376,7 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
     // auto-generated code begins here
 
+
     // S-S block
 
     #pragma omp parallel for schedule(static, PAD_SIZE)
@@ -413,40 +414,40 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -532,41 +533,41 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -662,42 +663,42 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+              const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-                const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -799,43 +800,43 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+              const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
+              const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-                const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-                const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -943,42 +944,42 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+              const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-                const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -1081,43 +1082,43 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+              const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+              const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-                const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-                const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -1228,44 +1229,44 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+              const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+              const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
+              const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-                const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-                const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-                const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -1387,44 +1388,44 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+              const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
+              const auto GA_1 = (a_j * rij[a1] + zeta_c * rci[a1]) / (a_i + a_j + zeta_c);
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+              const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-                const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
-                const auto GA_1 = (a_j * rij[a1] + zeta_c * rci[a1]) / (a_i + a_j + zeta_c);
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-                const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -1547,45 +1548,45 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+              const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
+              const auto GA_1 = (a_j * rij[a1] + zeta_c * rci[a1]) / (a_i + a_j + zeta_c);
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+              const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
+              const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-                const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
-                const auto GA_1 = (a_j * rij[a1] + zeta_c * rci[a1]) / (a_i + a_j + zeta_c);
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-                const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-                const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
@@ -1728,46 +1729,46 @@ computeFock2GOSTcontrib(const CMolecule&             molecule,
 
         double tco_p_m_ij = 0.0;
 
-        for (int m = 0; m < 3; m++)
+        for (int c = 0; c < npoints; c++)
         {
+            
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto zeta_c = points_info[c + npoints * 3];
+            const auto p_c = points_info[c + npoints * 4];
+            const auto nx_c = points_info[c + npoints * 5];
+            const auto ny_c = points_info[c + npoints * 6];
+            const auto nz_c = points_info[c + npoints * 7];
 
-            for (int c = 0; c < npoints; c++)
+            const double n_c[3] = {nx_c, ny_c, nz_c};
+
+            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
+                                (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
+                                (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+
+            const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
+
+            const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
+
+            const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
+
+            const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
+
+            const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
+                            (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
+                            (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
+              const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
+              const auto GA_1 = (a_j * rij[a1] + zeta_c * rci[a1]) / (a_i + a_j + zeta_c);
+              const auto GA_2 = (a_j * rij[a2] + zeta_c * rci[a2]) / (a_i + a_j + zeta_c);
+
+              const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
+              const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
+              const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
+
+
+            for (int m = 0; m < 3; m++)
             {
-                const auto x_c = points_info[c + npoints * 0];
-                const auto y_c = points_info[c + npoints * 1];
-                const auto z_c = points_info[c + npoints * 2];
-                const auto zeta_c = points_info[c + npoints * 3];
-                const auto p_c = points_info[c + npoints * 4];
-                const auto nx_c = points_info[c + npoints * 5];
-                const auto ny_c = points_info[c + npoints * 6];
-                const auto nz_c = points_info[c + npoints * 7];
-
-                const double n_c[3] = {nx_c, ny_c, nz_c};
-
-                const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                    (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                    (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
-
-                const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
-
-                const double rci[3] = {x_c - x_i, y_c - y_i, z_c - z_i};
-
-                const double rcj[3] = {x_c - x_j, y_c - y_j, z_c - z_j};
-
-                const auto G_ij_00 = std::pow((a_i + a_j) / (a_i + a_j + zeta_c), 1.5) * std::exp(-(a_i + a_j) * zeta_c / (a_i + a_j + zeta_c) * r2_PC);
-
-                const double GC[3] = {(a_i * x_i + a_j * x_j + zeta_c * x_c) / (a_i +  a_j + zeta_c) - x_c,
-                              (a_i * y_i + a_j * y_j + zeta_c * y_c) / (a_i + a_j + zeta_c) - y_c,
-                              (a_i * z_i + a_j * z_j + zeta_c * z_c) / (a_i + a_j + zeta_c) - z_c};
-                const auto GA_0 = (a_j * rij[a0] + zeta_c * rci[a0]) / (a_i + a_j + zeta_c);
-                const auto GA_1 = (a_j * rij[a1] + zeta_c * rci[a1]) / (a_i + a_j + zeta_c);
-                const auto GA_2 = (a_j * rij[a2] + zeta_c * rci[a2]) / (a_i + a_j + zeta_c);
-
-                const auto GB_0 = (-a_i * rij[b0] + zeta_c * rcj[b0]) / (a_i + a_j + zeta_c);
-                const auto GB_1 = (-a_i * rij[b1] + zeta_c * rcj[b1]) / (a_i + a_j + zeta_c);
-                const auto GB_2 = (-a_i * rij[b2] + zeta_c * rcj[b2]) / (a_i + a_j + zeta_c);
-
-
 
                 tco_p_m_ij -= 2 * zeta_c * n_c[m] * p_c * S_ij_00 * (
 
