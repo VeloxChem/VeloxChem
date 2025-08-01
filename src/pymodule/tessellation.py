@@ -700,5 +700,47 @@ class TessellationDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
+    def visualize_grid(self, molecule):
+        """
+        Visualizes grid for surface discretization.
 
+        :param molecule:
+            The molecule.
+        :param grid:
+            The grid.
+        """
+
+        grid = self.compute(molecule).T
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        assert_msg_critical(grid.shape[1] == 11,
+                            'TessellationDriver.visualize_grid: Invalid grid size')
+
+        grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
+
+        grid_xyz_string = f'{grid_in_angstrom.shape[0]}\n\n'
+
+        for i in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f'He {x} {y} {z}\n'
+
+        v = p3d.view(width=600, height=600)
+
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+
+        v.addModel(grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'He'},
+                   {'sphere': {
+                       'radius': 0.05,
+                       'color': 'red',
+                       'opacity': 0.5
+                   }})
+
+        v.zoomTo()
+        v.show()
 
