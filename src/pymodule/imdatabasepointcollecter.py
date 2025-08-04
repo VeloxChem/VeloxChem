@@ -132,7 +132,7 @@ def _worker_error_func_grad(mol, qm_e_i, qm_grad_i, alphas, z_matrix,
     if (np.linalg.norm(qm_grad_i) * np.linalg.norm(new_im_gradient)) < 1e-5:                    # 'zero-vector' branch
         cos_theta   = 1.0
     diff = e_x * (diff_e_kcal)**2 + (1.0 - e_x) * (diff_g_kcal**2).mean() + (1 - cos_theta)
-    sum_sq_error += (diff)
+    sum_sq_error = (diff)
     return sum_sq_error
 
 def _worker_gradient(mol, qm_e_i, alphas, z_matrix,
@@ -953,7 +953,7 @@ class IMDatabasePointCollecter:
         self.cycle_iteration = self.unadded_cycles
         
         print('current datapoints around the given starting structure', self.desired_datpoint_density, self.density_around_data_point[0], self.density_around_data_point[1], '\n allowed derivation from the given structure', self.allowed_molecule_deviation, '\n ---------------------------------------')
-        self.allowed_molecules = {root: {'molecules': [], 'qm_energies': [], 'im_energies':[], 'qm_gradients':[]} for root in self.roots_to_follow}
+        self.allowed_molecules = {root: {'molecules': [], 'qm_energies': [], 'im_energies':[], 'qm_gradients':[], 'distances': []} for root in self.roots_to_follow}
         openmm_coordinate = self.simulation.context.getState(getPositions=True).getPositions()
         self.coordinates = [openmm_coordinate]
         self.coordinates_xyz = []
@@ -980,16 +980,16 @@ class IMDatabasePointCollecter:
         self.qm_symmetry_datapoint_dict = {root: {} for root in self.roots_to_follow}
         self.qm_energies_dict = {root: [] for root in self.roots_to_follow}
         self.impes_drivers = {root: None for root in self.roots_to_follow}
-        self.sampled_molecules = {root: {'molecules': [], 'im_energies': [], 'qm_energies': [], 'distances': []} for root in self.roots_to_follow}
+        self.sampled_molecules = {root: {'molecules': [], 'im_energies': [], 'qm_energies': [], 'qm_gradients': [], 'distances': []} for root in self.roots_to_follow}
         print(self.reference_struc_energies_file)
         
         if self.reference_struc_energies_file is not None:
+            print('Extracting reference structures from', self.reference_struc_energies_file)
             self.sampled_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
             self.allowed_molecules = self.extract_reference_structures(self.reference_struc_energies_file, self.roots_to_follow)
             self.last_added += len(self.sampled_molecules[self.roots_to_follow[0]]['molecules'])
         else:
              self.reference_struc_energies_file = 'ref_struc_energy.xyz'
-        
 
         for root in self.roots_to_follow:
             # Dynamically create an attribute name
@@ -3407,9 +3407,9 @@ class IMDatabasePointCollecter:
                 diff_g_kcal = (new_im_gradient - qm_gradients[i]) 
                 cos_theta = np.dot(qm_gradients[i].ravel(), new_im_gradient.ravel()) / (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient))
                 
-                if (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient)) < 1e-5:                    # 'zero-vector' branch
+                if (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient)) < 1.0e-5:                    # 'zero-vector' branch
                     cos_theta   = 1.0
-                diff = e_x * (diff_e_kcal)**2 + (1.0 - e_x) * (diff_g_kcal**2).mean() + (1 - cos_theta)
+                diff = e_x * (diff_e_kcal)**2 + (1.0 - e_x) * (diff_g_kcal**2).mean() + 1.0 * (1 - cos_theta)
 
                 sum_sq_error += (diff)
 
@@ -3452,8 +3452,6 @@ class IMDatabasePointCollecter:
                 # residuals
                 dE_res = (new_im_energy - qm_e[i])          # kcal already
                 dG_res = (new_im_gradient - qm_gradients[i])    # (natms,3)
-                sum_of_weight_grad_num = np.zeros_like(mol.get_coordinates_in_bohr())
-                sum_of_weight_grad = np.zeros_like(mol.get_coordinates_in_bohr())
                 # print('DPS', len(dps), i)
 
                 for j, dp in enumerate(dps[:]):
@@ -3481,24 +3479,27 @@ class IMDatabasePointCollecter:
                     term3 = dw       * (P_j - new_im_energy) * S_prime / S**2 # (natms,3)  MINUS sign later
                     dG_dα = (term1 + term2 - term3) 
 
-                    dot_G = np.tensordot(dG_res, dG_dα, axes=((0,1),(0,1)))  # scalar
-
                     dE_dα = dw * (P_j - new_im_energy) / S                    # scalar
 
-                    norm_res   = np.linalg.norm(dG_res)
-                    norm_dGdα  = np.linalg.norm(dG_dα)
-                    
-                                     # scalar
-                    # dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G
-                    if (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient)) < 1e-5:
-                        dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + 0.0
-                    else:
-                        dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + dot_G / (norm_res * norm_dGdα)
+                    dot_g_gp = np.tensordot(dG_res, dG_dα, axes=((0,1),(0,1)))   # g · g'
+                    dmean_dα = 2.0 / (natms * 3) * dot_g_gp 
 
-                    # dF_dalphas[j] += 2*e_x    * dE_res * dE_dα \
-                    #             + 1 /(natms * 3) * 2*(1-e_x)* dot_G
-  
-                # print(sum_of_weight_grad, sum_of_weight_grad_num, S)
+                    norm_g = np.linalg.norm(new_im_gradient)
+                    norm_h = np.linalg.norm(qm_gradients[i])
+                    den    = norm_g * norm_h
+
+                    if den < 1.0e-5:
+                        dcos_dα = 0.0
+                    else:
+                        g_prime_dot_h = np.tensordot(dG_dα, qm_gradients[i], axes=((0,1),(0,1))) # g'·h
+                        g_dot_h      = np.tensordot(new_im_gradient, qm_gradients[i], axes=((0,1),(0,1))) # g·h
+                        g_dot_gprime = np.tensordot(new_im_gradient, dG_dα, axes=((0,1),(0,1))) # g·g'
+                        dcos_dα = (g_prime_dot_h / den) - (g_dot_h * g_dot_gprime / (norm_g**2 * den))
+                        
+                    dF_dalphas[j] += (
+                            2.0 * e_x       * dE_res * dE_dα          # energy part
+                            + (1.0 - e_x)     * dmean_dα               # mean‑square grad part
+                            - 1.0 * dcos_dα )  
             return dF_dalphas
 
                         
@@ -3598,15 +3599,15 @@ class IMDatabasePointCollecter:
             
             #     print('Gradients alpha', num_gradient - anal_grad)
             # exit()
-            # from scipy.optimize import check_grad
-            # err = check_grad(obj_energy_function,
-            #                 obj_gradient_function,
-            #                 alphas, *args)
-            # print("gradient check:", err)
+            from scipy.optimize import check_grad
+            err = check_grad(obj_energy_function,
+                            obj_gradient_function,
+                            alphas, *args)
+            print("gradient check:", err)
             
-            # exit()
+
             
-            if len(alphas) > 50 and len(geom_list) > 100:
+            if len(alphas) > 1000 and len(geom_list) > 10000:
             
                 res = minimize(
                     fun = obj_energy_function_parallel_gradient,
@@ -4187,6 +4188,20 @@ class IMDatabasePointCollecter:
 
     def extract_reference_structures(self, filename, roots):
 
+        def parse_gradient(grad_str):
+            # Remove outer [[ and ]]
+            grad_str = grad_str.strip()
+            grad_str = grad_str.lstrip("[").rstrip("]")  # remove only one layer
+            # Split by rows: each line with numbers
+            rows = grad_str.strip().split("\n")
+            data = []
+            for row in rows:
+                # Remove any inner brackets and extra spaces
+                row_clean = row.replace("[", "").replace("]", "").strip()
+                if row_clean:  # skip empty lines
+                    data.append([float(x) for x in row_clean.split()])
+            return np.array(data)
+
         xyz_strings = []  
         qm_energies = []
         qm_gradients = []  
@@ -4199,33 +4214,80 @@ class IMDatabasePointCollecter:
         with open(filename, 'r') as file:
             lines = file.readlines()
 
+        atom_line_pattern = re.compile(r"^[A-Z][a-z]?\s+[-\d\.]+\s+[-\d\.]+\s+[-\d\.]+")
+
         current_xyz = []
-        for line in lines: # read in lines from the file
+        skip_gradient = False
+
+        for line in lines:
             line = line.strip()
+
+            # new molecule start (atom count)
             if line.isdigit():  
                 if current_xyz: 
                     xyz_strings.append('\n'.join(current_xyz))
                     current_xyz = []  
-                current_xyz.append(line) 
-            elif "Energies" in line: # Extract the information of the second line that holds energy information
+                current_xyz.append(line)
+                current_xyz.append(' ')  # Add an empty line for the comment
+                print('Line is digit')
 
-                match = re.search(r"QM:\s*([\-\d\.]+)\s+QM_G:\s*([\-\d\.]+)\s+IM:\s*([\-\d\.]+)\s+Distance:\s*([\-\d\.]+)\s+State:\s*([\-\d\.]+)", line) # group the individual energies to append them in a list
-                if match:
-                    qm_energies.append(float(match.group(1)))
-                    qm_gradients.append(float(match.group(2)))
-                    im_energies.append(float(match.group(3)))
-                    distances.append(float(match.group(4)))
-                    states.append(float(match.group(5)))
+            elif "Energies" in line:
+                # # extract energies + gradient
+                # content = "\n".join(lines)
+                # pattern = (
+                #             r"QM:\s*([-0-9\.]+)\s*"
+                #             r"QM_G:\s*(\[\[[\s\S]*?\]\](?=\s*IM:))\s*"  # stop right before IM:
+                #             r"IM:\s*([-0-9\.]+)\s*"
+                #             r"Distance:\s*([-0-9\.]+)\s*"
+                #             r"State:\s*([0-9]+)"
+                #         )
+                # match = re.search(pattern, content, re.DOTALL)
+                # print(match, parse_gradient(match.group(2)), match.group(2))
+                # if match:
+                #     qm_energies.append(float(match.group(1)))
+                #     qm_gradients.append(parse_gradient(match.group(2)))
+                #     im_energies.append(float(match.group(3)))
+                #     distances.append(float(match.group(4)))
+                #     states.append(int(match.group(5)))
 
-                current_xyz.append(line) # still need to be stored as string because vlx reads it in as xyz string
+                # activate gradient skipping
+                skip_gradient = True
+
+            elif skip_gradient:
+                # Check if this line is an atom line → resume adding
+                if atom_line_pattern.match(line):
+                    skip_gradient = False
+                    current_xyz.append(line)
+                # else: we are still in QM_G gradient → skip it
             else:
                 current_xyz.append(line)
 
+        content = "\n".join(lines)
+        pattern = (
+                    r"QM:\s*([-0-9\.]+)\s*"
+                    r"QM_G:\s*(\[\[[\s\S]*?\]\](?=\s*IM:))\s*"  # stop right before IM:
+                    r"IM:\s*([-0-9\.]+)\s*"
+                    r"Distance:\s*([-0-9\.]+)\s*"
+                    r"State:\s*([0-9]+)"
+                )
+        matches = list(re.finditer(pattern, content, re.DOTALL))
+        for match in matches:
+            qm_energy = float(match.group(1))
+            grad = parse_gradient(match.group(2))
+            im_energy = float(match.group(3))
+            distance = float(match.group(4))
+            state = int(match.group(5))
 
+            qm_energies.append(qm_energy)
+            im_energies.append(im_energy)
+            distances.append(distance)
+            states.append(state)
+            qm_gradients.append(grad)
         if current_xyz:
             xyz_strings.append('\n'.join(current_xyz))
-        
+
         for i, state in enumerate(states):
+            
             mol = Molecule.from_xyz_string(xyz_strings[i])
 
             reference_molecules_check[state]['molecules'].append(mol)
