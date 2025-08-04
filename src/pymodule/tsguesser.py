@@ -138,7 +138,7 @@ class TransitionStateGuesser():
                 "Building forcefields. Disable mute_evb to see detailed output."
             )
             self.ostream.flush()
-        evb_drv.build_forcefields(
+        evb_drv.build_ff_from_molecules(
             reactant,
             product,
             reactant_partial_charges=reactant_partial_charges,

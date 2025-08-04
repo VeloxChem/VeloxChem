@@ -101,7 +101,6 @@ class EvbForceFieldBuilder():
             product_input: list[dict],
             reactant_total_multiplicity: int,
             product_total_multiplicity: int,
-            ordered_input: bool = False,
             breaking_bonds: set[tuple[int, int]] | tuple = set(),
     ):
 
@@ -138,15 +137,15 @@ class EvbForceFieldBuilder():
         self.product = self._combine_forcefield(products)
         self.product.molecule = promol
 
-        if not ordered_input:
-            self.ostream.print_info(
-                "Matching reactant and product force fields")
-            self.ostream.flush()
-            if isinstance(breaking_bonds, tuple):
-                breaking_bonds = {breaking_bonds}
-            self.product, product_mapping = self._match_reactant_and_product(
-                self.reactant, reamol.get_element_ids(), self.product,
-                promol.get_element_ids(), breaking_bonds)
+        
+        self.ostream.print_info(
+            "Matching reactant and product force fields")
+        self.ostream.flush()
+        if isinstance(breaking_bonds, tuple):
+            breaking_bonds = {breaking_bonds}
+        self.product, product_mapping = self._match_reactant_and_product(
+            self.reactant, reamol.get_element_ids(), self.product,
+            promol.get_element_ids(), breaking_bonds)
 
         formed_bonds, broken_bonds = self._summarise_reaction(
             self.reactant, self.product)

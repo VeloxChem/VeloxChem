@@ -64,6 +64,7 @@ class TestEvb:
         """
 
         reactant_input = {
+            "name": "ethanol",
             "molecule": Molecule.from_xyz_string(ethanol_xyz),
             "optimize": False,
             "forcefield": None,
@@ -71,12 +72,14 @@ class TestEvb:
             "charges": None,
         }
         product_input = [{
+            "name": "ethene",
             "molecule": Molecule.from_xyz_string(ethene_xyz),
             "optimize": False,
             "forcefield": None,
             "hessian": None,
             "charges": None,
         }, {
+            "name": "water",
             "molecule": Molecule.from_xyz_string(water_xyz),
             "optimize": False,
             "forcefield": None,
@@ -84,7 +87,7 @@ class TestEvb:
             "charges": None,
         }]
 
-        reactant, product, formed_bonds, broken_bonds, reactants, products = ffbuilder.build_forcefields(
+        reactant, product, formed_bonds, broken_bonds, reactants, products, mapping = ffbuilder.build_forcefields(
             [reactant_input], product_input, 1, 1)
 
         here = Path(__file__).parent

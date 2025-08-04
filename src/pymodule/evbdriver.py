@@ -86,11 +86,8 @@ class EvbDriver():
         self.temperature: float = 300
         self.Lambda: list[float] = None
 
-        self.input_folder: str
-
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
-        self.input_folder: str = "input_files"
 
         self.name: str = None
         self.results = None
@@ -102,27 +99,17 @@ class EvbDriver():
 
     def build_and_run_default_water_EVB(
         self,
-        reactant: str | Molecule,
-        product: str | list[str] | Molecule | list[Molecule],
+        reactant: Molecule | list[Molecule],
+        product: Molecule | list[Molecule],
         barrier,
         free_energy,
-        ordered_input=False,
     ):
-        """Automatically perform an EVB calculation using a vacuum system as reference and a system solvated in water as target system.
-
-        Args:
-            reactant (str | Molecule): The reactant. If a string is given, the corresponding xyz file must be present in the input_files folder.
-            product (str | list[str] | Molecule | list[Molecule]): A list of products. If a (list of) string(s) is given, the corresponding xyz file(s) must be present in the input_files folder.
-            barrier (float): the reaction barrier in kJ/mol of the vacuum system
-            free_energy (float): the reaction free energy in kJ/mol of the vacuum system
-            ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
-        """
         self.ostream.print_blank()
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
         
         
-        self.build_forcefields(
+        self.build_ff_from_molecules(
             reactant,
             product,
             ordered_input=True,
@@ -145,7 +132,7 @@ class EvbDriver():
 
         self.ostream.flush()
 
-    def build_forcefields(
+    def build_ff_from_molecules(
             self,
             reactant: Molecule | list[Molecule],
             product: Molecule | list[Molecule],
@@ -156,17 +143,12 @@ class EvbDriver():
             reparameterize: bool = True,
             optimize: bool = False,
             mm_opt_constrain_bonds: bool = True,
-            ordered_input: bool = False,
             breaking_bonds: set[tuple[int, int]] | tuple = set(),
             name=None,
     ):
         if self.name is None and name is not None:
             self.name = name
         cwd = Path().cwd()
-        input_path = cwd / self.input_folder
-        if not input_path.exists():
-            input_path.mkdir(parents=True, exist_ok=True)
-
         rea_input, reactant_total_charge = self._process_molecule_input(
             reactant,
             reactant_partial_charges,
@@ -194,7 +176,6 @@ class EvbDriver():
             product_input=pro_input,
             reactant_total_multiplicity=reactant_total_multiplicity,
             product_total_multiplicity=product_total_multiplicity,
-            ordered_input=ordered_input,
             breaking_bonds=breaking_bonds,
         )
 
