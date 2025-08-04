@@ -228,18 +228,29 @@ def _worker_gradient_grad(mol, qm_e_i, qm_grad_i, alphas, z_matrix,
 
         dE_dα = dw * (P_j - E_hat) / S                    # scalar
 
+        dot_g_gp = np.tensordot(dG_res, dG_dα, axes=((0,1),(0,1)))   # g · g'
+        dmean_dα = 2.0 / (natms * 3) * dot_g_gp 
+        
         norm_res   = np.linalg.norm(dG_res)
         norm_dGdα  = np.linalg.norm(dG_dα)
         
                          # scalar
         # dF_dalphas[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G
-        if (np.linalg.norm(qm_grad_i) * np.linalg.norm(G_hat)) < 1e-5:
-            dF_loc[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + 0.0
+        norm_g = np.linalg.norm(G_hat)
+        norm_h = np.linalg.norm(qm_grad_i)
+        den    = norm_g * norm_h
+        if den < 1.0e-5:
+            dcos_dα = 0.0
         else:
-            dF_loc[j] += 2*e_x * dE_res * dE_dα + 1 /(natms * 3) * 2*(1-e_x)* dot_G + dot_G / (norm_res * norm_dGdα)
-
-        # dF_dalphas[j] += 2*e_x    * dE_res * dE_dα \
-        #             + 1 /(natms * 3) * 2*(1-e_x)* dot_G
+            g_prime_dot_h = np.tensordot(dG_dα, qm_grad_i, axes=((0,1),(0,1))) # g'·h
+            g_dot_h      = np.tensordot(G_hat, qm_grad_i, axes=((0,1),(0,1))) # g·h
+            g_dot_gprime = np.tensordot(G_hat, dG_dα, axes=((0,1),(0,1))) # g·g'
+            dcos_dα = (g_prime_dot_h / den) - (g_dot_h * g_dot_gprime / (norm_g**2 * den))
+            
+        dF_loc[j] += (
+                2.0 * e_x       * dE_res * dE_dα          # energy part
+                + (1.0 - e_x)     * dmean_dα               # mean‑square grad part
+                - 1.0 * dcos_dα )  
     
     
     
