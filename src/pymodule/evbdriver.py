@@ -120,25 +120,14 @@ class EvbDriver():
         self.ostream.print_blank()
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
-        if isinstance(reactant, str) and isinstance(product, str):
-            self.build_ff_from_files(
-                reactant,
-                product,
-                ordered_input=ordered_input,
-                optimize=True,
-            )
-        elif isinstance(reactant, Molecule) and isinstance(product, Molecule):
-            self.build_ff_from_molecules(
-                reactant,
-                product,
-                ordered_input=True,
-                optimize=True,
-            )
-        else:
-            assert_msg_critical(
-                False,
-                "Either both reactant and product should be strings or both should be Molecule objects.",
-            )
+        
+        
+        self.build_forcefields(
+            reactant,
+            product,
+            ordered_input=True,
+            optimize=True,
+        )
         self.ostream.print_blank()
         self.ostream.print_header("Building systems")
         self.ostream.flush()
@@ -156,7 +145,7 @@ class EvbDriver():
 
         self.ostream.flush()
 
-    def build_ff_from_molecules(
+    def build_forcefields(
             self,
             reactant: Molecule | list[Molecule],
             product: Molecule | list[Molecule],
@@ -171,7 +160,7 @@ class EvbDriver():
             breaking_bonds: set[tuple[int, int]] | tuple = set(),
             name=None,
     ):
-        if self.name is None:
+        if self.name is None and name is not None:
             self.name = name
         cwd = Path().cwd()
         input_path = cwd / self.input_folder
@@ -252,232 +241,6 @@ class EvbDriver():
         total_charge = sum([mol.get_charge() for mol in molecules])
         return input, total_charge
 
-    def build_ff_from_files(
-        self,
-        reactant: str | list[str],
-        product: str | list[str],
-        reactant_charge: int | list[int] = 0,
-        product_charge: int | list[int] = 0,
-        reactant_multiplicity: int | list[int] = 1,
-        product_multiplicity: int | list[int] = 1,
-        reparameterize: bool = True,
-        optimize: bool = False,
-        mm_opt_constrain_bonds: bool = True,
-        ordered_input: bool = False,
-        breaking_bonds: set[tuple[int, int]] | tuple = set(),
-        save_output: bool = True,
-        force_recalculation: bool = False,
-    ):
-        if isinstance(reactant, list):
-            combined_reactant_name = '_'.join(reactant)
-        else:
-            combined_reactant_name = reactant
-        if self.name is None:
-            self.name = combined_reactant_name
-        combined_rea_input = self._get_input_files(combined_reactant_name)
-
-        if isinstance(product, list):
-            combined_product_name = '_'.join(product)
-        else:
-            combined_product_name = product
-        combined_pro_input = self._get_input_files(combined_product_name)
-
-        cwd = Path().cwd()
-        mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
-        if (combined_rea_input['forcefield'] is not None
-                and combined_rea_input['molecule'] is not None
-                and combined_pro_input['forcefield'] is not None
-                and mapped_product_path.exists() and not force_recalculation):
-            mapped_product_molecule = Molecule.read_xyz_file(
-                str(mapped_product_path))
-            combined_pro_input['forcefield'].molecule = mapped_product_molecule
-            combined_pro_input['molecule'] = mapped_product_molecule
-            self.ostream.print_info(
-                f"Found both reactant and product forcefield data. Not generating new forcefields"
-            )
-            self.reactant = combined_rea_input["forcefield"]
-            self.product = combined_pro_input["forcefield"]
-            self.ostream.flush()
-        else:
-            rea_input, reactant_total_multiplicity = self._process_file_input(
-                reactant,
-                reactant_charge,
-                reactant_multiplicity,
-            )
-
-            pro_input, product_total_multiplicity = self._process_file_input(
-                product,
-                product_charge,
-                product_multiplicity,
-            )
-
-            ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
-            ffbuilder.water_model = self.water_model
-            ffbuilder.reparameterize = reparameterize
-            ffbuilder.optimize = optimize
-            ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
-
-            if force_recalculation:
-                self.ostream.print_warning(
-                    f"Forcing recalculation of forcefields, even though they might all be present"
-                )
-                for rea in rea_input:
-                    rea['forcefield'] = None
-                for pro in pro_input:
-                    pro['forcefield'] = None
-            (self.reactant, self.product, self.forming_bonds,
-             self.breaking_bonds, self.reactants, self.products,
-             self.product_mapping) = ffbuilder.build_forcefields(
-                 rea_input,
-                 pro_input,
-                 reactant_total_multiplicity,
-                 product_total_multiplicity,
-                 ordered_input,
-                 breaking_bonds,
-             )
-            if save_output:
-                self.ostream.print_info(
-                    f"Saving forcefield and structure data to {self.input_folder} folder"
-                )
-                cwd = Path().cwd()
-                reactant_ff_path = cwd / self.input_folder / f"{combined_reactant_name}_ff_data.json"
-                product_ff_path = cwd / self.input_folder / f"{combined_product_name}_ff_data.json"
-                self.save_forcefield(self.reactant, str(reactant_ff_path))
-                self.save_forcefield(self.product, str(product_ff_path))
-
-                reactant_mol_path = cwd / self.input_folder / f"{combined_reactant_name}.xyz"
-                self.reactant.molecule.write_xyz_file(str(reactant_mol_path))
-                self.product.molecule.write_xyz_file(str(mapped_product_path))
-
-    def _process_file_input(self, filenames, charge, multiplicity):
-        if isinstance(filenames, str):
-            filenames = [filenames]
-
-        # by default, give all molecules 0 charge and 1 multiplicity
-        if isinstance(charge, int):
-            if charge == 0:
-                charge = [charge] * len(filenames)
-            else:
-                charge = [charge]
-
-        if isinstance(multiplicity, int):
-            if multiplicity == 1:
-                multiplicity = [multiplicity] * len(filenames)
-            else:
-                multiplicity = [multiplicity]
-        total_multiplicity = 0
-        for mult in multiplicity:
-            total_multiplicity += mult - 1
-        total_multiplicity += 1
-
-        assert len(filenames) == len(
-            charge), "Number of reactants and charges must match"
-        assert len(filenames) == len(
-            multiplicity), "Number of reactants and multiplicities must match"
-
-        input = []
-        for rea, charge, mult, name in zip(filenames, charge, multiplicity):
-            input.append(self._get_input_files(rea))
-            if input[-1]['molecule'] is not None:
-                self.ostream.print_info(f"Processing molecule input for {rea}")
-                self.ostream.flush()
-                input[-1]['molecule'].set_charge(charge)
-                input[-1]['molecule'].set_multiplicity(mult)
-                molecule_sanity_check(input[-1]['molecule'])
-
-            partial_charge = input[-1]['charges']
-            if partial_charge is not None:
-                assert abs(
-                    sum(partial_charge) - charge
-                ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total formal charge of the system {charge} for input {name}"
-
-        for inp, name in zip(input, filenames):
-            assert inp['molecule'] is not None or inp[
-                'forcefield'] is not None, f"Could not load {name} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
-            inp['name'] = name
-
-        return input, total_multiplicity
-
-    def _get_input_files(self, filename: str):
-        # Build a molecule from a (possibly optimized) geometry
-        optimize = True
-        cwd = Path().cwd()
-
-        opt_path = cwd / self.input_folder / f"{filename}_xtb_opt.xyz"
-        struct_path = cwd / self.input_folder / f"{filename}.xyz"
-        if opt_path.exists():
-            self.ostream.print_info(
-                f"Loading optimized geometry from {opt_path}")
-            molecule = Molecule.read_xyz_file(str(opt_path))
-            optimize = False
-        elif struct_path.exists():
-            self.ostream.print_info(
-                f"Loading (possibly unoptimized) geometry from {struct_path}")
-            molecule = Molecule.read_xyz_file(str(struct_path))
-        else:
-            molecule = None
-            self.ostream.print_info(
-                f"Could not load {'/'.join(opt_path.parts[-2:])} and {'/'.join(struct_path.parts[-2:])}"
-            )
-        self.ostream.flush()
-
-        charges = None
-        charge_path = cwd / self.input_folder / f"{filename}_charges.txt"
-        if charge_path.exists():
-            with open(charge_path, "r", encoding="utf-8") as file:
-                charges = []
-                for line in file:
-                    try:
-                        charges.append(float(line))
-                    except ValueError:
-                        self.ostream.print_info(
-                            f"Could not read line {line} from {charge_path}. Continuing"
-                        )
-            print_charge = sum([round(charge, 3) for charge in charges])
-            self.ostream.print_info(
-                f"Loading charges from {charge_path} file, total charge: {print_charge}"
-            )
-        else:
-            self.ostream.print_info(
-                f"Could not load {'/'.join(charge_path.parts[-2:])} file. Continuing without charges"
-            )
-        self.ostream.flush()
-
-        forcefield = None
-        json_path = cwd / self.input_folder / f"{filename}_ff_data.json"
-        if json_path.exists():
-            self.ostream.print_info(
-                f"Loading force field data from {json_path}")
-            forcefield = self.load_forcefield_from_json(str(json_path))
-            if charges is not None:
-                forcefield.partial_charges = charges
-            if molecule is not None:
-                forcefield.molecule = molecule
-        else:
-            self.ostream.print_info(
-                f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json."
-            )
-        self.ostream.flush()
-
-        hessian = None
-        hessian_path = cwd / self.input_folder / f"{filename}_hess.np"
-        if hessian_path.exists():
-            self.ostream.print_info(
-                f"Found hessian file at {hessian_path}, using it to reparameterize."
-            )
-            hessian = np.loadtxt(hessian_path)
-        else:
-            self.ostream.print_info(
-                f"Could not find hessian file at {hessian_path}")
-        self.ostream.flush()
-
-        return {
-            "molecule": molecule,
-            "optimize": optimize,
-            "forcefield": forcefield,
-            "hessian": hessian,
-            "charges": charges
-        }
 
     #todo, should be moved to forcefieldgenerator class
     @staticmethod
