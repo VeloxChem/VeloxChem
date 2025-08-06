@@ -89,7 +89,7 @@ class EvbForceFieldBuilder():
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
 
-        self.mute_scf: bool = True
+        self.mute_scf: bool = False
 
         self.optimize_ff: bool = True
         self.mm_opt_constrain_bonds: bool = True
@@ -411,12 +411,16 @@ class EvbForceFieldBuilder():
                 else:
                     scf_drv = ScfUnrestrictedDriver()
 
+                self.ostream.print_info("Calculating SCF for RESP charges")
+                self.ostream.flush()
                 if self.mute_scf:
                     scf_drv.ostream.mute()
-                    self.ostream.print_info("Calculating SCF for RESP charges")
-                    self.ostream.flush()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
+                    self.ostream.print_warning(
+                        "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
+                    )
+                    self.ostream.flush()
                     scf_drv.conv_thresh = 1.0e-4
                     scf_drv.max_iter = 200
                     scf_results = scf_drv.compute(molecule, basis)
