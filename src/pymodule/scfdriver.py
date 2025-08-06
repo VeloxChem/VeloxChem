@@ -243,6 +243,7 @@ class ScfDriver:
         self.cpcm_epsilon = 78.39
         self.cpcm_grid_per_sphere = 194
         self.cpcm_x = 0
+        self.cpcm_radii_scaling = 1.2
         self.cpcm_custom_vdw_radii = None
 
         # point charges (in case we want a simple MM environment without PE)
@@ -567,6 +568,7 @@ class ScfDriver:
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.radii_scaling = self.cpcm_radii_scaling
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
         else:

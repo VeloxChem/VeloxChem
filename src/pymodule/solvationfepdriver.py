@@ -381,7 +381,7 @@ class SolvationFepDriver:
         self.ostream.flush()
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
-        #rename
+
         delta_f = {i+1: {'Delta_f': self.delta_f[i]['Delta_f'][-1,0],
                 'Uncertainty': self.delta_f[i]['dDelta_f'][-1,0]}
           for i in range(4)}
@@ -719,7 +719,7 @@ class SolvationFepDriver:
         n_states = u_kln.shape[0]
         N_k = np.zeros(n_states)
         subsample_indices = []
-        # TODO: change this, subsampling is not recommended. 
+ 
         for k in range(n_states):
             t0, g, Neff_max = timeseries.detect_equilibration(u_kln[k, k, :])
             u_equil = u_kln[k, k, t0:]
@@ -744,6 +744,7 @@ class SolvationFepDriver:
 
         return delta_f
 
+    ## TODO: Consier just setting default alchemical region as the first residue in the pdb/gro, else that the user simply provides the indices in a list 
     def _old_get_alchemical_region(self, topology):
         """
         Define alchemical (perturbed) and chemical (unperturbed) regions.
