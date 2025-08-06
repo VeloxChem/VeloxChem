@@ -89,7 +89,7 @@ class EvbForceFieldBuilder():
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
 
-        self.mute_scf: bool = False
+        self.mute_scf: bool = True
 
         self.optimize_ff: bool = True
         self.mm_opt_constrain_bonds: bool = True

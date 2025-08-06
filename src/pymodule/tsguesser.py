@@ -36,6 +36,7 @@ import numpy as np
 import os
 import math
 import copy
+import h5py
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
@@ -91,11 +92,13 @@ class TransitionStateGuesser():
         self.scf_drv = None
         self.evb_drv: None | EvbDriver = None
         self.molecule = None
+        self.results = None
         self.folder_name = 'ts_data'
         self.force_conformer_search = False
         self.skip_conformer_search = False
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
+        self.results_file = 'ts_results.h5'
 
     def find_TS(
         self,
@@ -233,6 +236,9 @@ class TransitionStateGuesser():
         self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
         self.molecule.set_multiplicity(mult)
         self.molecule.set_charge(charge)
+        self.ostream.print_info(f"Saving results to {self.results_file}")
+        self.ostream.flush()
+        self._save_results(self.results_file, self.results)
         return self.molecule, self.results
 
     def _print_initial_mm_header(self):
@@ -699,7 +705,7 @@ class TransitionStateGuesser():
         scf_results = self.scf_drv.compute(self.molecule, basis)
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
-    def show_results(self, ts_results=None, atom_indices=False):
+    def show_results(self, ts_results=None, atom_indices=False, filename=None):
         """Show the results of the transition state guesser.
         This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
 
@@ -717,8 +723,16 @@ class TransitionStateGuesser():
             raise ImportError('ipywidgets is required for this functionality.')
 
         if ts_results is None:
-            ts_results = self.results
-
+            if self.results is not None:
+                ts_results = self.results
+            else:
+                try:
+                    if filename is not None:
+                        self.results_file = filename
+                    ts_results = self.load_results(self.results_file)
+                except Exception as e:
+                    raise e
+                    
         mm_energies = ts_results['mm_energies']
         geometries = ts_results['xyz_geometries']
         lambda_vec = ts_results['lambda_vec']
@@ -852,3 +866,39 @@ class TransitionStateGuesser():
         for i in range(molecule.number_of_atoms()):
             molecule.set_atom_coordinates(i, positions[i])
         return molecule
+
+    @staticmethod
+    def _save_results(fname,results):
+        hf = h5py.File(fname, 'w')
+        mm_energies = results['mm_energies']
+        geometries = results['xyz_geometries']
+        lambda_vec = results['lambda_vec']
+        scf_energies = results.get('scf_energies', None)
+        final_lambda = results['final_lambda']
+
+        hf.create_dataset('mm_energies', data=mm_energies, dtype='f')
+        hf.create_dataset('xyz_geometries', data=geometries)
+        hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
+        if scf_energies is not None:
+            hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
+        hf.create_dataset('final_lambda', data=final_lambda, dtype='f')
+        
+
+    @staticmethod
+    def _load_results(fname):
+        hf = h5py.File(fname, 'r')
+        results = {}
+        results['mm_energies'] = hf['mm_energies'][:]
+        results['xyz_geometries'] = [s.decode('utf-8') for s in hf['xyz_geometries'][:]]
+        results['lambda_vec'] = hf['lambda_vec'][:]
+        if 'scf_energies' in hf:
+            results['scf_energies'] = hf['scf_energies'][:]
+        results['final_lambda'] = hf['final_lambda'][()]
+        return results
+    
+    def load_results(self, fname):
+        self.ostream.print_info(f"Loading results from {fname}")
+        self.ostream.flush()
+        results = self._load_results(fname)
+        self.results = results
+        return results
