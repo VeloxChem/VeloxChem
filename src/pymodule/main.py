@@ -72,6 +72,7 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
+from .localizationdriver import LocalizationDriver
 
 
 def select_scf_driver(task, scf_type):
@@ -577,6 +578,11 @@ def main():
         rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+        if 'localize_mos' in rsp_dict:
+            loc_drv = LocalizationDriver()
+            mo_list_str = rsp_dict['localize_mos']
+            mo_list = [int(x) for x in mo_list_str.strip("[]").split(",")]
+            scf_results['C_alpha'] = loc_drv.compute(task.molecule, task.ao_basis, scf_results, mo_list)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)

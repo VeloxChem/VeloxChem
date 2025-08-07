@@ -159,6 +159,8 @@ from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
 from .rixsdriver import RixsDriver
+from .rixsdriver_backup import RixsDriver_backup
+from .localizationdriver import LocalizationDriver
 from .rixsdriverold import oldRixsDriver
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
