@@ -158,111 +158,41 @@ class EvbSystemBuilder():
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
         self.keywords = {
-            "temperature": {
-                "type": float
-            },
-            "nb_cutoff": {
-                "type": float
-            },
-            "bonded_integration": {
-                "type": bool
-            },
-            "bonded_integration_bond_fac": {
-                "type": float
-            },
-            "bonded_integration_angle_fac": {
-                "type": float
-            },
-            "torsion_lambda_switch": {
-                "type": float
-            },
-            "soft_core_coulomb_pes_static": {
-                "type": bool
-            },
-            "soft_core_lj_pes_static": {
-                "type": bool
-            },
-            "soft_core_coulomb_pes_dynamic": {
-                "type": bool
-            },
-            "soft_core_lj_pes_dynamic": {
-                "type": bool
-            },
-            "soft_core_coulomb_int": {
-                "type": bool
-            },
-            "soft_core_lj_int": {
-                "type": bool
-            },
-            "int_nb_const_exceptions": {
-                "type": bool
-            },
-            "pressure": {
-                "type": float
-            },
-            "solvent": {
-                "type": str
-            },
-            "padding": {
-                "type": float
-            },
-            "no_reactant": {
-                "type": bool
-            },
-            "E_field": {
-                "type": list
-            },
-            "neutralize": {
-                "type": bool
-            },
-            "morse_D_default": {
-                "type": float
-            },
-            "morse_couple": {
-                "type": float
-            },
-            "posres_k": {
-                "type": float
-            },
-            "posres_residue_radius": {
-                "type": float
-            },
-            "coul14_scale": {
-                "type": float
-            },
-            "lj14_scale": {
-                "type": float
-            },
-            "pdb": {
-                "type": str
-            },
-            "pdb_active_res": {
-                "type": list
-            },
-            "no_force_groups": {
-                "type": bool
-            },
-            "nb_switching_function": {
-                "type": bool
-            },
-            'graphene': {
-                "type": bool
-            },
-            'graphene_size_nm': {
-                'type': float
-            },
-            "CNT": {
-                "type": bool
-            },
-            "CNT_radius_nm": {
-                "type": float
-            },
-            "decompose_nb": {
-                "type": list
-            },
-            "decompose_bonded": {
-                "type": bool
-            },
+            "temperature": float,
+            "nb_cutoff": float,
+            "bonded_integration": bool,
+            "bonded_integration_bond_fac": float,
+            "bonded_integration_angle_fac": float,
+            "torsion_lambda_switch": float,
+            "soft_core_coulomb_pes_static": bool,
+            "soft_core_lj_pes_static": bool,
+            "soft_core_coulomb_pes_dynamic": bool,
+            "soft_core_lj_pes_dynamic": bool,
+            "soft_core_coulomb_int": bool,
+            "soft_core_lj_int": bool,
+            "int_nb_const_exceptions": bool,
+            "pressure": float,
+            "solvent": str,
+            "padding": float,
+            "no_reactant": bool,
+            "E_field": list,
+            "neutralize": bool,
+            "morse_D_default": float,
+            "morse_couple": float,
+            "posres_k": float,
+            "posres_residue_radius": float,
+            "coul14_scale": float,
+            "lj14_scale": float,
+            "pdb": str,
+            "pdb_active_res": list,
+            "no_force_groups": bool,
+            "nb_switching_function": bool,
+            'graphene': bool,
+            'graphene_size_nm': float,
+            "CNT": bool,
+            "CNT_radius_nm": float,
+            "decompose_nb": list,
+            "decompose_bonded": bool,
         }
 
     def build_systems(
@@ -277,13 +207,13 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules,
                             'openmm is required for EvbSystemBuilder.')
 
-        for keyword, value in self.keywords.items():
+        for keyword, val in self.keywords.items():
             if keyword in configuration:
-                if (not isinstance(configuration[keyword], value["type"])
+                if (not isinstance(configuration[keyword], val)
                         and not (isinstance(configuration[keyword], int)
-                                 and value["type"] == float)):
-                    raise ValueError(
-                        f"Configuration option {keyword} should be of type {value['type']}"
+                                 and val == float)):
+                    raise TypeError(
+                        f"Configuration option {keyword} should be of type {val}, but got {type(configuration[keyword])} instead."
                     )
                 else:
                     setattr(self, keyword, configuration[keyword])

@@ -107,8 +107,7 @@ class EvbDriver():
         self.ostream.print_blank()
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
-        
-        
+
         self.build_ff_from_molecules(
             reactant,
             product,
@@ -144,171 +143,22 @@ class EvbDriver():
             optimize: bool = False,
             mm_opt_constrain_bonds: bool = True,
             breaking_bonds: set[tuple[int, int]] | tuple = set(),
-            name=None,
     ):
-        if self.name is None and name is not None:
-            self.name = name
-        cwd = Path().cwd()
-        rea_input, reactant_total_charge = self._process_molecule_input(
-            reactant,
-            reactant_partial_charges,
-            "REA",
-        )
-
-        pro_input, product_total_charge = self._process_molecule_input(
-            product,
-            product_partial_charges,
-            "PRO",
-        )
-        assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
-
-        ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
-        ffbuilder.water_model = self.water_model
+        
+        ffbuilder = EvbForceFieldBuilder()
+        ffbuilder.reactant_partial_charges = reactant_partial_charges
+        ffbuilder.product_partial_charges = product_partial_charges
+        ffbuilder.reactant_total_multiplicity = reactant_total_multiplicity
+        ffbuilder.product_total_multiplicity = product_total_multiplicity
         ffbuilder.reparameterize = reparameterize
         ffbuilder.optimize = optimize
         ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
-
-        if isinstance(breaking_bonds, tuple):
-            breaking_bonds = [breaking_bonds]
+        ffbuilder.breaking_bonds = breaking_bonds
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = ffbuilder.build_forcefields(
-            reactant_input=rea_input,
-            product_input=pro_input,
-            reactant_total_multiplicity=reactant_total_multiplicity,
-            product_total_multiplicity=product_total_multiplicity,
-            breaking_bonds=breaking_bonds,
+            reactant=reactant,
+            product=product,
         )
-
-    @staticmethod
-    def _process_molecule_input(molecules, partial_charges, name="mol"):
-        if isinstance(molecules, Molecule):
-            molecules = [molecules]
-
-        if partial_charges is None:
-            partial_charges = [None] * len(molecules)
-        elif isinstance(partial_charges[0], float) or isinstance(
-                partial_charges[0], int):
-            partial_charges = [partial_charges]
-
-        # Casting to float is necessary for json serialization
-        for charge_list in partial_charges:
-            if charge_list is not None:
-                for i in range(len(charge_list)):
-                    if isinstance(charge_list[i], int):
-                        charge_list[i] = float(charge_list[i])
-
-        assert len(molecules) == len(
-            partial_charges
-        ), "Amount of input molecules and lists of partial charges must match"
-
-        for i, (molecule,
-                partial_charge) in enumerate(zip(molecules, partial_charges)):
-            charge = molecule.get_charge()
-            molecule_sanity_check(molecule)
-            if partial_charge is not None:
-                assert abs(
-                    sum(partial_charge) - charge
-                ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total formal charge of the system {charge} for input {i+1}"
-
-        input = [{
-            "molecule": mol,
-            "optimize": None,
-            "forcefield": None,
-            "hessian": None,
-            "charges": charge,
-            "name": f"{name}_{i+1}",
-        } for mol, charge, i in zip(molecules, partial_charges,
-                                    range(len(molecules)))]
-        total_charge = sum([mol.get_charge() for mol in molecules])
-        return input, total_charge
-
-
-    #todo, should be moved to forcefieldgenerator class
-    @staticmethod
-    def load_forcefield_from_json(path: str) -> MMForceFieldGenerator:
-        """
-        Load forcefield data from a JSON file.
-
-        Args:
-            Path (str): The path to the JSON file containing the forcefield data.
-
-        Returns:
-            MMForceFieldGenerator: The updated forcefield object with the loaded data.
-        """
-        with open(path, "r", encoding="utf-8") as file:
-            forcefield = MMForceFieldGenerator()
-            ff_data = json.load(file)
-
-            forcefield.atoms = EvbDriver._str_to_tuple_key(ff_data["atoms"])
-            forcefield.bonds = EvbDriver._str_to_tuple_key(ff_data["bonds"])
-            forcefield.angles = EvbDriver._str_to_tuple_key(ff_data["angles"])
-            forcefield.dihedrals = EvbDriver._str_to_tuple_key(
-                ff_data["dihedrals"])
-            forcefield.impropers = EvbDriver._str_to_tuple_key(
-                ff_data["impropers"])
-        return forcefield
-
-    #todo, should be moved to forcefieldgenerator class
-    @staticmethod
-    def save_forcefield(forcefield: MMForceFieldGenerator, path: str):
-        """
-        Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
-
-        Args:
-            forcefield (MMForceFieldGenerator): The forcefield object containing the data to be saved.
-            filename (str): The name of the file to save the forcefield data to.
-
-        Returns:
-            None
-        """
-        ff_data = {
-            "atoms": forcefield.atoms,
-            "bonds": EvbDriver._tuple_to_str_key(forcefield.bonds),
-            "angles": EvbDriver._tuple_to_str_key(forcefield.angles),
-            "dihedrals": EvbDriver._tuple_to_str_key(forcefield.dihedrals),
-            "impropers": EvbDriver._tuple_to_str_key(forcefield.impropers),
-        }
-        with open(path, "w", encoding="utf-8") as file:
-            json.dump(ff_data, file, indent=4)
-
-    @staticmethod
-    def _str_to_tuple_key(dictionary: dict) -> dict:
-        """
-        Converts the keys of a dictionary from string to tuple.
-
-        Args:
-            dictionary (dict): The dictionary to convert.
-
-        Returns:
-            dict: The dictionary with keys converted to tuple.
-        """
-        str_keys = list(dictionary.keys())
-        tup_keys = []
-        for str_key in str_keys:
-            tuple = ()
-            for item in str_key.split(","):
-                item = item.replace("(", "")
-                item = item.replace(")", "")
-                item = item.replace(" ", "")
-                tuple += (int(item), )
-            if len(tuple) == 1:
-                tuple = tuple[0]
-            tup_keys.append(tuple)
-        return {key: value for key, value in zip(tup_keys, dictionary.values())}
-
-    @staticmethod
-    def _tuple_to_str_key(dictionary: dict) -> dict:
-        """
-        Converts the keys of a dictionary from tuples to strings.
-
-        Args:
-            dictionary (dict): The dictionary to be converted.
-
-        Returns:
-            dict: The dictionary with string keys.
-
-        """
-        return {str(key): value for key, value in dictionary.items()}
 
     def build_systems(
         self,
@@ -387,9 +237,9 @@ class EvbDriver():
             self.product.molecule.write_xyz_file(
                 str(data_folder_path / "product_struct.xyz"))
 
-            self.save_forcefield(
+            MMForceFieldGenerator.save_forcefield(
                 self.reactant, str(data_folder_path / f"reactant_ff_data.json"))
-            self.save_forcefield(
+            MMForceFieldGenerator.save_forcefield(
                 self.product, str(data_folder_path / f"product_ff_data.json"))
 
             if conf.get('solvent', None) is None and conf.get('pressure',

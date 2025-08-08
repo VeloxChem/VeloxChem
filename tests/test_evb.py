@@ -9,6 +9,7 @@ from veloxchem.evbffbuilder import EvbForceFieldBuilder
 from veloxchem.evbsystembuilder import EvbSystemBuilder
 from veloxchem.evbdataprocessing import EvbDataProcessing
 from veloxchem.xtbdriver import XtbDriver
+from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 
 try:
     import openmm as mm
@@ -62,39 +63,23 @@ class TestEvb:
         H         -1.89040        1.13075       -0.65905
         O         -1.56707        0.49671        0.00000
         """
+        reactant = Molecule.from_xyz_string(ethanol_xyz)
+        product = [
+            Molecule.from_xyz_string(ethene_xyz),
+            Molecule.from_xyz_string(water_xyz),
+        ]
 
-        reactant_input = {
-            "name": "ethanol",
-            "molecule": Molecule.from_xyz_string(ethanol_xyz),
-            "optimize": False,
-            "forcefield": None,
-            "hessian": None,
-            "charges": None,
-        }
-        product_input = [{
-            "name": "ethene",
-            "molecule": Molecule.from_xyz_string(ethene_xyz),
-            "optimize": False,
-            "forcefield": None,
-            "hessian": None,
-            "charges": None,
-        }, {
-            "name": "water",
-            "molecule": Molecule.from_xyz_string(water_xyz),
-            "optimize": False,
-            "forcefield": None,
-            "hessian": None,
-            "charges": None,
-        }]
-
+        # todo how robust do I need to test these different input options?
         reactant, product, formed_bonds, broken_bonds, reactants, products, mapping = ffbuilder.build_forcefields(
-            [reactant_input], product_input, 1, 1)
+            reactant=reactant,
+            product=product,
+        )
 
         here = Path(__file__).parent
         reapath = str(here / 'data' / 'evb_ethanol_ff_data.json')
         propath = str(here / 'data' / 'evb_ethene_H2O_ff_data.json')
-        reactant_ref = EvbDriver.load_forcefield_from_json(reapath)
-        product_ref = EvbDriver.load_forcefield_from_json(propath)
+        reactant_ref = MMForceFieldGenerator.load_forcefield_from_json(reapath)
+        product_ref = MMForceFieldGenerator.load_forcefield_from_json(propath)
 
         self._compare_dict(reactant.bonds, reactant_ref.bonds)
         self._compare_dict(reactant.angles, reactant_ref.angles)
@@ -150,12 +135,13 @@ class TestEvb:
         propath = str(data_path / 'evb_ethene_H2O_ff_data.json')
 
         # build systems in water and vacuum
+        system_builder = EvbSystemBuilder()
 
         reactant_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethanol.xyz'), )
-        reactant = EvbDriver.load_forcefield_from_json(reapath)
+        reactant = MMForceFieldGenerator.load_forcefield_from_json(reapath)
         reactant.molecule = reactant_mol
-        product = EvbDriver.load_forcefield_from_json(propath)
+        product = MMForceFieldGenerator.load_forcefield_from_json(propath)
         product_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethene_H2O.xyz'), )
         product.molecule = product_mol
@@ -166,8 +152,7 @@ class TestEvb:
 
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
-        system_builder = EvbSystemBuilder()
-        system_builder.water_model = EVB.water_model
+        system_builder.water_model = 'spce'
         vac_systems, vac_topology, vac_positions = system_builder.build_systems(
             reactant,
             product,

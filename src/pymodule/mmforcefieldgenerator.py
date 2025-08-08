@@ -36,6 +36,7 @@ import numpy as np
 import tempfile
 import sys
 import re
+import json
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from collections import defaultdict
@@ -3353,3 +3354,97 @@ class MMForceFieldGenerator:
                 atom_names[i] = label
 
         return atom_names
+
+    @staticmethod
+    def load_forcefield_from_json(path: str):
+        """
+        Load forcefield data from a JSON file.
+
+        Args:
+            Path (str): The path to the JSON file containing the forcefield data.
+
+        Returns:
+            MMForceFieldGenerator: The updated forcefield object with the loaded data.
+        """
+        with open(path, "r", encoding="utf-8") as file:
+            forcefield = MMForceFieldGenerator()
+            ff_data = json.load(file)
+
+            forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
+                ff_data["atoms"])
+            forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
+                ff_data["bonds"])
+            forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
+                ff_data["angles"])
+            forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
+                ff_data["dihedrals"])
+            forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
+                ff_data["impropers"])
+        return forcefield
+
+    #todo, should be moved to forcefieldgenerator class
+    @staticmethod
+    def save_forcefield(forcefield, path: str):
+        """
+        Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
+
+        Args:
+            forcefield (MMForceFieldGenerator): The forcefield object containing the data to be saved.
+            filename (str): The name of the file to save the forcefield data to.
+
+        Returns:
+            None
+        """
+        ff_data = {
+            "atoms":
+            forcefield.atoms,
+            "bonds":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
+            "angles":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
+            "dihedrals":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.dihedrals),
+            "impropers":
+            MMForceFieldGenerator._tuple_to_str_key(forcefield.impropers),
+        }
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(ff_data, file, indent=4)
+
+    @staticmethod
+    def _str_to_tuple_key(dictionary: dict) -> dict:
+        """
+        Converts the keys of a dictionary from string to tuple.
+
+        Args:
+            dictionary (dict): The dictionary to convert.
+
+        Returns:
+            dict: The dictionary with keys converted to tuple.
+        """
+        str_keys = list(dictionary.keys())
+        tup_keys = []
+        for str_key in str_keys:
+            tuple = ()
+            for item in str_key.split(","):
+                item = item.replace("(", "")
+                item = item.replace(")", "")
+                item = item.replace(" ", "")
+                tuple += (int(item), )
+            if len(tuple) == 1:
+                tuple = tuple[0]
+            tup_keys.append(tuple)
+        return {key: value for key, value in zip(tup_keys, dictionary.values())}
+
+    @staticmethod
+    def _tuple_to_str_key(dictionary: dict) -> dict:
+        """
+        Converts the keys of a dictionary from tuples to strings.
+
+        Args:
+            dictionary (dict): The dictionary to be converted.
+
+        Returns:
+            dict: The dictionary with string keys.
+
+        """
+        return {str(key): value for key, value in dictionary.items()}
