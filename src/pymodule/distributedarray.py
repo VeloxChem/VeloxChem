@@ -37,6 +37,7 @@ import h5py
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import mpi_size_limit
+from .veloxchemlib import matmul_gpu
 
 
 class DistributedArray:
@@ -247,7 +248,12 @@ class DistributedArray:
             A numpy array on the master node, None on other nodes.
         """
 
-        mat = np.matmul(self.data.T, dist_array.data)
+        if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
+                self.data.dtype == np.float64 and
+                dist_array.data.dtype == np.float64):
+            mat = matmul_gpu(self.data.T, dist_array.data)
+        else:
+            mat = np.matmul(self.data.T, dist_array.data)
 
         if factor is not None:
             mat *= factor
@@ -269,7 +275,12 @@ class DistributedArray:
             A numpy array that is available on all nodes.
         """
 
-        mat = np.matmul(self.data.T, dist_array.data)
+        if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
+                self.data.dtype == np.float64 and
+                dist_array.data.dtype == np.float64):
+            mat = matmul_gpu(self.data.T, dist_array.data)
+        else:
+            mat = np.matmul(self.data.T, dist_array.data)
 
         if factor is not None:
             mat *= factor
@@ -291,7 +302,11 @@ class DistributedArray:
             A distributed array.
         """
 
-        seg_mat = np.matmul(self.data, array)
+        if (self.data.ndim == 2 and array.ndim == 2 and
+                self.data.dtype == np.float64 and array.dtype == np.float64):
+            seg_mat = matmul_gpu(self.data, array)
+        else:
+            seg_mat = np.matmul(self.data, array)
 
         if factor is not None:
             seg_mat *= factor
