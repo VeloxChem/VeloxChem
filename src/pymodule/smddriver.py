@@ -54,7 +54,7 @@ from .errorhandler import assert_msg_critical
 # thing extra to do is collecting the new parameters --> i.e., waking up smd VIA scf_drv, rather than
 # the other way around 
 
-class SMDDriver:
+class _SmdDriver_WorkInProgress:
     """
     SMD (Solvation Model based on Density) calculations.
 

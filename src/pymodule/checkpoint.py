@@ -37,7 +37,8 @@ import h5py
 
 from .veloxchemlib import mpi_master
 from .distributedarray import DistributedArray
-
+from .errorhandler import assert_msg_critical
+from .molecule import Molecule
 
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
@@ -142,7 +143,7 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         hf.close()
 
 
-def write_rsp_solution(fname, key, vec):
+def write_rsp_solution(fname, key, vec, group_label='rsp'):
     """
     Writes a response solution vector to HDF5 file.
 
@@ -152,18 +153,20 @@ def write_rsp_solution(fname, key, vec):
         The key for the solution vector.
     :param vec:
         The solution vector.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
-        label = 'rsp/' + key
+        label = group_label + '/' + key
         if label in hf:
             del hf[label]
         hf.create_dataset(label, data=vec)
         hf.close()
 
 
-def write_rsp_solution_with_multiple_keys(fname, keys, vec):
+def write_rsp_solution_with_multiple_keys(fname, keys, vec, group_label='rsp'):
     """
     Writes a response solution vector with multiple keys to HDF5 file.
 
@@ -173,18 +176,20 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         The list of keys for the solution vector.
     :param vec:
         The solution vector.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
 
-        label = 'rsp/' + keys[0]
+        label = group_label + '/' + keys[0]
         if label in hf:
             del hf[label]
         dset = hf.create_dataset(label, data=vec)
 
         for key in keys[1:]:
-            label = 'rsp/' + key
+            label = group_label + '/' + key
             if label in hf:
                 del hf[label]
             hf[label] = dset
@@ -192,7 +197,7 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         hf.close()
 
 
-def write_lr_rsp_results_to_hdf5(fname, rsp_results):
+def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
     """
     Writes the results of a linear response calculation to HDF5 file.
 
@@ -200,6 +205,8 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
         Name of the HDF5 file.
     :param rsp_results:
         The dictionary containing the linear response results.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
@@ -211,7 +218,7 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
             if "vector" in key or "cube" in key or "file" in key or "details" in key:
                 continue
 
-            label = 'rsp/' + key
+            label = group_label + '/' + key
             if label in hf:
                 del hf[label]
             hf.create_dataset(label, data=rsp_results[key])
@@ -268,7 +275,7 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     return True
 
 
-def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
+def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, group_label='rsp'):
     """
     Writes the detachment and attachment density matrices for a specific
     excited state to the checkpoint file.
@@ -281,6 +288,8 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
         The detachment density matrix.
     :param dens_attach:
         The attachment density matrix.
+	:param group_label:
+		The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
@@ -289,12 +298,12 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
 
         # add detachment/attachment densities to the rsp group
 
-        detach_label = "rsp/detach_" + state_label
+        detach_label = group_label + "/detach_" + state_label
         if detach_label in hf:
             del hf[detach_label]
         hf.create_dataset(detach_label, data=dens_detach)
 
-        attach_label = "rsp/attach_" + state_label
+        attach_label = group_label + "/attach_" + state_label
         if attach_label in hf:
             del hf[attach_label]
         hf.create_dataset(attach_label, data=dens_attach)
@@ -542,3 +551,129 @@ def check_distributed_focks(fname, key_freq_pairs):
     hf.close()
 
     return valid_checkpoint
+
+
+def write_cpcm_charges(fname, cpcm_q):
+    """
+    Write C-PCM surface charges.
+
+    :param fname:
+        Name of the checkpoint file.
+    :param cpcm_q:
+        The C-PCM surface charges.
+    """
+
+    hf = h5py.File(fname, 'a')
+    key = 'cpcm_q'
+    if key in hf:
+        del hf[key]
+    hf.create_dataset('cpcm_q', data=cpcm_q)
+    hf.close()
+
+
+def read_cpcm_charges(fname):
+    """
+    Read C-PCM surface charges.
+
+    :param fname:
+        Name of the checkpoint file.
+
+    :return:
+        The C-PCM surface charges.
+    """
+
+    hf = h5py.File(fname, 'r')
+    key = 'cpcm_q'
+    if key in hf:
+        cpcm_q = np.array(hf.get(key))
+    else:
+        cpcm_q = None
+    hf.close()
+
+    return cpcm_q
+
+def read_results(fname, label):
+    """ Read the results dictionary from a checkpoint file.
+
+        :param fname:
+            Name of the checkpoint file.
+        :param label:
+            The response dictionary label (scf, rsp, vib, opt, etc.).
+
+        :return:
+            the dictionary of results.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    assert_msg_critical(valid_checkpoint, fname + " is not a valid checkpoint file.") 
+
+    res_dict = {}
+    h5f = h5py.File(fname, "r")
+
+    label_found = (label in h5f)
+
+    if not label_found:
+        h5f.close()
+
+    assert_msg_critical(label_found, label + " section not found in the checkpoint file.")
+
+    # Always read general information about the molecule, basis, and settings
+    for key in h5f:
+        if key not in ["vib", "rsp", "scf", "opt"]:
+            data = np.array(h5f.get(key))
+            # Check if data is a number or an array
+            if len(data.shape) == 1 and data.shape[0] == 1:
+                res_dict[key] = data[0]
+            else:
+                res_dict[key] = data
+
+    h5f_dict = h5f[label]
+
+    for key in h5f_dict:
+        # For known lists of arrays (normal modes, raman and resonance raman),
+        # read the sub-group accordingly
+        if "normal_modes" in key or "raman_activities" in key:
+            sub_dict = dict(h5f_dict[key])
+            sub_dict_results = {}
+            for sub_key in sub_dict:
+                sub_dict_results[sub_key] = np.array(sub_dict[sub_key])
+            res_dict[key] = sub_dict_results
+        else:
+            data = np.array(h5f_dict[key])
+            # Check if data is a number or an array
+            if len(data.shape) == 1 and data.shape[0] == 1:
+                res_dict[key] = data[0]
+            else:
+                res_dict[key] = data
+
+    if "opt" in label:
+        # Create the list of xyz geometries
+        nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+        xyz_geometries = []
+        for coords in res_dict["opt_coordinates_au"]:
+            molecule = Molecule(nuclear_charges, coords, units="au")
+            xyz_geometries.append(molecule.get_xyz_string())
+        res_dict["opt_geometries"] = xyz_geometries
+    
+    # Create molecule xyz
+    nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+    coords = res_dict["atom_coordinates"]
+    molecule = Molecule(nuclear_charges, coords, units="au")
+
+    xyz_lines = molecule.get_xyz_string().splitlines()
+
+    xyz = []
+    for line in xyz_lines[2:]:
+        xyz.append(line)
+
+    res_dict["xyz"] = xyz
+
+    if "vib" in label:
+        # needed to animate the molecular vibrations
+        res_dict["molecule_xyz_string"] = molecule.get_xyz_string()
+
+    h5f.close()
+    
+    return res_dict

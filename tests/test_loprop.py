@@ -29,6 +29,7 @@ class TestPEForceFieldGenerator:
         if task.mpi_rank == mpi_master():
             charges = pe_ff_results['localized_charges']
             polarizabilities = pe_ff_results['localized_polarizabilities']
+
             assert np.max(np.abs(charges - ref_charges)) < 1.0e-4
             assert np.max(np.abs(polarizabilities -
                                  ref_polarizabilities)) < 1.0e-4
@@ -40,10 +41,10 @@ class TestPEForceFieldGenerator:
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'loprop_water.inp')
 
-        ref_charges = np.array([-0.1198, 0.0599, 0.0599])
+        ref_charges = np.array([-0.66166, 0.33083, 0.33083])
         ref_polarizabilities = np.array(
-            [[3.1116, -0.0000, -0.1131, 0.8247, -0.0000, 3.1116],
-             [3.3244, -0.0000, -0.2019, 0.2486, 0.0000, 0.1336],
-             [0.1336, -0.0000, -0.2019, 0.2486, -0.0000, 3.3244]])
+            [[4.10442, 0., 0.08114, 2.90629, -0., 4.10442],
+             [3.17099, 0., -0.0896, 1.22756, 0., 0.55135],
+             [0.55135, 0., -0.0896, 1.22756, -0., 3.17099]])
 
         self.run_loprop(inpfile, ref_charges, ref_polarizabilities)

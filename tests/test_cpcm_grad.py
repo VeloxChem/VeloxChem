@@ -19,7 +19,7 @@ class TestGradCpcm:
         scf_drv.xcfun = xcfun_label
 
         scf_drv.solvation_model = 'cpcm'
-        scf_drv.cpcm_grid_per_sphere = 110
+        scf_drv.cpcm_grid_per_sphere = (110, 110)
         scf_drv.cpcm_custom_vdw_radii = cpcm_custom_vdw_radii
 
         scf_drv.ostream.mute()

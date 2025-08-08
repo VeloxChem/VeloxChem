@@ -483,7 +483,7 @@ class OpenMMDynamics:
         if qm_atoms:
             self.set_qm_mm_system(phase, 
                                   ff_gen)
-            self.qm_stabilizer(ff_gen)
+            # self.qm_stabilizer(ff_gen)
         
         # Write the system to a xml file (for debugging purposes)
         with open(f'{filename}_system.xml', 'w') as f:
@@ -710,7 +710,7 @@ class OpenMMDynamics:
         self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
 
         # Adding the stabilizer force to the QM region
-        self.qm_stabilizer(ff_gen_qm)
+        # self.qm_stabilizer(ff_gen_qm)
 
         # Save system to XML and PDB for inspection and reuse
         with open(f'{filename}_system.xml', 'w') as f:
@@ -1147,9 +1147,9 @@ class OpenMMDynamics:
             print(f"Only {number} conformers available, showing all.")
         for i in range(number):
             if weights is not None:
-                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict['energies'][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
             else:
-                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict['energies'][i]:.3f} kJ/mol'
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol'
             self.ostream.print_info(msg)
             self.ostream.flush()
             self.conformer_dict["molecules"][i].show(
@@ -1399,6 +1399,8 @@ class OpenMMDynamics:
             self.driver_flag = 'ROSCF Driver'
         elif isinstance(self.qm_driver, InterpolationDriver):
             self.driver_flag = 'IM Driver'
+            _ = self.qm_driver.read_qm_data_points()
+
         
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')

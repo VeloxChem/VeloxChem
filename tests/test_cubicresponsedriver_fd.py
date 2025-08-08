@@ -161,8 +161,8 @@ class TestCrfFD:
         quad_result_minus = qrf_minus.compute(molecule, basis, scf_result_minus)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            beta_plus = -quad_result_plus[('qrf', wb, wc)]
-            beta_minus = -quad_result_minus[('qrf', wb, wc)]
+            beta_plus = quad_result_plus[('qrf', wb, wc)]
+            beta_minus = quad_result_minus[('qrf', wb, wc)]
             assert abs(beta_plus.imag) < 1.0e-6
             assert abs(beta_minus.imag) < 1.0e-6
 

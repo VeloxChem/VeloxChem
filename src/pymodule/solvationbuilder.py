@@ -141,7 +141,7 @@ class SolvationBuilder:
         # Standard forcefield
         self.parent_forcefield = 'amber03'
 
-    def solvate(self, solute, solvent = 'spce', solvent_molecule=None, padding=1, target_density=None, neutralize=True, equilibrate=False):
+    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False):
         """
         Create a solvated system with the most typical solvent molecules.
 
@@ -174,7 +174,7 @@ class SolvationBuilder:
         
         header_msg = "VeloxChem System Builder"
         self.ostream.print_header(header_msg)
-        self.ostream.print_header("="*len(header_msg))
+        self.ostream.print_header("=" * (len(header_msg) + 2))
         self.ostream.print_blank()
         self.ostream.flush()
         
@@ -386,30 +386,32 @@ class SolvationBuilder:
         self.ostream.print_info(f"Time to solvate the system: {end - start:.2f} s")
         self.ostream.flush()
         # Print results
-        self.ostream.print_info(f'The density of the solvent after packing is:{self._check_density(solvent_molecule, self.added_solvent_counts[0], volume_nm3)} kg/m^3')
+        self.ostream.print_info(
+            'The density of the solvent after packing is: ' +
+            f'{self._check_density(solvent_molecule, self.added_solvent_counts[0], volume_nm3)} kg/m^3')
+        self.ostream.print_blank()
         self.ostream.flush()
 
         self.system_molecule = self._save_molecule()
 
         if equilibrate:
-            self.equilibration_flag = True
-            self.ostream.print_blank()
-            self.ostream.print_info("Equilibrating the system")
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.ostream.print_info(f"Duration: {self.steps/1000} ps")
-            self.ostream.flush()
-            self.ostream.print_info(f"Temperature: {self.temperature} K")
-            self.ostream.flush()
-            self.ostream.print_info(f"Pressure: {self.pressure} bar")
-            self.ostream.flush()
-            self.ostream.print_blank()
-            start = time.time()
-            self.perform_equilibration()
-            self.ostream.print_info("Equilibration completed, system saved")
-            self.ostream.flush()
-            end = time.time()
-            self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
+            # TODO: run perform_equilibration using openmm files
+            try:
+                start = time.time()
+                self.perform_equilibration()
+                end = time.time()
+                self.ostream.print_info("Equilibrating the system")
+                self.ostream.print_blank()
+                self.ostream.print_info(f"Duration: {self.steps/1000} ps")
+                self.ostream.print_info(f"Temperature: {self.temperature} K")
+                self.ostream.print_info(f"Pressure: {self.pressure} bar")
+                self.ostream.print_blank()
+                self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
+                self.equilibration_flag = True
+            except ValueError:
+                # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
+                self.ostream.print_info("Equilibration skipped due to missing files")
+                self.ostream.print_blank()
             self.ostream.flush()
 
 
@@ -1279,7 +1281,7 @@ class SolvationBuilder:
             # Special case for 'itself' solvent
             if self.solvent_name == 'itself':
                 residue_name = 'MOL' 
-                num_atoms_per_molecule = len(self.solute_ff.atoms)
+                # num_atoms_per_molecule = len(self.solute_ff.atoms)
                 for mols in range(self.added_solvent_counts[0]):
                     if residue_counter > 9999:
                         residue_counter -= 9999
@@ -1354,7 +1356,7 @@ class SolvationBuilder:
             if self.solvent_ffs:
                 # Solvent bonds for 'itself' solvent
                 if self.solvent_name == 'itself':
-                    num_atoms_per_molecule = len(self.solute_ff.atoms)
+                    # num_atoms_per_molecule = len(self.solute_ff.atoms)
                     for mols in range(self.added_solvent_counts[0]):
                         for (i_atom, j_atom) in self.solute_ff.bonds:
                             pdb_i = pdb_atom_numbers[('solvent', mols, i_atom)]
@@ -1484,14 +1486,45 @@ class SolvationBuilder:
         batch_size = max(batch_size, min_batch_size)
         return batch_size
 
+    def show_solvation_box(self, width=600, height=500, solvent_opacity=0.8):
 
+        n_solute_atoms = self.solute.number_of_atoms()
 
+        solute_atoms = []
+        for atom in self.system[:n_solute_atoms]:
+            solute_atoms.append([atom[1]] + [str(x) for x in atom[2]])
+        solute_atoms_xyz = f'{len(solute_atoms)}\n\n'
+        for a in solute_atoms:
+            solute_atoms_xyz += ' '.join(a) + '\n'
 
+        solvent_atoms = []
+        for atom in self.system[n_solute_atoms:]:
+            solvent_atoms.append([atom[1]] + [str(x) for x in atom[2]])
+        solvent_atoms_xyz = f'{len(solvent_atoms)}\n\n'
+        for a in solvent_atoms:
+            solvent_atoms_xyz += ' '.join(a) + '\n'
 
+        try:
+            import py3Dmol
+            viewer = py3Dmol.view(width=width, height=height)
+            viewer.setViewStyle({"style": "outline", "width": 0.02})
 
+            viewer.addModel(solute_atoms_xyz)
+            viewer.setStyle({'model': 0}, {"stick": {}, "sphere": {"scale": 0.25}})
 
+            viewer.addModel(solvent_atoms_xyz)
+            viewer.setStyle(
+                {
+                    'model': 1,
+                },
+                {
+                    "stick": {"radius": 0.1, "opacity": solvent_opacity},
+                    "sphere": {"scale": 0.08, "opacity": solvent_opacity},
+                },
+            )
 
+            viewer.zoomTo()
+            viewer.show()
 
-
-
-
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol')

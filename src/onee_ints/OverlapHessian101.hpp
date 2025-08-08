@@ -30,8 +30,8 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef NuclearPotentialValues_hpp
-#define NuclearPotentialValues_hpp
+#ifndef OverlapHessian101_hpp
+#define OverlapHessian101_hpp
 
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
@@ -39,8 +39,11 @@
 
 namespace onee {  // onee namespace
 
-auto computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& basis, const double* point_coords, const int npoints, const double* D, const int naos) -> std::vector<double>;
+auto computeOverlapHessian101(const CMolecule& molecule,
+                              const CMolecularBasis& basis,
+                              const double* W,
+                              const int naos) -> CDenseMatrix;
 
 }  // namespace onee
 
-#endif /* NuclearPotentialValues_hpp */
+#endif /* OverlapHessian101_hpp */

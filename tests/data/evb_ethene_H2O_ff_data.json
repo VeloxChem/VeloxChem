@@ -2,7 +2,7 @@
     "atoms": {
         "0": {
             "type": "c2",
-            "name": "C1",
+            "name": "C11",
             "mass": 12.0,
             "charge": -0.337857,
             "sigma": 0.3315212309943831,
@@ -11,7 +11,7 @@
         },
         "1": {
             "type": "c2",
-            "name": "C2",
+            "name": "C21",
             "mass": 12.0,
             "charge": -0.3485849999999999,
             "sigma": 0.3315212309943831,
@@ -20,7 +20,7 @@
         },
         "2": {
             "type": "ha",
-            "name": "H1",
+            "name": "H11",
             "mass": 1.007825,
             "charge": 0.170322,
             "sigma": 0.262547852235958,
@@ -29,7 +29,7 @@
         },
         "3": {
             "type": "ha",
-            "name": "H2",
+            "name": "H21",
             "mass": 1.007825,
             "charge": 0.170175,
             "sigma": 0.262547852235958,
@@ -38,7 +38,7 @@
         },
         "4": {
             "type": "ha",
-            "name": "H3",
+            "name": "H31",
             "mass": 1.007825,
             "charge": 0.173394,
             "sigma": 0.262547852235958,
@@ -47,7 +47,7 @@
         },
         "5": {
             "type": "ha",
-            "name": "H4",
+            "name": "H41",
             "mass": 1.007825,
             "charge": 0.172551,
             "sigma": 0.262547852235958,
@@ -55,122 +55,119 @@
             "equivalent_atom": "ha_00"
         },
         "6": {
-            "type": "oh",
-            "name": "O",
+            "type": "ow",
+            "name": "O22",
             "mass": 15.994915,
-            "charge": -0.813698,
-            "sigma": 0.3242871334030835,
-            "epsilon": 0.389112,
-            "equivalent_atom": "ow_00",
-            "comment": "Reaction-water oxygen"
+            "charge": -0.8476,
+            "sigma": 0.31658,
+            "epsilon": 0.649775,
+            "equivalent_atom": "SPC/E water"
         },
         "7": {
-            "type": "ho",
-            "name": "H2",
+            "type": "hw",
+            "name": "H12",
             "mass": 1.007825,
-            "charge": 0.406024,
-            "sigma": 0.053792464601313685,
-            "epsilon": 0.019664800000000003,
-            "equivalent_atom": "hw_00",
-            "comment": "Reaction-water hydrogen"
+            "charge": 0.4238,
+            "sigma": 0.11658,
+            "epsilon": 0.064978,
+            "equivalent_atom": "SPC/E water"
         },
         "8": {
-            "type": "ho",
-            "name": "H1",
+            "type": "hw",
+            "name": "H02",
             "mass": 1.007825,
-            "charge": 0.407674,
-            "sigma": 0.053792464601313685,
-            "epsilon": 0.019664800000000003,
-            "equivalent_atom": "hw_00",
-            "comment": "Reaction-water hydrogen"
+            "charge": 0.4238,
+            "sigma": 0.11658,
+            "epsilon": 0.064978,
+            "equivalent_atom": "SPC/E water"
         }
     },
     "bonds": {
         "(0, 1)": {
             "type": "harmonic",
             "force_constant": 403170.23999999993,
-            "equilibrium": 0.13337567181836424,
+            "equilibrium": 0.13340000000000002,
             "comment": "c2-c2"
         },
         "(0, 2)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(0, 3)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(1, 4)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(1, 5)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(6, 8)": {
             "type": "harmonic",
-            "force_constant": 462750.3999999999,
-            "equilibrium": 0.09699989466483408,
-            "comment": "ow-hw"
+            "force_constant": 345000,
+            "equilibrium": 0.1,
+            "comment": "SPC/E water"
         },
         "(6, 7)": {
             "type": "harmonic",
-            "force_constant": 462750.3999999999,
-            "equilibrium": 0.09699989466483408,
-            "comment": "ow-hw"
+            "force_constant": 345000,
+            "equilibrium": 0.1,
+            "comment": "SPC/E water"
         }
     },
     "angles": {
         "(0, 1, 4)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(0, 1, 5)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(1, 0, 2)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(1, 0, 3)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(2, 0, 3)": {
             "type": "harmonic",
             "force_constant": 315.47360000000003,
-            "equilibrium": 119.00400538260389,
+            "equilibrium": 116.9,
             "comment": "ha-c2-ha"
         },
         "(4, 1, 5)": {
             "type": "harmonic",
             "force_constant": 315.47360000000003,
-            "equilibrium": 119.00400538260389,
+            "equilibrium": 116.9,
             "comment": "ha-c2-ha"
         },
         "(7, 6, 8)": {
             "type": "harmonic",
-            "force_constant": 836.8000000000001,
-            "equilibrium": 109.47105579356159,
-            "comment": "hw-ow-hw"
+            "force_constant": 383,
+            "equilibrium": 109.47,
+            "comment": "SPC/E water"
         }
     },
     "dihedrals": {
@@ -208,14 +205,14 @@
         }
     },
     "impropers": {
-        "(0, 1, 4, 5)": {
+        "(0, 1, 2, 3)": {
             "type": "Fourier",
             "barrier": 4.6024,
             "phase": 180.0,
             "periodicity": 2,
             "comment": "Guessed"
         },
-        "(1, 0, 2, 3)": {
+        "(1, 0, 4, 5)": {
             "type": "Fourier",
             "barrier": 4.6024,
             "phase": 180.0,
