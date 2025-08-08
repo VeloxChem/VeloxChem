@@ -109,6 +109,9 @@ class SMDDriver:
         
         self.smd_solvent_parameters = self.smd_solvent_parameters[solvent]
 
+        self.ostream.print_info(f"Computing SMD solvation energy in {self.solvent}")
+        self.ostream.flush()
+
         self.ostream.print_info("Computing the ENP Contribution...")
         self.ostream.flush()
         self.ENP_energy = self._get_ENP_contribution()

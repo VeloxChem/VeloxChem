@@ -70,7 +70,7 @@ class SolvationFepDriver:
     Instance variables:
         - padding: The padding for the solvation box.
         - solvent_name: The name of the solvent.
-        - resname: The residue name for the solute. Only needed when using input files where solute is not at top of (i.e., index 0) .pdb/.gro. If solute is a protein, set to 'protein'.
+        - resname: The residue name for the solute. Only needed when using input files where solute is not at top of (i.e., index 0) .pdb/.gro.
         - temperature: The temperature for the simulation.
         - pressure: The pressure for the simulation.
         - timestep: The timestep for the simulation.
@@ -131,7 +131,6 @@ class SolvationFepDriver:
         self.padding = 1.0
         self.solvent_name = 'spce'
         self.resname = None 
-        self.chain_ids = ['A'] # for protein systems - change if protein is containing multiple chains
         
         # Ensemble and MD options
         self.temperature = 298.15 * unit.kelvin
@@ -156,7 +155,6 @@ class SolvationFepDriver:
         self.beta = 5
         self.x = 4
         # Single parameter for lambdas for stage 1
-        # Set to 6 to be on the safe side
         self.lambdas_stage1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
         # Asymetric lambdas for stage 2 
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
@@ -422,7 +420,9 @@ class SolvationFepDriver:
         else:
             systems, topology, positions = self._create_solvated_systems(lambdas)
 
-        snapshots = []
+        self.snapshots = []
+        self.N_k = []
+        
         for l, lam in enumerate(lambdas):
             lam = round(lam, 2)
             self.ostream.print_info(f"Running lambda = {lam}, stage = {stage}...")
@@ -430,12 +430,13 @@ class SolvationFepDriver:
 
             # Run the simulation for the current lambda
             conformations, ns_simulated, sim_time = self._run_simulation(systems[l], topology, positions, lam)
-            
+            # Performance calculation in ns/hour
             total_ns_simulated += ns_simulated
             total_sim_time += sim_time
 
-            # Performance calculation in ns/hour
-            snapshots.append(conformations)
+            ## ADDED: saving the equilibrated snapshots from each simulation
+            #self._detect_equilibration(conformations)
+            #snapshots.append(conformations)
 
 
         # Print total performance metrics for the stage
@@ -450,9 +451,12 @@ class SolvationFepDriver:
         self.ostream.flush()
         recalculation_start = time.time()
 
-        u_kln = self._recalculate_energies(snapshots, systems, topology)
+        ## ADDED: recalculating only the energies for the equilibrated snapshots
+        u_kn = self._recalculate_energies_new(systems, topology)
+        #u_kln = self._recalculate_energies(snapshots, systems, topology)
 
-        self.u_kln_matrices.append(u_kln)
+        self.u_kln_matrices.append(u_kn)
+        #self.u_kln_matrices.append(u_kln)
 
         recalculation_end = time.time()
         recalculation_time = recalculation_end - recalculation_start
@@ -462,7 +466,10 @@ class SolvationFepDriver:
 
         self.ostream.print_info(f"Calculating the free energy with MBAR for stage {stage}...")
         self.ostream.flush()
-        delta_f = self._calculate_free_energy(u_kln)
+        ## ADDED:
+        delta_f = self._calculate_free_energy_new(u_kn)
+        #delta_f = self._calculate_free_energy(u_kln)
+
         free_energy = delta_f['Delta_f'][-1, 0]
         self.ostream.print_line(f"Free energy for stage {stage}: {delta_f['Delta_f'][-1, 0]:.4f} +/- {delta_f['dDelta_f'][-1, 0]:.4f} kJ/mol")
         self.ostream.flush()
@@ -633,7 +640,6 @@ class SolvationFepDriver:
         simulation.minimizeEnergy()
 
         # Equilibration
-        # TODO: Consider running longer equilibration (evaluate whether it is necessary)
         simulation.step(self.num_equil_steps)
 
         # Calculate production run time and interval
@@ -666,13 +672,27 @@ class SolvationFepDriver:
         # Start the production run
         time_start = time.time()
         
-        # Snapshot counter for the hdf5 file labels
+        ## ADDED:
         conformations = []
+        energies = []
         for _ in range(self.number_of_snapshots):
             simulation.step(interval)
-            state = simulation.context.getState(getPositions=True)
+            state = simulation.context.getState(getPositions=True, getEnergy=True)
             positions = state.getPositions().value_in_unit(unit.nanometers)
+            energy = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
             conformations.append(positions)
+            energies.append(energy)
+        
+        ## ADDED: saving the equilibrated snapshots from each simulation
+        self._detect_equilibration(conformations, energies)
+        
+        ## OLD: running recalculations on all snapshots, including the ones that are discarded by detect_equilibration
+        # conformations = []
+        # for _ in range(self.number_of_snapshots):
+        #     simulation.step(interval)
+        #     state = simulation.context.getState(getPositions=True)
+        #     positions = state.getPositions().value_in_unit(unit.nanometers)
+        #     conformations.append(positions)
 
         time_end = time.time()
 
@@ -685,6 +705,29 @@ class SolvationFepDriver:
 
         return conformations, simulated_ns, elapsed_time
     
+    def _recalculate_energies_new(self, forcefields, topology):
+        snapshots = self.snapshots
+        u_kn = np.zeros((len(forcefields),len(snapshots)))
+        
+        for k, forcefield in enumerate(forcefields):
+            self.ostream.print_info(f"Recalculating energies for Forcefield {k}...")
+            self.ostream.flush()
+            time_start_forcefield = time.time()
+
+            integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
+            simulation = app.Simulation(topology, forcefield, integrator)
+
+            for n, snapshot in enumerate(snapshots):
+                simulation.context.setPositions(snapshot)
+                state = simulation.context.getState(getEnergy=True)
+                u_kn[k, n] = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+                
+            elapsed_time_trajectory = time.time() - time_start_forcefield
+            self.ostream.print_info(f"Forcefield {k} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
+            self.ostream.flush()
+
+        return u_kn
+
     def _recalculate_energies(self, conformations, forcefields, topology):
         
         # TODO: Change from U_kln to U_kn (where n is snapshots*lambdas) since pymbar is phasing this out
@@ -714,38 +757,48 @@ class SolvationFepDriver:
             self.ostream.flush()
 
         return u_kln
+    
+    def _detect_equilibration(self, conformations, energies):
+        At = np.array(energies) 
+        t0, _, _ = timeseries.detect_equilibration(At) 
+        equilibrated_snapshots = conformations[t0:]
 
-    def _calculate_free_energy(self, u_kln):
-        n_states = u_kln.shape[0]
-        N_k = np.zeros(n_states)
-        subsample_indices = []
- 
-        for k in range(n_states):
-            t0, g, Neff_max = timeseries.detect_equilibration(u_kln[k, k, :])
-            u_equil = u_kln[k, k, t0:]
-            indices = timeseries.subsample_correlated_data(u_equil, g=g)
-            subsample_indices.append(indices + t0)
-            N_k[k] = len(indices)
+        self.snapshots.extend(equilibrated_snapshots)
+        self.N_k.append(len(equilibrated_snapshots))
 
-        u_kln_reduced = np.zeros_like(u_kln)
-        for k in range(n_states):
-            for l in range(n_states):
-                u_kln_reduced[k, l, :int(N_k[k])] = u_kln[k, l, subsample_indices[k]]
+        self.ostream.print_info(f"Number of snapshots after equilibration: {len(equilibrated_snapshots)}")
+        self.ostream.flush()
 
-        if any(n <= self.number_of_snapshots // 4 for n in N_k):
-            self.ostream.print_warning("MBAR may not converge due to insufficient sampling. Consider increasing the number of steps per lambda.")
-            self.ostream.flush()
-            mbar = MBAR(u_kln_reduced, N_k, solver_protocol='robust', n_bootstraps=50)
-            delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
+    def _calculate_free_energy_new(self, u_kn):
 
-        else:
-            mbar = MBAR(u_kln_reduced, N_k, solver_protocol='robust')
-            delta_f = mbar.compute_free_energy_differences()
+        mbar = MBAR(u_kn, N_k = self.N_k, solver_protocol='robust', n_bootstraps=50)
+        delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
 
         return delta_f
 
-    ## TODO: Consier just setting default alchemical region as the first residue in the pdb/gro, else that the user simply provides the indices in a list 
-    def _old_get_alchemical_region(self, topology):
+    def _calculate_free_energy(self, u_kln):
+        n_states = u_kln.shape[0]
+        N_k = np.zeros(n_states, dtype=int)
+        u_equil = []
+ 
+        for k in range(n_states):
+            t0, g, Neff_max = timeseries.detect_equilibration(u_kln[k, k, :])
+            u_kln_k = u_kln[k, :, t0:] #Truncate post-equilibration samples for all l, shape (l, n_equil_samples)
+            N_k[k] = u_kln_k.shape[1]
+            u_equil.append(u_kln_k) # (l,n)
+        
+        max_Nk = max(N_k)
+        u_kln_reduced = np.full((n_states, n_states, max_Nk), np.nan)
+        
+        for k in range(n_states):
+            u_kln_reduced[k, :, :N_k[k]] = u_equil[k]
+
+        mbar = MBAR(u_kln_reduced, N_k, solver_protocol='robust', n_bootstraps=50)
+        delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
+
+        return delta_f
+
+    def _get_alchemical_region(self, topology):
         """
         Define alchemical (perturbed) and chemical (unperturbed) regions.
         """
@@ -763,29 +816,3 @@ class SolvationFepDriver:
 
         return alchemical_region, chemical_region
 
-    def _get_alchemical_region(self, topology):
-        """
-        Define alchemical (perturbed) and chemical (unperturbed) regions.
-
-        - If self.resname == 'protein', use self.chain_ids to select alchemical chains.
-        - if self.resname is set, e.g., for a ligand in a protein, select residues with that name.
-        - Default to selecting the first residue.
-        """
-        alchemical_region = []
-        chemical_region = []
-
-        for chain in topology.chains():
-            for res in chain.residues():
-                if self.resname == 'protein':
-                    condition = chain.id in self.chain_ids
-                elif self.resname:
-                    condition = res.name == self.resname
-                else:
-                    condition = res.index == 0
-
-                region = alchemical_region if condition else chemical_region
-
-                for atom in res.atoms():
-                    region.append(atom.index)
-
-        return alchemical_region, chemical_region
