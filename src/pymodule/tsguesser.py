@@ -133,15 +133,16 @@ class TransitionStateGuesser():
             molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
         """
         evb_drv = EvbDriver()
-        if self.mute_evb:
-            evb_drv.ostream.mute()
+        self.evb_drv = evb_drv
+        
 
         if self.mute_evb:
+            evb_drv.ostream.mute()
             self.ostream.print_info(
                 "Building forcefields. Disable mute_evb to see detailed output."
             )
             self.ostream.flush()
-        evb_drv.build_ff_from_molecules(
+        self.evb_drv.build_ff_from_molecules(
             reactant,
             product,
             reactant_partial_charges=reactant_partial_charges,
@@ -152,7 +153,6 @@ class TransitionStateGuesser():
             reparameterize=reparameterize,
             mm_opt_constrain_bonds=mm_opt_constrain_bonds,
         )
-        self.evb_drv = evb_drv
         self.scf_drv = scf_drv
         if scf:
             molecule_sanity_check(self.evb_drv.reactant.molecule)
@@ -212,10 +212,10 @@ class TransitionStateGuesser():
             f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
         )
         self.ostream.print_blank()
-        if not scf:
-            self.results.update({'final_geometry': max_xyz_geom})
-            self.results.update({'final_lambda': max_mm_lambda})
-        else:
+        self.results.update({'max_mm_geometry': max_xyz_geom})
+        self.results.update({'max_mm_lambda': max_mm_lambda})
+        
+        if scf:
             # assert False, 'Not implemented yet'
 
             scf_energies = self._scan_scf()
@@ -223,8 +223,8 @@ class TransitionStateGuesser():
             max_scf_geom = self.results['xyz_geometries'][max_scf_index]
             max_scf_energy = scf_energies[max_scf_index]
             max_scf_lambda = self.lambda_vec[max_scf_index]
-            self.results.update({'final_geometry': max_scf_geom})
-            self.results.update({'final_lambda': max_scf_lambda})
+            self.results.update({'max_scf_geometry': max_scf_geom})
+            self.results.update({'max_scf_lambda': max_scf_lambda})
             self.ostream.print_info(
                 f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
             )
@@ -233,7 +233,11 @@ class TransitionStateGuesser():
         mult = self.molecule.get_multiplicity()
         charge = self.molecule.get_charge()
 
-        self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
+        if not scf:
+            self.molecule = Molecule.read_xyz_string(self.results['max_mm_geometry'])
+        else:
+            self.molecule = Molecule.read_xyz_string(
+                self.results['max_scf_geometry'])
         self.molecule.set_multiplicity(mult)
         self.molecule.set_charge(charge)
         self.ostream.print_info(f"Saving results to {self.results_file}")
@@ -557,7 +561,6 @@ class TransitionStateGuesser():
                                 E2[i] = e2
                                 energies_int[i] = e_int
                                 N_conf[i] = n_conf
-                        for i, l in enumerate(self.evb_drv.Lambda):
                             self._print_mm_iter(
                                 l,
                                 E1[i],
@@ -771,8 +774,8 @@ class TransitionStateGuesser():
             raise ImportError('matplotlib is required for this functionality.')
 
         rel_mm_energies = mm_energies - np.min(mm_energies)
-
-        lam_index = np.where(lambda_vec == step)[0][0]
+        
+        lam_index = np.where(lambda_vec == np.array(step))[0][0]
         xyz_data_i = geometries[lam_index]
         total_steps = len(rel_mm_energies) - 1
         x = np.linspace(0, lambda_vec[-1], 100)
@@ -867,21 +870,32 @@ class TransitionStateGuesser():
             molecule.set_atom_coordinates(i, positions[i])
         return molecule
 
-    @staticmethod
-    def _save_results(fname,results):
+    def _save_results(self,fname,results):
+        if os.path.exists(fname):
+            self.ostream.print_warning(
+                f"File {fname} already exists. Overwriting it."
+            )
+            self.ostream.flush()
+            os.remove(fname)
         hf = h5py.File(fname, 'w')
-        mm_energies = results['mm_energies']
-        geometries = results['xyz_geometries']
         lambda_vec = results['lambda_vec']
+        geometries = results['xyz_geometries']
+        mm_energies = results['mm_energies']
+        max_mm_geometry = results['max_mm_geometry']
+        max_mm_lambda = results['max_mm_lambda']
         scf_energies = results.get('scf_energies', None)
-        final_lambda = results['final_lambda']
+        max_scf_geometry = results.get('max_scf_geometry',None)
+        max_scf_lambda = results.get('max_scf_lambda',None)
 
         hf.create_dataset('mm_energies', data=mm_energies, dtype='f')
         hf.create_dataset('xyz_geometries', data=geometries)
         hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
+        hf.create_dataset('max_mm_geometry', data=[max_mm_geometry])
+        hf.create_dataset('max_mm_lambda', data=max_mm_lambda, dtype='f')
         if scf_energies is not None:
             hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
-        hf.create_dataset('final_lambda', data=final_lambda, dtype='f')
+            hf.create_dataset('max_scf_geometry', data=[max_scf_geometry])
+            hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
         
 
     @staticmethod
@@ -890,6 +904,7 @@ class TransitionStateGuesser():
         results = {}
         results['mm_energies'] = hf['mm_energies'][:]
         results['xyz_geometries'] = [s.decode('utf-8') for s in hf['xyz_geometries'][:]]
+        results['final_geometry'] = hf['final_geometry'][0].decode('utf-8')
         results['lambda_vec'] = hf['lambda_vec'][:]
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]

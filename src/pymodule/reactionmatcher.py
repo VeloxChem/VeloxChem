@@ -37,6 +37,7 @@ import networkx as nx
 import numpy as np
 import time
 import sys
+import math
 
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
@@ -65,12 +66,21 @@ class ReactionMatcher:
         self._iso_count = 0
         self._mono_count = 0
         self._start_time = 0
+        self._verbose = True
         self.max_time = 600
-        self._breaking_depth = 2  # how many breaking edges to try
+
+        self.max_break_attempts_guess = 1e5
+        self._breaking_depth = 1  # how many breaking edges to try
         self._check_monomorphic = False
 
-    def get_mapping(self, reactant_ff, rea_elems, product_ff, pro_elems,
-                    breaking_bonds):
+    def get_mapping(
+        self,
+        reactant_ff,
+        rea_elems,
+        product_ff,
+        pro_elems,
+        breaking_bonds,
+    ):
 
         self.rea_graph, self.pro_graph = self._create_reaction_graphs(
             reactant_ff,
@@ -80,25 +90,25 @@ class ReactionMatcher:
             breaking_bonds,
         )
 
+        N = len(self.rea_graph.edges)
+        while math.factorial(N) / math.factorial(
+                N - self._breaking_depth) < self.max_break_attempts_guess:
+            self._breaking_depth += 1
+            if self._breaking_depth == N:
+                break
+
+        self.ostream.print_info(
+            f"Set max breaking depth to {self._breaking_depth} from max breaking attempts {self.max_break_attempts_guess}"
+        )
+        self.ostream.flush()
+
         map, breaking_edges, forming_edges = self._find_mapping(
             self.rea_graph.copy(), self.pro_graph.copy(), breaking_bonds)
-        if map is None:
 
-            self._check_monomorphic = True
-            self.ostream.print_info(
-                "No mapping found by checking subgraph isomorphism, trying to find mapping with subgraph monomorphism."
-            )
-            self.ostream.print_info(f"Total subgraph isomorphism checks: {self._iso_count}")
-            self.ostream.flush()
-            self._iso_count = 0
-            map, breaking_edges, forming_edges = self._find_mapping(
-                self.rea_graph.copy(), self.pro_graph.copy(), breaking_bonds)
-        if map is None:
-            self.ostream.print_warning(
-                "No subgraph solution with two broken bonds found, aborting. Try suggesting more breaking bonds."
-            )
         self.ostream.flush()
-        self.ostream.print_info(f"Total subgraph isomorphism checks: {self._iso_count}, total subgraph monomorphism checks: {self._mono_count}")
+        self.ostream.print_info(
+            f"Total subgraph isomorphism checks: {self._iso_count}, total subgraph monomorphism checks: {self._mono_count}"
+        )
         return map, breaking_edges, forming_edges
 
     def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
@@ -142,15 +152,30 @@ class ReactionMatcher:
 
         self._start_time = time.time()
         breaking_edges = None
-        for depth in range(1, self._breaking_depth):
+        B_composition = self._get_bond_element_composition(B)
+        for depth in range(0, self._breaking_depth):
+            self._check_monomorphic = False
             self.ostream.print_info(
-                f"Finding breaking edges at depth {depth}"
-            )
+                f"Finding isomorphic breaking edges at depth {depth}")
             self.ostream.flush()
-            breaking_edges = self._find_breaking_edges(A, B, depth)
+            breaking_edges = self._find_breaking_edges(A, B, depth,
+                                                       B_composition)
             if breaking_edges is not None:
                 break
-            
+            self._check_monomorphic = True
+            self.ostream.print_info(
+                f"Finding monomorphic breaking edges at depth {depth}")
+            self.ostream.flush()
+            breaking_edges = self._find_breaking_edges(A, B, depth,
+                                                       B_composition)
+            if breaking_edges is not None:
+                break
+            else:
+                self.ostream.print_info(
+                    f"No breaking edges found at depth {depth}, increasing depth."
+                )
+                self.ostream.flush()
+
         if breaking_edges is None:
             return None, None, None
 
@@ -172,8 +197,7 @@ class ReactionMatcher:
         GM = GraphMatcher(A, B, categorical_node_match('elem', ''))
         map = next(GM.isomorphisms_iter())
 
-        self._check_time(
-            f"finding mapping.")
+        self._check_time(f"finding mapping.")
         if swapped:
             # if we swapped A and B, we need to swap the mapping back
             self.ostream.print_info(
@@ -181,32 +205,42 @@ class ReactionMatcher:
             map = {v: k for k, v in map.items()}
         return map, breaking_edges, forming_edges
 
-
-    def _find_breaking_edges(self,A,B, depth):
+    def _find_breaking_edges(self, A, B, depth, B_composition):
         if not self._check_time():
             return None
 
         if self._connected_components_are_subgraphs(A, B):
             return set()
-            
+
         if depth > 0:
+            # B will have more bonds then A, if there is a type of bond in A of which there are more in A then in B, then those bonds for sure need to be removed
+            A_composition = self._get_bond_element_composition(A)
+            required_elements = set()
+            for key, val in A_composition.items():
+                if B_composition.get(key, 0) < val:
+                    required_elements.add(key)
+
             for edge in A.edges():
+                if len(required_elements) > 0:
+                    comb = self._get_elem_comb(edge[0], edge[1], A)
+                    if comb not in required_elements:
+                        continue
+
                 A.remove_edge(*edge)
-                # self.ostream.print_info(
-                #     f"Trying to find breaking edge {edge} at depth {depth}"
-                # )
+                if self._verbose:
+                    self.ostream.print_info(
+                        f"Trying to find breaking edge {edge} at depth {depth}")
                 self.ostream.flush()
-                edges = self._find_breaking_edges(A, B, depth-1)
+                edges = self._find_breaking_edges(A, B, depth - 1,
+                                                  B_composition)
                 if edges is not None:
                     edges.add(edge)
                     self.ostream.print_info(
-                        f"Found breaking edges: {edges} at depth {depth}."
-                    )
+                        f"Found breaking edges: {edges} at depth {depth}.")
                     self.ostream.flush()
                     return edges
                 A.add_edge(*edge)
         return None
-
 
     def _find_forming_edges(self, A, B, breaking_edges):
         """
@@ -220,49 +254,41 @@ class ReactionMatcher:
             active_nodes.add(edge[0])
             active_nodes.add(edge[1])
         # Move every element of active_nodes in nodes to the front of the list
-        nodes = [n for n in nodes if n in active_nodes] + [n for n in nodes if n not in active_nodes]
+        nodes = [n for n in nodes if n in active_nodes
+                 ] + [n for n in nodes if n not in active_nodes]
 
-        elem_combinations_B = {}
-        for edge in B.edges():
-            comb = self._get_elem_comb(edge[0], edge[1], B)
-            if comb not in elem_combinations_B.keys():
-                elem_combinations_B[comb] = 1
-            else:
-                elem_combinations_B[comb] += 1
+        elem_combinations_B = self._get_bond_element_composition(B)
+        elem_combinations_A = self._get_bond_element_composition(A)
 
-        elem_combinations_A = {}
-        for edge in A.edges():
-            comb = self._get_elem_comb(edge[0], edge[1], A)
-            if comb not in elem_combinations_A.keys():
-                elem_combinations_A[comb] = 1
-            else:
-                elem_combinations_A[comb] += 1
-
-        #todo only look through the list of node combinations that form bonds of element pairs that are missing
         while len(A.edges()) < len(B.edges()):
             bond_count += 1
             edge = None
-            for i,node_i in enumerate(nodes):
-                for j,node_j in enumerate(A.nodes()):
-                    if j<= i:
+            for i, node_i in enumerate(nodes):
+                for j, node_j in enumerate(nodes):
+                    if j <= i:
                         continue
-                    edge_in_A = (node_i, node_j) in A.edges() or (node_j, node_i) in A.edges()
+                    edge_in_A = (node_i,
+                                 node_j) in A.edges() or (node_j,
+                                                          node_i) in A.edges()
                     edge_in_broken = (node_i, node_j) in breaking_edges or (
                         node_j, node_i) in breaking_edges
-                    
+
                     # HH_bond = A.nodes[node_i]['elem'] == 1.0 and A.nodes[node_j]['elem'] == 1.0
                     if edge_in_A or edge_in_broken:
                         continue
-                    
+
                     comb = self._get_elem_comb(node_i, node_j, A)
-                    if elem_combinations_B.get(comb, 0) <= elem_combinations_A.get(comb, 0):
+                    if elem_combinations_B.get(comb,
+                                               0) <= elem_combinations_A.get(
+                                                   comb, 0):
                         continue
 
                     A.add_edge(node_i, node_j)
-                    self.ostream.print_info(
-                        f"Trying to find bond {bond_count}: ({node_i}, {node_j})"
-                    )
-                    self.ostream.flush()
+                    if self._verbose:
+                        self.ostream.print_info(
+                            f"Trying to find bond {bond_count}: ({node_i}, {node_j})"
+                        )
+                        self.ostream.flush()
                     if not self._connected_components_are_subgraphs(A, B):
                         A.remove_edge(node_i, node_j)
                         continue
@@ -281,9 +307,20 @@ class ReactionMatcher:
                 self.ostream.flush()
                 return None
         return forming_edges
-    
+
     @staticmethod
-    def _get_elem_comb(node1,node2,A):
+    def _get_bond_element_composition(A):
+        composition = {}
+        for edge in A.edges():
+            comb = ReactionMatcher._get_elem_comb(edge[0], edge[1], A)
+            if comb not in composition.keys():
+                composition[comb] = 1
+            else:
+                composition[comb] += 1
+        return composition
+
+    @staticmethod
+    def _get_elem_comb(node1, node2, A):
         """
         Get the element combination of two nodes in a graph.
         """
@@ -291,14 +328,15 @@ class ReactionMatcher:
         elem2 = A.nodes[node2]['elem']
         return tuple(sorted((elem1, elem2)))
 
-    
     def _connected_components_are_subgraphs(self, A, B):
         """
         Check if all connected components of A are subgraphs of B. If true, return a list of GraphMatchers for each connected component and their corresponding subgraphs. 
         Otherwise return None.
         """
         cc_A = list(nx.connected_components(A))
-        cc_A.sort(key=len) # Sorting by length speeds up the algorithm for larger systems
+        cc_A.sort(
+            key=len
+        )  # Sorting by length speeds up the algorithm for larger systems
         cc_B = list(nx.connected_components(B))
         cc_B.sort(key=len)
         max_nodes = len(cc_B[-1])
@@ -308,37 +346,43 @@ class ReactionMatcher:
                 return False
             A_sub = A.subgraph(g)
             GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
-            self._iso_count += 1
-            is_iso = GM.subgraph_is_isomorphic()
-            if not is_iso:
-                if self._check_monomorphic:
-                    self._mono_count += 1
-                    is_mono = GM.subgraph_is_monomorphic()
-                    if not is_mono:
-
-                        return False
-                else:
+            if self._check_monomorphic:
+                self._mono_count += 1
+                is_mono = GM.subgraph_is_monomorphic()
+                if not is_mono:
                     return False
-        
-        # If every connected component is a subgraph, we need to verify it is a unique subgraph. 
+            else:
+                self._iso_count += 1
+                is_iso = GM.subgraph_is_isomorphic()
+                if not is_iso:
+                    return False
+
+        # If every connected component is a subgraph, we need to verify it is a unique subgraph.
         # This is done later, because we need to start with the largest component this time.
         cc_A.reverse()
         B = nx.Graph(B)
         for g in cc_A:
             A_sub = A.subgraph(g)
             GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
-            self._iso_count += 1
-            if not GM.subgraph_is_isomorphic():
-                return False
-            map = next(GM.subgraph_isomorphisms_iter())
-            
+            if self._check_monomorphic:
+                self._mono_count += 1
+                if not GM.subgraph_is_monomorphic():
+                    return False
+                map = next(GM.subgraph_monomorphisms_iter())
+            else:
+                self._iso_count += 1
+                if not GM.subgraph_is_isomorphic():
+                    return False
+                map = next(GM.subgraph_isomorphisms_iter())
+
             B.remove_nodes_from(map.keys())
         return True
 
     def _check_time(self, msg=None):
         if msg is not None:
             self.ostream.print_info(
-                f"Total time = {time.time() - self._start_time:.3f} s after {msg}")
+                f"Total time = {time.time() - self._start_time:.3f} s after {msg}"
+            )
             self.ostream.flush()
             return True
 
