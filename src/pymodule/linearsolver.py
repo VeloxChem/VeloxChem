@@ -42,6 +42,7 @@ import os
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import ScreeningData, GpuDevices
+from .veloxchemlib import matmul_gpu
 from .veloxchemlib import compute_fock_gpu
 from .veloxchemlib import compute_electric_dipole_integrals_gpu
 from .veloxchemlib import compute_linear_momentum_integrals_gpu
@@ -615,6 +616,8 @@ class LinearSolver:
         n_ung = vecs_ung.shape(1)
         n_total = n_ger + n_ung
 
+        prep_t0 = tm.time()
+
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
@@ -640,7 +643,8 @@ class LinearSolver:
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
             else:
-                fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
+                # fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
+                fa_mo = matmul_gpu(mo.T, matmul_gpu(fa, mo))
         else:
             mo = None
             fa = None
@@ -703,14 +707,12 @@ class LinearSolver:
 
         num_gpus_per_node = self._get_num_gpus_per_node()
 
-        screening_t0 = tm.time()
-
         local_screening = ScreeningData(molecule, basis, num_gpus_per_node,
                                         self.pair_thresh, self.density_thresh,
                                         local_comm.Get_rank(), local_comm.Get_size())
 
         if profiler is not None:
-            profiler.add_timing_info('Screening', tm.time() - screening_t0)
+            profiler.add_timing_info('Prep', tm.time() - prep_t0)
 
         # go through batches
 
@@ -735,6 +737,8 @@ class LinearSolver:
 
             symm_flags = [None for idx in range(len(local_master_ranks))]
             vec_list = [None for idx in range(len(local_master_ranks))]
+
+            prep_t0 = tm.time()
 
             for idx, local_master_rank in enumerate(local_master_ranks):
 
@@ -762,7 +766,12 @@ class LinearSolver:
 
             self.comm.barrier()
 
+            if profiler is not None:
+                profiler.add_timing_info('Prep', tm.time() - prep_t0)
+
             if subcomm_index + batch_start < batch_end:
+
+                prep_t0 = tm.time()
 
                 local_master_rank = local_master_ranks[subcomm_index]
 
@@ -786,7 +795,8 @@ class LinearSolver:
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
-                        dak = np.linalg.multi_dot([mo, dak, mo.T])
+                        # dak = np.linalg.multi_dot([mo, dak, mo.T])
+                        dak = matmul_gpu(mo, matmul_gpu(dak, mo.T))
 
                     dks.append(dak)
                     kns.append(kn)
@@ -805,6 +815,9 @@ class LinearSolver:
 
                 dens = AODensityMatrix([den_mat_np], denmat.rest)
 
+                if profiler is not None:
+                    profiler.add_timing_info('Prep', tm.time() - prep_t0)
+
                 # form Fock matrices
 
                 # Note: skipping Coulomb for antisymmetric density matrix
@@ -813,6 +826,8 @@ class LinearSolver:
                                                     dft_dict, pe_dict, coulomb_coef,
                                                     symm_flag, local_screening, local_comm,
                                                     profiler)
+
+                comm_t0 = tm.time()
 
                 if is_local_master:
                     fock_mat = np.zeros(fock_mat_local.shape)
@@ -824,11 +839,16 @@ class LinearSolver:
                                   op=MPI.SUM,
                                   root=mpi_master())
 
+                if profiler is not None:
+                    profiler.add_timing_info('FockComm', tm.time() - comm_t0)
+
                 e2_ger = None
                 e2_ung = None
 
                 fock_ger = None
                 fock_ung = None
+
+                prep_t0 = tm.time()
 
                 if is_local_master:
 
@@ -855,9 +875,10 @@ class LinearSolver:
                             fak_mo = np.linalg.multi_dot(
                                 [mo_core_exc.T, fak, mo_core_exc])
                         else:
-                            fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+                            # fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+                            fak_mo = matmul_gpu(mo.T, matmul_gpu(fak, mo))
 
-                        kfa_mo = self.commut(fa_mo.T, kns[ifock])
+                        kfa_mo = self.commut_gpu(fa_mo.T, kns[ifock])
 
                         fat_mo = fak_mo + kfa_mo
 
@@ -886,6 +907,9 @@ class LinearSolver:
                             e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
                             if self.nonlinear:
                                 fock_ung[:, ifock - batch_ger] = fak_mo_vec
+
+                if profiler is not None:
+                    profiler.add_timing_info('Prep', tm.time() - prep_t0)
 
             self.comm.barrier()
 
@@ -1878,6 +1902,22 @@ class LinearSolver:
         """
 
         return np.matmul(A, B) - np.matmul(B, A)
+
+    @staticmethod
+    def commut_gpu(A, B):
+        """
+        Commutes two matricies A and B
+
+        :param A:
+            Matrix A.
+        :param B:
+            Matrix B.
+
+        :return:
+            AB - BA
+        """
+
+        return matmul_gpu(A, B) - matmul_gpu(B, A)
 
     @staticmethod
     def lrvec2mat(vec, nocc, norb, num_core_orbitals=None):
