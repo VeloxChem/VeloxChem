@@ -479,6 +479,12 @@ class ComplexResponse(LinearSolver):
 
             profiler.start_timer('ReducedSpace')
 
+            iter_prep_dt = 0.0
+            iter_solv_dt = 0.0
+            iter_post_dt = 0.0
+
+            iter_t0 = tm.time()
+
             xvs = []
             self._cur_iter = iteration
 
@@ -489,9 +495,13 @@ class ComplexResponse(LinearSolver):
             e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
             s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
+            iter_prep_dt += tm.time() - iter_t0
+
             for op, w in op_freq_keys:
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
+
+                    iter_t0 = tm.time()
 
                     grad_rg = dist_grad[(op, w)].get_column(0)
                     grad_ru = dist_grad[(op, w)].get_column(1)
@@ -505,11 +515,15 @@ class ComplexResponse(LinearSolver):
                     g_realung = self._dist_bung.matmul_AtB(grad_ru, 2.0)
                     g_imagung = self._dist_bung.matmul_AtB(grad_iu, 2.0)
 
+                    iter_prep_dt += tm.time() - iter_t0
+
                     # creating gradient and matrix for linear equation
 
                     size = 2 * (n_ger + n_ung)
 
                     if self.rank == mpi_master():
+
+                        iter_t0 = tm.time()
 
                         # gradient
 
@@ -561,11 +575,20 @@ class ComplexResponse(LinearSolver):
                         mat[size - n_ger:,
                             n_ger + n_ung:size - n_ger] = w * s2ug.T[:, :]
 
+                        iter_prep_dt += tm.time() - iter_t0
+                        iter_t0 = tm.time()
+
                         # solving matrix equation
 
                         c = np.linalg.solve(mat, g)
+
+                        iter_solv_dt += tm.time() - iter_t0
+
                     else:
                         c = None
+
+                    iter_t0 = tm.time()
+
                     c = self.comm.bcast(c, root=mpi_master())
 
                     # extracting the 4 components of c...
@@ -665,6 +688,16 @@ class ComplexResponse(LinearSolver):
                     else:
                         residuals[(op, w)] = r
 
+                    iter_post_dt += tm.time() - iter_t0
+
+            self.ostream.print_info(
+                f'Time spent in reduced space prep.: {iter_prep_dt:.2f} sec.')
+            self.ostream.print_info(
+                f'Time spent in reduced space solve: {iter_solv_dt:.2f} sec.')
+            self.ostream.print_info(
+                f'Time spent in reduced space postproc.: {iter_post_dt:.2f} sec.')
+            self.ostream.print_blank()
+
             # write to output
             if self.rank == mpi_master():
 
@@ -714,6 +747,9 @@ class ComplexResponse(LinearSolver):
 
             profiler.stop_timer('Orthonorm.')
 
+            profiler.check_memory_usage(
+                'Iteration {:d} orthonorm.'.format(iteration + 1))
+
             if self.rank == mpi_master():
                 n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
             else:
@@ -729,6 +765,9 @@ class ComplexResponse(LinearSolver):
             if self.force_checkpoint:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
+
+            profiler.check_memory_usage(
+                'Iteration {:d} sigma build prep'.format(iteration + 1))
 
             # creating new sigma and rho linear transformations
 

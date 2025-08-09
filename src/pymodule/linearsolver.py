@@ -652,6 +652,9 @@ class LinearSolver:
             norb = None
             fa_mo = None
 
+        if profiler is not None:
+            profiler.check_memory_usage('MO prep')
+
         if self.rank == mpi_master():
             dt_and_subcomm_size = []
 
@@ -705,6 +708,9 @@ class LinearSolver:
         if n_total % batch_size != 0:
             num_batches += 1
 
+        if profiler is not None:
+            profiler.check_memory_usage('Subcomm prep')
+
         num_gpus_per_node = self._get_num_gpus_per_node()
 
         local_screening = ScreeningData(molecule, basis, num_gpus_per_node,
@@ -713,6 +719,7 @@ class LinearSolver:
 
         if profiler is not None:
             profiler.add_timing_info('Prep', tm.time() - prep_t0)
+            profiler.check_memory_usage('Screening prep')
 
         # go through batches
 
@@ -818,6 +825,8 @@ class LinearSolver:
                 if profiler is not None:
                     profiler.add_timing_info('Prep', tm.time() - prep_t0)
 
+                fock_t0 = tm.time()
+
                 # form Fock matrices
 
                 # Note: skipping Coulomb for antisymmetric density matrix
@@ -826,6 +835,9 @@ class LinearSolver:
                                                     dft_dict, pe_dict, coulomb_coef,
                                                     symm_flag, local_screening, local_comm,
                                                     profiler)
+
+                if profiler is not None:
+                    profiler.add_timing_info('Fock', tm.time() - fock_t0)
 
                 comm_t0 = tm.time()
 
@@ -918,6 +930,8 @@ class LinearSolver:
                 if idx + batch_start >= batch_end:
                     break
 
+                prep_t0 = tm.time()
+
                 vecs_e2_ger = DistributedArray(e2_ger, self.comm, root=local_master_rank)
                 vecs_e2_ung = DistributedArray(e2_ung, self.comm, root=local_master_rank)
                 self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
@@ -927,7 +941,19 @@ class LinearSolver:
                     dist_fock_ung = DistributedArray(fock_ung, self.comm, root=local_master_rank)
                     self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
+                if profiler is not None:
+                    profiler.add_timing_info('Prep', tm.time() - prep_t0)
+
+        if profiler is not None:
+            profiler.check_memory_usage('Fock batch')
+
+        prep_t0 = tm.time()
+
         self._append_trial_vectors(vecs_ger, vecs_ung)
+
+        if profiler is not None:
+            profiler.add_timing_info('Prep', tm.time() - prep_t0)
+            profiler.check_memory_usage('Append trial vecs')
 
         self.ostream.print_blank()
 
@@ -1391,7 +1417,14 @@ class LinearSolver:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
+        t0 = tm.time()
+
         dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
+
+        self.ostream.print_info(
+            f'Time spent in preconditioning: {(tm.time() - t0):.2f} sec.')
+
+        t0 = tm.time()
 
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
@@ -1411,7 +1444,13 @@ class LinearSolver:
             dist_new_ung_proj = dist_bung.matmul_AB_no_gather(bT_new_ung)
             dist_new_ung.data -= dist_new_ung_proj.data
 
+        self.ostream.print_info(
+            f'Time spent in orthogonalization: {(tm.time() - t0):.2f} sec.')
+
         if renormalize:
+
+            t0 = tm.time()
+
             if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
                 dist_new_ger = self._remove_linear_dependence_half_size(
                     dist_new_ger, self.lindep_thresh)
@@ -1425,6 +1464,11 @@ class LinearSolver:
                 dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
+
+            self.ostream.print_info(
+                f'Time spent in renormalization: {(tm.time() - t0):.2f} sec.')
+
+        self.ostream.print_blank()
 
         if self.rank == mpi_master():
             assert_msg_critical(
