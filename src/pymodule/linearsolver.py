@@ -836,6 +836,9 @@ class LinearSolver:
                                                     symm_flag, local_screening, local_comm,
                                                     profiler)
 
+                if profiler is not None:
+                    profiler.check_memory_usage('LR Fock')
+
                 comm_t0 = tm.time()
 
                 if is_local_master:
@@ -850,6 +853,7 @@ class LinearSolver:
 
                 if profiler is not None:
                     profiler.add_timing_info('FockComm', tm.time() - comm_t0)
+                    profiler.check_memory_usage('FockComm')
 
                 e2_ger = None
                 e2_ung = None
@@ -923,12 +927,12 @@ class LinearSolver:
 
             self.comm.barrier()
 
+            prep_t0 = tm.time()
+
             for idx, local_master_rank in enumerate(local_master_ranks):
 
                 if idx + batch_start >= batch_end:
                     break
-
-                prep_t0 = tm.time()
 
                 vecs_e2_ger = DistributedArray(e2_ger, self.comm, root=local_master_rank)
                 vecs_e2_ung = DistributedArray(e2_ung, self.comm, root=local_master_rank)
@@ -939,12 +943,9 @@ class LinearSolver:
                     dist_fock_ung = DistributedArray(fock_ung, self.comm, root=local_master_rank)
                     self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
-                if profiler is not None:
-                    profiler.add_timing_info('PostProc', tm.time() - prep_t0)
-                    profiler.check_memory_usage('AppendSigmaVecs')
-
-        if profiler is not None:
-            profiler.check_memory_usage('Fock batch')
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+                profiler.check_memory_usage('AppendSigmaVecs')
 
         prep_t0 = tm.time()
 
