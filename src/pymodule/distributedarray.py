@@ -413,6 +413,8 @@ class DistributedArray:
             The distributed array.
         """
 
+        t0 = tm.time()
+
         rank = comm.Get_rank()
         nodes = comm.Get_size()
 
@@ -443,6 +445,11 @@ class DistributedArray:
             data = np.array(dset[row_start:row_end, :])
             hf.close()
             comm.barrier()
+
+        if rank == mpi_master():
+            print(f'* Info * Time spent in reading hdf5: {tm.time() - t0:.2f} sec\n')
+            import sys
+            sys.stdout.flush()
 
         return cls(data, comm, distribute=False)
 

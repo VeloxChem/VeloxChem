@@ -368,6 +368,8 @@ class ComplexResponse(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
+        profiler.check_memory_usage('ERI/DFT init')
+
         # right-hand side (gradient)
         if self.rank == mpi_master():
             self.nonlinear = (v_grad is not None)
@@ -384,6 +386,8 @@ class ComplexResponse(LinearSolver):
                     (op, w): v for op, v in zip(self.b_components, b_grad)
                     for w in self.frequencies
                 }
+
+        profiler.check_memory_usage('Prop grad')
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
@@ -403,6 +407,8 @@ class ComplexResponse(LinearSolver):
             w: self._get_precond(orb_ene, nocc, norb, w, d)
             for w in self.frequencies
         }
+
+        profiler.check_memory_usage('Precond')
 
         # distribute the gradient and right-hand side:
         # dist_grad will be used for calculating the subspace matrix
@@ -430,6 +436,8 @@ class ComplexResponse(LinearSolver):
                 rhs_mat = None
             dist_grad[key] = DistributedArray(grad_mat, self.comm)
             dist_rhs[key] = DistributedArray(rhs_mat, self.comm)
+
+        profiler.check_memory_usage('dist_grad dist_rhs')
 
         if self.nonlinear:
             rsp_vector_labels = [
