@@ -40,6 +40,7 @@ import sys
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
                            extinction_coefficient_from_beta)
+from .veloxchemlib import dot_product_gpu
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -481,7 +482,10 @@ class ComplexResponse(LinearSolver):
 
             iter_prep_dt = 0.0
             iter_solv_dt = 0.0
-            iter_post_dt = 0.0
+            iter_post_dt_1 = 0.0
+            iter_post_dt_2 = 0.0
+            iter_post_dt_3 = 0.0
+            iter_post_dt_4 = 0.0
 
             iter_t0 = tm.time()
 
@@ -630,6 +634,9 @@ class ComplexResponse(LinearSolver):
                                                           self.comm,
                                                           distribute=False)
 
+                    iter_post_dt_1 += tm.time() - iter_t0
+                    iter_t0 = tm.time()
+
                     # calculating the residual components
 
                     s2realger = x_realger.data
@@ -667,10 +674,28 @@ class ComplexResponse(LinearSolver):
 
                     x = DistributedArray(x_data, self.comm, distribute=False)
 
+                    iter_post_dt_2 += tm.time() - iter_t0
+                    iter_t0 = tm.time()
+
                     x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
-                        xv = np.dot(x_full, v_grad[(op, w)])
+                        # xv = np.dot(x_full, v_grad[(op, w)])
+
+                        x_full_real = x_full.real.copy()
+                        x_full_imag = x_full.imag.copy()
+                        v_grad_op_w_real = v_grad[(op, w)].real.copy()
+                        v_grad_op_w_imag = v_grad[(op, w)].imag.copy()
+
+                        xv_real = (dot_product_gpu(x_full_real, v_grad_op_w_real) -
+                                   dot_product_gpu(x_full_imag, v_grad_op_w_imag))
+                        xv_imag = (dot_product_gpu(x_full_real, v_grad_op_w_imag) +
+                                   dot_product_gpu(x_full_imag, v_grad_op_w_real))
+                        xv = xv_real + 1j * xv_imag
+
                         xvs.append((op, w, xv))
+
+                    iter_post_dt_3 += tm.time() - iter_t0
+                    iter_t0 = tm.time()
 
                     r_norms_2 = 2.0 * r.squared_norm(axis=0)
                     x_norms_2 = 2.0 * x.squared_norm(axis=0)
@@ -688,14 +713,20 @@ class ComplexResponse(LinearSolver):
                     else:
                         residuals[(op, w)] = r
 
-                    iter_post_dt += tm.time() - iter_t0
+                    iter_post_dt_4 += tm.time() - iter_t0
 
             self.ostream.print_info(
                 f'Time spent in reduced space prep.: {iter_prep_dt:.2f} sec.')
             self.ostream.print_info(
                 f'Time spent in reduced space solve: {iter_solv_dt:.2f} sec.')
             self.ostream.print_info(
-                f'Time spent in reduced space postproc.: {iter_post_dt:.2f} sec.')
+                f'Time spent in reduced space postproc. 1: {iter_post_dt_1:.2f} sec.')
+            self.ostream.print_info(
+                f'Time spent in reduced space postproc. 2: {iter_post_dt_2:.2f} sec.')
+            self.ostream.print_info(
+                f'Time spent in reduced space postproc. 3: {iter_post_dt_3:.2f} sec.')
+            self.ostream.print_info(
+                f'Time spent in reduced space postproc. 4: {iter_post_dt_4:.2f} sec.')
             self.ostream.print_blank()
 
             # write to output

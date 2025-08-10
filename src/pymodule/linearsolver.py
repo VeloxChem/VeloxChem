@@ -775,6 +775,7 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('Prep', tm.time() - prep_t0)
+                profiler.check_memory_usage('Vec list')
 
             if subcomm_index + batch_start < batch_end:
 
@@ -824,8 +825,7 @@ class LinearSolver:
 
                 if profiler is not None:
                     profiler.add_timing_info('Prep', tm.time() - prep_t0)
-
-                fock_t0 = tm.time()
+                    profiler.check_memory_usage('Densities')
 
                 # form Fock matrices
 
@@ -835,9 +835,6 @@ class LinearSolver:
                                                     dft_dict, pe_dict, coulomb_coef,
                                                     symm_flag, local_screening, local_comm,
                                                     profiler)
-
-                if profiler is not None:
-                    profiler.add_timing_info('Fock', tm.time() - fock_t0)
 
                 comm_t0 = tm.time()
 
@@ -921,7 +918,8 @@ class LinearSolver:
                                 fock_ung[:, ifock - batch_ger] = fak_mo_vec
 
                 if profiler is not None:
-                    profiler.add_timing_info('Prep', tm.time() - prep_t0)
+                    profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+                    profiler.check_memory_usage('PostProc')
 
             self.comm.barrier()
 
@@ -942,7 +940,8 @@ class LinearSolver:
                     self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
                 if profiler is not None:
-                    profiler.add_timing_info('Prep', tm.time() - prep_t0)
+                    profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+                    profiler.check_memory_usage('AppendSigmaVecs')
 
         if profiler is not None:
             profiler.check_memory_usage('Fock batch')
