@@ -1888,11 +1888,13 @@ class LinearSolver:
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
-            matrices = [
-                factor * (-1.0) *
-                self.commut_mo_density(np.linalg.multi_dot([mo.T, P, mo]), nocc)
-                for P in integral_comps
-            ]
+            matrices = []
+            for P in integral_comps:
+                P_trans_real = matmul_gpu(mo.T, matmul_gpu(P.real.copy(), mo))
+                P_trans_imag = matmul_gpu(mo.T, matmul_gpu(P.imag.copy(), mo))
+                matrices.append(
+                    factor * (-1.0) *
+                    self.commut_mo_density(P_trans_real + 1j * P_trans_imag, nocc))
 
             gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
             return gradients

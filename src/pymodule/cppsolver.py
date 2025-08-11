@@ -167,6 +167,16 @@ class ComplexResponse(LinearSolver):
         # spawning needed components
 
         ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
+
+        ave, res = divmod(ediag.shape[0], self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        start_idx = displacements[self.rank]
+        end_idx = start_idx + counts[self.rank]
+        ediag = ediag[start_idx:end_idx]
+        sdiag = sdiag[start_idx:end_idx]
+
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         sdiag_fp = sdiag**4
@@ -194,7 +204,7 @@ class ComplexResponse(LinearSolver):
             pd_diag.reshape(-1, 1),
         ))
 
-        return DistributedArray(p_mat, self.comm)
+        return DistributedArray(p_mat, self.comm, distribute=False)
 
     def _preconditioning(self, precond, v_in):
         """
@@ -419,25 +429,41 @@ class ComplexResponse(LinearSolver):
         for key in op_freq_keys:
             if self.rank == mpi_master():
                 gradger, gradung = self._decomp_grad(v_grad[key])
-                grad_mat = np.hstack((
-                    gradger.real.reshape(-1, 1),
-                    gradung.real.reshape(-1, 1),
-                    gradung.imag.reshape(-1, 1),
-                    gradger.imag.reshape(-1, 1),
-                ))
+            else:
+                gradger, gradung = None, None
+            gradger = self.comm.bcast(gradger, root=mpi_master())
+            gradung = self.comm.bcast(gradung, root=mpi_master())
+
+            ave, res = divmod(gradger.shape[0], self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+            start_idx = displacements[self.rank]
+            end_idx = start_idx + counts[self.rank]
+            gradger = gradger[start_idx:end_idx]
+            gradung = gradung[start_idx:end_idx]
+
+            grad_mat = np.hstack((
+                gradger.real.reshape(-1, 1),
+                gradung.real.reshape(-1, 1),
+                gradung.imag.reshape(-1, 1),
+                gradger.imag.reshape(-1, 1),
+            ))
+            if not self.restart:
                 rhs_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
                     gradung.real.reshape(-1, 1),
                     -gradung.imag.reshape(-1, 1),
                     -gradger.imag.reshape(-1, 1),
                 ))
-            else:
-                grad_mat = None
-                rhs_mat = None
-            dist_grad[key] = DistributedArray(grad_mat, self.comm)
-            dist_rhs[key] = DistributedArray(rhs_mat, self.comm)
 
-        profiler.check_memory_usage('dist_grad dist_rhs')
+            dist_grad[key] = DistributedArray(grad_mat, self.comm,
+                                              distribute=False)
+            if not self.restart:
+                dist_rhs[key] = DistributedArray(rhs_mat, self.comm,
+                                                 distribute=False)
+
+        profiler.check_memory_usage('dist_grad')
 
         if self.nonlinear:
             rsp_vector_labels = [
