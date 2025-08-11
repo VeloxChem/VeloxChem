@@ -828,8 +828,10 @@ class ComplexResponse(LinearSolver):
                                         rsp_vector_labels)
 
             if self.force_checkpoint:
-                self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                                       rsp_vector_labels)
+                pass
+                # TODO
+                #self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                #                       rsp_vector_labels)
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build prep'.format(iteration + 1))
@@ -846,8 +848,9 @@ class ComplexResponse(LinearSolver):
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                               rsp_vector_labels)
+        # TODO
+        #self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+        #                       rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
