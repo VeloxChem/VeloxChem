@@ -53,6 +53,7 @@ from .reactionmatcher import ReactionMatcher
 from .outputstream import OutputStream
 from .veloxchemlib import Point
 from .waterparameters import get_water_parameters
+from .errorhandler import assert_msg_critical
 
 try:
     import openmm as mm
@@ -85,35 +86,39 @@ class EvbForceFieldBuilder():
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
 
-        self.optimize: bool = False
-        self.reparameterize: bool = True
-        self.mute_scf: bool = True
-        self.optimize_ff: bool = True
-        self.mm_opt_constrain_bonds: bool = True
-        self.water_model: str = 'spce'
-        self.reactant_partial_charges: list[float] | list[list[float]] = None
-        self.product_partial_charges: list[float] | list[list[float]] = None
-        self.reactant_total_multiplicity: int = -1
-        self.product_total_multiplicity: int = -1
-        self.breaking_bonds: set[tuple[int, int]] | tuple = set()
+        self.optimize_mol: bool
+        self.reparameterize: bool
+        self.optimize_ff: bool
+        self.mm_opt_constrain_bonds: bool
+        self.water_model: str
+        self.reactant_partial_charges: list[float] | list[list[float]]
+        self.product_partial_charges: list[float] | list[list[float]]
+        self.reactant_total_multiplicity: int
+        self.product_total_multiplicity: int
+        self.breaking_bonds: set[tuple[int, int]] | tuple
+        self.reactant_hessians: list[np.ndarray | None] | None
+        self.product_hessians: list[np.ndarray | None] | None
+
+        # todo what to do with this option?
+        self.mute_scf: bool
 
     def build_forcefields(
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
-        
     ):
-
 
         self.reactant, reactants, reactant_total_charge = self._create_combined_forcefield(
             reactant,
             self.reactant_partial_charges,
+            self.reactant_hessians,
             "REA",
         )
 
         self.product, products, product_total_charge = self._create_combined_forcefield(
             product,
             self.product_partial_charges,
+            self.product_hessians,
             "PRO",
         )
 
@@ -151,9 +156,10 @@ class EvbForceFieldBuilder():
 
         return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products, product_mapping
 
-    def _create_combined_forcefield(self, molecules: list[Molecule],
-                                    partial_charges: list[list[float]]
-                                    | list[float] | None, name: str):
+    def _create_combined_forcefield(
+            self, molecules: list[Molecule], partial_charges: list[list[float]]
+        | list[float] | None,
+            hessians: np.ndarray | list[np.ndarray | None] | None, name: str):
         if isinstance(molecules, Molecule):
             molecules = [molecules]
 
@@ -162,25 +168,31 @@ class EvbForceFieldBuilder():
         elif isinstance(partial_charges[0], float) or isinstance(
                 partial_charges[0], int):
             partial_charges = [partial_charges]  # type: ignore
-
         assert isinstance(partial_charges, list)
 
-        assert len(molecules) == len(
-            partial_charges
-        ), "Amount of input molecules and lists of partial charges must match"
+        if isinstance(hessians, np.ndarray) or hessians is None:
+            hessians = [hessians] * len(molecules)
+
+        assert_msg_critical(
+            len(molecules) == len(partial_charges),
+            "Amount of input molecules and lists of partial charges must match")
+        assert_msg_critical(
+            len(molecules) == len(hessians),
+            "Amount of input molecules and lists of hessians must match")
 
         single_ffs: list[MMForceFieldGenerator] = []
-        for i, (molecule,
-                partial_charge) in enumerate(zip(molecules, partial_charges)):
+        for i, (molecule, partial_charge,
+                hessian) in enumerate(zip(molecules, partial_charges,
+                                          hessians)):
             charge = molecule.get_charge()
             molecule_sanity_check(molecule)
             if partial_charge is not None:
                 # Casting to float is necessary for json serialization
                 assert isinstance(partial_charge, list)
                 partial_charge = [float(x) for x in partial_charge]
-                assert abs(
-                    sum(partial_charge) - charge
-                ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total formal charge of the system {charge} for input {i+1}"
+                cond = len(partial_charge) == molecule.number_of_atoms()
+                msg = f"Number of partial charges {len(partial_charge)} must match the number of atoms {molecule.number_of_atoms()} in the molecule."
+                assert_msg_critical(cond, msg)
 
             self.ostream.print_blank()
             self.ostream.print_header(f"Building force field for {name}_{i+1}")
@@ -189,6 +201,7 @@ class EvbForceFieldBuilder():
             ff = self._create_single_forcefield(
                 molecule,
                 partial_charge,
+                hessian,
             )
             single_ffs.append(ff)
 
@@ -203,6 +216,7 @@ class EvbForceFieldBuilder():
         self.ostream.print_info(
             f"Combined reactant with total charge {combined_mol.get_charge()} and multiplicity {combined_mol.get_multiplicity()}"
         )
+        self.ostream.flush()
         combined_ff = self._combine_forcefield(single_ffs)
         combined_ff.molecule = combined_mol
 
@@ -216,22 +230,22 @@ class EvbForceFieldBuilder():
         self,
         molecule,
         partial_charges: list[float] | None,
-        # hessian=None,
+        hessian: np.ndarray | None = None,
     ) -> MMForceFieldGenerator:
 
         # # If charges exist, load them into the forcefield object before creating the topology
 
         # The topology creation will calculate charges if they're not already set
-        if self.optimize:
-            scf_drv = XtbDriver(ostream=self.ostream)
+        if self.optimize_mol:
+            scf_drv = XtbDriver()
             opt_drv = OptimizationDriver(scf_drv)
             opt_drv.hessian = "last"
             if self.mute_scf:
                 self.ostream.print_info("Optimising the geometry with xtb.")
                 self.ostream.flush()
-                self.ostream.mute()
+                scf_drv.ostream.mute()
             opt_results = opt_drv.compute(molecule)
-            self.ostream.unmute()
+            
             molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
             molecule.set_charge(molecule.get_charge())
             molecule.set_multiplicity(molecule.get_multiplicity())
@@ -279,7 +293,7 @@ class EvbForceFieldBuilder():
                 scf_drv.conv_thresh = 1.0e-4
                 scf_drv.max_iter = 200
                 scf_results = scf_drv.compute(molecule, basis)
-            self.ostream.unmute()
+            # self.ostream.unmute()
             assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
             resp_drv = RespChargesDriver()
             self.ostream.flush()
@@ -321,20 +335,29 @@ class EvbForceFieldBuilder():
         if self.reparameterize and unknowns_params:
             self.ostream.print_info("Reparameterising force field.")
             self.ostream.flush()
-
-            xtb_drv = XtbDriver()
-            xtb_hessian_drv = XtbHessianDriver(xtb_drv)
-            xtb_hessian_drv.ostream.mute()
+            if hessian is None:
+                self.ostream.print_info(
+                    "Calculating Hessian with XTB to reparameterise the force field."
+                )
+                self.ostream.flush()
+                xtb_drv = XtbDriver()
+                xtb_hessian_drv = XtbHessianDriver(xtb_drv)
+                xtb_hessian_drv.ostream.mute()
+                self.ostream.flush()
+                xtb_hessian_drv.compute(molecule)
+                hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
+            else:
+                cond = np.shape(hessian) == (molecule.number_of_atoms() * 3,
+                                             molecule.number_of_atoms() * 3)
+                msg = f"Hessian shape {np.shape(hessian)} should be square with width 3 times the number"
+                msg += f" of atoms 3*{molecule.number_of_atoms()}={3*molecule.number_of_atoms()} in the molecule."
+                assert_msg_critical(cond, msg)
             self.ostream.flush()
-            xtb_hessian_drv.compute(molecule)
-            hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
-            self.ostream.flush()
-            forcefield.reparameterize(hessian=hessian)
+            forcefield.reparameterize(hessian)
         return forcefield
 
     # Guesses how to combine molecular structures without overlapping them
-    @staticmethod
-    def _combine_molecule(molecules, total_multiplicity):
+    def _combine_molecule(self,molecules, total_multiplicity):
 
         combined_molecule = Molecule()
         # pos = []
@@ -361,6 +384,11 @@ class EvbForceFieldBuilder():
         if total_multiplicity > -1:
             combined_molecule.set_multiplicity(total_multiplicity)
         else:
+            self.ostream.print_info(
+                f"Setting multiplicity of the combined molecule to {Sm1 + 1} based on the multiplicities of the provided molecules."
+            )
+            self.ostream.flush()
+
             combined_molecule.set_multiplicity(Sm1 + 1)
 
         molecule_sanity_check(combined_molecule)

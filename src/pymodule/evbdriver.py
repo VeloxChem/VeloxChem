@@ -92,7 +92,7 @@ class EvbDriver():
         self.name: str = None
         self.results = None
         self.system_confs: list[dict] = []
-        self.fast_run = False
+        self.mute_scf = True
 
         self.t_label = int(time.time())
         self.water_model = 'spce'
@@ -112,7 +112,7 @@ class EvbDriver():
             reactant,
             product,
             ordered_input=True,
-            optimize=True,
+            optimize_mol=True,
         )
         self.ostream.print_blank()
         self.ostream.print_header("Building systems")
@@ -140,20 +140,30 @@ class EvbDriver():
             reactant_total_multiplicity: int = -1,
             product_total_multiplicity: int = -1,
             reparameterize: bool = True,
-            optimize: bool = False,
+            optimize_mol: bool = False,
+            optimize_ff: bool = True,
             mm_opt_constrain_bonds: bool = True,
             breaking_bonds: set[tuple[int, int]] | tuple = set(),
+            reactant_hessians: np.ndarray | list[np.ndarray|None] | None = None,
+            product_hessians: list[np.ndarray|None] | None = None,
+            mute_scf: bool = True,
     ):
         
-        ffbuilder = EvbForceFieldBuilder()
+        ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
         ffbuilder.reactant_partial_charges = reactant_partial_charges
         ffbuilder.product_partial_charges = product_partial_charges
         ffbuilder.reactant_total_multiplicity = reactant_total_multiplicity
         ffbuilder.product_total_multiplicity = product_total_multiplicity
         ffbuilder.reparameterize = reparameterize
-        ffbuilder.optimize = optimize
+        ffbuilder.optimize_ff = optimize_ff
+        ffbuilder.optimize_mol = optimize_mol
         ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
         ffbuilder.breaking_bonds = breaking_bonds
+        ffbuilder.reactant_hessians = reactant_hessians
+        ffbuilder.product_hessians = product_hessians
+        ffbuilder.mute_scf = mute_scf
+
+        ffbuilder.water_model = self.water_model
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = ffbuilder.build_forcefields(
             reactant=reactant,
