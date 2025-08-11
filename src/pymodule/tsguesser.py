@@ -134,7 +134,6 @@ class TransitionStateGuesser():
         """
         evb_drv = EvbDriver()
         self.evb_drv = evb_drv
-        
 
         if self.mute_evb:
             evb_drv.ostream.mute()
@@ -214,7 +213,7 @@ class TransitionStateGuesser():
         self.ostream.print_blank()
         self.results.update({'max_mm_geometry': max_xyz_geom})
         self.results.update({'max_mm_lambda': max_mm_lambda})
-        
+
         if scf:
             # assert False, 'Not implemented yet'
 
@@ -234,7 +233,8 @@ class TransitionStateGuesser():
         charge = self.molecule.get_charge()
 
         if not scf:
-            self.molecule = Molecule.read_xyz_string(self.results['max_mm_geometry'])
+            self.molecule = Molecule.read_xyz_string(
+                self.results['max_mm_geometry'])
         else:
             self.molecule = Molecule.read_xyz_string(
                 self.results['max_scf_geometry'])
@@ -735,12 +735,12 @@ class TransitionStateGuesser():
                     ts_results = self.load_results(self.results_file)
                 except Exception as e:
                     raise e
-                    
+
         mm_energies = ts_results['mm_energies']
         geometries = ts_results['xyz_geometries']
         lambda_vec = ts_results['lambda_vec']
         scf_energies = ts_results.get('scf_energies', None)
-        final_lambda = ts_results['final_lambda']
+        final_lambda = ts_results['max_scf_lambda']
         ipywidgets.interact(
             self._show_iteration,
             mm_energies=ipywidgets.fixed(mm_energies),
@@ -774,7 +774,7 @@ class TransitionStateGuesser():
             raise ImportError('matplotlib is required for this functionality.')
 
         rel_mm_energies = mm_energies - np.min(mm_energies)
-        
+
         lam_index = np.where(lambda_vec == np.array(step))[0][0]
         xyz_data_i = geometries[lam_index]
         total_steps = len(rel_mm_energies) - 1
@@ -870,11 +870,10 @@ class TransitionStateGuesser():
             molecule.set_atom_coordinates(i, positions[i])
         return molecule
 
-    def _save_results(self,fname,results):
+    def _save_results(self, fname, results):
         if os.path.exists(fname):
             self.ostream.print_warning(
-                f"File {fname} already exists. Overwriting it."
-            )
+                f"File {fname} already exists. Overwriting it.")
             self.ostream.flush()
             os.remove(fname)
         hf = h5py.File(fname, 'w')
@@ -884,8 +883,8 @@ class TransitionStateGuesser():
         max_mm_geometry = results['max_mm_geometry']
         max_mm_lambda = results['max_mm_lambda']
         scf_energies = results.get('scf_energies', None)
-        max_scf_geometry = results.get('max_scf_geometry',None)
-        max_scf_lambda = results.get('max_scf_lambda',None)
+        max_scf_geometry = results.get('max_scf_geometry', None)
+        max_scf_lambda = results.get('max_scf_lambda', None)
 
         hf.create_dataset('mm_energies', data=mm_energies, dtype='f')
         hf.create_dataset('xyz_geometries', data=geometries)
@@ -896,21 +895,24 @@ class TransitionStateGuesser():
             hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
             hf.create_dataset('max_scf_geometry', data=[max_scf_geometry])
             hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
-        
 
     @staticmethod
     def _load_results(fname):
         hf = h5py.File(fname, 'r')
         results = {}
         results['mm_energies'] = hf['mm_energies'][:]
-        results['xyz_geometries'] = [s.decode('utf-8') for s in hf['xyz_geometries'][:]]
-        results['final_geometry'] = hf['final_geometry'][0].decode('utf-8')
+        results['xyz_geometries'] = [
+            s.decode('utf-8') for s in hf['xyz_geometries'][:]
+        ]
         results['lambda_vec'] = hf['lambda_vec'][:]
+        results['max_mm_geometry'] = hf['max_mm_geometry'][0].decode('utf-8')
+        results['max_mm_lambda'] = hf['max_mm_lambda'][()]
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]
-        results['final_lambda'] = hf['final_lambda'][()]
+            results['max_scf_geometry'] = hf['max_scf_geometry'][0].decode('utf-8')
+            results['max_scf_lambda'] = hf['max_scf_lambda'][()]
         return results
-    
+
     def load_results(self, fname):
         self.ostream.print_info(f"Loading results from {fname}")
         self.ostream.flush()
