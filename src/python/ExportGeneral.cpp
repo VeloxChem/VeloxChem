@@ -87,12 +87,23 @@ get_shape_and_strides(const std::vector<int>& dimension) -> std::tuple<std::vect
 auto
 pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::array_t<double>
 {
-    if ((ptr == nullptr) || (dimension.size() == 0))
+    if (dimension.size() == 0)
     {
         return py::array_t<double>();
     }
     else
     {
+        if (ptr == nullptr)
+        {
+            // double check that total number of elements is zero
+            int num_elems = 1;
+            for (const auto& n : dimension)
+            {
+                num_elems *= n;
+            }
+            errors::assertMsgCritical(num_elems == 0, std::string("pointer_to_numpy: Invalid dimension for nullptr"));
+        }
+
         const auto [shape, strides] = get_shape_and_strides(dimension);
 
         return py::array_t<double>(shape, strides, ptr);

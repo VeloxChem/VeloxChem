@@ -37,7 +37,6 @@ from pathlib import Path
 import numpy as np
 import sys
 import time
-import h5py # Can be removed if we skip the option of writing trajectory completely
 
 from .veloxchemlib import mpi_master
 from .solvationbuilder import SolvationBuilder
@@ -129,7 +128,7 @@ class SolvationFepDriver:
         self.output_folder = Path("solvation_fep_output")
 
         # Options for the SolvationBuilder
-        self.padding = 2.0
+        self.padding = 1.0
         self.solvent_name = 'spce'
         self.resname = None
         
@@ -158,7 +157,7 @@ class SolvationFepDriver:
         # Single parameter for lambdas for stage 1
         # Set to 6 to be on the safe side
         self.lambdas_stage1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Asymetric lambdas for stage 2 ##TODO: see if it's possible to reduce #of lambdas here..
+        # Asymetric lambdas for stage 2 
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
         # Fixed lambda vector for stage 3 with 6 lambdas
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
@@ -196,7 +195,7 @@ class SolvationFepDriver:
         """
         
         sol_builder = SolvationBuilder()
-        sol_builder.steps = 10000
+        sol_builder.steps = 50000
 
         sol_builder.solvate(solute=molecule, 
                             solvent=solvent,
@@ -258,7 +257,7 @@ class SolvationFepDriver:
             ffgen_solute.create_topology(molecule, resp=False)
 
             sol_builder = SolvationBuilder()
-            sol_builder.steps = 10000
+            sol_builder.steps = 50000
             sol_builder.write_pdb_only = True
 
             sol_builder.solvate(solute=molecule, 
@@ -634,6 +633,7 @@ class SolvationFepDriver:
         simulation.minimizeEnergy()
 
         # Equilibration
+        # TODO: Consider running longer equilibration (evaluate whether it is necessary)
         simulation.step(self.num_equil_steps)
 
         # Calculate production run time and interval

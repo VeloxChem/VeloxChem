@@ -36,6 +36,8 @@ from time import time
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
 import numpy as np
+from itertools import combinations
+import string
 import sys
 
 from .veloxchemlib import mpi_master
@@ -150,6 +152,8 @@ class OpenMMDynamics:
         self.padding = 1.0
         self.cutoff = 1.0
         self.integrator = None
+        self.k = 1000
+        self.r0 = 0.5
 
         # OpenMM objects
         self.system = None
@@ -725,6 +729,173 @@ class OpenMMDynamics:
         self.phase = 'gas'
 
     # Simulation methods
+    def conformational_sampling_multiple(self,
+                                molecules = None,
+                                pdb_file=None,
+                                xml_files=None,
+                                partial_charges = None,
+                                temperature=700, 
+                                timestep=2.0, 
+                                nsteps=100000,
+                                snapshots=100,
+                                lowest_conformations=10,
+                                ):
+        """
+        Runs high-temperature conformational sampling for multiple residues in the system.
+        :param molecules:
+            List of VeloxChem Molecule objects to be used in the simulation.
+        :param pdb_file:
+            PDB file containing the system. If None, it will be generated from the molecules.
+        :param xml_files:
+            List of XML files for the molecule force fields.
+        :param partial_charges:
+            List (of lists) of partial charges for all molecules. If None, RESP charges will be computed.
+        :param temperature:
+            Temperature of the system in Kelvin. Default is 700 K.
+        :param timestep:
+            Timestep of the simulation in femtoseconds. Default is 2.0 fs.
+        :param nsteps:
+            Number of steps in the simulation. Default is 500 000.
+        :param snapshots:
+            The number of snapshots to save. Default is 10.
+        :param lowest_conformations:
+            Number of lowest energy conformations to save. Default is 10.
+
+        :return:
+            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
+            and their corresponding coordinates in XYZ format.
+        """
+
+        if molecules:
+            self.ostream.print_info("Generating system...")
+            self.ostream.flush()
+            self.atom_dict = {}
+            xml_files = [] 
+
+            for i, mol in enumerate(molecules):
+                ff_gen = MMForceFieldGenerator()
+                ff_gen.ostream.mute()
+
+                duplicate = False
+                for j in range(i):
+                    if (mol.get_labels() == molecules[j].get_labels() and
+                        mol.get_connectivity_matrix().shape == molecules[j].get_connectivity_matrix().shape and
+                        (mol.get_connectivity_matrix() == molecules[j].get_connectivity_matrix()).all()):
+
+                        ff_gen.create_topology(mol, resp=False)
+                        self.atom_dict[f'{i}'] = ff_gen.atoms
+                        duplicate = True
+                        break
+
+                if not duplicate:
+                    if partial_charges:
+                        ff_gen.partial_charges = partial_charges[i]
+                    ff_gen.create_topology(mol)
+                    if mol.get_labels() != ['O', 'H', 'H']:  # skip for water
+                        ff_gen.generate_residue_xml(f'molecule_{i+1}.xml', f'M{i+1:02d}')
+                        xml_files.append(f'molecule_{i+1}.xml')
+                
+                self.atom_dict[f'{i}'] = ff_gen.atoms
+
+            pdb_file = 'system.pdb'
+            self._create_system_from_multiple_molecules(molecules, pdb_file)
+        else:
+            assert_msg_critical(
+                pdb_file is not None and xml_files is not None,
+                "No molecules provided. Please provide either a list of VeloxChem Molecule objects or a PDB file and XML files.")   
+
+        self.create_md_system_from_files(pdb_file, xml_files)
+        
+        # prepare system for simulation
+        real_system = self.system # used for recalculation
+        self.ensemble = 'NVT'
+        self.temperature = temperature * unit.kelvin
+        self.timestep = timestep * unit.femtosecond
+        self.nsteps = nsteps
+
+        self.integrator = self._create_integrator()
+        topology = self.pdb.topology
+        self.positions = self.pdb.positions
+
+        # add customcentroidforce to the system
+        self.ostream.print_info("Applying centroid force to the system...")
+        self.ostream.flush()
+        self._get_centroid_bond_force()
+
+        self.simulation = app.Simulation(topology, self.system, self.integrator)
+        self.simulation.context.setPositions(self.positions)
+        self.simulation.context.setVelocitiesToTemperature(self.temperature)
+        self.simulation.minimizeEnergy()
+
+        # Determine the frequency of saving depending on the number of snapshots.
+        save_freq = max(nsteps // snapshots, 1)
+        conformations = []
+        minimized_energies = []
+        opt_coordinates = []
+
+        # Run MD 
+        self.ostream.print_info(f"Running high-temperature MD for {self.nsteps * self.timestep.value_in_unit(unit.nanoseconds):.2f} ns...")
+        self.ostream.flush()
+        for i in range(snapshots):
+            self.simulation.step(save_freq)
+            state = self.simulation.context.getState(getEnergy=True, getPositions=True)
+            positions = state.getPositions().value_in_unit(unit.nanometers)
+            self.ostream.print_info(f'Saved coordinates for step {save_freq * (i + 1)}')
+            self.ostream.print_info(f"Energy for conformer {i}: {state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole):.4f} kJ/mol")
+            self.ostream.flush()
+            conformations.append(positions)
+        
+        # Recalculate energies
+        self.ostream.print_info("Recalculating energies for the conformations...")
+        self.ostream.flush()
+        simulation = app.Simulation(topology, real_system, self._create_integrator())
+
+        for idx, conformation in enumerate(conformations):    
+            simulation.context.setPositions(conformation)
+            simulation.minimizeEnergy()
+            state = simulation.context.getState(getEnergy=True, getPositions=True)
+            
+            minimized_energy = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+            minimized_energies.append(minimized_energy)
+            self.ostream.print_info(f'Minimized energy of conformer {idx}: {minimized_energy:.4f} kJ/mol')
+            self.ostream.flush()
+            
+            minimized_coordinates = state.getPositions()
+
+            xyz = f"{len(self.labels)}\n\n"
+            for label, coord in zip(self.labels, minimized_coordinates):
+                xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
+
+            opt_coordinates.append(xyz)
+
+        # Sort the conformations by energy
+        index_ẹnergy = [(i, minimized_energies[i]) for i in range(len(minimized_energies))]
+        sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1]) # sorted by increasing energy
+        sorted_indices = [i[0] for i in sorted_index_energy]
+
+        minimized_energies = [minimized_energies[i] for i in sorted_indices]
+        opt_coordinates = [opt_coordinates[i] for i in sorted_indices]
+
+        if lowest_conformations:
+            self.ostream.print_info(f"Saving the {lowest_conformations} lowest energy conformations")
+            self.ostream.flush()
+            minimized_energies = minimized_energies[:lowest_conformations]
+            opt_coordinates = opt_coordinates[:lowest_conformations]
+        
+        self.ostream.print_info('Conformational sampling completed!')
+        self.ostream.flush()
+
+        # Save final molecules, coordinates and corresponding energies to a dictionary
+        conformers_dict = {
+                'energies': minimized_energies,
+                'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
+                'geometries': opt_coordinates
+        }
+
+        self.conformer_dict = conformers_dict
+
+        return conformers_dict
+
     def conformational_sampling(self, 
                                 ensemble='NVT', 
                                 temperature=700, 
@@ -749,8 +920,8 @@ class OpenMMDynamics:
             Number of steps in the simulation. Default is 1000.
         :param snapshots:
             The number of snapshots to save. Default is 10.
-        :param lowest_conformations:
-            Number of lowest energy conformations to save. Default is None.
+        :param unique_conformers:
+            If True, the method will remove any identical conformers. Default is True.
         :param qm_minimization:
             QM driver object for energy minimization. Default is None.
         :param basis:
@@ -761,8 +932,9 @@ class OpenMMDynamics:
             If True, the energy of the conformations will be minimized. Default is True.
 
         :return:
-            energies: List of potential energies of the conformations.
-            opt_coordinates: List of XYZ format strings of the minimized coordinates.
+            conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
+            and their corresponding coordinates in XYZ format.
+            
         """
 
         if self.system is None:
@@ -823,8 +995,6 @@ class OpenMMDynamics:
         self.ostream.print_info(f'Number of conformations: {len(opt_coordinates)}')
         self.ostream.flush()
 
-
-        # TODO: Replace this with the unique_conformers function
         equiv_conformer_pairs= []
         if unique_conformers:
             msg = f'Filtering for unique conformers'
@@ -874,39 +1044,13 @@ class OpenMMDynamics:
             opt_coordinates = filtered_geometries
             energies = filtered_energies
 
-            def calculate_boltzmann(energies, T=300, unit='kj/mol'):
-                if unit=='kj/mol':
-                    R = 0.008314462618
-                elif unit=='kcal/mol':
-                    R = 1.98720425864083e-3
-                elif unit=='hartree':
-                    R = 3.166811563671e-6
-                else:
-                    raise ValueError('Invalid unit')
-                # calculate relative energies
-                relative_energies = [energy - min(energies) for energy in energies]
-                # calculate the boltzmann factors
-                boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
-                # calculate the partition function
-                partition_function = sum(boltzmann_factors)
-                # calculate the probabilities
-                probabilities = [factor/partition_function for factor in boltzmann_factors]
-                return probabilities
+
         
-            weights = calculate_boltzmann(energies, T=300, unit='kj/mol')
+        
             # print table of results
             msg = f'\nNumber of unique conformers: {len(opt_coordinates)}'
             self.ostream.print_info(msg)
             self.ostream.flush()
-            for i, (energy, weight) in enumerate(zip(energies, weights)):
-                # on the first line of the msg, print the energy in kJ/mol and the weight
-                # on the second line, add a visulization of the conformer
-                
-                msg = f'\nConformation {i+1}: Energy: {energy:.2f} kJ/mol, Weight: {weight:.4f}'
-                msg += f'\n{Molecule.from_xyz_string(opt_coordinates[i]).show()}'    
-
-                self.ostream.print_info(msg)
-                self.ostream.flush()
 
         if qm_driver:
             # Use qm_miniization to minimize the energy of the conformations
@@ -942,15 +1086,75 @@ class OpenMMDynamics:
             energies = qm_energies
             opt_coordinates = qm_opt_coordinates
 
-        # Convert the opt_coordinates to molecule objects
+        # Save final molecules, coordinates and corresponding energies to a dictionary
+        conformers_dict = {
+                'energies': energies,
+                'molecules': [Molecule.from_xyz_string(coords) for coords in opt_coordinates],
+                'geometries': opt_coordinates
+        }
 
-        opt_molecules = [Molecule.from_xyz_string(coords) for coords in opt_coordinates]
+        self.conformer_dict = conformers_dict
 
+        return conformers_dict
+    
+    def calculate_boltzmann_distribution(self, energies=None, T=300, unit='kj/mol'):
+        """ 
+        Calculate the Boltzmann distribution of conformers based on their energies.
+        
+        :param energies: 
+            list of energies. If None, it will use the energies from the conformers_dict from the conformational sampling.
+        :param T: 
+            temperature in Kelvin
+        :param unit: 
+            unit of energy, options are 'kj/mol', 'kcal/mol', 'hartree'
 
+        :return: 
+            list of probabilities for each conformer
+        
+        """
+        if unit=='kj/mol':
+            R = 0.008314462618
+        elif unit=='kcal/mol':
+            R = 1.98720425864083e-3
+        elif unit=='hartree':
+            R = 3.166811563671e-6
+        else:
+            raise ValueError('Invalid unit')
+        # calculate relative energies
+        if energies is None:
+            energies = self.conformer_dict['energies']
+        else:
+            energies = energies
 
+        relative_energies = [energy - min(energies) for energy in energies]
 
-        return energies, opt_molecules
+        # calculate the boltzmann factors
+        boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
+        # calculate the partition function
+        partition_function = sum(boltzmann_factors)
+        # calculate the probabilities
+        probabilities = [factor/partition_function for factor in boltzmann_factors]
+        
+        return probabilities
+    
+    def show_conformers(self, number=5, atom_indices=False, atom_labels=False, boltzmann_distribution=True):
+        weights = None
+        if boltzmann_distribution:
+            weights = self.calculate_boltzmann_distribution(T=300, unit='kj/mol')
 
+        if number > len(self.conformer_dict["energies"]):
+            number = len(self.conformer_dict["energies"])
+            print(f"Only {number} conformers available, showing all.")
+        for i in range(number):
+            if weights is not None:
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol, Weight: {weights[i]:.4f}'   
+            else:
+                msg = f'\nConformation {i+1}: Energy: {self.conformer_dict["energies"][i]:.3f} kJ/mol'
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+            self.conformer_dict["molecules"][i].show(
+                atom_indices=atom_indices, atom_labels=atom_labels)
+                
     def run_md(self, 
                restart_file=None,
                ensemble='NVE',
@@ -1195,6 +1399,8 @@ class OpenMMDynamics:
             self.driver_flag = 'ROSCF Driver'
         elif isinstance(self.qm_driver, InterpolationDriver):
             self.driver_flag = 'IM Driver'
+            _ = self.qm_driver.read_qm_data_points()
+
         
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
@@ -2318,7 +2524,137 @@ class OpenMMDynamics:
 
         return rmsd_value
 
-    
+    def _get_centroid(self,coords):
+        centroid = np.mean(coords, axis=0)
+        rg_sq = np.mean(np.sum((coords - centroid) ** 2, axis=1))
+        
+        return np.sqrt(rg_sq)
+
+    def _create_system_from_multiple_molecules(
+        self, molecules, pdb_file='system.pdb', spacing_factor=1.5, max_attempts=1000
+    ):
+        placed_coords = []
+        placed_rgs = []
+        all_labels = []
+        atom_mol_ids = []
+
+        for mol_index, mol in enumerate(molecules):
+            coords = mol.get_coordinates_in_angstrom()
+            labels = mol.get_labels()
+            centroid = np.mean(coords, axis=0)
+            coords_centered = coords - centroid
+            
+            rg = self._get_centroid(coords)
+
+            if mol_index == 0:
+                offset = np.zeros(3)
+                coords_shifted = coords_centered
+            else:
+                # Try finding a non-overlapping position
+                for attempt in range(max_attempts):
+                    vec = np.random.normal(size=3)
+                    direction = vec / np.linalg.norm(vec)
+                    distance = 0.0
+
+                    # Calculate min distance needed from all placed molecules
+                    for prev_rg, prev_coords in zip(placed_rgs, placed_coords):
+                        dist_needed = spacing_factor * (rg + prev_rg)
+                        distance = max(distance, dist_needed * (1 + 0.1 * attempt))
+
+                    offset = direction * distance
+                    coords_shifted = coords_centered + offset
+
+                    # Check distance from all placed molecule centroids
+                    overlaps = False
+                    for prev_coords in placed_coords:
+                        prev_centroid = np.mean(prev_coords, axis=0)
+                        new_centroid = np.mean(coords_shifted, axis=0)
+                        if np.linalg.norm(new_centroid - prev_centroid) < spacing_factor * (rg + self._get_centroid(prev_coords)):
+                            overlaps = True
+                            break
+
+                    if not overlaps:
+                        break
+                else:
+                    raise RuntimeError(f"Failed to place molecule {mol_index} without overlaps after {max_attempts} attempts.")
+
+            placed_coords.append(coords_shifted)
+            placed_rgs.append(rg)
+            all_labels.extend(labels)
+            atom_mol_ids.extend([mol_index] * len(labels))
+        
+        # Write system.pdb
+        self.labels = all_labels
+        all_coords = np.vstack(placed_coords)
+        chain_id_list = list(string.ascii_uppercase + string.ascii_lowercase + string.digits)
+        atom_names = [atom_info['name'] for mol in self.atom_dict.values() for atom_info in mol.values()]
+
+        # Determine box size
+        min_coords = np.min(all_coords, axis=0)
+        max_coords = np.max(all_coords, axis=0)
+        extent = max_coords - min_coords
+        
+        # Add the padding to the extent
+        self.padding = 2.0 #(nm)
+        box_size = np.max(extent) + 2 * self.padding * 10
+
+        with open(pdb_file, 'w') as f:
+            # Write the box size (Ångstrom) to the PDB file
+            f.write("HEADER    Generated by VeloxChem\n")
+            f.write(f"CRYST1{box_size:9.3f}{box_size:9.3f}{box_size:9.3f}  90.00  90.00  90.00 P 1           1\n")
+
+            for i, (coord, label, mol_id) in enumerate(zip(all_coords, all_labels, atom_mol_ids), 1):
+                resname = f"M{mol_id+1:02d}"
+                chain_id = chain_id_list[mol_id % len(chain_id_list)]
+                resseq = mol_id + 1
+                atom_name = atom_names[i - 1][:4]  # Ensure name is max 4 chars
+                occupancy = 1.00
+                temp_factor = 0.00
+                element_symbol = label[:2].rjust(2).capitalize()
+
+                # Format line per PDB spec (https://cupnet.net/pdb-format/)
+                line_str = "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   ".format(
+                    'HETATM', i, atom_name, '', resname[:3], chain_id, resseq, '')
+
+                line_str += "{:8.3f}{:8.3f}{:8.3f}".format(
+                    coord[0], coord[1], coord[2])
+
+                line_str += "{:6.2f}{:6.2f}          {:>2s}".format(
+                    occupancy, temp_factor, element_symbol)
+
+                f.write(line_str + '\n')
+
+            f.write("END\n")
+
+    def _get_centroid_bond_force(self):
+        """
+        Creates a CustomCentroidBondForce to restrain the molecules to eachother during conformational sampling
+        of more than one molecule.
+        """
+        k = self.k
+        r0 = self.r0 * unit.nanometer  
+
+        residues = list(self.pdb.topology.residues())
+        if len(residues) < 2:
+            raise ValueError("Expected at least two residues in the PDB file")
+
+        restraint = mm.CustomCentroidBondForce(2, "0.5*k*(distance(g1,g2)-r0)^2")
+        restraint.setUsesPeriodicBoundaryConditions(True)
+        restraint.addGlobalParameter('r0', r0)
+        restraint.addGlobalParameter('k',k)
+        
+        groups = [[atom.index for atom in residue.atoms()] for residue in residues] 
+
+        group_indices = []
+        for group in groups:
+            group_idx = restraint.addGroup(group)
+            group_indices.append(group_idx)
+
+        # Add a bond between each pair of groups
+        for g1, g2 in combinations(group_indices, 2):
+            restraint.addBond([g1, g2], [])
+
+        self.system.addForce(restraint)
 
 
 

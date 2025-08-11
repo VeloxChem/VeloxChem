@@ -38,6 +38,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import boltzmann_in_hartreeperkelvin, hartree_in_kjpermol
+from .evbsystembuilder import EvbForceGroup
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -139,7 +140,9 @@ class EvbDataProcessing:
                             'scipy is required for EvbDataProcessing.')
 
         reference_key = list(self.results.keys())[0]
-        self.ostream.print_info(f"Configuration with key {reference_key} is used as reference for fitting")
+        self.ostream.print_info(
+            f"Configuration with key {reference_key} is used as reference for fitting"
+        )
 
         E1_ref = self.results[reference_key]["E1_pes"]
         E2_ref = self.results[reference_key]["E2_pes"]
@@ -340,7 +343,6 @@ class EvbDataProcessing:
     def _get_FEP_and_EVB(self):
 
         for result in self.results.values():
-            # Temp = result["Temp_step"]
             E1_ref = result["E1_pes"]
             E2_ref = result["E2_pes"]
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
@@ -481,6 +483,29 @@ class EvbDataProcessing:
 
         return np.arange(dE_min, dE_max, bin_size)
 
+    def _calculate_fg_profiles(self):
+        assert len(self.coordinate_bins) > 0, "Coordinate bins not set"
+        assert len(self.Lambda) > 0, "Lambda not set"
+
+        for result in self.results.values():
+            E1_fg = result["E1_fg"]
+            E2_fg = result["E2_fg"]
+            dGfep_fg = []
+            dGevb_fg = []
+            for i, fg in enumerate(EvbForceGroup):
+                E1 = E1_fg[i]
+                E2 = E2_fg[i]
+                E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
+                    E1, E2, self.alpha, self.H12)
+                dGfep = self._calculate_dGfep(dE, result["Temp_set"])
+                dGevb, shift, fepxi = self._dGevb_analytical(
+                    dGfep, self.Lambda, self.H12, self.coordinate_bins)
+                dGfep_fg.append(dGfep)
+                dGevb_fg.append(dGevb)
+
+            result.update({"dGfep_fg": np.array(dGfep_fg)})
+            result.update({"dGevb_fg": np.array(dGevb_fg)})
+
     @staticmethod
     def print_results(results, ostream):
 
@@ -589,7 +614,11 @@ class EvbDataProcessing:
         return fig, ax
 
     @staticmethod
-    def plot_results(results, plot_analytical=True, plot_discrete=False, order = None):
+    def plot_results(results,
+                     plot_analytical=True,
+                     plot_discrete=False,
+                     order=None,
+                     x_axis_publication=True):
 
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -622,8 +651,7 @@ class EvbDataProcessing:
             for name, conf in results['configuration_results'].items():
                 names.append(name)
                 to_plot.append(conf)
-        for i, (name,
-                result) in enumerate(zip(names,to_plot)):
+        for i, (name, result) in enumerate(zip(names, to_plot)):
 
             #Shift both averages by the same amount so that their relative differences stay the same
             ax[0].plot(Lambda, result["dGfep"], label=name)
@@ -670,6 +698,9 @@ class EvbDataProcessing:
         ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
         ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
         ax[1].set_title("EVB profiles", fontsize=12)
+        if x_axis_publication:
+            ax[1].tick_params(labelbottom=False)
+            ax[1].set_xlabel("Reaction coordinate")
         # fig.tight_layout()  # Adjust layout
         fig.legend(
             legend_lines,
