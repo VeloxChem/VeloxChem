@@ -567,11 +567,14 @@ def solvation_model_sanity_check(obj):
             'point charges')
 
         assert_msg_critical(
-            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm', 'smd'],
             type(obj).__name__ +
-            ': Only the C-PCM solvation model is implemented.')
+            ': Only the C-PCM and SMD solvation models are implemented.')
 
         obj._cpcm = True
+        
+        if obj.solvation_model.lower() == 'smd':
+            obj._smd = True
 
     else:
         obj._cpcm = False

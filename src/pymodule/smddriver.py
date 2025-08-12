@@ -41,20 +41,13 @@ import rdkit
 import time
 
 
-from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
+from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
 from .smdsolventproperties import get_smd_solvent_properties, get_sigma_properties, get_rzz_parameters
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
-from .scfrestdriver import ScfRestrictedDriver
-from .mmforcefieldgenerator import MMForceFieldGenerator
+from .atomtypeidentifier import AtomTypeIdentifier
 from .errorhandler import assert_msg_critical
 
-## Note: Maybe adopt a keyword in scf_drv saying smd = True or similar, since then the only 
-# thing extra to do is collecting the new parameters --> i.e., waking up smd VIA scf_drv, rather than
-# the other way around 
-
-class _SmdDriver_WorkInProgress:
+class SmdDriver:
     """
     SMD (Solvation Model based on Density) calculations.
 
@@ -62,11 +55,15 @@ class _SmdDriver_WorkInProgress:
         The MPI communicator.
     :param ostream:
         The output stream.
-    
+    Instance variables:
+        - solvent (str): The solvent used for SMD calculations (default is 'water'). 
     """
 
     def __init__(self, comm=None, ostream=None):
-
+        """
+        Initializes SMD driver.
+        """
+        
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -83,58 +80,19 @@ class _SmdDriver_WorkInProgress:
 
         # outputstream
         self.ostream = ostream
-
-        # scf_drv settings
-        self.basis_set = '6-31G*'
-        self.xcfun = 'B3LYP'
         
         # solvent properties
-        self.solute = None
-        self.cpcm_grid_per_sphere = 194
+        self.solvent = 'water'
         self.smd_solvent_parameters = get_smd_solvent_properties() 
         self.sigma_param, self.sigma_water = get_sigma_properties()
         self.r_zz_dict = get_rzz_parameters()
 
-    def compute_solvation_energy(self, molecule, solvent='water'):
-        """
-        Perform SMD solvation.
-        """
+        self.solute = None
 
-        self.solute = molecule
-        self.solvent = solvent
-        
-        assert_msg_critical(
-            self.solvent in self.smd_solvent_parameters,
-            'Solvent {self.solvent} not available')
-        
-        self.smd_solvent_parameters = self.smd_solvent_parameters[solvent]
-
-        self.ostream.print_info(f"Computing SMD solvation energy in {self.solvent}")
-        self.ostream.flush()
-
-        self.ostream.print_info("Computing the ENP Contribution...")
-        self.ostream.flush()
-        self.ENP_energy = self._get_ENP_contribution()
-        
-        self.ostream.print_info("Computing the CDS Contribution...")
-        self.ostream.flush()
-        self.CDS_energy = self._get_CDS_contribution()
-        
-        # DG_solv = DG_ENP + DG_CDS (+ DG_conc)
-        # N contribution in ENP: diff in total gas phase energy between gas-equil.geometry and liq-equil.geometry
-        # DG_conc = DG_conc(gas-phase) + DG_conc(solv-phase) (=0 if 1 mol/L, =1.89 kcal/mol if gas-phase std state of 1 atm)
-        
-        final_E = self.ENP_energy + self.CDS_energy 
-        
-        self.ostream.print_info(f"Final SMD Solvation Energy: {final_E:.4f} kJ/mol")
-        self.ostream.flush()
-
-        return final_E
     
-    def _get_intrinsic_coulomb_radii(self):
+    def get_intrinsic_coulomb_radii(self):
         """
         Get the intrinsic Coulomb radii (Å) for the solute.
-
         """
 
         atom_labels = self.solute.get_labels() 
@@ -167,34 +125,35 @@ class _SmdDriver_WorkInProgress:
 
         return atom_radii
 
-    def _get_ENP_contribution(self):
+    def get_CDS_contribution(self):
         """
-        Get the ENP contribution to the solvation energy.
+        Get the Cavity-Dispersion-Solvent-Structure (CDS) contribution to the solvation energy.
         """
-        # Electrostatic contribution: DG_ENP = DG_EP if E_tot(gas-geometry in gas-phase) = E_tot(solv-geometry in gas-phase) 
-        # (not the case in general for SMD model, but assumed in the paper)
-        # --> DG_EP calculated fr MO self-consistent reaction field solver
+
+        assert_msg_critical(
+            self.solvent in self.smd_solvent_parameters,
+            'Solvent {self.solvent} not available')
         
-        atom_radii = self._get_intrinsic_coulomb_radii()
-        basis_set = self.basis_set
-        basis = MolecularBasis.read(self.solute, basis_set)
-
-        scf_drv = ScfRestrictedDriver()
-        scf_drv.ostream.mute()
-        scf_drv.xcfun = self.xcfun
-        scf_drv.solvation_model = 'cpcm'
-        scf_drv.cpcm_radii_scaling = 1
-        scf_drv.cpcm_epsilon = self.smd_solvent_parameters['epsilon']
-        scf_drv.cpcm_grid_per_sphere = self.cpcm_grid_per_sphere
-        scf_drv.cpcm_custom_vdw_radii = atom_radii
+        self.smd_solvent_parameters = self.smd_solvent_parameters[self.solvent]
+        self.epsilon = self.smd_solvent_parameters['epsilon']
         
-        scf_drv.compute(self.solute, basis)
-        ENP_energy = scf_drv.cpcm_epol * hartree_in_kjpermol()
+        CDS_energy = 0.0
+        cal_per_mol_to_hartree = 1/627509.5
+        
+        SASA_list = self._get_SASA()
 
-        self.ostream.print_info(f"ENP Contribution: {ENP_energy:.4f} kJ/mol")
-        self.ostream.flush()
+        sigma_k = self._calculate_sigma_k()
 
-        return ENP_energy
+        for k in range(len(self.solute.get_labels())):
+            CDS_energy += sigma_k[k] * SASA_list[k]
+        
+        if self.solvent != 'water': # sigma[M] = 0 for water
+            self._get_molecular_surface_tension()
+            CDS_energy += self.sigma_M * sum(SASA_list)
+
+        CDS_energy *= cal_per_mol_to_hartree
+        
+        return CDS_energy
 
     def _calculate_sigma_k(self):        
         # Table 4 (cal/molÅ^2):  Any possible surface tension parameter that is not in this table is set equal to zero in SMD. 
@@ -213,11 +172,9 @@ class _SmdDriver_WorkInProgress:
         atoms = self.solute.get_labels()
         num_atoms = len(atoms)
         
-        # Check atom types since sigma_k depends on sp3 carbon for k=N
-        ffgen = MMForceFieldGenerator()
-        ffgen.ostream.mute()
-        ffgen.create_topology(self.solute, resp = False)
-        atom_types = ffgen.atom_types
+        atomtypeidentifier = AtomTypeIdentifier(self.comm)
+        atomtypeidentifier.ostream.mute()
+        atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.solute)
 
         halogens = ['F', 'Si', 'S', 'Cl', 'Br'] #if Zk in halogens, sigma_k = sigma_tilde_Z_k 
         all_smd_atoms = ['H', 'C', 'N', 'O'] + halogens #if Z_k not in all_smd, sigma_k = 0
@@ -362,9 +319,6 @@ class _SmdDriver_WorkInProgress:
 
         from rdkit import Chem
         from rdkit.Chem import rdFreeSASA
-    
-        self.ostream.print_info("Computing Solvent Accessible Surface Area (SASA) per atom...")
-        self.ostream.flush()
         
         solute = Chem.MolFromXYZBlock(self.solute.get_xyz_string())
         ptable = Chem.GetPeriodicTable()
@@ -382,9 +336,6 @@ class _SmdDriver_WorkInProgress:
         atoms = solute.GetAtoms()
         SASA_list = [float(atoms[i].GetProp("SASA")) for i in range(len(atoms))]
         
-        self.ostream.print_info(f"Total SASA: {sum(SASA_list):.4f} Å^2")
-        self.ostream.flush()
-        
         return SASA_list
 
     def _get_molecular_surface_tension(self):
@@ -400,31 +351,6 @@ class _SmdDriver_WorkInProgress:
             + sigma_psi2 * param['psi']**2
         )
  
-    def _get_CDS_contribution(self):
-        """
-        Get the Cavity-Dispersion-Solvent-Structure (CDS) contribution to the solvation energy.
-        """
-        #Eq. 6
-        
-        CDS_energy = 0.0
-        cal_to_kJ_per_mol = 0.004184
-        
-        SASA_list = self._get_SASA()
 
-        sigma_k = self._calculate_sigma_k()
-
-        for k in range(len(self.solute.get_labels())):
-            CDS_energy += sigma_k[k] * SASA_list[k]
-        
-        if self.solvent != 'water': # sigma[M] = 0 for water
-            self._get_molecular_surface_tension()
-            CDS_energy += self.sigma_M * sum(SASA_list)
-
-        CDS_energy *= cal_to_kJ_per_mol
-        
-        self.ostream.print_info(f"CDS Contribution: {CDS_energy:.4f} kJ/mol")
-        self.ostream.flush()
-        
-        return CDS_energy
     
     
