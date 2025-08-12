@@ -1437,6 +1437,7 @@ class ScfDriver:
             self._ri_drv.prepare_buffers(molecule,
                                          ao_basis,
                                          self.ri_auxiliary_basis,
+                                         k_metric=False,
                                          verbose=True)
 
         e_grad = None

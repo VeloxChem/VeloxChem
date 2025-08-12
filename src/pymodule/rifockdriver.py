@@ -44,7 +44,7 @@ from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
 
 try:
-    from scipy.linalg import lu_factor, lu_solve
+    from scipy.linalg import lu_factor, lu_solve, sqrtm
 except ImportError:
     pass
 
@@ -85,6 +85,7 @@ class RIFockDriver:
                         molecule,
                         basis,
                         ri_auxiliary_basis,
+                        k_metric=False,
                         verbose=True):
         """
         Prepare buffers for the RI Fock driver.
@@ -131,11 +132,18 @@ class RIFockDriver:
         if 'scipy' in sys.modules:
             lu, piv = lu_factor(mat_j_np)
             inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            if k_metric:
+                inv_mat_k_np = sqrtm(inv_mat_j_np)
         else:
             inv_mat_j_np = np.linalg.inv(mat_j_np)
+            if k_metric:
+                assert_msg_critical(
+                    False,
+                    'RI Fock driver: K metric computation requires scipy module.'
+                )
 
         if verbose:
-            self.ostream.print_info('Matrix inversion for RI done in ' +
+            self.ostream.print_info('Metric(s) for RI done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
 
@@ -145,8 +153,16 @@ class RIFockDriver:
             [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
         inv_mat_j.set_values(inv_mat_j_np)
 
+        if k_metric:
+            inv_mat_k = SubMatrix(
+                [0, 0, inv_mat_k_np.shape[0], inv_mat_k_np.shape[1]])
+            inv_mat_k.set_values(inv_mat_k_np)
+
         # note _RIFockDriver from C++
-        self._ri_drv = _RIFockDriver(inv_mat_j)
+        if k_metric:
+            self._ri_drv = _RIFockDriver(inv_mat_j, inv_mat_k)
+        else:
+            self._ri_drv = _RIFockDriver(inv_mat_j)
 
         local_atoms = molecule.partition_atoms(self.comm)
         self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j, local_atoms)
@@ -181,3 +197,14 @@ class RIFockDriver:
         gvec = self.compute_bq_vector(den_mat_for_fock)
 
         return self._ri_drv.local_compute(den_mat_for_fock, gvec, fock_type)
+
+    def compute_mo_bq_vectors(self, lambda_p, lambda_h):
+        """
+        Compute bq vectors in MO basis using the RI Fock driver.
+        """
+
+        if self.comm.Get_size() == 1:
+            self._ri_drv.compute_bq_vectors(lambda_p, lambda_h)
+            return None
+        else:
+            return None
