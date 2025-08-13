@@ -91,11 +91,11 @@ class EvbForceFieldBuilder():
         self.optimize_ff: bool
         self.mm_opt_constrain_bonds: bool
         self.water_model: str
-        self.reactant_partial_charges: list[float] | list[list[float]]
-        self.product_partial_charges: list[float] | list[list[float]]
         self.reactant_total_multiplicity: int
         self.product_total_multiplicity: int
         self.breaking_bonds: set[tuple[int, int]] | tuple
+        self.reactant_partial_charges: list[float] | list[list[float]] | None
+        self.product_partial_charges: list[float] | list[list[float]] | None
         self.reactant_hessians: list[np.ndarray | None] | None
         self.product_hessians: list[np.ndarray | None] | None
 
@@ -157,9 +157,13 @@ class EvbForceFieldBuilder():
         return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products, product_mapping
 
     def _create_combined_forcefield(
-            self, molecules: list[Molecule], partial_charges: list[list[float]]
+        self,
+        molecules: list[Molecule],
+        partial_charges: list[list[float]]
         | list[float] | None,
-            hessians: np.ndarray | list[np.ndarray | None] | None, name: str):
+        hessians: np.ndarray | list[np.ndarray | None] | None,
+        name: str,
+    ):
         if isinstance(molecules, Molecule):
             molecules = [molecules]
 
@@ -245,7 +249,7 @@ class EvbForceFieldBuilder():
                 self.ostream.flush()
                 scf_drv.ostream.mute()
             opt_results = opt_drv.compute(molecule)
-            
+
             molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
             molecule.set_charge(molecule.get_charge())
             molecule.set_multiplicity(molecule.get_multiplicity())
@@ -357,7 +361,7 @@ class EvbForceFieldBuilder():
         return forcefield
 
     # Guesses how to combine molecular structures without overlapping them
-    def _combine_molecule(self,molecules, total_multiplicity):
+    def _combine_molecule(self, molecules, total_multiplicity):
 
         combined_molecule = Molecule()
         # pos = []

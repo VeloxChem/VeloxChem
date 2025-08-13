@@ -49,6 +49,8 @@ from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
+from .evbffbuilder import EvbForceFieldBuilder
+from .evbsystembuilder import EvbSystemBuilder
 
 try:
     import openmm as mm
@@ -80,7 +82,7 @@ class TransitionStateGuesser():
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-        self.lambda_vec = np.round(np.linspace(0, 1, 21), 3)
+        self.lambda_vec = list(np.round(np.linspace(0, 1, 21), 3))
         self.scf_xcfun = "b3lyp"
         self.scf_basis = 'def2-svp'
         self.mute_scf = True
@@ -90,7 +92,7 @@ class TransitionStateGuesser():
         self.mm_step_size = 0.001 * mmunit.picoseconds
         self.save_mm_traj = False
         self.scf_drv = None
-        self.evb_drv: None | EvbDriver = None
+        # self.evb_drv: None | EvbDriver = None
         self.molecule = None
         self.results = None
         self.folder_name = 'ts_data'
@@ -104,17 +106,19 @@ class TransitionStateGuesser():
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
+        scf=True,
+        scf_drv=None,
         reactant_partial_charges: list[float]
         | list[list[float]] = None,
         product_partial_charges: list[float] | list[list[float]] = None,
         reactant_total_multiplicity=-1,
         product_total_multiplicity=-1,
         breaking_bonds: set[tuple[int, int]] | tuple = set(),
-        scf=True,
-        scf_drv=None,
-        constraints=None,
+        constraints=[],
         reparameterize=True,
         mm_opt_constrain_bonds=True,
+        reactant_hessians=None,
+        product_hessians=None,
     ):
         """Find a guess for the transition state using a force field scan.
 
@@ -132,16 +136,9 @@ class TransitionStateGuesser():
         Returns:
             molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
         """
-        evb_drv = EvbDriver()
-        self.evb_drv = evb_drv
 
-        if self.mute_evb:
-            evb_drv.ostream.mute()
-            self.ostream.print_info(
-                "Building forcefields. Disable mute_evb to see detailed output."
-            )
-            self.ostream.flush()
-        self.evb_drv.build_ff_from_molecules(
+        # Build forcefields and systems
+        systems, topology, init_positions = self.build_forcefields(
             reactant,
             product,
             reactant_partial_charges=reactant_partial_charges,
@@ -151,83 +148,33 @@ class TransitionStateGuesser():
             breaking_bonds=breaking_bonds,
             reparameterize=reparameterize,
             mm_opt_constrain_bonds=mm_opt_constrain_bonds,
-        )
-        self.scf_drv = scf_drv
-        if scf:
-            molecule_sanity_check(self.evb_drv.reactant.molecule)
-
-        self.molecule = Molecule.read_xyz_string(
-            self.evb_drv.reactant.molecule.get_xyz_string())
-        self.molecule.set_charge(self.evb_drv.reactant.molecule.get_charge())
-        self.molecule.set_multiplicity(
-            self.evb_drv.reactant.molecule.get_multiplicity())
-        self.ostream.print_info(
-            f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
-        )
-
-        self.evb_drv.temperature = self.mm_temperature
-        self.ostream.print_info(
-            "Building MM systems for the transition state guess. Disable mute_evb to see detailed output."
-        )
-        self.ostream.flush()
-        self.evb_drv.build_systems(
-            ['ts_guesser'],
-            self.lambda_vec,
             constraints=constraints,
+            reactant_hessians=reactant_hessians,
+            product_hessians=product_hessians,
         )
-        self.lambda_vec = self.evb_drv.Lambda
-        (mm_energies, E1, E2, md_energies, mm_geometries,
-         ff_exception) = self._scan_ff()
-        xyz_geometries = []
-        for mm_geom in mm_geometries:
-            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.molecule)
-            xyz_geometries.append(xyz_geom)
-        self.results = {
-            'mm_energies': mm_energies,
-            'mm_energies_reactant': E1,
-            'mm_energies_product': E2,
-            'int_energies': md_energies,
-            'mm_geometries': mm_geometries,
-            'xyz_geometries': xyz_geometries,
-            'lambda_vec': self.lambda_vec,
-            'broken_bonds': self.evb_drv.breaking_bonds,
-            'formed_bonds': self.evb_drv.forming_bonds,
-        }
 
-        self.results['broken_bonds'] = self.evb_drv.breaking_bonds
-        self.results['formed_bonds'] = self.evb_drv.forming_bonds
-        if ff_exception:
+        # Scan MM
+        self.results = {
+            'broken_bonds': self.breaking_bonds,
+            'formed_bonds': self.forming_bonds,
+            'lambda_vec': self.lambda_vec
+        }
+        results, mm_exception = self.scan_mm(systems, topology, init_positions)
+        self.results.update(results)
+        if mm_exception:
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
             self.ostream.flush()
-            raise ff_exception
+            raise mm_exception
 
-        max_mm_index = np.argmax(mm_energies)
-        max_xyz_geom = xyz_geometries[max_mm_index]
-        max_mm_energy = mm_energies[max_mm_index]
-        max_mm_lambda = self.lambda_vec[max_mm_index]
-        self.ostream.print_info(
-            f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
-        )
-        self.ostream.print_blank()
-        self.results.update({'max_mm_geometry': max_xyz_geom})
-        self.results.update({'max_mm_lambda': max_mm_lambda})
-
+        # Scan SCF
         if scf:
+            self.scf_drv = scf_drv
             # assert False, 'Not implemented yet'
-
-            scf_energies = self._scan_scf()
-            max_scf_index = np.argmax(scf_energies)
-            max_scf_geom = self.results['xyz_geometries'][max_scf_index]
-            max_scf_energy = scf_energies[max_scf_index]
-            max_scf_lambda = self.lambda_vec[max_scf_index]
-            self.results.update({'max_scf_geometry': max_scf_geom})
-            self.results.update({'max_scf_lambda': max_scf_lambda})
-            self.ostream.print_info(
-                f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
-            )
-            self.ostream.flush()
+            structures = self.results['mm_geometries']
+            scf_results = self.scan_scf(structures)
+            self.results.update(scf_results)
 
         mult = self.molecule.get_multiplicity()
         charge = self.molecule.get_charge()
@@ -245,209 +192,82 @@ class TransitionStateGuesser():
         self._save_results(self.results_file, self.results)
         return self.molecule, self.results
 
-    def _print_initial_mm_header(self):
-        self.ostream.print_blank()
-        self.ostream.print_header("Starting initial MM scan")
-        self.ostream.print_blank()
-        valstr = '{} | {} | {} | {} | {}'.format(
-            'Lambda',
-            ' E_int',
-            '    E1',
-            '    E2',
-            '    Em',
+    def build_forcefields(
+        self,
+        reactant,
+        product,
+        reactant_partial_charges,
+        product_partial_charges,
+        reactant_total_multiplicity,
+        product_total_multiplicity,
+        breaking_bonds,
+        reparameterize,
+        mm_opt_constrain_bonds,
+        constraints,
+        reactant_hessians,
+        product_hessians,
+    ):
+        evb_drv = EvbDriver()
+        # self.evb_drv = evb_drv
+
+        ffbuilder = EvbForceFieldBuilder()
+        if self.mute_evb:
+            ffbuilder.ostream.mute()
+            self.ostream.print_info(
+                "Building forcefields. Disable mute_evb to see detailed output."
+            )
+            self.ostream.flush()
+        ffbuilder.reactant_partial_charges = reactant_partial_charges
+        ffbuilder.product_partial_charges = product_partial_charges
+        ffbuilder.reactant_total_multiplicity = reactant_total_multiplicity
+        ffbuilder.product_total_multiplicity = product_total_multiplicity
+        ffbuilder.reparameterize = reparameterize
+        ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
+        ffbuilder.breaking_bonds = breaking_bonds
+        ffbuilder.mute_scf = True
+
+        ffbuilder.optimize_ff = True
+        ffbuilder.optimize_mol = False
+        ffbuilder.reactant_hessians = reactant_hessians
+        ffbuilder.product_hessians = product_hessians
+        ffbuilder.water_model = 'spce'
+
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = ffbuilder.build_forcefields(
+            reactant=reactant,
+            product=product,
         )
-        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
-        self.ostream.print_header(valstr)
-        self.ostream.print_header(45 * '-')
+
+        self.molecule = self.reactant.molecule
+
+        self.ostream.print_info(
+            f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
+        )
+
+        conf = {
+            "name": "vacuum",
+            "bonded_integration": True,
+            "soft_core_coulomb_pes": True,
+            "soft_core_lj_pes": True,
+            "soft_core_coulomb_int": False,
+            "soft_core_lj_int": False,
+        }
+
+        self.ostream.print_info(
+            "Building MM systems for the transition state guess. Disable mute_evb to see detailed output."
+        )
         self.ostream.flush()
+        sysbuilder = EvbSystemBuilder()
 
-    def _print_rescan_mm_header(self):
-        self.ostream.print_blank()
-        self.ostream.print_header("Scanning MM conformers")
-        self.ostream.print_blank()
-        valstr = '{} | {} | {} | {} | {} | {}'.format(
-            'Lambda',
-            ' E_int',
-            '    E1',
-            '    E2',
-            '    Em',
-            'n_conf',
+        systems, topology, init_positions = sysbuilder.build_systems(
+            self.reactant,
+            self.product,
+            list(self.lambda_vec),
+            conf,
+            constraints,
         )
-        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
-        self.ostream.print_header(valstr)
-        self.ostream.print_header(50 * '-')
-        self.ostream.flush()
+        return systems, topology, init_positions
 
-    def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
-        if n_conf is None:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
-                l, md_e, e1, e2, em)
-        else:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
-                l, md_e, e1, e2, em, n_conf)
-        self.ostream.print_header(valstr)
-        self.ostream.flush()
-
-    def _print_scf_header(self):
-        self.ostream.print_blank()
-        self.ostream.print_header(f"Starting SCF scan")
-        self.ostream.print_blank()
-        valsltr = '{} | {} | {}'.format(
-            'Lambda',
-            'SCF Energy',
-            'Difference',
-        )
-        self.ostream.print_header(valsltr)
-        self.ostream.print_header(40 * '-')
-        self.ostream.flush()
-
-    def _print_scf_iter(self, l, scf_E, dif):
-        valstr = "{:8.2f}  {:15.5f}  {:8.3f}".format(l, scf_E, dif)
-        self.ostream.print_header(valstr)
-        self.ostream.flush()
-
-    #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
-    #todo add option for recalculating charges from ts_mol
-    def get_ts_ffgen(self,
-                     reaffgen=None,
-                     proffgen=None,
-                     l=0.5,
-                     ts_mol=None,
-                     recalculate=True):
-        if reaffgen is None:
-            reaffgen = self.evb_drv.reactant
-        if proffgen is None:
-            proffgen = self.evb_drv.product
-        if ts_mol is None:
-            ts_mol = self.molecule
-
-        if recalculate:
-            assert ts_mol is not None, "Please provide a molecule, or turn of recalculation"
-        ts_ffgen = MMForceFieldGenerator()
-
-        ts_ffgen.bonds = self._average_params(
-            reaffgen.bonds,
-            proffgen.bonds,
-            l,
-            ts_mol,
-        )
-        ts_ffgen.angles = self._average_params(
-            reaffgen.angles,
-            proffgen.angles,
-            l,
-            ts_mol,
-        )
-        ts_ffgen.dihedrals = self._mix_dihedrals(
-            reaffgen.dihedrals,
-            proffgen.dihedrals,
-            l,
-            ts_mol,
-        )
-        ts_ffgen.impropers = self._mix_dihedrals(
-            reaffgen.impropers,
-            proffgen.impropers,
-            l,
-            ts_mol,
-        )
-        ts_ffgen.atoms = self._merge_atoms(
-            reaffgen.atoms,
-            proffgen.atoms,
-            l,
-            ts_mol,
-        )
-        return ts_ffgen
-
-    @staticmethod
-    def _average_params(reaparams, proparams, l, mol):
-        ts_params = {}
-        for id in reaparams.keys() | proparams.keys():
-            param = {}
-            if id in reaparams.keys() and id in proparams.keys():
-                reaparam = reaparams[id]
-                proparam = proparams[id]
-                #todo change this to measurement from molecule
-                eq = (1 -
-                      l) * reaparam['equilibrium'] + l * proparam['equilibrium']
-                fc = (1 - l) * reaparam['force_constant'] + l * proparam[
-                    'force_constant']
-                comment = f"averaged {reaparam['comment']} {proparam['comment']}"
-                param = {
-                    'force_constant': fc,
-                    'equilibrium': eq,
-                    'comment': comment,
-                }
-            elif id in reaparams.keys():
-                param = reaparams[id]
-                param['force_constant'] *= (1 - l)
-            elif id in proparams.keys():
-                param = proparams[id]
-                param['force_constant'] *= l
-            else:
-                continue
-            ts_params.update({id: copy.copy(param)})
-        if ts_params is {}:
-            return None
-        return ts_params
-
-    @staticmethod
-    def _mix_dihedrals(rea_dihedrals, pro_dihedrals, l, mol):
-        ts_params = {}
-        for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
-            for id, param in dict.items():
-                #todo reassign value of phase?
-                new_param = copy.copy(param)
-                if new_param.get('multiple'):
-                    new_param['barrier'] = [
-                        bar * scaling for bar in new_param['barrier']
-                    ]
-                else:
-                    new_param['barrier'] *= scaling
-                ts_params.update({id: new_param})
-        return ts_params
-
-    @staticmethod
-    def _merge_atoms(rea_atoms, pro_atoms, l, mol):
-        atoms = {}
-        for i, (rea_atom, pro_atom) in enumerate(
-                zip(rea_atoms.values(), pro_atoms.values())):
-            assert rea_atom["mass"] == pro_atom[
-                "mass"], "Atoms in reactont and product are not the same"
-
-            name = ''.join(x for x in rea_atom['name'] if x.isalpha())
-
-            if rea_atom['type'] == pro_atom['type']:
-                typ = rea_atom['type']
-            else:
-                typ = name.lower() + "rx"
-
-            if rea_atom.get('comment') == pro_atom.get(
-                    'comment') and rea_atom.get('comment') is not None:
-                comment = rea_atom['comment']
-            else:
-                comment = "Merged TS atom"
-
-            charge = (1 - l) * rea_atom['charge'] + l * pro_atom['charge']
-            eps = (1 - l) * rea_atom['epsilon'] + l * pro_atom['epsilon']
-            sigma = (1 - l) * rea_atom['sigma'] + l * pro_atom['sigma']
-
-            atom = {
-                'name': f"{name}{i}",
-                'sigma': sigma,
-                'epsilon': eps,
-                'charge': charge,
-                'mass': rea_atom["mass"],
-                'type': typ,
-                'comment': comment
-            }
-
-            if rea_atom.get('equivalent_atom') == pro_atom.get(
-                    'equivalent_atom'):
-                equi_atom = rea_atom['equivalent_atom']
-                atom.update({'equivalent_atom': equi_atom})
-            atoms.update({i: atom})
-        return atoms
-
-    def _scan_ff(self):
+    def scan_mm(self, systems, topology, initial_positions):
 
         energies = []
         E1 = []
@@ -456,10 +276,6 @@ class TransitionStateGuesser():
         N_conf = []
 
         positions = []
-        initial_positions = self.evb_drv.system_confs[0][
-            'initial_positions']  #in nm
-
-        topology = self.evb_drv.system_confs[0]['topology']
         if not os.path.exists(self.folder_name):
             os.makedirs(self.folder_name)
         else:
@@ -477,13 +293,13 @@ class TransitionStateGuesser():
         rea_int = mm.VerletIntegrator(1)
         rea_sim = mmapp.Simulation(
             topology,
-            self.evb_drv.system_confs[0]['systems']['reactant'],
+            systems['reactant'],
             rea_int,
         )
         pro_int = mm.VerletIntegrator(1)
         pro_sim = mmapp.Simulation(
             topology,
-            self.evb_drv.system_confs[0]['systems']['product'],
+            systems['product'],
             pro_int,
         )
         pos = initial_positions
@@ -497,9 +313,10 @@ class TransitionStateGuesser():
                 self._print_rescan_mm_header()
             else:
                 self._print_initial_mm_header()
-            for l in self.evb_drv.Lambda:
+            for l in self.lambda_vec:
                 em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
                     topology,
+                    systems[l],
                     l,
                     pos,
                     rea_sim,
@@ -531,8 +348,8 @@ class TransitionStateGuesser():
                         printed_header = True
                     smooth_energy = True
 
-                    for i, l in enumerate(self.evb_drv.Lambda):
-                        if i < len(self.evb_drv.Lambda) - 1:
+                    for i, l in enumerate(self.lambda_vec):
+                        if i < len(self.lambda_vec) - 1:
                             if E1[i] > E1[i + 1]:
                                 smooth_energy = False
                         if i > 0:
@@ -544,6 +361,7 @@ class TransitionStateGuesser():
                                 break
                             em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
                                 topology,
+                                systems[l],
                                 l,
                                 pos,
                                 rea_sim,
@@ -577,21 +395,49 @@ class TransitionStateGuesser():
                         self.ostream.flush()
                     initial_scan = False
                 self.ostream.print_blank()
+
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
             exception = e
-        return energies, E1, E2, energies_int, positions, exception
+
+        xyz_geometries = []
+        for mm_geom in positions:
+            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.molecule)
+            xyz_geometries.append(xyz_geom)
+        results = {
+            'mm_energies': energies,
+            'mm_energies_reactant': E1,
+            'mm_energies_product': E2,
+            'int_energies': energies_int,
+            'mm_geometries': positions,
+            'xyz_geometries': xyz_geometries,
+        }
+
+        if exception is None:
+            max_mm_index = np.argmax(energies)
+            max_xyz_geom = xyz_geometries[max_mm_index]
+            max_mm_energy = energies[max_mm_index]
+            max_mm_lambda = self.lambda_vec[max_mm_index]
+            self.ostream.print_info(
+                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
+            )
+            self.ostream.print_blank()
+            results.update({
+                'max_mm_geometry': max_xyz_geom,
+                'max_mm_lambda': max_mm_lambda,
+            })
+        return results, exception
 
     def _get_mm_energy(
         self,
         topology,
+        system,
         l,
         init_pos,
         reasim,
         prosim,
         conformer_search,
     ):
-        system = self.evb_drv.system_confs[0]['systems'][l]
         if not conformer_search:
             integrator = mm.VerletIntegrator(self.mm_step_size)
             simulation = mmapp.Simulation(
@@ -676,12 +522,12 @@ class TransitionStateGuesser():
 
         return em, e1, e2
 
-    def _scan_scf(self):
+    def scan_scf(self, structures):
         self._print_scf_header()
         scf_energies = []
         ref = 0
-        for i, l in enumerate(self.evb_drv.Lambda):
-            geom = self.results['mm_geometries'][i]
+        for i, l in enumerate(self.lambda_vec):
+            geom = structures[i]
             scf_E = self._get_scf_energy(geom)
             if i == 0:
                 ref = scf_E
@@ -691,9 +537,22 @@ class TransitionStateGuesser():
             scf_energies.append(scf_E)
             self._print_scf_iter(l, scf_E, dif)
         self.ostream.print_blank()
-        self.results['scf_energies'] = scf_energies
 
-        return scf_energies
+        max_scf_index = np.argmax(scf_energies)
+        max_scf_geom = self._mm_to_xyz_geom(structures[max_scf_index])
+        max_scf_energy = scf_energies[max_scf_index]
+        max_scf_lambda = self.lambda_vec[max_scf_index]
+        results = {
+            'scf_energies': scf_energies,
+            'max_scf_geometry': max_scf_geom,
+            'max_scf_lambda': max_scf_lambda
+        }
+        self.ostream.print_info(
+            f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
+        )
+        self.ostream.flush()
+
+        return results
 
     def _get_scf_energy(self, positions):
         self.molecule = self._set_molecule_positions(self.molecule, positions)
@@ -861,8 +720,9 @@ class TransitionStateGuesser():
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
 
-    @staticmethod
-    def _mm_to_xyz_geom(geom, molecule):
+    def _mm_to_xyz_geom(self, geom, molecule=None):
+        if molecule is None:
+            molecule = self.molecule
         new_mol = TransitionStateGuesser._set_molecule_positions(molecule, geom)
         return new_mol.get_xyz_string()
 
@@ -923,3 +783,205 @@ class TransitionStateGuesser():
         results = self._load_results(fname)
         self.results = results
         return results
+
+    def _print_initial_mm_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header("Starting initial MM scan")
+        self.ostream.print_blank()
+        valstr = '{} | {} | {} | {} | {}'.format(
+            'Lambda',
+            ' E_int',
+            '    E1',
+            '    E2',
+            '    Em',
+        )
+        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(45 * '-')
+        self.ostream.flush()
+
+    def _print_rescan_mm_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header("Scanning MM conformers")
+        self.ostream.print_blank()
+        valstr = '{} | {} | {} | {} | {} | {}'.format(
+            'Lambda',
+            ' E_int',
+            '    E1',
+            '    E2',
+            '    Em',
+            'n_conf',
+        )
+        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(50 * '-')
+        self.ostream.flush()
+
+    def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
+        if n_conf is None:
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
+                l, md_e, e1, e2, em)
+        else:
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
+                l, md_e, e1, e2, em, n_conf)
+        self.ostream.print_header(valstr)
+        self.ostream.flush()
+
+    def _print_scf_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header(f"Starting SCF scan")
+        self.ostream.print_blank()
+        valsltr = '{} | {} | {}'.format(
+            'Lambda',
+            'SCF Energy',
+            'Difference',
+        )
+        self.ostream.print_header(valsltr)
+        self.ostream.print_header(40 * '-')
+        self.ostream.flush()
+
+    def _print_scf_iter(self, l, scf_E, dif):
+        valstr = "{:8.2f}  {:15.5f}  {:8.3f}".format(l, scf_E, dif)
+        self.ostream.print_header(valstr)
+        self.ostream.flush()
+
+    #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
+    #todo add option for recalculating charges from ts_mol
+    def get_ts_ffgen(self,
+                     reaffgen=None,
+                     proffgen=None,
+                     l=0.5,
+                     ts_mol=None,
+                     recalculate=True):
+        if reaffgen is None:
+            reaffgen = self.reactant
+        if proffgen is None:
+            proffgen = self.product
+        if ts_mol is None:
+            ts_mol = self.molecule
+
+        if recalculate:
+            assert ts_mol is not None, "Please provide a molecule, or turn of recalculation"
+        ts_ffgen = MMForceFieldGenerator()
+
+        ts_ffgen.bonds = self._average_params(
+            reaffgen.bonds,
+            proffgen.bonds,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.angles = self._average_params(
+            reaffgen.angles,
+            proffgen.angles,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.dihedrals = self._mix_dihedrals(
+            reaffgen.dihedrals,
+            proffgen.dihedrals,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.impropers = self._mix_dihedrals(
+            reaffgen.impropers,
+            proffgen.impropers,
+            l,
+            ts_mol,
+        )
+        ts_ffgen.atoms = self._merge_atoms(
+            reaffgen.atoms,
+            proffgen.atoms,
+            l,
+            ts_mol,
+        )
+        return ts_ffgen
+
+    @staticmethod
+    def _average_params(reaparams, proparams, l, mol):
+        ts_params = {}
+        for id in reaparams.keys() | proparams.keys():
+            param = {}
+            if id in reaparams.keys() and id in proparams.keys():
+                reaparam = reaparams[id]
+                proparam = proparams[id]
+                #todo change this to measurement from molecule
+                eq = (1 -
+                      l) * reaparam['equilibrium'] + l * proparam['equilibrium']
+                fc = (1 - l) * reaparam['force_constant'] + l * proparam[
+                    'force_constant']
+                comment = f"averaged {reaparam['comment']} {proparam['comment']}"
+                param = {
+                    'force_constant': fc,
+                    'equilibrium': eq,
+                    'comment': comment,
+                }
+            elif id in reaparams.keys():
+                param = reaparams[id]
+                param['force_constant'] *= (1 - l)
+            elif id in proparams.keys():
+                param = proparams[id]
+                param['force_constant'] *= l
+            else:
+                continue
+            ts_params.update({id: copy.copy(param)})
+        if ts_params is {}:
+            return None
+        return ts_params
+
+    @staticmethod
+    def _mix_dihedrals(rea_dihedrals, pro_dihedrals, l, mol):
+        ts_params = {}
+        for dict, scaling in zip([rea_dihedrals, pro_dihedrals], [1 - l, l]):
+            for id, param in dict.items():
+                #todo reassign value of phase?
+                new_param = copy.copy(param)
+                if new_param.get('multiple'):
+                    new_param['barrier'] = [
+                        bar * scaling for bar in new_param['barrier']
+                    ]
+                else:
+                    new_param['barrier'] *= scaling
+                ts_params.update({id: new_param})
+        return ts_params
+
+    @staticmethod
+    def _merge_atoms(rea_atoms, pro_atoms, l, mol):
+        atoms = {}
+        for i, (rea_atom, pro_atom) in enumerate(
+                zip(rea_atoms.values(), pro_atoms.values())):
+            assert rea_atom["mass"] == pro_atom[
+                "mass"], "Atoms in reactont and product are not the same"
+
+            name = ''.join(x for x in rea_atom['name'] if x.isalpha())
+
+            if rea_atom['type'] == pro_atom['type']:
+                typ = rea_atom['type']
+            else:
+                typ = name.lower() + "rx"
+
+            if rea_atom.get('comment') == pro_atom.get(
+                    'comment') and rea_atom.get('comment') is not None:
+                comment = rea_atom['comment']
+            else:
+                comment = "Merged TS atom"
+
+            charge = (1 - l) * rea_atom['charge'] + l * pro_atom['charge']
+            eps = (1 - l) * rea_atom['epsilon'] + l * pro_atom['epsilon']
+            sigma = (1 - l) * rea_atom['sigma'] + l * pro_atom['sigma']
+
+            atom = {
+                'name': f"{name}{i}",
+                'sigma': sigma,
+                'epsilon': eps,
+                'charge': charge,
+                'mass': rea_atom["mass"],
+                'type': typ,
+                'comment': comment
+            }
+
+            if rea_atom.get('equivalent_atom') == pro_atom.get(
+                    'equivalent_atom'):
+                equi_atom = rea_atom['equivalent_atom']
+                atom.update({'equivalent_atom': equi_atom})
+            atoms.update({i: atom})
+        return atoms
