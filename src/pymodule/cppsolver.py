@@ -40,7 +40,6 @@ import sys
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
                            extinction_coefficient_from_beta)
-from .veloxchemlib import dot_product_gpu
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -385,23 +384,71 @@ class ComplexResponse(LinearSolver):
             self.nonlinear = (v_grad is not None)
         self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
 
+        dist_grad = {}
+        dist_rhs = {}
+
         if not self.nonlinear:
             # TODO: make this screening temporary
             b_grad = self.get_complex_prop_grad(self.b_operator,
                                                 self.b_components, molecule,
                                                 basis, scf_tensors,
                                                 eri_dict['screening'])
-            if self.rank == mpi_master():
-                v_grad = {
-                    (op, w): v for op, v in zip(self.b_components, b_grad)
-                    for w in self.frequencies
-                }
+
+            for comp_idx, op in enumerate(self.b_components):
+
+                if self.rank == mpi_master():
+                    gradger, gradung = self._decomp_grad(b_grad[comp_idx])
+                else:
+                    gradger, gradung = None, None
+                gradger = self.comm.bcast(gradger, root=mpi_master())
+                gradung = self.comm.bcast(gradung, root=mpi_master())
+
+                ave, res = divmod(gradger.shape[0], self.nodes)
+                counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+                displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+                start_idx = displacements[self.rank]
+                end_idx = start_idx + counts[self.rank]
+                gradger = gradger[start_idx:end_idx]
+                gradung = gradung[start_idx:end_idx]
+
+                # distribute the gradient and right-hand side:
+                # dist_grad will be used for calculating the subspace matrix
+                # equation and residuals, dist_rhs for the initial guess
+
+                grad_mat = np.hstack((
+                    gradger.real.reshape(-1, 1),
+                    gradung.real.reshape(-1, 1),
+                    gradung.imag.reshape(-1, 1),
+                    gradger.imag.reshape(-1, 1),
+                ))
+
+                dist_v_grad = DistributedArray(grad_mat, self.comm,
+                                               distribute=False)
+
+                if not self.restart:
+                    rhs_mat = np.hstack((
+                        gradger.real.reshape(-1, 1),
+                        gradung.real.reshape(-1, 1),
+                        -gradung.imag.reshape(-1, 1),
+                        -gradger.imag.reshape(-1, 1),
+                    ))
+
+                    dist_v_rhs = DistributedArray(rhs_mat, self.comm,
+                                                  distribute=False)
+
+                for w in self.frequencies:
+
+                    dist_grad[(op, w)] = dist_v_grad
+
+                    if not self.restart:
+                        dist_rhs[(op, w)] = dist_v_rhs
 
         profiler.check_memory_usage('Prop grad')
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
-            op_freq_keys = list(v_grad.keys())
+            op_freq_keys = list(dist_grad.keys())
         else:
             op_freq_keys = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
@@ -419,51 +466,6 @@ class ComplexResponse(LinearSolver):
         }
 
         profiler.check_memory_usage('Precond')
-
-        # distribute the gradient and right-hand side:
-        # dist_grad will be used for calculating the subspace matrix
-        # equation and residuals, dist_rhs for the initial guess
-
-        dist_grad = {}
-        dist_rhs = {}
-        for key in op_freq_keys:
-            if self.rank == mpi_master():
-                gradger, gradung = self._decomp_grad(v_grad[key])
-            else:
-                gradger, gradung = None, None
-            gradger = self.comm.bcast(gradger, root=mpi_master())
-            gradung = self.comm.bcast(gradung, root=mpi_master())
-
-            ave, res = divmod(gradger.shape[0], self.nodes)
-            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-            displacements = [sum(counts[:p]) for p in range(self.nodes)]
-
-            start_idx = displacements[self.rank]
-            end_idx = start_idx + counts[self.rank]
-            gradger = gradger[start_idx:end_idx]
-            gradung = gradung[start_idx:end_idx]
-
-            grad_mat = np.hstack((
-                gradger.real.reshape(-1, 1),
-                gradung.real.reshape(-1, 1),
-                gradung.imag.reshape(-1, 1),
-                gradger.imag.reshape(-1, 1),
-            ))
-            if not self.restart:
-                rhs_mat = np.hstack((
-                    gradger.real.reshape(-1, 1),
-                    gradung.real.reshape(-1, 1),
-                    -gradung.imag.reshape(-1, 1),
-                    -gradger.imag.reshape(-1, 1),
-                ))
-
-            dist_grad[key] = DistributedArray(grad_mat, self.comm,
-                                              distribute=False)
-            if not self.restart:
-                dist_rhs[key] = DistributedArray(rhs_mat, self.comm,
-                                                 distribute=False)
-
-        profiler.check_memory_usage('dist_grad')
 
         if self.nonlinear:
             rsp_vector_labels = [
@@ -711,22 +713,39 @@ class ComplexResponse(LinearSolver):
                     iter_post_dt_2 += tm.time() - iter_t0
                     iter_t0 = tm.time()
 
-                    x_full = self.get_full_solution_vector(x)
+                    # x_full = self.get_full_solution_vector(x)
+
+                    # x_realger = solution.get_full_vector(0)
+                    # x_realung = solution.get_full_vector(1)
+                    # x_imagung = solution.get_full_vector(2)
+                    # x_imagger = solution.get_full_vector(3)
+
+                    # x_real = np.hstack((x_realger, x_realger)) + np.hstack((x_realung, -x_realung))
+                    # x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack((x_imagger, x_imagger))
+
+                    # xv = np.dot(x_full, v_grad[(op, w)])
+
+                    x_real_np = (np.hstack((x_realger.data, x_realger.data)) +
+                                 np.hstack((x_realung.data, -x_realung.data)))
+                    x_imag_np = (np.hstack((x_imagung.data, -x_imagung.data)) +
+                                 np.hstack((x_imagger.data, x_imagger.data)))
+
+                    grad_real_np = (np.hstack((grad_rg.data, grad_rg.data)) +
+                                    np.hstack((grad_ru.data, -grad_ru.data)))
+                    grad_imag_np = (np.hstack((grad_iu.data, -grad_iu.data)) +
+                                    np.hstack((grad_ig.data, grad_ig.data)))
+
+                    xv_real = (np.dot(x_real_np, grad_real_np) -
+                               np.dot(x_imag_np, grad_imag_np))
+                    xv_imag = (np.dot(x_real_np, grad_imag_np) +
+                               np.dot(x_imag_np, grad_real_np))
+
+                    sum_xv_real = self.comm.reduce(xv_real, op=MPI.SUM, root=mpi_master())
+                    sum_xv_imag = self.comm.reduce(xv_imag, op=MPI.SUM, root=mpi_master())
+
                     if self.rank == mpi_master():
-                        # xv = np.dot(x_full, v_grad[(op, w)])
-
-                        x_full_real = x_full.real.copy()
-                        x_full_imag = x_full.imag.copy()
-                        v_grad_op_w_real = v_grad[(op, w)].real.copy()
-                        v_grad_op_w_imag = v_grad[(op, w)].imag.copy()
-
-                        xv_real = (dot_product_gpu(x_full_real, v_grad_op_w_real) -
-                                   dot_product_gpu(x_full_imag, v_grad_op_w_imag))
-                        xv_imag = (dot_product_gpu(x_full_real, v_grad_op_w_imag) +
-                                   dot_product_gpu(x_full_imag, v_grad_op_w_real))
-                        xv = xv_real + 1j * xv_imag
-
-                        xvs.append((op, w, xv))
+                        sum_xv = sum_xv_real + 1j * sum_xv_imag
+                        xvs.append((op, w, sum_xv))
 
                     iter_post_dt_3 += tm.time() - iter_t0
                     iter_t0 = tm.time()

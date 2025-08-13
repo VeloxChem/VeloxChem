@@ -1900,7 +1900,7 @@ class LinearSolver:
             return gradients
 
         else:
-            return tuple()
+            return tuple([None for p in components])
 
     @staticmethod
     def commut_mo_density(A, nocc, num_core_orbitals=None):
