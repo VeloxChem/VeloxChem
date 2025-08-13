@@ -86,7 +86,7 @@ class TransitionStateGuesser():
         self.scf_xcfun = "b3lyp"
         self.scf_basis = 'def2-svp'
         self.mute_scf = True
-        self.mute_evb = True
+        self.mute_ff_build = True
         self.mm_temperature = 600
         self.mm_steps = 1000
         self.mm_step_size = 0.001 * mmunit.picoseconds
@@ -102,34 +102,31 @@ class TransitionStateGuesser():
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
 
-    def find_TS(
-        self,
-        reactant: Molecule | list[Molecule],
-        product: Molecule | list[Molecule],
-        scf=True,
-        scf_drv=None,
-        reactant_partial_charges: list[float]
-        | list[list[float]] = None,
-        product_partial_charges: list[float] | list[list[float]] = None,
-        reactant_total_multiplicity=-1,
-        product_total_multiplicity=-1,
-        breaking_bonds: set[tuple[int, int]] | tuple = set(),
-        constraints=[],
-        reparameterize=True,
-        mm_opt_constrain_bonds=True,
-        reactant_hessians=None,
-        product_hessians=None,
-    ):
+    def find_TS(self,
+                reactant: Molecule | list[Molecule],
+                product: Molecule | list[Molecule],
+                scf=True,
+                **ts_kwargs,):
         """Find a guess for the transition state using a force field scan.
 
         Args:
-            evb (evbDriver): An EVB driver object with built forcefields
-            scf (bool, optional): If an scf energy scan should be performed. Defaults to True.
-            scf_drv (scfDriver, optional): The scf driver to be used for the scf scan.
-            constraints (dict, optional): Dictionary of constraints, see the EVB documentation for details. Defaults to None.
-            charge (int, optional): The charge of the total system. If None (default), the charge of the evb reactant molecule will be used.
-            multiplicity (int, optional): The multiplicity of the total system. If None (default), the multiplicity of the evb reactant molecule will be used.
-
+            reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
+            product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
+            scf (bool, optional): If True, performs an SCF scan after the MM scan. Defaults to True.
+            reactant_partial_charges (list[float], list[list[float]]): Partial charges for the reactant. Will be calculated if not provided. Defaults to None.
+            product_partial_charges (list[float], list[list[float]]): Partial charges for the product. Will be calculated if not provided. Defaults to None.
+            reparameterize (bool): If True, reparameterizes unknown force constants with the Seminario method. Defaults to True
+            reactant_hessians (np.ndarray, list[np.ndarray]): Hessians for the reactant for the Seminario method. Will be calculated if not provided. Defaults to None.
+            product_hessians (np.ndarray, list[np.ndarray]): Hessians for the product for the Seminario method. Will be calculated if not provided. Defaults to None.
+            mm_opt_constrain_bonds (list[tuple[int, int]]): Bonds to constrain during MM optimization.
+            reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
+            product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
+            breaking_bonds (list[tuple[int, int]]): (List of) Bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
+            mute_ff_scf (bool): If True, mutes SCF output from RESP calculations. Has no effect if mute_ff_build is True. Defaults to True.
+            optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
+            optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
+            water_model (str): The water model used by the ffbuilder. Only has effect if there is a water molecule involved in the reaction. Defaults to "spce".
+            
         Raises:
             ff_exception: If for whatever reason the force field scan crashes, an exception is raised.
 
@@ -139,19 +136,7 @@ class TransitionStateGuesser():
 
         # Build forcefields and systems
         systems, topology, init_positions = self.build_forcefields(
-            reactant,
-            product,
-            reactant_partial_charges=reactant_partial_charges,
-            product_partial_charges=product_partial_charges,
-            reactant_total_multiplicity=reactant_total_multiplicity,
-            product_total_multiplicity=product_total_multiplicity,
-            breaking_bonds=breaking_bonds,
-            reparameterize=reparameterize,
-            mm_opt_constrain_bonds=mm_opt_constrain_bonds,
-            constraints=constraints,
-            reactant_hessians=reactant_hessians,
-            product_hessians=product_hessians,
-        )
+            reactant, product, **ts_kwargs)
 
         # Scan MM
         self.results = {
@@ -170,7 +155,6 @@ class TransitionStateGuesser():
 
         # Scan SCF
         if scf:
-            self.scf_drv = scf_drv
             # assert False, 'Not implemented yet'
             structures = self.results['mm_geometries']
             scf_results = self.scan_scf(structures)
@@ -196,40 +180,31 @@ class TransitionStateGuesser():
         self,
         reactant,
         product,
-        reactant_partial_charges,
-        product_partial_charges,
-        reactant_total_multiplicity,
-        product_total_multiplicity,
-        breaking_bonds,
-        reparameterize,
-        mm_opt_constrain_bonds,
-        constraints,
-        reactant_hessians,
-        product_hessians,
+        constraints=[],
+        **ts_kwargs
     ):
         evb_drv = EvbDriver()
         # self.evb_drv = evb_drv
 
         ffbuilder = EvbForceFieldBuilder()
-        if self.mute_evb:
+        if self.mute_ff_build:
             ffbuilder.ostream.mute()
             self.ostream.print_info(
-                "Building forcefields. Disable mute_evb to see detailed output."
+                "Building forcefields. Disable mute_ff_builder to see detailed output."
             )
             self.ostream.flush()
-        ffbuilder.reactant_partial_charges = reactant_partial_charges
-        ffbuilder.product_partial_charges = product_partial_charges
-        ffbuilder.reactant_total_multiplicity = reactant_total_multiplicity
-        ffbuilder.product_total_multiplicity = product_total_multiplicity
-        ffbuilder.reparameterize = reparameterize
-        ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
-        ffbuilder.breaking_bonds = breaking_bonds
-        ffbuilder.mute_scf = True
-
-        ffbuilder.optimize_ff = True
-        ffbuilder.optimize_mol = False
-        ffbuilder.reactant_hessians = reactant_hessians
-        ffbuilder.product_hessians = product_hessians
+        ffbuilder.reactant_partial_charges = ts_kwargs.get("reactant_partial_charges", None)
+        ffbuilder.product_partial_charges = ts_kwargs.get("product_partial_charges", None)
+        ffbuilder.reactant_total_multiplicity = ts_kwargs.get("reactant_total_multiplicity", -1)
+        ffbuilder.product_total_multiplicity = ts_kwargs.get("product_total_multiplicity", -1)
+        ffbuilder.reparameterize = ts_kwargs.get("reparameterize", True)
+        ffbuilder.mm_opt_constrain_bonds = ts_kwargs.get("mm_opt_constrain_bonds", False)
+        ffbuilder.breaking_bonds = ts_kwargs.get("breaking_bonds",set())
+        ffbuilder.mute_scf = ts_kwargs.get("mute_ff_scf", True)
+        ffbuilder.optimize_ff = ts_kwargs.get("optimize_ff", True)
+        ffbuilder.optimize_mol = ts_kwargs.get("optimize_mol", False)
+        ffbuilder.reactant_hessians = ts_kwargs.get("reactant_hessians", None)
+        ffbuilder.product_hessians = ts_kwargs.get("product_hessians", None)
         ffbuilder.water_model = 'spce'
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = ffbuilder.build_forcefields(
@@ -251,12 +226,13 @@ class TransitionStateGuesser():
             "soft_core_coulomb_int": False,
             "soft_core_lj_int": False,
         }
-
-        self.ostream.print_info(
-            "Building MM systems for the transition state guess. Disable mute_evb to see detailed output."
-        )
-        self.ostream.flush()
         sysbuilder = EvbSystemBuilder()
+        if self.mute_ff_build:
+            sysbuilder.ostream.mute()   
+            self.ostream.print_info(
+                "Building MM systems for the transition state guess. Disable mute_sys_builder to see detailed output."
+            )
+            self.ostream.flush()
 
         systems, topology, init_positions = sysbuilder.build_systems(
             self.reactant,
