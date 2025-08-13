@@ -740,7 +740,10 @@ class TransitionStateGuesser():
         geometries = ts_results['xyz_geometries']
         lambda_vec = ts_results['lambda_vec']
         scf_energies = ts_results.get('scf_energies', None)
-        final_lambda = ts_results['max_scf_lambda']
+        if scf_energies is not None:
+            final_lambda = ts_results['max_scf_lambda']
+        else:
+            final_lambda = ts_results['max_mm_lambda']
         ipywidgets.interact(
             self._show_iteration,
             mm_energies=ipywidgets.fixed(mm_energies),
@@ -909,7 +912,8 @@ class TransitionStateGuesser():
         results['max_mm_lambda'] = hf['max_mm_lambda'][()]
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]
-            results['max_scf_geometry'] = hf['max_scf_geometry'][0].decode('utf-8')
+            results['max_scf_geometry'] = hf['max_scf_geometry'][0].decode(
+                'utf-8')
             results['max_scf_lambda'] = hf['max_scf_lambda'][()]
         return results
 
