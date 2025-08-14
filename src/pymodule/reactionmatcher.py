@@ -187,6 +187,14 @@ class ReactionMatcher:
         forming_edges = self._find_forming_edges(
             A, B, breaking_edges | forced_breaking_edges)
         if forming_edges is None:
+            if not self._check_monomorphic:
+                self.ostream.print_info(
+                    f"Could not find forming edges from subgraph isomorphism, attempting subgraph monomorphism"
+                )
+                self._check_monomorphic = True
+                forming_edges = self._find_forming_edges(
+                    A, B, breaking_edges | forced_breaking_edges)
+        if forming_edges is None:
             return None, None, None
 
         self.ostream.print_info(
