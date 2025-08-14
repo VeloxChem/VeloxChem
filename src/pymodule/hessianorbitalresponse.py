@@ -88,8 +88,14 @@ class HessianOrbitalResponse(CphfSolver):
 
         super().update_settings(cphf_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
-                    pe_dict):
+    def compute_rhs(self,
+                    molecule,
+                    basis,
+                    scf_tensors,
+                    eri_dict,
+                    dft_dict,
+                    pe_dict,
+                    atom_pairs=None):
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
@@ -149,7 +155,20 @@ class HessianOrbitalResponse(CphfSolver):
 
         # partition atoms for parallellisation
         # TODO: use partition_atoms in e.g. scfgradientdriver
-        local_atoms = partition_atoms(natm, self.rank, self.nodes)
+
+        if atom_pairs is None:
+            local_atoms = partition_atoms(natm, self.rank, self.nodes)
+        else:
+            if self.rank == mpi_master():
+                local_atoms = []
+                for i, j in atom_pairs:
+                    if i not in local_atoms:
+                        local_atoms.append(i)
+                    if j not in local_atoms:
+                        local_atoms.append(j)
+                # natm = len(local_atoms)
+            else:
+                local_atoms = []
 
         atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
         gathered_atom_idx_rank = self.comm.gather(atom_idx_rank)
@@ -173,7 +192,9 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.start_timer('dOvlp')
 
         ovlp_deriv_ao_dict = {
-            (iatom, x): None for iatom in range(natm) for x in range(3)
+            (iatom, x): None
+            for iatom in range(natm)
+            for x in range(3)
         }
 
         ovlp_grad_drv = OverlapGeom100Driver()
@@ -208,7 +229,9 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.start_timer('dFock')
 
         fock_deriv_ao_dict = {
-            (iatom, x): None for iatom in range(natm) for x in range(3)
+            (iatom, x): None
+            for iatom in range(natm)
+            for x in range(3)
         }
 
         for iatom in local_atoms:
@@ -247,39 +270,59 @@ class HessianOrbitalResponse(CphfSolver):
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
-            naos = basis.get_dimensions_of_basis()
+            if atom_pairs is None:
+                naos = basis.get_dimensions_of_basis()
 
-            batch_size = get_batch_size(None, natm * 3, naos, self.comm)
-            batch_size = batch_size // 3
+                batch_size = get_batch_size(None, natm * 3, naos, self.comm)
+                batch_size = batch_size // 3
 
-            num_batches = natm // batch_size
-            if natm % batch_size != 0:
-                num_batches += 1
+                num_batches = natm // batch_size
+                if natm % batch_size != 0:
+                    num_batches += 1
 
-            for batch_ind in range(num_batches):
+                for batch_ind in range(num_batches):
 
-                batch_start = batch_ind * batch_size
-                batch_end = min(batch_start + batch_size, natm)
+                    batch_start = batch_ind * batch_size
+                    batch_end = min(batch_start + batch_size, natm)
 
-                atom_list = list(range(batch_start, batch_end))
+                    atom_list = list(range(batch_start, batch_end))
 
-                vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
-                    molecule, basis, gs_density, mol_grid,
-                    self.xcfun.get_func_label(), atom_list)
+                    vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
+                        molecule, basis, gs_density, mol_grid,
+                        self.xcfun.get_func_label(), atom_list)
 
-                for vecind, (iatom, root_rank) in enumerate(
-                        all_atom_idx_rank[batch_start:batch_end]):
+                    for vecind, (iatom, root_rank) in enumerate(
+                            all_atom_idx_rank[batch_start:batch_end]):
+                        # print(iatom)
+                        for x in range(3):
+                            vxc_deriv_ix = self.comm.reduce(
+                                vxc_deriv_batch[vecind * 3 + x])
 
-                    for x in range(3):
-                        vxc_deriv_ix = self.comm.reduce(
-                            vxc_deriv_batch[vecind * 3 + x])
+                            dist_vxc_deriv_ix = DistributedArray(
+                                vxc_deriv_ix, self.comm)
 
-                        dist_vxc_deriv_ix = DistributedArray(
-                            vxc_deriv_ix, self.comm)
+                            key_ix = (iatom, x)
+                            dist_fock_deriv_ao[
+                                key_ix].data += dist_vxc_deriv_ix.data
+            else:
+                if self.rank == mpi_master():
+                    vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
+                        molecule, basis, gs_density, mol_grid,
+                        self.xcfun.get_func_label(), local_atoms)
 
-                        key_ix = (iatom, x)
-                        dist_fock_deriv_ao[
-                            key_ix].data += dist_vxc_deriv_ix.data
+                    for vecind, (iatom,
+                                 root_rank) in enumerate(all_atom_idx_rank):
+                        # print(iatom)
+                        for x in range(3):
+                            vxc_deriv_ix = self.comm.reduce(
+                                vxc_deriv_batch[vecind * 3 + x])
+
+                            dist_vxc_deriv_ix = DistributedArray(
+                                vxc_deriv_ix, self.comm)
+
+                            key_ix = (iatom, x)
+                            dist_fock_deriv_ao[
+                                key_ix].data += dist_vxc_deriv_ix.data
 
         profiler.stop_timer('dXC')
 
@@ -321,6 +364,11 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
+                    if atom_pairs is not None:
+                        if (iatom, jatom) not in atom_pairs and \
+                                (jatom, iatom) not in atom_pairs and iatom!=jatom:
+                            continue
+
                     for y in range(3):
                         key_jy = (jatom, y)
 
@@ -398,7 +446,10 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
-
+                    if atom_pairs is not None:
+                        if (iatom, jatom) not in atom_pairs and \
+                                (jatom, iatom) not in atom_pairs and iatom!=jatom:
+                            continue
                     for y in range(3):
                         key_jy = (jatom, y)
 
@@ -477,6 +528,17 @@ class HessianOrbitalResponse(CphfSolver):
 
             profiler.add_timing_info('distRHS', tm.time() - uij_t0)
 
+        # fill up the missing values in dist_cphf_rhs with zeros so later indexing does not fail
+        if atom_pairs is not None:
+            for i in range(molecule.number_of_atoms()):
+                if i not in local_atoms:
+                    zer = np.zeros(len(dist_cphf_rhs[0].data))
+                    for j in range(3):
+                        empty_dist_arr = DistributedArray(zer,
+                                                          self.comm,
+                                                          distribute=False)
+                        dist_cphf_rhs.insert(i * 3 + j, empty_dist_arr)
+
         hessian_eri_overlap = self.comm.reduce(hessian_eri_overlap,
                                                root=mpi_master())
 
@@ -496,7 +558,8 @@ class HessianOrbitalResponse(CphfSolver):
             # 'ovlp_deriv_oo': ovlp_deriv_oo,
             # 'fock_deriv_ao': fock_deriv_ao,
             # 'fock_uij': fock_uij,
-            'hessian_first_integral_derivatives': hessian_first_integral_derivatives,
+            'hessian_first_integral_derivatives':
+            hessian_first_integral_derivatives,
             'hessian_eri_overlap': hessian_eri_overlap,
         }
 
@@ -581,7 +644,8 @@ class HessianOrbitalResponse(CphfSolver):
             gmats_100 = Matrices()
 
         if self._embedding_hess_drv is not None:
-            pe_fock_grad_contr = self._embedding_hess_drv.compute_pe_fock_gradient_contributions(i=i)
+            pe_fock_grad_contr = self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
+                i=i)
             for x in range(3):
                 fmat_deriv[x] += pe_fock_grad_contr[x]
 
