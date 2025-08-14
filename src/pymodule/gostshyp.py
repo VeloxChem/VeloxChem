@@ -912,6 +912,7 @@ class GostshypDriver:
 
         p_amp = self.pressure * a / f_tilde
 
+        # mark gradient of negative ampltitudes with nan to exclude the point
         if p_amp < 0:
             return np.full((3), np.nan)
 
