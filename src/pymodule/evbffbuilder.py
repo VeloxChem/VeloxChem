@@ -104,6 +104,7 @@ class EvbForceFieldBuilder():
                                                  | None] | None = None
         # todo what to do with this option?
         self.mute_scf: bool = True
+        self.skip_reaction_matching: bool = False
 
         self.keywords = {
             "optimize_mol": bool,
@@ -118,7 +119,8 @@ class EvbForceFieldBuilder():
             "product_partial_charges": list | None,
             "reactant_hessians": np.ndarray | list | None,
             "product_hessians": np.ndarray | list | None,
-            "mute_scf": bool
+            "mute_scf": bool,
+            "skip_reaction_matching": bool,
         }
 
     def read_keywords(self, **kwargs):
@@ -156,16 +158,19 @@ class EvbForceFieldBuilder():
 
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
-        self.ostream.print_info("Matching reactant and product force fields")
-        self.ostream.flush()
 
-        self.product, product_mapping = self._match_reactant_and_product(
-            self.reactant,
-            self.reactant.molecule.get_element_ids(),
-            self.product,
-            self.product.molecule.get_element_ids(),
-            self.breaking_bonds,
-        )
+        if not self.skip_reaction_matching:
+            self.ostream.print_info("Matching reactant and product force fields")
+            self.ostream.flush()
+            self.product, product_mapping = self._match_reactant_and_product(
+                self.reactant,
+                self.reactant.molecule.get_element_ids(),
+                self.product,
+                self.product.molecule.get_element_ids(),
+                self.breaking_bonds,
+            )
+        else:
+            self.ostream.print_info("Skipping reaction matching")
 
         formed_bonds, broken_bonds = self._summarise_reaction(
             self.reactant, self.product)
