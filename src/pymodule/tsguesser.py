@@ -102,11 +102,13 @@ class TransitionStateGuesser():
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
 
-    def find_TS(self,
-                reactant: Molecule | list[Molecule],
-                product: Molecule | list[Molecule],
-                scf=True,
-                **ts_kwargs,):
+    def find_TS(
+        self,
+        reactant: Molecule | list[Molecule],
+        product: Molecule | list[Molecule],
+        scf=True,
+        **ff_kwargs,
+    ):
         """Find a guess for the transition state using a force field scan.
 
         Args:
@@ -136,7 +138,7 @@ class TransitionStateGuesser():
 
         # Build forcefields and systems
         systems, topology, init_positions = self.build_forcefields(
-            reactant, product, **ts_kwargs)
+            reactant, product, **ff_kwargs)
 
         # Scan MM
         self.results = {
@@ -176,15 +178,7 @@ class TransitionStateGuesser():
         self._save_results(self.results_file, self.results)
         return self.molecule, self.results
 
-    def build_forcefields(
-        self,
-        reactant,
-        product,
-        constraints=[],
-        **ts_kwargs
-    ):
-        evb_drv = EvbDriver()
-        # self.evb_drv = evb_drv
+    def build_forcefields(self, reactant, product, constraints=[], **ts_kwargs):
 
         ffbuilder = EvbForceFieldBuilder()
         if self.mute_ff_build:
@@ -193,19 +187,7 @@ class TransitionStateGuesser():
                 "Building forcefields. Disable mute_ff_builder to see detailed output."
             )
             self.ostream.flush()
-        ffbuilder.reactant_partial_charges = ts_kwargs.get("reactant_partial_charges", None)
-        ffbuilder.product_partial_charges = ts_kwargs.get("product_partial_charges", None)
-        ffbuilder.reactant_total_multiplicity = ts_kwargs.get("reactant_total_multiplicity", -1)
-        ffbuilder.product_total_multiplicity = ts_kwargs.get("product_total_multiplicity", -1)
-        ffbuilder.reparameterize = ts_kwargs.get("reparameterize", True)
-        ffbuilder.mm_opt_constrain_bonds = ts_kwargs.get("mm_opt_constrain_bonds", False)
-        ffbuilder.breaking_bonds = ts_kwargs.get("breaking_bonds",set())
-        ffbuilder.mute_scf = ts_kwargs.get("mute_ff_scf", True)
-        ffbuilder.optimize_ff = ts_kwargs.get("optimize_ff", True)
-        ffbuilder.optimize_mol = ts_kwargs.get("optimize_mol", False)
-        ffbuilder.reactant_hessians = ts_kwargs.get("reactant_hessians", None)
-        ffbuilder.product_hessians = ts_kwargs.get("product_hessians", None)
-        ffbuilder.water_model = 'spce'
+        ffbuilder.read_keywords(**ts_kwargs)
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = ffbuilder.build_forcefields(
             reactant=reactant,
@@ -228,7 +210,7 @@ class TransitionStateGuesser():
         }
         sysbuilder = EvbSystemBuilder()
         if self.mute_ff_build:
-            sysbuilder.ostream.mute()   
+            sysbuilder.ostream.mute()
             self.ostream.print_info(
                 "Building MM systems for the transition state guess. Disable mute_sys_builder to see detailed output."
             )

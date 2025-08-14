@@ -135,18 +135,7 @@ class EvbDriver():
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
-        reactant_partial_charges: list[float] | list[list[float]] = None,
-        product_partial_charges: list[float] | list[list[float]] = None,
-        reactant_total_multiplicity: int = -1,
-        product_total_multiplicity: int = -1,
-        reparameterize: bool = True,
-        optimize_mol: bool = False,
-        optimize_ff: bool = True,
-        mm_opt_constrain_bonds: bool = True,
-        breaking_bonds: set[tuple[int, int]] | tuple = set(),
-        reactant_hessians: np.ndarray | list[np.ndarray | None] | None = None,
-        product_hessians: np.ndarray | list[np.ndarray | None] | None = None,
-        mute_scf: bool = True,
+        **kwargs
     ):
         """_summary_
 
@@ -168,19 +157,7 @@ class EvbDriver():
         """
 
         ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
-
-        ffbuilder.reactant_partial_charges = reactant_partial_charges
-        ffbuilder.product_partial_charges = product_partial_charges
-        ffbuilder.reparameterize = reparameterize
-        ffbuilder.reactant_hessians = reactant_hessians
-        ffbuilder.product_hessians = product_hessians
-        ffbuilder.reactant_total_multiplicity = reactant_total_multiplicity
-        ffbuilder.product_total_multiplicity = product_total_multiplicity
-        ffbuilder.optimize_ff = optimize_ff
-        ffbuilder.optimize_mol = optimize_mol
-        ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
-        ffbuilder.breaking_bonds = breaking_bonds
-        ffbuilder.mute_scf = mute_scf
+        ffbuilder.read_keywords(**kwargs)
 
         ffbuilder.water_model = self.water_model
 

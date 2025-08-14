@@ -86,21 +86,53 @@ class EvbForceFieldBuilder():
         self.reactant: MMForceFieldGenerator = None
         self.product: MMForceFieldGenerator = None
 
-        self.optimize_mol: bool
-        self.reparameterize: bool
-        self.optimize_ff: bool
-        self.mm_opt_constrain_bonds: bool
-        self.water_model: str
-        self.reactant_total_multiplicity: int
-        self.product_total_multiplicity: int
-        self.breaking_bonds: set[tuple[int, int]] | tuple
-        self.reactant_partial_charges: list[float] | list[list[float]] | None
-        self.product_partial_charges: list[float] | list[list[float]] | None
-        self.reactant_hessians: list[np.ndarray | None] | None
-        self.product_hessians: list[np.ndarray | None] | None
-
+        self.optimize_mol: bool = False
+        self.reparameterize: bool = True
+        self.optimize_ff: bool = True
+        self.mm_opt_constrain_bonds: bool = False
+        self.water_model: str = 'spce'
+        self.reactant_total_multiplicity: int = -1
+        self.product_total_multiplicity: int = -1
+        self.breaking_bonds: set[tuple[int, int]] | tuple = set()
+        self.reactant_partial_charges: list[float] | list[
+            list[float]] | None = None
+        self.product_partial_charges: list[float] | list[
+            list[float]] | None = None
+        self.reactant_hessians: np.ndarray | list[np.ndarray
+                                                  | None] | None = None
+        self.product_hessians: np.ndarray | list[np.ndarray
+                                                 | None] | None = None
         # todo what to do with this option?
-        self.mute_scf: bool
+        self.mute_scf: bool = True
+
+        self.keywords = {
+            "optimize_mol": bool,
+            "reparameterize": bool,
+            "optimize_ff": bool,
+            "mm_opt_constrain_bonds": bool,
+            "water_model": str,
+            "reactant_total_multiplicity": int,
+            "product_total_multiplicity": int,
+            "breaking_bonds": set[tuple[int, int]] | tuple,
+            "reactant_partial_charges": list[float] | list[list[float]] | None,
+            "product_partial_charges": list[float] | list[list[float]] | None,
+            "reactant_hessians": np.ndarray | list[np.ndarray | None] | None,
+            "product_hessians": np.ndarray | list[np.ndarray | None] | None,
+            "mute_scf": bool
+        }
+
+    def read_keywords(self, **kwargs):
+        for key, value in kwargs.items():
+            if key in self.keywords.keys():
+                if type(value) is self.keywords[key]:
+                    setattr(self, key, value)
+                else:
+                    raise ValueError(
+                        f"Type for given keyword {key} is {type(value)} but should be {self.keywords[key]}"
+                    )
+            else:
+                raise ValueError(
+                    f"Unknown keyword {key} in EvbForceFieldBuilder")
 
     def build_forcefields(
         self,
