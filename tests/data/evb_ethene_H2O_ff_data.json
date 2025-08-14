@@ -65,7 +65,7 @@
         },
         "7": {
             "type": "hw",
-            "name": "H12",
+            "name": "H02",
             "mass": 1.007825,
             "charge": 0.4238,
             "sigma": 0.11658,
@@ -74,7 +74,7 @@
         },
         "8": {
             "type": "hw",
-            "name": "H02",
+            "name": "H12",
             "mass": 1.007825,
             "charge": 0.4238,
             "sigma": 0.11658,
@@ -113,13 +113,13 @@
             "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
-        "(6, 8)": {
+        "(6, 7)": {
             "type": "harmonic",
             "force_constant": 345000,
             "equilibrium": 0.1,
             "comment": "SPC/E water"
         },
-        "(6, 7)": {
+        "(6, 8)": {
             "type": "harmonic",
             "force_constant": 345000,
             "equilibrium": 0.1,
@@ -205,14 +205,14 @@
         }
     },
     "impropers": {
-        "(0, 1, 2, 3)": {
+        "(1, 0, 4, 5)": {
             "type": "Fourier",
             "barrier": 4.6024,
             "phase": 180.0,
             "periodicity": 2,
             "comment": "Guessed"
         },
-        "(1, 0, 4, 5)": {
+        "(0, 1, 2, 3)": {
             "type": "Fourier",
             "barrier": 4.6024,
             "phase": 180.0,

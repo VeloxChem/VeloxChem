@@ -433,6 +433,7 @@ class CphfSolver(LinearSolver):
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, *args)
 
+        
         dist_rhs = cphf_rhs_dict['dist_cphf_rhs']
         dof = len(dist_rhs)
 
