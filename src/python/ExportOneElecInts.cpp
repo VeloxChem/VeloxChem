@@ -59,6 +59,10 @@
 #include "TCOSValues.hpp"
 #include "TCOPFock2GOST.hpp"
 #include "TCOPValues.hpp"
+#include "TCODValues.hpp"
+#include "TCOFValues.hpp"
+#include "TCOSGradient.hpp"
+#include "TCOPGradient.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -546,109 +550,261 @@ export_oneeints(py::module& m)
                 "point_amp"_a);
 
     m.def("compute_tco_s_values",
-        [](const CMolecule&           molecule,
-            const CMolecularBasis&     basis,
-            const py::array_t<double>& point_coords,
-            const py::array_t<double>& point_exp,
-            const py::array_t<double>& point_amp,
-            const py::array_t<double>& D
-            ) -> py::array_t<double> {
-            std::string errstyle("compute_tco_s_fock: Expecting contiguous numpy arrays");
-            auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
-            auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
-            auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
-            errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
-            std::string errsize("compute_tco_s_fock: Inconsistent sizes");
-            errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
-            errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
-            errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
-            auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
-            errors::assertMsgCritical(c_style, errstyle);
-            std::string errshape("compute_electric_point_values: Expecting square matrix D");
-            errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
-            auto npoints = static_cast<int>(point_coords.shape(0));
-            auto naos = static_cast<int>(basis.dimensions_of_basis());
-            auto tco_s_vals = onee::computeTCOSValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), D.data(), naos);
-            return vlx_general::pointer_to_numpy(tco_s_vals.data(), {static_cast<int>(tco_s_vals.size())});
-        },
-        "Computes three-center s-type overlap integrals.",
-            "molecule"_a,
-            "basis"_a,
-            "point_coords"_a,
-            "point_exp"_a,
-            "point_amp"_a,
-            "density"_a);
+            [](const CMolecule&           molecule,
+                const CMolecularBasis&     basis,
+                const py::array_t<double>& point_coords,
+                const py::array_t<double>& point_exp,
+                const py::array_t<double>& point_amp,
+                const py::array_t<double>& D
+                ) -> py::array_t<double> {
+                std::string errstyle("compute_tco_s_values: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+                std::string errsize("compute_tco_s_values: Inconsistent sizes");
+                errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_tco_s_values: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                auto tco_s_vals = onee::computeTCOSValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), D.data(), naos);
+                return vlx_general::pointer_to_numpy(tco_s_vals.data(), {static_cast<int>(tco_s_vals.size())});
+            },
+            "Computes three-center s-type overlap integrals and contracts with density matrix",
+                "molecule"_a,
+                "basis"_a,
+                "point_coords"_a,
+                "point_exp"_a,
+                "point_amp"_a,
+                "density"_a);
 
     m.def("compute_tco_p_fock",
-    [](const CMolecule&           molecule,
-        const CMolecularBasis&     basis,
-        const py::array_t<double>& point_coords,
-        const py::array_t<double>& point_exp,
-        const py::array_t<double>& point_amp,
-        const py::array_t<double>& point_norms) -> py::array_t<double> {
-        std::string errstyle("compute_tco_p_fock: Expecting contiguous numpy arrays");
-        auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
-        auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
-        auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
-        auto        c_style_4 = py::detail::check_flags(point_norms.ptr(), py::array::c_style);
-        errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
-        std::string errsize("compute_tco_p_fock: Inconsistent sizes");
-        errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
-        errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
-        errors::assertMsgCritical(point_coords.shape(0) == point_norms.shape(0), errsize);
-        errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
-        errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
-        auto npoints = static_cast<int>(point_coords.shape(0));
-        auto naos = static_cast<int>(basis.dimensions_of_basis());
-        auto tco_p = onee::computeFock2GOSTcontrib(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), naos);
-        return vlx_general::pointer_to_numpy(tco_p.values(), {tco_p.getNumberOfRows(), tco_p.getNumberOfColumns()});
-    },
-    "Computes three-center p-type overlap integrals and takes dot product with grid point normal vector.",
-        "molecule"_a,
-        "basis"_a,
-        "point_coords"_a,
-        "point_exp"_a,
-        "point_amp"_a,
-        "point_norms"_a);
+            [](const CMolecule&           molecule,
+                const CMolecularBasis&     basis,
+                const py::array_t<double>& point_coords,
+                const py::array_t<double>& point_exp,
+                const py::array_t<double>& point_amp,
+                const py::array_t<double>& point_norms) -> py::array_t<double> {
+                std::string errstyle("compute_tco_p_fock: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(point_norms.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                std::string errsize("compute_tco_p_fock: Inconsistent sizes");
+                errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_norms.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                auto tco_p = onee::computeFock2GOSTcontrib(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), naos);
+                return vlx_general::pointer_to_numpy(tco_p.values(), {tco_p.getNumberOfRows(), tco_p.getNumberOfColumns()});
+            },
+            "Computes three-center p-type overlap integrals and takes dot product with grid point normal vector.",
+                "molecule"_a,
+                "basis"_a,
+                "point_coords"_a,
+                "point_exp"_a,
+                "point_amp"_a,
+                "point_norms"_a);
 
     m.def("compute_tco_p_values",
-    [](const CMolecule&           molecule,
-        const CMolecularBasis&     basis,
-        const py::array_t<double>& point_coords,
-        const py::array_t<double>& point_exp,
-        const py::array_t<double>& point_amp,
-        const py::array_t<double>& point_norms,
-        const py::array_t<double>& D
-        ) -> py::array_t<double> {
-        std::string errstyle("compute_tco_p_fock: Expecting contiguous numpy arrays");
-        auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
-        auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
-        auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
-        auto        c_style_4 = py::detail::check_flags(point_norms.ptr(), py::array::c_style);
-        errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
-        std::string errsize("compute_tco_p_fock: Inconsistent sizes");
-        errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
-        errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
-        errors::assertMsgCritical(point_coords.shape(0) == point_norms.shape(0), errsize);
-        errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
-        errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
-        auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
-        errors::assertMsgCritical(c_style, errstyle);
-        std::string errshape("compute_electric_point_values: Expecting square matrix D");
-        errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
-        auto npoints = static_cast<int>(point_coords.shape(0));
-        auto naos = static_cast<int>(basis.dimensions_of_basis());
-        auto tco_p_vals = onee::computeTCOPValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), D.data(), naos);
-        return vlx_general::pointer_to_numpy(tco_p_vals.data(), {static_cast<int>(tco_p_vals.size())});
-    },
-    "Computes three-center s-type overlap integrals.",
-        "molecule"_a,
-        "basis"_a,
-        "point_coords"_a,
-        "point_exp"_a,
-        "point_amp"_a,
-        "point_norms"_a,
-        "density"_a);
+            [](const CMolecule&           molecule,
+                const CMolecularBasis&     basis,
+                const py::array_t<double>& point_coords,
+                const py::array_t<double>& point_exp,
+                const py::array_t<double>& point_amp,
+                const py::array_t<double>& point_norms,
+                const py::array_t<double>& D
+                ) -> py::array_t<double> {
+                std::string errstyle("compute_tco_p_values: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(point_norms.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                std::string errsize("compute_tco_p_values: Inconsistent sizes");
+                errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_norms.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
+                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_tco_p_values: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                auto tco_p_vals = onee::computeTCOPValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), D.data(), naos);
+                return vlx_general::pointer_to_numpy(tco_p_vals.data(), {static_cast<int>(tco_p_vals.size())});
+            },
+            "Computes three-center p-type overlap integrals.",
+                "molecule"_a,
+                "basis"_a,
+                "point_coords"_a,
+                "point_exp"_a,
+                "point_amp"_a,
+                "point_norms"_a,
+                "density"_a);
+
+    m.def("compute_tco_d_values",
+            [](const CMolecule&           molecule,
+                const CMolecularBasis&     basis,
+                const py::array_t<double>& point_coords,
+                const py::array_t<double>& point_exp,
+                const py::array_t<double>& point_amp,
+                const py::array_t<double>& D
+                ) -> py::array_t<double> {
+                std::string errstyle("compute_tco_d_fock: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+                std::string errsize("compute_tco_d_fock: Inconsistent sizes");
+                errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_electric_point_values: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                auto tco_d_vals = onee::computeTCODValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), D.data(), naos);
+                return vlx_general::pointer_to_numpy(tco_d_vals.data(), {static_cast<int>(tco_d_vals.size())});
+            },
+            "Computes three-center s-type d-function overlap integrals.",
+                "molecule"_a,
+                "basis"_a,
+                "point_coords"_a,
+                "point_exp"_a,
+                "point_amp"_a,
+                "density"_a);
+
+    m.def("compute_tco_f_values",
+            [](const CMolecule&           molecule,
+                const CMolecularBasis&     basis,
+                const py::array_t<double>& point_coords,
+                const py::array_t<double>& point_exp,
+                const py::array_t<double>& point_amp,
+                const py::array_t<double>& point_norms,
+                const py::array_t<double>& D
+                ) -> py::array_t<double> {
+                std::string errstyle("compute_tco_f_fock: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(point_norms.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                std::string errsize("compute_tco_f_fock: Inconsistent sizes");
+                errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_norms.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
+                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_electric_point_values: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                auto e_tilde_vals = onee::computeTCOFValues(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), D.data(), naos);
+                return vlx_general::pointer_to_numpy(e_tilde_vals.data(), {static_cast<int>(e_tilde_vals.size())});
+            },
+            "Computes linear combination of three-center p-type f-function overlap integrals.",
+                "molecule"_a,
+                "basis"_a,
+                "point_coords"_a,
+                "point_exp"_a,
+                "point_amp"_a,
+                "point_norms"_a,
+                "density"_a);
+
+    m.def("compute_tco_s_gradient",
+            [](const CMolecule&           molecule,
+                const CMolecularBasis&     basis,
+                const py::array_t<double>& point_coords,
+                const py::array_t<double>& point_exp,
+                const py::array_t<double>& point_amp,
+                const py::array_t<double>& D
+                ) -> py::list {
+                std::string errstyle("compute_tco_p_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+                std::string errsize("compute_tco_p_gradient: Inconsistent sizes");
+                errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_tco_p_gradient: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                auto tco_s_grad = onee::computeTCOSGradient(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), D.data(), naos);
+                py::list ret;
+                for (int c = 0; c < npoints; c++) 
+                ret.append(vlx_general::pointer_to_numpy(tco_s_grad[c].values(), {tco_s_grad[c].getNumberOfRows(), tco_s_grad[c].getNumberOfColumns()}));
+                return ret;
+            },
+            "Computes three-center s-type overlap integrals gradient contribution and contracts with density matrix",
+                "molecule"_a,
+                "basis"_a,
+                "point_coords"_a,
+                "point_exp"_a,
+                "point_amp"_a,
+                "density"_a);
+
+    m.def("compute_tco_p_gradient",
+            [](const CMolecule&           molecule,
+                const CMolecularBasis&     basis,
+                const py::array_t<double>& point_coords,
+                const py::array_t<double>& point_exp,
+                const py::array_t<double>& point_amp,
+                const py::array_t<double>& point_norms,
+                const py::array_t<double>& D
+                ) -> py::list {
+                std::string errstyle("compute_tco_p_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_exp.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(point_amp.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(point_norms.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                std::string errsize("compute_tco_p_gradient: Inconsistent sizes");
+                errors::assertMsgCritical(point_coords.shape(0) == point_exp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(0) == point_amp.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(point_norms.shape(1) == 3, errsize);
+                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errshape("compute_tco_p_gradient: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                auto tco_p_grad = onee::computeTCOPGradient(molecule, basis, point_coords.data(), npoints, point_exp.data(), point_amp.data(), point_norms.data(), D.data(), naos);
+                py::list ret;
+                for (int c = 0; c < npoints; c++) 
+                ret.append(vlx_general::pointer_to_numpy(tco_p_grad[c].values(), {tco_p_grad[c].getNumberOfRows(), tco_p_grad[c].getNumberOfColumns()}));
+                return ret;
+            },
+            "Computes three-center p-type overlap integrals gradient contribution and contracts with density matrix",
+                "molecule"_a,
+                "basis"_a,
+                "point_coords"_a,
+                "point_exp"_a,
+                "point_amp"_a,
+                "point_norms"_a,
+                "density"_a);
+
 }
 
 }  // namespace vlx_oneeints

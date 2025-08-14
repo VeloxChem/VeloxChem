@@ -24,6 +24,10 @@ target_sources(vlxobjs
     TCOSValues.cpp
     TCOPFock2GOST.cpp
     TCOPValues.cpp
+    TCODValues.cpp
+    TCOFValues.cpp
+    TCOSGradient.cpp
+    TCOPGradient.cpp
   )
 
 target_include_directories(vlxobjs
