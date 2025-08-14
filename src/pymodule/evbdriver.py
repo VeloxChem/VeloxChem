@@ -132,35 +132,54 @@ class EvbDriver():
         self.ostream.flush()
 
     def build_ff_from_molecules(
-            self,
-            reactant: Molecule | list[Molecule],
-            product: Molecule | list[Molecule],
-            reactant_partial_charges: list[float] | list[list[float]] = None,
-            product_partial_charges: list[float] | list[list[float]] = None,
-            reactant_total_multiplicity: int = -1,
-            product_total_multiplicity: int = -1,
-            reparameterize: bool = True,
-            optimize_mol: bool = False,
-            optimize_ff: bool = True,
-            mm_opt_constrain_bonds: bool = True,
-            breaking_bonds: set[tuple[int, int]] | tuple = set(),
-            reactant_hessians: np.ndarray | list[np.ndarray|None] | None = None,
-            product_hessians: list[np.ndarray|None] | None = None,
-            mute_scf: bool = True,
+        self,
+        reactant: Molecule | list[Molecule],
+        product: Molecule | list[Molecule],
+        reactant_partial_charges: list[float] | list[list[float]] = None,
+        product_partial_charges: list[float] | list[list[float]] = None,
+        reactant_total_multiplicity: int = -1,
+        product_total_multiplicity: int = -1,
+        reparameterize: bool = True,
+        optimize_mol: bool = False,
+        optimize_ff: bool = True,
+        mm_opt_constrain_bonds: bool = True,
+        breaking_bonds: set[tuple[int, int]] | tuple = set(),
+        reactant_hessians: np.ndarray | list[np.ndarray | None] | None = None,
+        product_hessians: np.ndarray | list[np.ndarray | None] | None = None,
+        mute_scf: bool = True,
     ):
-        
+        """_summary_
+
+        Args:
+            reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
+            product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
+            reactant_partial_charges (list[float], list[list[float]]): Partial charges for the reactant. Will be calculated if not provided. Defaults to None.
+            product_partial_charges (list[float], list[list[float]]): Partial charges for the product. Will be calculated if not provided. Defaults to None.
+            reparameterize (bool): If True, reparameterizes unknown force constants with the Seminario method. Defaults to True
+            reactant_hessians (np.ndarray, list[np.ndarray]): Hessians for the reactant for the Seminario method. Will be calculated if not provided. Defaults to None.
+            product_hessians (np.ndarray, list[np.ndarray]): Hessians for the product for the Seminario method. Will be calculated if not provided. Defaults to None.
+            mm_opt_constrain_bonds (list[tuple[int, int]]): Bonds to constrain during MM optimization.
+            reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
+            product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
+            breaking_bonds (list[tuple[int, int]]): (List of) Bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
+            mute_ff_scf (bool): If True, mutes SCF output from RESP calculations. Has no effect if mute_ff_build is True. Defaults to True.
+            optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
+            optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
+        """
+
         ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
+
         ffbuilder.reactant_partial_charges = reactant_partial_charges
         ffbuilder.product_partial_charges = product_partial_charges
+        ffbuilder.reparameterize = reparameterize
+        ffbuilder.reactant_hessians = reactant_hessians
+        ffbuilder.product_hessians = product_hessians
         ffbuilder.reactant_total_multiplicity = reactant_total_multiplicity
         ffbuilder.product_total_multiplicity = product_total_multiplicity
-        ffbuilder.reparameterize = reparameterize
         ffbuilder.optimize_ff = optimize_ff
         ffbuilder.optimize_mol = optimize_mol
         ffbuilder.mm_opt_constrain_bonds = mm_opt_constrain_bonds
         ffbuilder.breaking_bonds = breaking_bonds
-        ffbuilder.reactant_hessians = reactant_hessians
-        ffbuilder.product_hessians = product_hessians
         ffbuilder.mute_scf = mute_scf
 
         ffbuilder.water_model = self.water_model
