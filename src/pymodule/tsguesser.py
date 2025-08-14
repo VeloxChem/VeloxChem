@@ -94,7 +94,7 @@ class TransitionStateGuesser():
         self.scf_drv = None
         # self.evb_drv: None | EvbDriver = None
         self.molecule = None
-        self.results = None
+        self.results = {}
         self.folder_name = 'ts_data'
         self.force_conformer_search = False
         self.skip_conformer_search = False
@@ -137,45 +137,16 @@ class TransitionStateGuesser():
         """
 
         # Build forcefields and systems
-        systems, topology, init_positions = self.build_forcefields(
-            reactant, product, **ff_kwargs)
+        self.build_forcefields(reactant, product, **ff_kwargs)
 
         # Scan MM
-        self.results = {
-            'broken_bonds': self.breaking_bonds,
-            'formed_bonds': self.forming_bonds,
-            'lambda_vec': self.lambda_vec
-        }
-        results, mm_exception = self.scan_mm(systems, topology, init_positions)
-        self.results.update(results)
-        if mm_exception:
-            self.ostream.print_warning(
-                "The force field scan crashed. Saving results in self.results and raising exception"
-            )
-            self.ostream.flush()
-            raise mm_exception
+        self.scan_mm()
 
         # Scan SCF
         if scf:
             # assert False, 'Not implemented yet'
-            structures = self.results['mm_geometries']
-            scf_results = self.scan_scf(structures)
-            self.results.update(scf_results)
+            self.scan_scf(self.results)
 
-        mult = self.molecule.get_multiplicity()
-        charge = self.molecule.get_charge()
-
-        if not scf:
-            self.molecule = Molecule.read_xyz_string(
-                self.results['max_mm_geometry'])
-        else:
-            self.molecule = Molecule.read_xyz_string(
-                self.results['max_scf_geometry'])
-        self.molecule.set_multiplicity(mult)
-        self.molecule.set_charge(charge)
-        self.ostream.print_info(f"Saving results to {self.results_file}")
-        self.ostream.flush()
-        self._save_results(self.results_file, self.results)
         return self.molecule, self.results
 
     def build_forcefields(self, reactant, product, constraints=[], **ts_kwargs):
@@ -216,16 +187,22 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
 
-        systems, topology, init_positions = sysbuilder.build_systems(
+        self.systems, self.topology, self.initial_positions = sysbuilder.build_systems(
             self.reactant,
             self.product,
             list(self.lambda_vec),
             conf,
             constraints,
         )
-        return systems, topology, init_positions
+        self.results.update({
+            'broken_bonds': self.breaking_bonds,
+            'formed_bonds': self.forming_bonds,
+            'lambda_vec': self.lambda_vec
+        })
 
-    def scan_mm(self, systems, topology, initial_positions):
+        return
+
+    def scan_mm(self):
 
         energies = []
         E1 = []
@@ -244,23 +221,23 @@ class TransitionStateGuesser():
         self.folder = Path().cwd() / self.folder_name
 
         if self.save_mm_traj:
-            mmapp.PDBFile.writeFile(topology, initial_positions,
+            mmapp.PDBFile.writeFile(self.topology, self.initial_positions,
                                     str(self.folder / 'topology.pdb'))
         exception = None
 
         rea_int = mm.VerletIntegrator(1)
         rea_sim = mmapp.Simulation(
-            topology,
-            systems['reactant'],
+            self.topology,
+            self.systems['reactant'],
             rea_int,
         )
         pro_int = mm.VerletIntegrator(1)
         pro_sim = mmapp.Simulation(
-            topology,
-            systems['product'],
+            self.topology,
+            self.systems['product'],
             pro_int,
         )
-        pos = initial_positions
+        pos = self.initial_positions
         bohr_to_nm = 0.0529177249
         try:
             if self.force_conformer_search:
@@ -273,8 +250,8 @@ class TransitionStateGuesser():
                 self._print_initial_mm_header()
             for l in self.lambda_vec:
                 em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
-                    topology,
-                    systems[l],
+                    self.topology,
+                    self.systems[l],
                     l,
                     pos,
                     rea_sim,
@@ -318,8 +295,8 @@ class TransitionStateGuesser():
                             if initial_scan:
                                 break
                             em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
-                                topology,
-                                systems[l],
+                                self.topology,
+                                self.systems[l],
                                 l,
                                 pos,
                                 rea_sim,
@@ -384,7 +361,22 @@ class TransitionStateGuesser():
                 'max_mm_geometry': max_xyz_geom,
                 'max_mm_lambda': max_mm_lambda,
             })
-        return results, exception
+            self.results.update(results)
+            mult = self.molecule.get_multiplicity()
+            charge = self.molecule.get_charge()
+            self.molecule = Molecule.read_xyz_string(max_xyz_geom)
+            self.molecule.set_multiplicity(mult)
+            self.molecule.set_charge(charge)
+            self._save_results(self.results_file, self.results)
+            return self.molecule, self.results
+        else:
+            self.ostream.flush()
+            self.results.update(results)
+            self._save_results(self.results_file, self.results)
+            self.ostream.print_warning(
+                "The force field scan crashed. Saving results in self.results and raising exception"
+            )
+            raise exception
 
     def _get_mm_energy(
         self,
@@ -480,7 +472,14 @@ class TransitionStateGuesser():
 
         return em, e1, e2
 
-    def scan_scf(self, structures):
+    def scan_scf(self, results=None):
+        if results is None:
+            results = self.results
+        assert_msg_critical(
+            'mm_geometries' in results.keys(),
+            'Could not find "mm_geometries" in results.',
+        )
+        structures = results['mm_geometries']
         self._print_scf_header()
         scf_energies = []
         ref = 0
@@ -509,8 +508,14 @@ class TransitionStateGuesser():
             f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
         )
         self.ostream.flush()
-
-        return results
+        self.results.update(results)
+        mult = self.molecule.get_multiplicity()
+        charge = self.molecule.get_charge()
+        self.molecule = Molecule.read_xyz_string(max_scf_geom)
+        self.molecule.set_multiplicity(mult)
+        self.molecule.set_charge(charge)
+        self._save_results(self.results_file, self.results)
+        return self.molecule, self.results
 
     def _get_scf_energy(self, positions):
         self.molecule = self._set_molecule_positions(self.molecule, positions)
@@ -692,6 +697,8 @@ class TransitionStateGuesser():
         return molecule
 
     def _save_results(self, fname, results):
+        self.ostream.print_info(f"Saving results to {self.results_file}")
+        self.ostream.flush()
         if os.path.exists(fname):
             self.ostream.print_warning(
                 f"File {fname} already exists. Overwriting it.")

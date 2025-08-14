@@ -113,18 +113,18 @@ class EvbForceFieldBuilder():
             "water_model": str,
             "reactant_total_multiplicity": int,
             "product_total_multiplicity": int,
-            "breaking_bonds": set[tuple[int, int]] | tuple,
-            "reactant_partial_charges": list[float] | list[list[float]] | None,
-            "product_partial_charges": list[float] | list[list[float]] | None,
-            "reactant_hessians": np.ndarray | list[np.ndarray | None] | None,
-            "product_hessians": np.ndarray | list[np.ndarray | None] | None,
+            "breaking_bonds": set | tuple,
+            "reactant_partial_charges": list | None,
+            "product_partial_charges": list | None,
+            "reactant_hessians": np.ndarray | list | None,
+            "product_hessians": np.ndarray | list | None,
             "mute_scf": bool
         }
 
     def read_keywords(self, **kwargs):
         for key, value in kwargs.items():
             if key in self.keywords.keys():
-                if type(value) is self.keywords[key]:
+                if isinstance(value, self.keywords[key]):
                     setattr(self, key, value)
                 else:
                     raise ValueError(
@@ -220,7 +220,6 @@ class EvbForceFieldBuilder():
         for i, (molecule, partial_charge,
                 hessian) in enumerate(zip(molecules, partial_charges,
                                           hessians)):
-            charge = molecule.get_charge()
             molecule_sanity_check(molecule)
             if partial_charge is not None:
                 # Casting to float is necessary for json serialization
