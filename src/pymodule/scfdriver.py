@@ -598,8 +598,8 @@ class ScfDriver:
             self.smd_drv = SmdDriver(self.comm, self.ostream)
             self.smd_drv.solute = molecule
             self.smd_drv.solvent = self.smd_solvent
-            self.cds_energy = self.smd_drv.get_CDS_contribution()
-            self.smd_energy = self.cds_energy            
+            self.smd_cds_energy = self.smd_drv.get_CDS_contribution()
+            self.smd_energy = self.smd_cds_energy            
             self.cpcm_drv.epsilon = self.smd_drv.epsilon
             self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii()
             self.cpcm_drv.radii_scaling = 1
@@ -3012,7 +3012,7 @@ class ScfDriver:
             valstr += f'{self.cpcm_epol:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
             valstr = f'... CDS contribution               :'
-            valstr += f'{self.cds_energy:20.10f} a.u.'
+            valstr += f'{self.smd_cds_energy:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'

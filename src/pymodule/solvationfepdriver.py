@@ -134,6 +134,7 @@ class SolvationFepDriver:
         
         # Ensemble and MD options
         self.temperature = 298.15 * unit.kelvin
+        self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * self.temperature).in_units_of(unit.kilojoule_per_mole)
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
         self.num_equil_steps = 5000 #10 ps
@@ -164,7 +165,7 @@ class SolvationFepDriver:
         self.lambdas_stage4 = [1.0, 0.5, 0.0] 
 
         # Storage for potential energies across stages
-        self.u_kln_matrices = []
+        self.u_kn_matrices = []
         self.stage = 1
 
         # Final energies
@@ -380,8 +381,8 @@ class SolvationFepDriver:
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
 
-        delta_f = {i+1: {'Delta_f': self.delta_f[i]['Delta_f'][-1,0],
-                'Uncertainty': self.delta_f[i]['dDelta_f'][-1,0]}
+        delta_f = {i+1: {'Delta_f': (self.delta_f[i]['Delta_f'][-1,0]*self.kT).value_in_unit(unit.kilojoule_per_mole),
+                'Uncertainty': (self.delta_f[i]['dDelta_f'][-1,0]*self.kT).value_in_unit(unit.kilojoule_per_mole)}
           for i in range(4)}
         
         self.final_free_energy = final_free_energy
@@ -397,7 +398,7 @@ class SolvationFepDriver:
         :param vacuum:
             If True, run the simulation in vacuum.
         """
-        
+
         total_sim_time = 0  # Track total simulation time
         total_ns_simulated = 0  # Track total simulated time in ns
 
@@ -414,6 +415,7 @@ class SolvationFepDriver:
 
         self.ostream.print_info(f"Generating systems for stage {stage}")
         self.ostream.flush()
+        
         # Create systems, topology and initial positions
         if vacuum:
             systems, topology, positions = self._create_vacuum_systems(lambdas)
@@ -428,16 +430,11 @@ class SolvationFepDriver:
             self.ostream.print_info(f"Running lambda = {lam}, stage = {stage}...")
             self.ostream.flush()
 
-            # Run the simulation for the current lambda
-            conformations, ns_simulated, sim_time = self._run_simulation(systems[l], topology, positions, lam)
+            # Run the simulation for the current lambda, perform equilibration and subsampling
+            ns_simulated, sim_time = self._run_simulation(systems[l], topology, positions, lam)
             # Performance calculation in ns/hour
             total_ns_simulated += ns_simulated
             total_sim_time += sim_time
-
-            ## ADDED: saving the equilibrated snapshots from each simulation
-            #self._detect_equilibration(conformations)
-            #snapshots.append(conformations)
-
 
         # Print total performance metrics for the stage
         overall_ns_per_hour = (total_ns_simulated / total_sim_time) * 3600
@@ -451,12 +448,8 @@ class SolvationFepDriver:
         self.ostream.flush()
         recalculation_start = time.time()
 
-        ## ADDED: recalculating only the energies for the equilibrated snapshots
-        u_kn = self._recalculate_energies_new(systems, topology)
-        #u_kln = self._recalculate_energies(snapshots, systems, topology)
-
-        self.u_kln_matrices.append(u_kn)
-        #self.u_kln_matrices.append(u_kln)
+        u_kn = self._recalculate_energies(systems, topology)
+        self.u_kn_matrices.append(u_kn)
 
         recalculation_end = time.time()
         recalculation_time = recalculation_end - recalculation_start
@@ -466,12 +459,11 @@ class SolvationFepDriver:
 
         self.ostream.print_info(f"Calculating the free energy with MBAR for stage {stage}...")
         self.ostream.flush()
-        ## ADDED:
-        delta_f = self._calculate_free_energy_new(u_kn)
-        #delta_f = self._calculate_free_energy(u_kln)
 
-        free_energy = delta_f['Delta_f'][-1, 0]
-        self.ostream.print_line(f"Free energy for stage {stage}: {delta_f['Delta_f'][-1, 0]:.4f} +/- {delta_f['dDelta_f'][-1, 0]:.4f} kJ/mol")
+        delta_f = self._calculate_free_energy(u_kn)
+        free_energy = (delta_f['Delta_f'][-1, 0] * self.kT).value_in_unit(unit.kilojoule_per_mole)
+        
+        self.ostream.print_line(f"Free energy for stage {stage}: {free_energy:.4f} +/- {(delta_f['dDelta_f'][-1, 0]* self.kT).value_in_unit(unit.kilojoule_per_mole):.4f} kJ/mol")
         self.ostream.flush()
 
         return delta_f, free_energy
@@ -672,43 +664,33 @@ class SolvationFepDriver:
         # Start the production run
         time_start = time.time()
         
-        ## ADDED:
         conformations = []
         energies = []
+        
         for _ in range(self.number_of_snapshots):
             simulation.step(interval)
             state = simulation.context.getState(getPositions=True, getEnergy=True)
-            positions = state.getPositions().value_in_unit(unit.nanometers)
-            energy = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+            positions = state.getPositions() 
+            energy = state.getPotentialEnergy() / self.kT # Reduced potential energy
             conformations.append(positions)
             energies.append(energy)
         
-        ## ADDED: saving the equilibrated snapshots from each simulation
-        self._detect_equilibration(conformations, energies)
-        
-        ## OLD: running recalculations on all snapshots, including the ones that are discarded by detect_equilibration
-        # conformations = []
-        # for _ in range(self.number_of_snapshots):
-        #     simulation.step(interval)
-        #     state = simulation.context.getState(getPositions=True)
-        #     positions = state.getPositions().value_in_unit(unit.nanometers)
-        #     conformations.append(positions)
-
         time_end = time.time()
-
-        elapsed_time = time_end - time_start  # Elapsed real-world time in seconds
         
+        self._detect_equilibration(conformations, energies)
+
+        elapsed_time = time_end - time_start  # Elapsed real-world time in seconds 
         ns_per_hour = (simulated_ns / elapsed_time) * 3600
         self.ostream.print_info(f'Lambda = {lambda_value} completed. Elapsed time: {elapsed_time:.2f} s')
         self.ostream.print_info(f'Performance: {ns_per_hour:.2f} ns/hour')
         self.ostream.flush()
 
-        return conformations, simulated_ns, elapsed_time
+        return simulated_ns, elapsed_time
     
-    def _recalculate_energies_new(self, forcefields, topology):
+    def _recalculate_energies(self, forcefields, topology):
         snapshots = self.snapshots
-        u_kn = np.zeros((len(forcefields),len(snapshots)))
-        
+        u_kn = np.zeros((len(forcefields), sum(self.N_k)), np.float64)
+
         for k, forcefield in enumerate(forcefields):
             self.ostream.print_info(f"Recalculating energies for Forcefield {k}...")
             self.ostream.flush()
@@ -720,80 +702,69 @@ class SolvationFepDriver:
             for n, snapshot in enumerate(snapshots):
                 simulation.context.setPositions(snapshot)
                 state = simulation.context.getState(getEnergy=True)
-                u_kn[k, n] = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-                
+                u_kn[k, n] = state.getPotentialEnergy() / self.kT
+
+            assert_msg_critical(u_kn.shape[1] == sum(self.N_k),
+                f"Recalculated energies shape mismatch of u_kn and N_k")
+
             elapsed_time_trajectory = time.time() - time_start_forcefield
             self.ostream.print_info(f"Forcefield {k} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
             self.ostream.flush()
 
         return u_kn
-
-    def _recalculate_energies(self, conformations, forcefields, topology):
-        
-        # TODO: Change from U_kln to U_kn (where n is snapshots*lambdas) since pymbar is phasing this out
-        num_snapshots = self.number_of_snapshots
-        u_kln = np.zeros((len(conformations), len(forcefields), num_snapshots))
-
-        # l loop for U_kln
-        for l, forcefield in enumerate(forcefields):
-            self.ostream.print_info(f"Recalculating energies for Forcefield {l}...")
-            self.ostream.flush()
-            time_start_forcefield = time.time()
-            
-            integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
-            platform = mm.Platform.getPlatformByName(self.platform) if self.platform else None
-            simulation = app.Simulation(topology, forcefield, integrator, platform=platform)
-            
-            # k loop for U_kln
-            for k, conformation in enumerate(conformations):
-                # n loop for U_kln
-                for n in range(num_snapshots):
-                    simulation.context.setPositions(conformation[n])
-                    state = simulation.context.getState(getEnergy=True)
-                    u_kln[k, l, n] = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-                
-            elapsed_time_trajectory = time.time() - time_start_forcefield
-            self.ostream.print_info(f"Forcefield {l} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
-            self.ostream.flush()
-
-        return u_kln
     
     def _detect_equilibration(self, conformations, energies):
+        g_threshold = 20
         At = np.array(energies) 
-        t0, _, _ = timeseries.detect_equilibration(At) 
-        equilibrated_snapshots = conformations[t0:]
-
-        self.snapshots.extend(equilibrated_snapshots)
-        self.N_k.append(len(equilibrated_snapshots))
-
-        self.ostream.print_info(f"Number of snapshots after equilibration: {len(equilibrated_snapshots)}")
+        
+        t0, g, Neff_max = timeseries.detect_equilibration(At)
+        
+        conformations_equil = conformations[t0:]
+        
+        self.ostream.print_info(f"Equilibration detected at frame {t0} with g = {g} and Neff_max = {Neff_max}")
         self.ostream.flush()
 
-    def _calculate_free_energy_new(self, u_kn):
+        if g > g_threshold:
+            stride = max(1,int(g/10))
+            indices = np.arange(0,len(conformations_equil), stride)
+            snapshots = [conformations_equil[i] for i in indices]
+            info = f"Subsampling applied (g={g:.2f} > {g_threshold}) with stride={stride} "
+        else:
+            snapshots = conformations_equil
+            info = f"No subsampling (g={g:.2f} <= {g_threshold})"
 
-        mbar = MBAR(u_kn, N_k = self.N_k, solver_protocol='robust', n_bootstraps=50)
-        delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
 
-        return delta_f
-
-    def _calculate_free_energy(self, u_kln):
-        n_states = u_kln.shape[0]
-        N_k = np.zeros(n_states, dtype=int)
-        u_equil = []
- 
-        for k in range(n_states):
-            t0, g, Neff_max = timeseries.detect_equilibration(u_kln[k, k, :])
-            u_kln_k = u_kln[k, :, t0:] #Truncate post-equilibration samples for all l, shape (l, n_equil_samples)
-            N_k[k] = u_kln_k.shape[1]
-            u_equil.append(u_kln_k) # (l,n)
+        self.snapshots.extend(snapshots)
+        self.N_k.append(len(snapshots))
         
-        max_Nk = max(N_k)
-        u_kln_reduced = np.full((n_states, n_states, max_Nk), np.nan)
-        
-        for k in range(n_states):
-            u_kln_reduced[k, :, :N_k[k]] = u_equil[k]
+        self.ostream.print_info(f"Frames saved = {len(snapshots)} | {info}")
+        self.ostream.flush()
 
-        mbar = MBAR(u_kln_reduced, N_k, solver_protocol='robust', n_bootstraps=50)
+    def _detect_equilibration_subsampling(self, conformations, energies):
+        At = np.array(energies) 
+        
+        t0, g, Neff_max = timeseries.detect_equilibration(At)
+        
+        At_equil = At[t0:]
+        conformations_equil = conformations[t0:]
+        
+        self.ostream.print_info(f"Equilibration detected at time {t0} with g = {g} and Neff_max = {Neff_max}")
+        self.ostream.print_info(f"Number of snapshots after equilibration: {len(conformations_equil)}")
+        self.ostream.flush()
+
+        indices = timeseries.subsample_correlated_data(At_equil,g=g) 
+        
+        subsampled_snapshots = [conformations_equil[i] for i in indices]
+
+        self.snapshots.extend(subsampled_snapshots)
+        self.N_k.append(len(subsampled_snapshots))
+
+        self.ostream.print_info(f"Number of snapshots after subsampling: {len(subsampled_snapshots)}")
+        self.ostream.flush()
+
+    def _calculate_free_energy(self, u_kn):
+
+        mbar = MBAR(u_kn, N_k = self.N_k, n_bootstraps=50) # if convergence error, use: solver_protocol='robust'
         delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
 
         return delta_f
