@@ -1110,6 +1110,7 @@ class LinearSolver:
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
             profiler.add_timing_info('(loadimb)', eri_load_imb)
+            profiler.check_memory_usage('FockERI')
 
         if self._dft:
             t0 = tm.time()
@@ -1128,6 +1129,7 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
+                profiler.check_memory_usage('FockXC')
 
         fock_mat_local = fock_mat.to_numpy()
         if fock_mat_erf_k is not None:

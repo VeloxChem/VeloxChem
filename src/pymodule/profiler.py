@@ -302,7 +302,7 @@ class Profiler:
             self.memory_usage.append((dt, used_mem, remark))
 
             if MPI.COMM_WORLD.Get_rank() == mpi_master():
-                print(f'* Info * Time stamp [{remark:<30s}]: {dt:.2f} sec')
+                print(f'* Info * Time stamp [{remark:<30s}]: {dt:10.3f} sec')
                 sys.stdout.flush()
 
     def print_memory_usage(self, ostream, scf_flag=False):
