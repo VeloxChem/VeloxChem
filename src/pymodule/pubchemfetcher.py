@@ -138,7 +138,8 @@ def get_all_conformer_IDs(mol_name):
             return conformerID_list
 
     except HTTPError as e:
-        print(f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist.")
+        print(f"HTTP Error: {e.code}. " +
+              "The compound may not have conformers, or it may not exist.")
 
     except URLError as e:
         print(f"URL Error: {e.reason}")
@@ -196,21 +197,23 @@ def get_conformer_data(conformer_ID):
             return xyz
 
     except HTTPError as e:
-        print(f"HTTP Error: {e.code}. The compound may not have conformers, or it may not exist.")
+        print(f"HTTP Error: {e.code}. " +
+              "The compound may not have conformers, or it may not exist.")
 
     except URLError as e:
         print(f"URL Error: {e.reason}")
 
 
 def index_to_element(indices):
-    """Sends the numerical position of an element on the periodic table to their abbreviations
+    """
+    Sends the numerical position of an element on the periodic table to their
+    abbreviations
 
     :param indicies
         The numerical positions of a list of elements on the periodic table
 
     :return elements:
         The corresponding list of element abbreviations
-
     """
 
     periodic_table = [
@@ -246,3 +249,17 @@ def get_pubchem_reference():
     pubchem_ref += ' Nucleic Acids Res., 2025, 53, D1516-D1525.'
 
     return pubchem_ref
+
+
+def get_pubchem_sketcher_reference():
+    """
+    Gets PubChem sketcher reference.
+
+    :return:
+        The reference.
+    """
+
+    pubchem_sketcher_ref = 'W. D. Ihlenfeldt, E. E. Bolton, S. H. Bryant,'
+    pubchem_sketcher_ref += ' J. Cheminform., 2009, 1, 20.'
+
+    return pubchem_sketcher_ref
