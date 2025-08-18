@@ -33,7 +33,6 @@
 from mpi4py import MPI
 import numpy as np
 import math
-import time
 import sys
 
 from .veloxchemlib import cpcm_local_matrix_A_diagonals
@@ -93,13 +92,13 @@ class CpcmDriver:
 
         # model settings
         # standard value for dielectric const. is for that of water
-        self.epsilon         = 78.39 
+        self.epsilon = 78.39
         self.optical_epsilon = 1.777849
         self.grid_per_sphere = (194, 110)
-        self.x               = 0
+        self.x = 0
 
         self.custom_vdw_radii = None
-        
+
         # input keywords
         self.input_keywords = {
             'cpcm': {
@@ -110,10 +109,11 @@ class CpcmDriver:
             },
         }
 
-    def print_info(self):
+    def print_cpcm_info(self):
         """
         Print information and reference.
         """
+
         cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
         self.ostream.print_info(cpcm_info)
         self.ostream.print_blank()
@@ -123,7 +123,7 @@ class CpcmDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def init(self, molecule, do_nuclear = True):
+    def init(self, molecule, do_nuclear=True):
         """
         Initialize the driver for energy calculations.
 
@@ -134,21 +134,22 @@ class CpcmDriver:
         """
 
         (self._cpcm_grid,
-             self._cpcm_sw_func) = self.generate_cpcm_grid(molecule)
+         self._cpcm_sw_func) = self.generate_cpcm_grid(molecule)
 
-        cpcm_local_precond = self.form_local_precond(
-                self._cpcm_grid, self._cpcm_sw_func)
+        cpcm_local_precond = self.form_local_precond(self._cpcm_grid,
+                                                     self._cpcm_sw_func)
 
         self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
         self._cpcm_precond = np.hstack(self._cpcm_precond)
 
         if do_nuclear:
-            self._cpcm_Bzvec = self.form_vector_Bz(
-                    self._cpcm_grid, molecule)
+            self._cpcm_Bzvec = self.form_vector_Bz(self._cpcm_grid, molecule)
+        else:
+            self._cpcm_Bzvec = None
 
         self._cpcm_q = None
 
-    def compute_fock(self, molecule, basis, density, cpcm_cg_thresh):
+    def compute_gs_fock(self, molecule, basis, density, cpcm_cg_thresh):
         """
         Compute the energy and Fock matrix contribution.
 
@@ -167,8 +168,7 @@ class CpcmDriver:
         Cvec = self.form_vector_C(molecule, basis, self._cpcm_grid, density)
 
         if self.rank == mpi_master():
-            scale_f = -(self.epsilon - 1) / (
-                self.epsilon + self.x)
+            scale_f = -(self.epsilon - 1) / (self.epsilon + self.x)
             rhs = scale_f * (self._cpcm_Bzvec + Cvec)
         else:
             rhs = None
@@ -181,23 +181,26 @@ class CpcmDriver:
         if self._cpcm_q is not None and self._cpcm_q.size != rhs.size:
             self._cpcm_q = None
 
-        self._cpcm_q = self.cg_solve_parallel_direct(
-                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, self._cpcm_q, cpcm_cg_thresh)
+        self._cpcm_q = self.cg_solve_parallel_direct(self._cpcm_grid,
+                                                     self._cpcm_sw_func,
+                                                     self._cpcm_precond, rhs,
+                                                     self._cpcm_q,
+                                                     cpcm_cg_thresh)
 
         if self.rank == mpi_master():
-            e_sol = self.compute_solv_energy(
-                self._cpcm_Bzvec, Cvec, self._cpcm_q)
+            e_sol = self.compute_solv_energy(self._cpcm_Bzvec, Cvec,
+                                             self._cpcm_q)
             self.cpcm_epol = e_sol
         else:
             self.cpcm_epol = None
 
-        Fock_sol = self.get_contribution_to_Fock(
-                    molecule, basis, self._cpcm_grid, self._cpcm_q)
+        Fock_sol = self.get_contribution_to_Fock(molecule, basis,
+                                                 self._cpcm_grid, self._cpcm_q)
 
         return self.cpcm_epol, Fock_sol
 
-    def compute_response_fock(self, molecule, basis, density, cpcm_cg_thresh, non_equilibrium):
+    def compute_response_fock(self, molecule, basis, density, cpcm_cg_thresh,
+                              non_equilibrium):
         """
         Compute the Fock matrix contribution to response calculations.
 
@@ -219,24 +222,23 @@ class CpcmDriver:
 
         if self.rank == mpi_master():
             if non_equilibrium:
-                scale_f = -(self.optical_epsilon - 1) / (
-                    self.optical_epsilon + self.x)
+                scale_f = -(self.optical_epsilon - 1) / (self.optical_epsilon +
+                                                         self.x)
             else:
-                scale_f = -(self.epsilon - 1) / (
-                    self.epsilon + self.x)
+                scale_f = -(self.epsilon - 1) / (self.epsilon + self.x)
             rhs = scale_f * (Cvec)
         else:
             rhs = None
 
         rhs = self.comm.bcast(rhs, root=mpi_master())
 
-        cpcm_rsp_q = self.cg_solve_parallel_direct(
-                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, None, cpcm_cg_thresh)
+        cpcm_rsp_q = self.cg_solve_parallel_direct(self._cpcm_grid,
+                                                   self._cpcm_sw_func,
+                                                   self._cpcm_precond, rhs,
+                                                   None, cpcm_cg_thresh)
 
-        return self.get_contribution_to_Fock(
-                    molecule, basis, self._cpcm_grid, cpcm_rsp_q)
-
+        return self.get_contribution_to_Fock(molecule, basis, self._cpcm_grid,
+                                             cpcm_rsp_q)
 
     def compute_gradient(self, molecule, basis, density):
         """
@@ -252,13 +254,16 @@ class CpcmDriver:
         :return:
             The gradient contributions
         """
-        gradA = self.grad_Aij(molecule, self._cpcm_grid, self._cpcm_q, self.epsilon, self.x)
+        gradA = self.grad_Aij(molecule, self._cpcm_grid, self._cpcm_q,
+                              self.epsilon, self.x)
 
-        gradA += self.grad_Aii(molecule, self._cpcm_grid, self._cpcm_sw_func, self._cpcm_q, self.epsilon, self.x)
+        gradA += self.grad_Aii(molecule, self._cpcm_grid, self._cpcm_sw_func,
+                               self._cpcm_q, self.epsilon, self.x)
 
         gradB = self.grad_B(molecule, self._cpcm_grid, self._cpcm_q)
 
-        gradC = self.grad_C(molecule, basis, self._cpcm_grid, self._cpcm_q, density)
+        gradC = self.grad_C(molecule, basis, self._cpcm_grid, self._cpcm_q,
+                            density)
 
         return gradA + gradB + gradC
 
@@ -295,7 +300,7 @@ class CpcmDriver:
 
         parse_input(self, cpcm_keywords, cpcm_dict)
 
-    def compute_solv_energy(self, Bzvec, Cvec, q, molecule=False):
+    def compute_solv_energy(self, Bzvec, Cvec, q):
         """
         Computes (electrostatic component of) C-PCM energy.
         TODO: add other components of the energy
@@ -310,8 +315,9 @@ class CpcmDriver:
         :return:
             The C-PCM energy.
         """
+
         return 0.5 * np.vdot(q, Bzvec + Cvec)
-    
+
     def get_cpcm_vdw_radii(self, molecule):
         """
         Get C-PCM VDW radii.
@@ -322,26 +328,29 @@ class CpcmDriver:
         :return:
             The VDW radii of the atoms.
         """
- 
+
         atom_radii = molecule.vdw_radii_to_numpy()
         if self.custom_vdw_radii is not None:
             assert_msg_critical(
                 len(self.custom_vdw_radii) % 2 == 0,
-                'C-PCM: expecting even number of entries for user-defined C-PCM radii')
- 
+                'C-PCM: expecting even number of entries for user-defined C-PCM radii'
+            )
+
             keys = self.custom_vdw_radii[0::2]
             vals = self.custom_vdw_radii[1::2]
- 
+
             for key, val in zip(keys, vals):
                 val_au = float(val) / bohr_in_angstrom()
                 try:
                     idx = int(key) - 1
                     assert_msg_critical(
                         0 <= idx and idx < molecule.number_of_atoms(),
-                        'C-PCM: invalid atom index for user-defined C-PCM radii')
+                        'C-PCM: invalid atom index for user-defined C-PCM radii'
+                    )
                     atom_radii[idx] = val_au
                     self.ostream.print_info(
-                        f'Applying user-defined C-PCM radius {val} for atom {key}')
+                        f'Applying user-defined C-PCM radius {val} for atom {key}'
+                    )
 
                 except ValueError:
                     elem_found = False
@@ -349,10 +358,11 @@ class CpcmDriver:
                         if label.upper() == key.upper():
                             atom_radii[idx] = val_au
                             elem_found = True
- 
+
                     if elem_found:
                         self.ostream.print_info(
-                            f'Applying user-defined C-PCM radius {val} for atom {key}')
+                            f'Applying user-defined C-PCM radius {val} for atom {key}'
+                        )
 
             self.ostream.print_blank()
 
@@ -366,7 +376,7 @@ class CpcmDriver:
             The molecule.
 
         :return:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         """
 
@@ -374,8 +384,8 @@ class CpcmDriver:
 
         assert_msg_critical(
             (len(self.grid_per_sphere) == 2) and
-                (self.grid_per_sphere[0] in valid_grid_numbers) and
-                (self.grid_per_sphere[1] in valid_grid_numbers),
+            (self.grid_per_sphere[0] in valid_grid_numbers) and
+            (self.grid_per_sphere[1] in valid_grid_numbers),
             'CpcmDriver.generate_cpcm_grid: Invalid grid_per_sphere')
 
         unit_grid = gen_lebedev_grid(self.grid_per_sphere[0])
@@ -410,14 +420,18 @@ class CpcmDriver:
         for i in range(atom_start, atom_end):
             if identifiers[i] == 1:
                 # scale and shift unit grid of hydrogen atom
-                atom_grid_coords = unit_hydrogen_grid_coords * atom_radii[i] + atom_coords[i]
-                grid_zeta = hydrogen_zeta / (atom_radii[i] * np.sqrt(unit_hydrogen_grid_weights))
+                atom_grid_coords = unit_hydrogen_grid_coords * atom_radii[
+                    i] + atom_coords[i]
+                grid_zeta = hydrogen_zeta / (
+                    atom_radii[i] * np.sqrt(unit_hydrogen_grid_weights))
                 atom_idx = np.full_like(grid_zeta, i)
                 atom_grid = np.hstack(
-                    (atom_grid_coords, unit_hydrogen_grid_weights, grid_zeta, atom_idx))
+                    (atom_grid_coords, unit_hydrogen_grid_weights, grid_zeta,
+                     atom_idx))
             else:
                 # scale and shift unit grid of non-hydrogen atom
-                atom_grid_coords = unit_grid_coords * atom_radii[i] + atom_coords[i]
+                atom_grid_coords = unit_grid_coords * atom_radii[
+                    i] + atom_coords[i]
                 grid_zeta = zeta / (atom_radii[i] * np.sqrt(unit_grid_weights))
                 atom_idx = np.full_like(grid_zeta, i)
                 atom_grid = np.hstack(
@@ -427,7 +441,8 @@ class CpcmDriver:
         gathered_cpcm_grid_raw = self.comm.allgather(cpcm_grid_raw)
         cpcm_grid_raw = np.vstack(gathered_cpcm_grid_raw)
 
-        sw_func_raw = self.get_switching_function(atom_coords, atom_radii, cpcm_grid_raw)
+        sw_func_raw = self.get_switching_function(atom_coords, atom_radii,
+                                                  cpcm_grid_raw)
 
         gathered_sw_func_raw = self.comm.allgather(sw_func_raw)
         sw_func_raw = np.hstack(gathered_sw_func_raw)
@@ -448,9 +463,9 @@ class CpcmDriver:
         :param atom_radii:
             The Van der Waals atomic radii (a.u.)
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
-        
+
         :return:
             Switching function array of each grid point.
         """
@@ -490,11 +505,11 @@ class CpcmDriver:
                 sw_func[g - start] *= f_ag
 
         return sw_func
-    
+
     def get_zeta_dict(self):
         """
         Return the dictionary of Gaussian exponents for different grid-levels.
-        
+
         Ref.: B. A. Gregersen and D. M. York, J. Chem. Phys. 122, 194110 (2005)
         """
         return {
@@ -514,7 +529,7 @@ class CpcmDriver:
         Forms the cavity-cavity interaction matrix.
 
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         :param sw_func:
             The switching function.
@@ -541,9 +556,9 @@ class CpcmDriver:
         :param molecule:
             The molecule.
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
-        
+
         :return:
             The (nuclear) electrostatic potential at each grid point due to
             each nucleus (not weighted by nuclear charge).
@@ -574,7 +589,7 @@ class CpcmDriver:
         :param basis:
             The atomic basis.
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         :param D:
             The AO density matrix.
@@ -608,11 +623,12 @@ class CpcmDriver:
         end = sum(counts[:self.rank + 1])
 
         grid_coords = grid[start:end, :3].copy()
-        zeta        = grid[start:end, 4].copy()
+        zeta = grid[start:end, 4].copy()
 
         nerf_drv = NuclearPotentialErfDriver()
 
-        local_V_es = -1.0 * nerf_drv.compute(molecule, basis, q[start:end], grid_coords, zeta).to_numpy()
+        local_V_es = -1.0 * nerf_drv.compute(molecule, basis, q[start:end],
+                                             grid_coords, zeta).to_numpy()
 
         V_es = self.comm.reduce(local_V_es, root=mpi_master())
 
@@ -664,16 +680,16 @@ class CpcmDriver:
         """
         Calculates the (off-diagonal) cavity-cavity gradient contribution.
 
-        :param molecule: 
+        :param molecule:
             The molecule object.
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         :param q:
             The grid point charges.
         :param eps:
             Dielectric constant.
-        :param x: 
+        :param x:
             Alternative scale term in the denominator of
             the scaling function f.
 
@@ -694,7 +710,8 @@ class CpcmDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, start, end, natoms)
+        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, start,
+                                      end, natoms)
         grad_Aij *= (-0.5 / scale_f)
 
         return grad_Aij
@@ -703,10 +720,10 @@ class CpcmDriver:
         """
         Calculates the (diagonal) cavity-cavity gradient contribution.
 
-        :param molecule: 
+        :param molecule:
             The molecule object.
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         :param sw_f:
             The switching function.
@@ -714,7 +731,7 @@ class CpcmDriver:
             The grid point charges.
         :param eps:
             Dielectric constant.
-        :param x: 
+        :param x:
             Alternative scale factor in the denominator of
             the scaling function f.
 
@@ -722,14 +739,14 @@ class CpcmDriver:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
 
-        scale_f       = -(eps - 1) / (eps + x)
+        scale_f = -(eps - 1) / (eps + x)
 
         grid_coords = np.copy(grid[:, :3])
-        zeta_i      = np.copy(grid[:, 4])
-        atom_idx    = np.copy(grid[:, 5])
+        zeta_i = np.copy(grid[:, 4])
+        atom_idx = np.copy(grid[:, 5])
 
-        atom_coords   = molecule.get_coordinates_in_bohr()
-        atom_radii    = self.get_cpcm_vdw_radii(molecule) * 1.2
+        atom_coords = molecule.get_coordinates_in_bohr()
+        atom_radii = self.get_cpcm_vdw_radii(molecule) * 1.2
 
         npoints = grid_coords.shape[0]
         ave, rem = divmod(npoints, self.nodes)
@@ -754,7 +771,7 @@ class CpcmDriver:
         :param molecule:
             The molecule.
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         :param q:
             The grid point charges.
@@ -764,11 +781,11 @@ class CpcmDriver:
         """
 
         atom_coords = molecule.get_coordinates_in_bohr()
-        natoms      = molecule.number_of_atoms()
+        natoms = molecule.number_of_atoms()
 
         grid_coords = np.copy(grid[:, :3])
-        zeta_i      = np.copy(grid[:, 4])
-        atom_idx    = np.copy(grid[:, 5]).astype(int)
+        zeta_i = np.copy(grid[:, 4])
+        atom_idx = np.copy(grid[:, 5]).astype(int)
 
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
 
@@ -779,16 +796,17 @@ class CpcmDriver:
 
         for a in list(range(natoms))[self.rank::self.nodes]:
 
-            r_iA   = grid_coords - atom_coords[a]
+            r_iA = grid_coords - atom_coords[a]
             r_iA_2 = np.sum(r_iA**2, axis=1)
-            d_iA   = np.sqrt(r_iA_2)
+            d_iA = np.sqrt(r_iA_2)
 
-            dr_iA  = r_iA / d_iA.reshape(-1, 1)
+            dr_iA = r_iA / d_iA.reshape(-1, 1)
 
-            zeta_r   = zeta_i * d_iA
+            zeta_r = zeta_i * d_iA
             erf_term = self.erf_array(zeta_r)
             exp_term = np.exp(-1.0 * (zeta_i**2) * r_iA_2)
-            dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
+            dB_dr = -1.0 * (erf_term -
+                            two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
 
             for b in range(natoms):
 
@@ -797,15 +815,15 @@ class CpcmDriver:
                 gradB_vec[b] += np.dot(dB_dr * factor * q, dr_iA) * elem_ids[a]
 
         return gradB_vec
-    
+
     def grad_C(self, molecule, basis, grid, q, DM):
         """
         Calculates the electron-cavity and electron-nuclear gradient contribution.
 
-        :param molecule: 
+        :param molecule:
             The molecule object.
         :param grid:
-            The grid object containing the grid positions, weights, 
+            The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         :param q:
             The grid point charges.
@@ -815,7 +833,7 @@ class CpcmDriver:
         :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
-        
+
         npoints = grid.shape[0]
 
         ave, rem = divmod(npoints, self.nodes)
@@ -823,12 +841,13 @@ class CpcmDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        grid_coords  = np.copy(grid[start:end, :3])
-        zeta         = np.copy(grid[start:end, 4])
+        grid_coords = np.copy(grid[start:end, :3])
+        zeta = np.copy(grid[start:end, 4])
         atom_indices = np.copy(grid[start:end, 5].astype(int))
 
-        return compute_nuclear_potential_erf_gradient(
-            molecule, basis, grid_coords, q[start:end], DM, zeta, atom_indices)
+        return compute_nuclear_potential_erf_gradient(molecule, basis,
+                                                      grid_coords, q[start:end],
+                                                      DM, zeta, atom_indices)
 
     def cg_solve_parallel_direct(self,
                                  grid,
@@ -857,7 +876,8 @@ class CpcmDriver:
             start = sum(counts[:self.rank])
             end = sum(counts[:self.rank + 1])
 
-            local_v = cpcm_local_matrix_A_dot_vector(grid, sw_func, v, start, end)
+            local_v = cpcm_local_matrix_A_dot_vector(grid, sw_func, v, start,
+                                                     end)
 
             ret = self.comm.allgather(local_v)
             return np.hstack(ret)
@@ -892,12 +912,12 @@ class CpcmDriver:
                                              b=b,
                                              x0=x0,
                                              M=PrecondOp,
-                                             tol=(cg_thresh * np.linalg.norm(b)),
+                                             tol=(cg_thresh *
+                                                  np.linalg.norm(b)),
                                              atol=0)
 
-
-        assert_msg_critical(cg_conv == 0,
-                            'C-PCM: conjugate gradient solver did not converge')
+        assert_msg_critical(
+            cg_conv == 0, 'C-PCM: conjugate gradient solver did not converge')
 
         cg_solution = self.comm.bcast(cg_solution, root=mpi_master())
 

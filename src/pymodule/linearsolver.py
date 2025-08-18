@@ -520,7 +520,7 @@ class LinearSolver:
         if self._cpcm:
 
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
-            self.cpcm_drv.print_info()
+            self.cpcm_drv.print_cpcm_info()
 
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
@@ -530,7 +530,7 @@ class LinearSolver:
 
             cpcm_grid_t0 = tm.time()
 
-            self.cpcm_drv.init(molecule, do_nuclear = False)
+            self.cpcm_drv.init(molecule, do_nuclear=False)
 
             self.ostream.print_info(
                 f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
@@ -1490,9 +1490,8 @@ class LinearSolver:
 
             for idx in range(num_densities):
                 Fock_sol = self.cpcm_drv.compute_response_fock(
-                    molecule, basis, dens[idx] * 2.0,
-                    self.cpcm_cg_thresh, self.non_equilibrium_solv
-                )
+                    molecule, basis, dens[idx] * 2.0, self.cpcm_cg_thresh,
+                    self.non_equilibrium_solv)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol

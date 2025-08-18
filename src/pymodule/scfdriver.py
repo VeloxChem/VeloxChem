@@ -659,8 +659,8 @@ class ScfDriver:
         if self._cpcm:
             cpcm_grid_t0 = tm.time()
 
-            self.cpcm_drv.print_info()
-            self.cpcm_drv.init(molecule)
+            self.cpcm_drv.print_cpcm_info()
+            self.cpcm_drv.init(molecule, do_nuclear=True)
 
             self.ostream.print_info(
                 f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
@@ -1453,13 +1453,17 @@ class ScfDriver:
 
             if self._cpcm:
                 if self.scf_type == 'restricted':
-                    e_sol, Fock_sol = self.cpcm_drv.compute_fock(molecule, ao_basis, den_mat[0] * 2.0, self.cpcm_cg_thresh)
+                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
+                        molecule, ao_basis, den_mat[0] * 2.0,
+                        self.cpcm_cg_thresh)
                 else:
-                    e_sol, Fock_sol = self.cpcm_drv.compute_fock(molecule, ao_basis, den_mat[0] + den_mat[1], self.cpcm_cg_thresh)
-
-                e_el += e_sol
+                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
+                        molecule, ao_basis, den_mat[0] + den_mat[1],
+                        self.cpcm_cg_thresh)
 
                 if self.rank == mpi_master():
+                    e_el += e_sol
+
                     fock_mat[0] += Fock_sol
                     if self.scf_type != 'restricted':
                         fock_mat[1] += Fock_sol
