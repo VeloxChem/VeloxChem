@@ -657,33 +657,13 @@ class ScfDriver:
 
         # set up polarizable continuum model
         if self._cpcm:
-            cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
-            self.ostream.print_info(cpcm_info)
-            self.ostream.print_blank()
-            iswig_ref = 'A. W. Lange, J. M. Herbert,'
-            iswig_ref += ' J. Chem. Phys. 2010, 133, 244111.'
-            self.ostream.print_reference(iswig_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
             cpcm_grid_t0 = tm.time()
 
-            (self._cpcm_grid,
-             self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
-
-            cpcm_local_precond = self.cpcm_drv.form_local_precond(
-                self._cpcm_grid, self._cpcm_sw_func)
-
-            self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
-            self._cpcm_precond = np.hstack(self._cpcm_precond)
-
-            self._cpcm_Bzvec = self.cpcm_drv.form_vector_Bz(
-                self._cpcm_grid, molecule)
-
-            self._cpcm_q = None
+            self.cpcm_drv.print_info()
+            self.cpcm_drv.init(molecule)
 
             self.ostream.print_info(
-                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
+                f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
                 + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1473,42 +1453,11 @@ class ScfDriver:
 
             if self._cpcm:
                 if self.scf_type == 'restricted':
-                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
-                                                       self._cpcm_grid,
-                                                       den_mat[0] * 2.0)
+                    e_sol, Fock_sol = self.cpcm_drv.compute_fock(molecule, ao_basis, den_mat[0] * 2.0, self.cpcm_cg_thresh)
                 else:
-                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
-                                                       self._cpcm_grid,
-                                                       den_mat[0] + den_mat[1])
+                    e_sol, Fock_sol = self.cpcm_drv.compute_fock(molecule, ao_basis, den_mat[0] + den_mat[1], self.cpcm_cg_thresh)
 
-                if self.rank == mpi_master():
-                    scale_f = -(self.cpcm_drv.epsilon - 1) / (
-                        self.cpcm_drv.epsilon + self.cpcm_drv.x)
-                    rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                else:
-                    rhs = None
-                rhs = self.comm.bcast(rhs, root=mpi_master())
-
-                # in case number of C-PCM grid points do not match between
-                # cpcm_q and rhs, such as between previous and current
-                # geometries during an optimization, reset cpcm_q
-                if self._cpcm_q is not None and self._cpcm_q.size != rhs.size:
-                    self._cpcm_q = None
-
-                self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
-                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, self._cpcm_q, self.cpcm_cg_thresh)
-
-                if self.rank == mpi_master():
-                    e_sol = self.cpcm_drv.compute_solv_energy(
-                        self._cpcm_Bzvec, Cvec, self._cpcm_q)
-                    e_el += e_sol
-                    self.cpcm_epol = e_sol
-                else:
-                    self.cpcm_epol = None
-
-                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
-                    molecule, ao_basis, self._cpcm_grid, self._cpcm_q)
+                e_el += e_sol
 
                 if self.rank == mpi_master():
                     fock_mat[0] += Fock_sol
@@ -2957,7 +2906,7 @@ class ScfDriver:
 
         e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
         if self._cpcm:
-            e_el -= self.cpcm_epol
+            e_el -= self.cpcm_drv.cpcm_epol
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -2967,7 +2916,7 @@ class ScfDriver:
 
         if self._cpcm:
             valstr = 'Electrostatic Solvation Energy     :'
-            valstr += f'{self.cpcm_epol:20.10f} a.u.'
+            valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
