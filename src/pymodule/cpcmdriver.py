@@ -158,13 +158,14 @@ class CpcmDriver:
         :param basis:
             The atomic basis.
         :param density:
-            The AO density matrix.
+            The density matrix.
         :param cpcm_cg_thresh:
             threshold for solving charges.
 
         :return:
             The energy and Fock matrix contributions
         """
+
         Cvec = self.form_vector_C(molecule, basis, self._cpcm_grid, density)
 
         if self.rank == mpi_master():
@@ -188,9 +189,8 @@ class CpcmDriver:
                                                      cpcm_cg_thresh)
 
         if self.rank == mpi_master():
-            e_sol = self.compute_solv_energy(self._cpcm_Bzvec, Cvec,
-                                             self._cpcm_q)
-            self.cpcm_epol = e_sol
+            self.cpcm_epol = self.compute_solv_energy(self._cpcm_Bzvec, Cvec,
+                                                      self._cpcm_q)
         else:
             self.cpcm_epol = None
 
@@ -209,7 +209,7 @@ class CpcmDriver:
         :param basis:
             The atomic basis.
         :param density:
-            The AO density matrix.
+            The density matrix.
         :param cpcm_cg_thresh:
             threshold for solving charges.
         :param non_equilibrium:
@@ -218,6 +218,7 @@ class CpcmDriver:
         :return:
             The Fock matrix contribution.
         """
+
         Cvec = self.form_vector_C(molecule, basis, self._cpcm_grid, density)
 
         if self.rank == mpi_master():
@@ -242,18 +243,19 @@ class CpcmDriver:
 
     def compute_gradient(self, molecule, basis, density):
         """
-        Compute geometric gradient contribution.
+        Compute CPCM gradient contribution.
 
         :param molecule:
             The molecule.
         :param basis:
             The atomic basis.
         :param density:
-            The AO density matrix.
+            The density matrix.
 
         :return:
-            The gradient contributions
+            The CPCM gradient contribution.
         """
+
         gradA = self.grad_Aij(molecule, self._cpcm_grid, self._cpcm_q,
                               self.epsilon, self.x)
 
@@ -309,8 +311,8 @@ class CpcmDriver:
             The nuclear potential on the grid.
         :param Cvec:
             The electronic potential on the grid.
-        :param molecule:
-            The molecule.
+        :param q:
+            The surface charges.
 
         :return:
             The C-PCM energy.
@@ -420,8 +422,8 @@ class CpcmDriver:
         for i in range(atom_start, atom_end):
             if identifiers[i] == 1:
                 # scale and shift unit grid of hydrogen atom
-                atom_grid_coords = unit_hydrogen_grid_coords * atom_radii[
-                    i] + atom_coords[i]
+                atom_grid_coords = (unit_hydrogen_grid_coords * atom_radii[i] +
+                                    atom_coords[i])
                 grid_zeta = hydrogen_zeta / (
                     atom_radii[i] * np.sqrt(unit_hydrogen_grid_weights))
                 atom_idx = np.full_like(grid_zeta, i)
@@ -430,8 +432,8 @@ class CpcmDriver:
                      atom_idx))
             else:
                 # scale and shift unit grid of non-hydrogen atom
-                atom_grid_coords = unit_grid_coords * atom_radii[
-                    i] + atom_coords[i]
+                atom_grid_coords = (unit_grid_coords * atom_radii[i] +
+                                    atom_coords[i])
                 grid_zeta = zeta / (atom_radii[i] * np.sqrt(unit_grid_weights))
                 atom_idx = np.full_like(grid_zeta, i)
                 atom_grid = np.hstack(
@@ -553,11 +555,11 @@ class CpcmDriver:
         """
         Forms the nuclear-cavity interaction vector.
 
-        :param molecule:
-            The molecule.
         :param grid:
             The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
+        :param molecule:
+            The molecule.
 
         :return:
             The (nuclear) electrostatic potential at each grid point due to
@@ -592,7 +594,7 @@ class CpcmDriver:
             The grid object containing the grid positions, weights,
             the Gaussian exponents, and indices for which atom they belong to.
         :param D:
-            The AO density matrix.
+            The density matrix.
 
         :return:
             The total (electronic) electrostatic potential at each grid point.
@@ -616,6 +618,21 @@ class CpcmDriver:
         return esp
 
     def get_contribution_to_Fock(self, molecule, basis, grid, q):
+        """
+        Gets CPCM contribution to Fock matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param grid:
+            The grid.
+        :param q:
+            The surface charges.
+
+        :return:
+            The CPCM contribution to Fock matrix.
+        """
 
         ave, res = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
