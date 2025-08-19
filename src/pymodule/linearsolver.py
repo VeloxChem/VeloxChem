@@ -370,6 +370,9 @@ class LinearSolver:
 
         solvation_model_sanity_check(self)
 
+        assert_msg_critical(not self._smd,
+                            'Cannot use SMD in response calculation')
+
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,

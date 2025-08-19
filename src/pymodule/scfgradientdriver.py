@@ -443,7 +443,10 @@ class ScfGradientDriver(GradientDriver):
         # CPCM contribution to gradient
 
         if self.scf_driver._cpcm:
-            self.gradient += self.scf_driver.cpcm_drv.compute_gradient(molecule, basis, 2.0 * D)
+            assert_msg_critical(not self.scf_driver._smd,
+                                'Cannot use SMD in gradient calculation')
+            self.gradient += self.scf_driver.cpcm_drv.compute_gradient(
+                molecule, basis, 2.0 * D)
             grad_timing['CPCM_grad'] += time.time() - t0
 
         # nuclear contribution to gradient
@@ -812,7 +815,10 @@ class ScfGradientDriver(GradientDriver):
         # CPCM contribution to gradient
 
         if self.scf_driver._cpcm:
-            self.gradient += self.scf_driver.cpcm_drv.compute_gradient(molecule, basis, Da + Db)
+            assert_msg_critical(not self.scf_driver._smd,
+                                'Cannot use SMD in gradient calculation')
+            self.gradient += self.scf_driver.cpcm_drv.compute_gradient(
+                molecule, basis, Da + Db)
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
