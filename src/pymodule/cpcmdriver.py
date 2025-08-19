@@ -98,6 +98,7 @@ class CpcmDriver:
         self.x = 0
 
         self.custom_vdw_radii = None
+        self.radii_scaling = 1.2
 
         # input keywords
         self.input_keywords = {
@@ -407,7 +408,7 @@ class CpcmDriver:
         hydrogen_zeta = self.get_zeta_dict()[self.grid_per_sphere[1]]
 
         # increase radii by 20%
-        atom_radii = self.get_cpcm_vdw_radii(molecule) * 1.2
+        atom_radii = self.get_cpcm_vdw_radii(molecule) * self.radii_scaling
         atom_coords = molecule.get_coordinates_in_bohr()
         identifiers = molecule.get_identifiers()
 

@@ -60,6 +60,7 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
 from .cpcmdriver import CpcmDriver
+from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
@@ -245,7 +246,12 @@ class ScfDriver:
         self.cpcm_grid_per_sphere = (194, 110)
         self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
+        self.cpcm_radii_scaling = 1.2
         self.cpcm_custom_vdw_radii = None
+
+        self._smd = False
+        self.smd_drv = None
+        self.smd_solvent = 'water'
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
@@ -580,10 +586,23 @@ class ScfDriver:
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.radii_scaling = self.cpcm_radii_scaling
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
         else:
             self.cpcm_drv = None
+
+        # set up SMD Solvation Model
+        # note that SMD also uses CPCM, but with a different scaling factor for radii
+        if self._smd:
+            self.smd_drv = SmdDriver(self.comm, self.ostream)
+            self.smd_drv.solute = molecule
+            self.smd_drv.solvent = self.smd_solvent
+            self.smd_cds_energy = self.smd_drv.get_CDS_contribution()
+            self.smd_energy = self.smd_cds_energy
+            self.cpcm_drv.epsilon = self.smd_drv.epsilon
+            self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii()
+            self.cpcm_drv.radii_scaling = 1.0
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -654,6 +673,16 @@ class ScfDriver:
                                               root=mpi_master())
         else:
             self._d4_energy = 0.0
+
+        if self._smd:
+            smd_info = 'Using SMD solvation model.'
+            self.ostream.print_info(smd_info)
+            self.ostream.print_blank()
+            smd_ref = 'A. V. Marenich, C. J. Cramer, D. G. Truhlar,'
+            smd_ref += ' J. Phys. Chem. B, 2009, 113, 6378-6396.'
+            self.ostream.print_reference(smd_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         # set up polarizable continuum model
         if self._cpcm:
@@ -2647,7 +2676,10 @@ class ScfDriver:
 
         if self._cpcm:
             cur_str = 'Solvation Model                 : '
-            cur_str += 'C-PCM with ISWIG Discretization'
+            if self._smd:
+                cur_str += 'SMD'
+            else:
+                cur_str += 'C-PCM with ISWIG Discretization'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'C-PCM Dielectric Constant       : '
             cur_str += f'{self.cpcm_drv.epsilon}'
@@ -2909,7 +2941,12 @@ class ScfDriver:
         etot = self._iter_data['energy']
 
         e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
-        if self._cpcm:
+
+        # note: handle e_el differently for SMD and CPCM
+        if self._smd:
+            self.smd_energy += self.cpcm_epol
+            e_el -= self.smd_energy
+        elif self._cpcm:
             e_el -= self.cpcm_drv.cpcm_epol
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
@@ -2918,7 +2955,18 @@ class ScfDriver:
         valstr = f'Electronic Energy                  :{e_el:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        if self._cpcm:
+        # note: print energy differently for SMD and CPCM
+        if self._smd:
+            valstr = 'SMD Solvation Energy               :'
+            valstr += f'{self.smd_energy:20.10f} a.u'
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = '... ENP contribution               :'
+            valstr += f'{self.cpcm_epol:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = '... CDS contribution               :'
+            valstr += f'{self.smd_cds_energy:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+        elif self._cpcm:
             valstr = 'Electrostatic Solvation Energy     :'
             valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
