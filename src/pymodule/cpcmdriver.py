@@ -98,6 +98,7 @@ class CpcmDriver:
         self.x = 0
 
         self.custom_vdw_radii = None
+        self.custom_vdw_radii_verbose = True
         self.radii_scaling = 1.2
 
         # input keywords
@@ -351,9 +352,10 @@ class CpcmDriver:
                         'C-PCM: invalid atom index for user-defined C-PCM radii'
                     )
                     atom_radii[idx] = val_au
-                    self.ostream.print_info(
-                        f'Applying user-defined C-PCM radius {val} for atom {key}'
-                    )
+                    if self.custom_vdw_radii_verbose:
+                        self.ostream.print_info(
+                            f'Applying user-defined C-PCM radius {val} for atom {key}'
+                        )
 
                 except ValueError:
                     elem_found = False
@@ -363,11 +365,13 @@ class CpcmDriver:
                             elem_found = True
 
                     if elem_found:
-                        self.ostream.print_info(
-                            f'Applying user-defined C-PCM radius {val} for atom {key}'
-                        )
+                        if self.custom_vdw_radii_verbose:
+                            self.ostream.print_info(
+                                f'Applying user-defined C-PCM radius {val} for atom {key}'
+                            )
 
-            self.ostream.print_blank()
+            if self.custom_vdw_radii_verbose:
+                self.ostream.print_blank()
 
         return atom_radii
 
@@ -407,7 +411,7 @@ class CpcmDriver:
         zeta = self.get_zeta_dict()[self.grid_per_sphere[0]]
         hydrogen_zeta = self.get_zeta_dict()[self.grid_per_sphere[1]]
 
-        # increase radii by 20%
+        # increase radii (default radii_scaling is 1.2)
         atom_radii = self.get_cpcm_vdw_radii(molecule) * self.radii_scaling
         atom_coords = molecule.get_coordinates_in_bohr()
         identifiers = molecule.get_identifiers()
@@ -764,7 +768,7 @@ class CpcmDriver:
         atom_idx = np.copy(grid[:, 5])
 
         atom_coords = molecule.get_coordinates_in_bohr()
-        atom_radii = self.get_cpcm_vdw_radii(molecule) * 1.2
+        atom_radii = self.get_cpcm_vdw_radii(molecule) * self.radii_scaling
 
         npoints = grid_coords.shape[0]
         ave, rem = divmod(npoints, self.nodes)

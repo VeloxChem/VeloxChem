@@ -589,6 +589,7 @@ class ScfDriver:
             self.cpcm_drv.radii_scaling = self.cpcm_radii_scaling
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
+            self.cpcm_drv.custom_vdw_radii_verbose = True
         else:
             self.cpcm_drv = None
 
@@ -601,7 +602,9 @@ class ScfDriver:
             self.smd_cds_energy = self.smd_drv.get_CDS_contribution()
             self.smd_energy = self.smd_cds_energy
             self.cpcm_drv.epsilon = self.smd_drv.epsilon
+            # apply intrinsic Coulomb radii for SMD
             self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii()
+            self.cpcm_drv.custom_vdw_radii_verbose = False
             self.cpcm_drv.radii_scaling = 1.0
 
         # check print level (verbosity of output)
@@ -675,7 +678,7 @@ class ScfDriver:
             self._d4_energy = 0.0
 
         if self._smd:
-            smd_info = 'Using SMD solvation model.'
+            smd_info = 'Using the SMD solvation model.'
             self.ostream.print_info(smd_info)
             self.ostream.print_blank()
             smd_ref = 'A. V. Marenich, C. J. Cramer, D. G. Truhlar,'
@@ -882,8 +885,10 @@ class ScfDriver:
 
             if self._cpcm:
                 if self.restart and self.rank == mpi_master():
-                    self._cpcm_q = read_cpcm_charges(self.checkpoint_file)
-                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+                    self.cpcm_drv._cpcm_q = read_cpcm_charges(
+                        self.checkpoint_file)
+                self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
+                                                        root=mpi_master())
 
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
@@ -1312,7 +1317,8 @@ class ScfDriver:
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 if self._cpcm:
-                    write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
+                    write_cpcm_charges(self.checkpoint_file,
+                                       self.cpcm_drv._cpcm_q)
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         self.checkpoint_file)
@@ -2944,7 +2950,7 @@ class ScfDriver:
 
         # note: handle e_el differently for SMD and CPCM
         if self._smd:
-            self.smd_energy += self.cpcm_epol
+            self.smd_energy += self.cpcm_drv.cpcm_epol
             e_el -= self.smd_energy
         elif self._cpcm:
             e_el -= self.cpcm_drv.cpcm_epol
@@ -2961,7 +2967,7 @@ class ScfDriver:
             valstr += f'{self.smd_energy:20.10f} a.u'
             self.ostream.print_header(valstr.ljust(92))
             valstr = '... ENP contribution               :'
-            valstr += f'{self.cpcm_epol:20.10f} a.u.'
+            valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
             valstr = '... CDS contribution               :'
             valstr += f'{self.smd_cds_energy:20.10f} a.u.'
