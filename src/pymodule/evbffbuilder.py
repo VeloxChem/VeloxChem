@@ -44,6 +44,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestdriver import ScfRestrictedDriver
+from .scfhessiandriver import ScfHessianDriver
 from .respchargesdriver import RespChargesDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -102,10 +103,13 @@ class EvbForceFieldBuilder():
                                                   | None] | None = None
         self.product_hessians: np.ndarray | list[np.ndarray
                                                  | None] | None = None
-        # todo what to do with this option?
+        
         self.mute_scf: bool = True
         self.skip_reaction_matching: bool = False
-
+        #Todo get a better functional and basis set from here https://pubs.acs.org/doi/10.1021/acs.jctc.3c00558
+        self.hessian_xc_fun:str = 'B3LYP' 
+        self.hessian_basis = 'def2-SVPD' # Can be scaled up to def2-TZVPPD, and if only we had our ECP's by now
+        
         self.keywords = {
             "optimize_mol": bool,
             "reparameterize": bool,
@@ -121,6 +125,9 @@ class EvbForceFieldBuilder():
             "product_hessians": np.ndarray | list | None,
             "mute_scf": bool,
             "skip_reaction_matching": bool,
+            "hessian_xc_fun": str,
+            "hessian_basis": str
+
         }
 
     def read_keywords(self, **kwargs):
@@ -158,9 +165,9 @@ class EvbForceFieldBuilder():
 
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
-
         if not self.skip_reaction_matching:
-            self.ostream.print_info("Matching reactant and product force fields")
+            self.ostream.print_info(
+                "Matching reactant and product force fields")
             self.ostream.flush()
             self.product, product_mapping = self._match_reactant_and_product(
                 self.reactant,
@@ -279,7 +286,6 @@ class EvbForceFieldBuilder():
         if self.optimize_mol:
             scf_drv = XtbDriver()
             opt_drv = OptimizationDriver(scf_drv)
-            opt_drv.hessian = "last"
             if self.mute_scf:
                 self.ostream.print_info("Optimising the geometry with xtb.")
                 self.ostream.flush()
@@ -368,23 +374,42 @@ class EvbForceFieldBuilder():
                 forcefield.angles[ang_id] = water_model['angles']
 
         #Reparameterize the forcefield if necessary and requested
-        unknowns_params = 'Guessed' in [
-            par['comment'] for par in list(forcefield.bonds.values()) +
-            list(forcefield.angles.values())
-        ]
-        if self.reparameterize and unknowns_params:
+        unknown_params = set()
+        for key, bond in forcefield.bonds.items():
+            if bond['comment'] == 'Guessed':
+                sorted_tuple = tuple(sorted(key))
+                unknown_params.add(sorted_tuple)
+
+        for key, angle in forcefield.angles.items():
+            if angle['comment'] == 'Guessed':
+                sorted_tuple = tuple(sorted((key[0],key[1])))
+                unknown_params.add(sorted_tuple)
+                sorted_tuple = tuple(sorted((key[1],key[2])))
+                unknown_params.add(sorted_tuple)
+        
+        if self.reparameterize and len(unknown_params) > 0:
             self.ostream.print_info("Reparameterising force field.")
             self.ostream.flush()
             if hessian is None:
                 self.ostream.print_info(
-                    "Calculating Hessian with XTB to reparameterise the force field."
+                    f"Calculating hessian submatrices for atom pairs {unknown_params} to reparameterise the force field."
                 )
+                if molecule.get_multiplicity() == 1:
+                    scf_drv = ScfRestrictedDriver()
+                else:
+                    scf_drv = ScfUnrestrictedDriver()
                 self.ostream.flush()
-                xtb_drv = XtbDriver()
-                xtb_hessian_drv = XtbHessianDriver(xtb_drv)
-                xtb_hessian_drv.ostream.mute()
-                self.ostream.flush()
-                xtb_hessian_drv.compute(molecule)
+                if self.mute_scf:
+                    scf_drv.ostream.mute()
+                basis = MolecularBasis.read(molecule, self.hessian_basis)
+                scf_drv.xcfun = self.hessian_xc_fun
+                scf_drv.dispersion = True
+                scf_drv.compute(molecule, basis)
+                hess_drv = ScfHessianDriver(scf_drv)
+                if self.mute_scf:
+                    hess_drv.ostream.mute()
+                hess_drv.atom_pairs = list(unknown_params)
+                hess_drv.compute(molecule, basis)
                 hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
             else:
                 cond = np.shape(hessian) == (molecule.number_of_atoms() * 3,
@@ -668,7 +693,8 @@ class EvbForceFieldBuilder():
             self.ostream.print_info(
                 f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}"
             )
-
+        self.ostream.print_blank()
+        self.ostream.flush()
         return formed_bonds, broken_bonds
 
     # Does an FF optimization of the molecule.

@@ -3479,9 +3479,8 @@ class MMForceFieldGenerator:
                 ff_data["impropers"])
         return forcefield
 
-    #todo, should be moved to forcefieldgenerator class
     @staticmethod
-    def save_forcefield(forcefield, path: str):
+    def save_forcefield_as_json(forcefield, path: str):
         """
         Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
 
@@ -3504,6 +3503,9 @@ class MMForceFieldGenerator:
             "impropers":
             MMForceFieldGenerator._tuple_to_str_key(forcefield.impropers),
         }
+        folder = str(Path(path).parent)
+        if not Path(folder).exists():
+            Path(folder).mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as file:
             json.dump(ff_data, file, indent=4)
 

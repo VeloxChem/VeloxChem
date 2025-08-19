@@ -200,6 +200,15 @@ class TransitionStateGuesser():
             'lambda_vec': self.lambda_vec
         })
 
+        self.ostream.print_info(
+            f"Saving reactant and product forcefield as json to {self.folder_name}"
+        )
+        self.ostream.flush()
+        self.reactant.save_forcefield_as_json(
+            self.reactant, f"{self.folder_name}/reactant.json")
+        self.product.save_forcefield_as_json(
+            self.product, f"{self.folder_name}/product.json")
+
         return
 
     def scan_mm(self):
@@ -273,63 +282,41 @@ class TransitionStateGuesser():
             self.ostream.print_blank()
             #make sure E1 is monotonically increasing
             #make sure E2 is monotonically decreasing
-            if not self.skip_conformer_search:
-                smooth_energy = False
-                initial_scan = True
-                printed_header = False
-                while not smooth_energy and not self.force_conformer_search:
-                    if not initial_scan and not printed_header:
-                        self._print_rescan_mm_header()
-                        printed_header = True
-                    smooth_energy = True
-
-                    for i, l in enumerate(self.lambda_vec):
-                        if i < len(self.lambda_vec) - 1:
-                            if E1[i] > E1[i + 1]:
-                                smooth_energy = False
-                        if i > 0:
-                            if E2[i - 1] < E2[i]:
-                                smooth_energy = False
-
-                        if not smooth_energy:
-                            if initial_scan:
-                                break
-                            em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
-                                self.topology,
-                                self.systems[l],
-                                l,
-                                pos,
-                                rea_sim,
-                                pro_sim,
-                                True,
-                            )
-                            if e_int < energies_int[i]:
-                                self.ostream.print_info(
-                                    f"Found lower integration energy for lambda {l} ({e_int:.3f} kJ/mol) than before ({energies_int[i]:.3f} kJ/mol). Updating results."
-                                )
-                                self.ostream.flush()
-                                positions[i] = pos
-                                energies[i] = em
-                                E1[i] = e1
-                                E2[i] = e2
-                                energies_int[i] = e_int
-                                N_conf[i] = n_conf
-                            self._print_mm_iter(
-                                l,
-                                E1[i],
-                                E2[i],
-                                energies[i],
-                                energies_int[i],
-                                N_conf[i],
-                            )
-
-                    if initial_scan and smooth_energy:
-                        self.ostream.print_info(
-                            "Initial scan was smooth, skipping scanning of conformers."
+            if not self.skip_conformer_search and not self.force_conformer_search:
+                self._print_rescan_mm_header()
+                for i, l in enumerate(self.lambda_vec):
+                    rescan = False
+                    if i < len(self.lambda_vec) - 1:
+                        rescan = E1[i] >= E1[i + 1]
+                    if i > 0:
+                        rescan = rescan or E2[i - 1] <= E2[i]
+                    if rescan:
+                        em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
+                            self.topology,
+                            self.systems[l],
+                            l,
+                            pos,
+                            rea_sim,
+                            pro_sim,
+                            True,
                         )
-                        self.ostream.flush()
-                    initial_scan = False
-                self.ostream.print_blank()
+                        if e_int < energies_int[i]:
+                            positions[i] = pos
+                            energies[i] = em
+                            E1[i] = e1
+                            E2[i] = e2
+                            energies_int[i] = e_int
+                            N_conf[i] = n_conf
+                    if n_conf == -1:
+                        n_conf = 'N/A'
+                    self._print_mm_iter(
+                        l,
+                        E1[i],
+                        E2[i],
+                        energies[i],
+                        energies_int[i],
+                        N_conf[i],
+                    )
 
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
@@ -372,7 +359,7 @@ class TransitionStateGuesser():
         else:
             self.ostream.flush()
             self.results.update(results)
-            self._save_results(self.results_file, self.results)
+            # self._save_results(self.results_file, self.results)
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
@@ -431,7 +418,7 @@ class TransitionStateGuesser():
             opm_dyn = OpenMMDynamics()
             opm_dyn.ostream.mute()
             # opm_dyn.create_system_from_molecule(mol, ff_gen)
-            pdb_name = self.folder_name + '/conf_top_{l}.pdb'
+            pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
 
             pdb = mmapp.PDBFile.writeFile(topology, init_pos, pdb_name)
             opm_dyn.pdb = mmapp.PDBFile(pdb_name)
@@ -447,10 +434,10 @@ class TransitionStateGuesser():
             temp_mol = conformers_dict['molecules'][arg]
             pos_nm = temp_mol.get_coordinates_in_angstrom() * 0.1
             pos_bohr = temp_mol.get_coordinates_in_bohr()
-            self.ostream.print_info(
-                f"Found {len(conformers_dict['energies'])} conformers for lambda {l}. Energies: {conformers_dict['energies']}, index of minimum: {arg}"
-            )
-            self.ostream.flush()
+            # self.ostream.print_info(
+            #     f"Found {len(conformers_dict['energies'])} conformers for lambda {l}. Energies: {conformers_dict['energies']}, index of minimum: {arg}"
+            # )
+            # self.ostream.flush()
 
         em, e1, e2 = self._recalc_mm_energy(pos_nm, l, reasim, prosim)
         avg_x = np.mean(pos_bohr[:, 0])
@@ -528,6 +515,15 @@ class TransitionStateGuesser():
             self.scf_drv.ostream.mute()
         basis = MolecularBasis.read(self.molecule, self.scf_basis)
         scf_results = self.scf_drv.compute(self.molecule, basis)
+
+        if not self.scf_drv.is_converged:
+            self.ostream.print_warning(
+                "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
+            )
+            self.ostream.flush()
+            self.scf_drv.conv_thresh = 1.0e-4
+            self.scf_drv.max_iter = 200
+            scf_results = self.scf_drv.compute(self.molecule, basis)
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
     def show_results(self, ts_results=None, atom_indices=False, filename=None):
@@ -705,11 +701,11 @@ class TransitionStateGuesser():
             self.ostream.flush()
             os.remove(fname)
         hf = h5py.File(fname, 'w')
-        lambda_vec = results['lambda_vec']
-        geometries = results['xyz_geometries']
-        mm_energies = results['mm_energies']
-        max_mm_geometry = results['max_mm_geometry']
-        max_mm_lambda = results['max_mm_lambda']
+        lambda_vec = results.get('lambda_vec', None)
+        geometries = results.get('xyz_geometries', None)
+        mm_energies = results.get('mm_energies', None)
+        max_mm_geometry = results.get('max_mm_geometry', None)
+        max_mm_lambda = results.get('max_mm_lambda', None)
         scf_energies = results.get('scf_energies', None)
         max_scf_geometry = results.get('max_scf_geometry', None)
         max_scf_lambda = results.get('max_scf_lambda', None)
@@ -767,7 +763,7 @@ class TransitionStateGuesser():
 
     def _print_rescan_mm_header(self):
         self.ostream.print_blank()
-        self.ostream.print_header("Scanning MM conformers")
+        self.ostream.print_header(f"Scanning MM conformers with {self.conformer_snapshots} snapshots and {self.conformer_steps} steps")
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {} | {}'.format(
             'Lambda',
