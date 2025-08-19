@@ -31,15 +31,8 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from io import StringIO
-from contextlib import redirect_stderr
-from pathlib import Path
 import numpy as np
 import sys
-from itertools import combinations
-import rdkit
-import time
-
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
@@ -110,11 +103,12 @@ class SmdDriver:
         alpha = self.smd_solvent_parameters['alpha']
         atom_radii = []
 
-        for i, atom in enumerate(atom_labels):
+        for atom, vdw_r in zip(atom_labels, vdw_radii):
             atom_radii.append(atom)
             
-            if atom not in smd_elements.keys(): # Using Bondi Radius
-                atom_radii.append(vdw_radii.tolist()[i])
+            if atom not in smd_elements:
+                # Using Bondi Radius
+                atom_radii.append(vdw_r)
             else:
                 # re-parametrize O radius dep. on the solvent
                 if atom == 'O':
@@ -317,8 +311,11 @@ class SmdDriver:
         # https://www.sciencedirect.com/science/article/pii/002228367190324X?via%3Dihub
         # Using the Lee Richard algorithm available from FreeSASA via RDkit 
 
-        from rdkit import Chem
-        from rdkit.Chem import rdFreeSASA
+        try:
+            from rdkit import Chem
+            from rdkit.Chem import rdFreeSASA
+        except ImportError:
+            raise ImportError('Unable to import rdkit.')
         
         solute = Chem.MolFromXYZBlock(self.solute.get_xyz_string())
         ptable = Chem.GetPeriodicTable()
