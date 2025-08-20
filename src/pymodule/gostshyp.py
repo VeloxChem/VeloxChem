@@ -38,14 +38,6 @@ from pathlib import Path
 
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ThreeCenterOverlapDriver
-from .veloxchemlib import ThreeCenterOverlapGradientDriver
-from .veloxchemlib import ThreeCenterOverlapGeom001Driver
-from .veloxchemlib import ThreeCenterOverlapGeom100Driver
-from .veloxchemlib import ThreeCenterOverlapGradientGeom100Driver
-from .veloxchemlib import ThreeCenterOverlapGradientGeom001Driver
-from .veloxchemlib import ThreeCenterR2Driver
-from .veloxchemlib import ThreeCenterRR2Driver
 from .veloxchemlib import compute_tco_s_fock
 from .veloxchemlib import compute_tco_s_values
 from .veloxchemlib import compute_tco_p_fock
