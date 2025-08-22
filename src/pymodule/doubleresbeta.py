@@ -35,13 +35,9 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-import math
-
 
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
-                           hartree_in_inverse_nm, fine_structure_constant,
-                           speed_of_light_in_vacuum_in_SI)
+from .veloxchemlib import mpi_master, hartree_in_ev
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
@@ -533,7 +529,7 @@ class DoubleResBetaDriver(NonlinearSolver):
 
         # Print dipole moments for each state transition using bra-ket notation
         for (initial_state, final_state), components in dipole_dict.items():
-            label = f'<{initial_state}|μ|{final_state}> :'
+            label = f'<{initial_state}|mu|{final_state}> :'
             valstr = f'{label:<20}' + \
                     '{:>12.6f}{:>12.6f}{:>12.6f}'.format(
                         components['x'], components['y'], components['z']

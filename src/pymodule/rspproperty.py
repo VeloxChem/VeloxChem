@@ -224,7 +224,6 @@ class ResponseProperty:
 
             self._rsp_driver = DoubleResBetaDriver(self.comm, self.ostream)
 
-
         # Cubic response driver
         elif (self.prop_type == 'custom' and
               self._rsp_dict['order'] == 'cubic' and

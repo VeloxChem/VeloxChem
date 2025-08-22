@@ -57,7 +57,7 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
-from .doublerestrans import DoubleResTransition
+from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
