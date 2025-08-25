@@ -60,6 +60,7 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
 from .cpcmdriver import CpcmDriver
+from .smddriver import SmdDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
@@ -245,7 +246,12 @@ class ScfDriver:
         self.cpcm_grid_per_sphere = (194, 110)
         self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
+        self.cpcm_radii_scaling = 1.2
         self.cpcm_custom_vdw_radii = None
+
+        self._smd = False
+        self.smd_drv = None
+        self.smd_solvent = 'water'
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
@@ -580,10 +586,26 @@ class ScfDriver:
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.radii_scaling = self.cpcm_radii_scaling
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
+            self.cpcm_drv.custom_vdw_radii_verbose = True
         else:
             self.cpcm_drv = None
+
+        # set up SMD Solvation Model
+        # note that SMD also uses CPCM, but with a different scaling factor for radii
+        if self._smd:
+            self.smd_drv = SmdDriver(self.comm, self.ostream)
+            self.smd_drv.solute = molecule
+            self.smd_drv.solvent = self.smd_solvent
+            self.smd_cds_energy = self.smd_drv.get_CDS_contribution()
+            self.smd_energy = self.smd_cds_energy
+            self.cpcm_drv.epsilon = self.smd_drv.epsilon
+            # apply intrinsic Coulomb radii for SMD
+            self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii()
+            self.cpcm_drv.custom_vdw_radii_verbose = False
+            self.cpcm_drv.radii_scaling = 1.0
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -655,35 +677,25 @@ class ScfDriver:
         else:
             self._d4_energy = 0.0
 
-        # set up polarizable continuum model
-        if self._cpcm:
-            cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
-            self.ostream.print_info(cpcm_info)
+        if self._smd:
+            smd_info = 'Using the SMD solvation model.'
+            self.ostream.print_info(smd_info)
             self.ostream.print_blank()
-            iswig_ref = 'A. W. Lange, J. M. Herbert,'
-            iswig_ref += ' J. Chem. Phys. 2010, 133, 244111.'
-            self.ostream.print_reference(iswig_ref)
+            smd_ref = 'A. V. Marenich, C. J. Cramer, D. G. Truhlar,'
+            smd_ref += ' J. Phys. Chem. B, 2009, 113, 6378-6396.'
+            self.ostream.print_reference(smd_ref)
             self.ostream.print_blank()
             self.ostream.flush()
 
+        # set up polarizable continuum model
+        if self._cpcm:
             cpcm_grid_t0 = tm.time()
 
-            (self._cpcm_grid,
-             self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
-
-            cpcm_local_precond = self.cpcm_drv.form_local_precond(
-                self._cpcm_grid, self._cpcm_sw_func)
-
-            self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
-            self._cpcm_precond = np.hstack(self._cpcm_precond)
-
-            self._cpcm_Bzvec = self.cpcm_drv.form_vector_Bz(
-                self._cpcm_grid, molecule)
-
-            self._cpcm_q = None
+            self.cpcm_drv.print_cpcm_info()
+            self.cpcm_drv.init(molecule, do_nuclear=True)
 
             self.ostream.print_info(
-                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
+                f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
                 + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
@@ -873,8 +885,10 @@ class ScfDriver:
 
             if self._cpcm:
                 if self.restart and self.rank == mpi_master():
-                    self._cpcm_q = read_cpcm_charges(self.checkpoint_file)
-                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+                    self.cpcm_drv._cpcm_q = read_cpcm_charges(
+                        self.checkpoint_file)
+                self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
+                                                        root=mpi_master())
 
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
@@ -1303,7 +1317,8 @@ class ScfDriver:
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 if self._cpcm:
-                    write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
+                    write_cpcm_charges(self.checkpoint_file,
+                                       self.cpcm_drv._cpcm_q)
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         self.checkpoint_file)
@@ -1437,6 +1452,7 @@ class ScfDriver:
             self._ri_drv.prepare_buffers(molecule,
                                          ao_basis,
                                          self.ri_auxiliary_basis,
+                                         k_metric=False,
                                          verbose=True)
 
         e_grad = None
@@ -1472,44 +1488,17 @@ class ScfDriver:
 
             if self._cpcm:
                 if self.scf_type == 'restricted':
-                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
-                                                       self._cpcm_grid,
-                                                       den_mat[0] * 2.0)
+                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
+                        molecule, ao_basis, den_mat[0] * 2.0,
+                        self.cpcm_cg_thresh)
                 else:
-                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
-                                                       self._cpcm_grid,
-                                                       den_mat[0] + den_mat[1])
+                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
+                        molecule, ao_basis, den_mat[0] + den_mat[1],
+                        self.cpcm_cg_thresh)
 
                 if self.rank == mpi_master():
-                    scale_f = -(self.cpcm_drv.epsilon - 1) / (
-                        self.cpcm_drv.epsilon + self.cpcm_drv.x)
-                    rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                else:
-                    rhs = None
-                rhs = self.comm.bcast(rhs, root=mpi_master())
-
-                # in case number of C-PCM grid points do not match between
-                # cpcm_q and rhs, such as between previous and current
-                # geometries during an optimization, reset cpcm_q
-                if self._cpcm_q is not None and self._cpcm_q.size != rhs.size:
-                    self._cpcm_q = None
-
-                self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
-                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, self._cpcm_q, self.cpcm_cg_thresh)
-
-                if self.rank == mpi_master():
-                    e_sol = self.cpcm_drv.compute_solv_energy(
-                        self._cpcm_Bzvec, Cvec, self._cpcm_q)
                     e_el += e_sol
-                    self.cpcm_epol = e_sol
-                else:
-                    self.cpcm_epol = None
 
-                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
-                    molecule, ao_basis, self._cpcm_grid, self._cpcm_q)
-
-                if self.rank == mpi_master():
                     fock_mat[0] += Fock_sol
                     if self.scf_type != 'restricted':
                         fock_mat[1] += Fock_sol
@@ -2693,7 +2682,10 @@ class ScfDriver:
 
         if self._cpcm:
             cur_str = 'Solvation Model                 : '
-            cur_str += 'C-PCM with ISWIG Discretization'
+            if self._smd:
+                cur_str += 'SMD'
+            else:
+                cur_str += 'C-PCM with ISWIG Discretization'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'C-PCM Dielectric Constant       : '
             cur_str += f'{self.cpcm_drv.epsilon}'
@@ -2955,8 +2947,13 @@ class ScfDriver:
         etot = self._iter_data['energy']
 
         e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
-        if self._cpcm:
-            e_el -= self.cpcm_epol
+
+        # note: handle e_el differently for SMD and CPCM
+        if self._smd:
+            self.smd_energy += self.cpcm_drv.cpcm_epol
+            e_el -= self.smd_energy
+        elif self._cpcm:
+            e_el -= self.cpcm_drv.cpcm_epol
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -2964,9 +2961,20 @@ class ScfDriver:
         valstr = f'Electronic Energy                  :{e_el:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        if self._cpcm:
+        # note: print energy differently for SMD and CPCM
+        if self._smd:
+            valstr = 'SMD Solvation Energy               :'
+            valstr += f'{self.smd_energy:20.10f} a.u'
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = '... ENP contribution               :'
+            valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+            valstr = '... CDS contribution               :'
+            valstr += f'{self.smd_cds_energy:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+        elif self._cpcm:
             valstr = 'Electrostatic Solvation Energy     :'
-            valstr += f'{self.cpcm_epol:20.10f} a.u.'
+            valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
