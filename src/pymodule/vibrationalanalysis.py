@@ -1219,6 +1219,8 @@ class VibrationalAnalysis:
                 broadening_type='lorentzian',
                 broadening_value=20,
                 scaling_factor=1.0,
+                xmin=0,
+                xmax=4000,
                 invert_axes=False,
                 ax=None):
         """
@@ -1232,6 +1234,12 @@ class VibrationalAnalysis:
             The broadening value to use in cm^-1.
         :param scaling_factor:
             A scaling factor for the frequencies.
+        :param xmin:
+            Minimum value on the x-axis.
+        :param xmax:
+            Maximum value on the x-axis.
+        :param invert_axes:
+            Invert the axes.
         :param ax:
             A Matplotlib axis object.
         """
@@ -1239,29 +1247,30 @@ class VibrationalAnalysis:
         import matplotlib.pyplot as plt
         import matplotlib.lines as mlines
 
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.set_xlabel('Wavenumber [cm$^{-1}$]')
-        ax.set_ylabel('IR intensity [km/mol]')
-        ax.set_title("IR Spectrum")
-
+        #if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
         ax2 = ax.twinx()
 
-        freqs = vib_results['vib_frequencies']
+        ax.set_xlabel('Wavenumber [cm$^{-1}$]')
+        ax.set_ylabel('Absorption cross section')
+        ax2.set_ylabel('IR intensity [km/mol]')
+        ax.set_title("IR Spectrum")
+
+        vib_freqs = vib_results['vib_frequencies']
         ir_ints = vib_results['ir_intensities']
+
         if broadening_type.lower() == 'lorentzian':
-            x, y = self.lorentzian_broadening(freqs, ir_ints, 0, 4000, 1,
+            x, y = self.lorentzian_broadening(vib_freqs, ir_ints, xmin, xmax, 1,
                                               broadening_value)
         elif broadening_type.lower() == 'gaussian':
-            x, y = self.gaussian_broadening(freqs, ir_ints, 0, 4000, 1,
+            x, y = self.gaussian_broadening(vib_freqs, ir_ints, xmin, xmax, 1,
                                             broadening_value)
 
-        ax2.plot(x * scaling_factor,
-                 y * 0.00001,
-                 color="black",
-                 alpha=0.9,
-                 linewidth=2.5)
+        ax.plot(x * scaling_factor,
+                y,
+                color="black",
+                alpha=0.9,
+                linewidth=2.0)
 
         legend_bars = mlines.Line2D([], [],
                                     color='darkcyan',
@@ -1273,7 +1282,7 @@ class VibrationalAnalysis:
         legend_spectrum = mlines.Line2D([], [],
                                         color='black',
                                         linestyle='-',
-                                        linewidth=2.5,
+                                        linewidth=2.0,
                                         label=label_spectrum)
         scaling = str(scaling_factor)
         legend_scaling = mlines.Line2D([], [],
@@ -1281,29 +1290,30 @@ class VibrationalAnalysis:
                                        linestyle='-',
                                        alpha=0.0001,
                                        label="Scaling factor: " + scaling)
+
+        ax.set_ylim(0, max(y) * 1.1)
+        ax.set_xlim(xmin, xmax)
+
         ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
                    frameon=False,
                    borderaxespad=0.,
                    loc='center left',
-                   bbox_to_anchor=(1.05, 0.5))
-        ax2.set_ylim(0, max(y * 0.00001) * 1.1)
-        ax2.set_ylim(bottom=0)
-        ax2.set_xlim(0, 3900)
-        ax2.yaxis.set_ticks([])
+                   bbox_to_anchor=(1.10, 0.85)
+                   )
 
-        for i in range(len(vib_results['vib_frequencies'])):
-            ax.plot(
+        for i, v in enumerate(vib_freqs):
+            ax2.plot(
                 [
-                    scaling_factor * vib_results['vib_frequencies'][i],
-                    scaling_factor * vib_results['vib_frequencies'][i]
+                    scaling_factor * v,
+                    scaling_factor * v
                 ],
-                [0.0, vib_results['ir_intensities'][i]],
+                [0.0, ir_ints[i]],
                 alpha=0.7,
                 linewidth=2,
                 color="darkcyan",
             )
 
-        ax.set_ylim(bottom=0)
+        ax2.set_ylim(bottom=0)
 
         if invert_axes:
             ax.invert_xaxis()
@@ -1313,10 +1323,10 @@ class VibrationalAnalysis:
     def plot_raman(self,
                    vib_results,
                    broadening_type='lorentzian',
-                   xmin=0,
-                   xmax=4000,
                    broadening_value=20,
                    scaling_factor=1.0,
+                   xmin=0,
+                   xmax=4000,
                    invert_axes=False):
         """
         Plot Raman spectrum.
@@ -1325,14 +1335,16 @@ class VibrationalAnalysis:
             The dictionary containing vibrational analysis results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
-        :param xmin:
-            Minimum value on the x-axis
-        :param xmax:
-            Maximum value on the x-axis
         :param broadening_value:
             The broadening value to use in cm^-1.
         :param scaling_factor:
             A scaling factor for the frequencies.
+        :param xmin:
+            Minimum value on the x-axis.
+        :param xmax:
+            Maximum value on the x-axis.
+        :param invert_axes:
+            Invert the x-axis.
         """
 
         import matplotlib.pyplot as plt
@@ -1393,10 +1405,11 @@ class VibrationalAnalysis:
             ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
                        frameon=False,
                        borderaxespad=0.,
-                       bbox_to_anchor=(1.10, 0.95))
+                       loc='center left',
+                       bbox_to_anchor=(1.10, 0.85)
+                       )
 
             ax.set_ylim(0, max(y) * 1.1)
-            ax.set_ylim(bottom=0)
             ax.set_xlim(xmin, xmax)
 
             for j, v in enumerate(vib_freqs):
