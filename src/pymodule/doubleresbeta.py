@@ -390,7 +390,6 @@ class DoubleResBetaDriver(NonlinearSolver):
         profiler.check_memory_usage('E[3]')
 
         ret_dict = {}
-        M_tensors = {}
         excited_state_dipole_moments = {}
 
         # Compute dipole vector
@@ -490,20 +489,24 @@ class DoubleResBetaDriver(NonlinearSolver):
         self.ostream.print_blank()
 
 
-        self._print_transition_dipoles("Transition dipole moments",excited_state_dipole_moments)
+        if self.initial_state == self.final_state:
+            self._print_transition_dipoles("Excited state dipole moments",excited_state_dipole_moments)
+        else:
+            self._print_transition_dipoles("Transition dipole moments",excited_state_dipole_moments)
+
         if self.rank == mpi_master():
 
             profiler.check_memory_usage('End of QRF')
 
             ret_dict = {
                 'photon_energies': [-w for w in freqs],
-                'transition_moments': M_tensors,
-                'excited_state_dipole_moments': excited_state_dipole_moments,
-                'ground_state_dipole_moments':
-                    scf_prop.get_property('dipole moment')
+                'ground_state_dipole_moments': scf_prop.get_property('dipole moment'),
             }
 
-            #self._print_results(ret_dict)
+            if self.initial_state == self.final_state:
+                ret_dict['excited_state_dipole_moments'] = excited_state_dipole_moments
+            else:
+                ret_dict['transition_dipole_moments'] = excited_state_dipole_moments
 
             return ret_dict
         else:
@@ -813,107 +816,3 @@ class DoubleResBetaDriver(NonlinearSolver):
 
         self.ostream.print_blank()
         self.ostream.flush()
-
-    def _print_component(self, value, width):
-        """
-        Prints QRF component.
-
-        :param value:
-            The complex value
-        :param width:
-            The width for the output
-        """
-
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
-            'x', value[0][0].real, value[0][1].real, value[0][2].real)
-        self.ostream.print_header(w_str.ljust(width))
-
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
-            'y', value[1][0].real, value[1][1].real, value[1][2].real)
-        self.ostream.print_header(w_str.ljust(width))
-
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
-            'z', value[2][0].real, value[2][1].real, value[2][2].real)
-        self.ostream.print_header(w_str.ljust(width))
-
-    def _print_results(self, rsp_results):
-        """
-        Prints the results of TPA calculation.
-
-        :param rsp_results:
-            A dictonary containing the results of response calculation.
-        """
-
-        width = 92
-
-        freqs = rsp_results['photon_energies']
-        M_tensors = rsp_results['transition_moments']
-
-        self.ostream.print_blank()
-        title = 'Components of TPA Transition Moments (a.u.)'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * width)
-
-        title = '  {:<9s} {:>12s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s} '.format(
-            'Ex. State', 'Ex. Energy', 'Sxx  ', 'Syy  ', 'Szz  ', 'Sxy  ',
-            'Sxz  ', 'Syz  ')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header('-' * width)
-
-        for w_ind, w in enumerate(freqs):
-            exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 0].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][1, 1].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][2, 2].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 1].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][0, 2].real)
-            exec_str += '{:11.4f}'.format(M_tensors[-w][1, 2].real)
-            self.ostream.print_header(exec_str.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-        tpa_strengths = rsp_results['tpa_strengths']
-        tpa_cross_sections = rsp_results['cross_sections']
-
-        title = 'TPA Strength and Cross-Section (Linear Polarization)'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * width)
-
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', 'TPA strength    ',
-            'TPA cross-section    ')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header('-' * width)
-
-        for w_ind, w in enumerate(freqs):
-            exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
-            self.ostream.print_header(exec_str.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-        title = 'TPA Strength and Cross-Section (Circular Polarization)'
-        self.ostream.print_header(title)
-        self.ostream.print_header('-' * width)
-
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', 'TPA strength    ',
-            'TPA cross-section    ')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header('-' * width)
-
-        for w_ind, w in enumerate(freqs):
-            exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
-            self.ostream.print_header(exec_str.ljust(width))
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-        self.ostream.flush()
-
-
