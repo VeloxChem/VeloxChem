@@ -295,14 +295,13 @@ class Profiler:
         """
 
         if self.memory_profiling:
-            #avail_mem = psutil.virtual_memory().available
-            #used_mem = max(0, self.start_avail_mem - avail_mem)
-            used_mem = 0
-            dt = tm.time() - self.start_time
-            self.memory_usage.append((dt, used_mem, remark))
+            avail_mem = psutil.virtual_memory().available
+            used_mem = max(0, self.start_avail_mem - avail_mem)
+            self.memory_usage.append(
+                (tm.time() - self.start_time, used_mem, remark))
 
             if MPI.COMM_WORLD.Get_rank() == mpi_master():
-                print(f'* Info * Time stamp [{remark:<30s}]: {dt:10.3f} sec')
+                print(f'* Info * Time stamp [{remark}]: {tm.time() - self.start_time:.2f} sec\n')
                 sys.stdout.flush()
 
     def print_memory_usage(self, ostream, scf_flag=False):
