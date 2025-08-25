@@ -652,9 +652,6 @@ class LinearSolver:
             norb = None
             fa_mo = None
 
-        if profiler is not None:
-            profiler.check_memory_usage('MO prep')
-
         if self.rank == mpi_master():
             dt_and_subcomm_size = []
 
@@ -708,9 +705,6 @@ class LinearSolver:
         if n_total % batch_size != 0:
             num_batches += 1
 
-        if profiler is not None:
-            profiler.check_memory_usage('Subcomm prep')
-
         num_gpus_per_node = self._get_num_gpus_per_node()
 
         local_screening = ScreeningData(molecule, basis, num_gpus_per_node,
@@ -719,7 +713,6 @@ class LinearSolver:
 
         if profiler is not None:
             profiler.add_timing_info('Prep', tm.time() - prep_t0)
-            profiler.check_memory_usage('Screening prep')
 
         # go through batches
 
@@ -775,7 +768,6 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('Prep', tm.time() - prep_t0)
-                profiler.check_memory_usage('Vec list')
 
             if subcomm_index + batch_start < batch_end:
 
@@ -825,7 +817,6 @@ class LinearSolver:
 
                 if profiler is not None:
                     profiler.add_timing_info('Prep', tm.time() - prep_t0)
-                    profiler.check_memory_usage('Densities')
 
                 # form Fock matrices
 
@@ -835,9 +826,6 @@ class LinearSolver:
                                                     dft_dict, pe_dict, coulomb_coef,
                                                     symm_flag, local_screening, local_comm,
                                                     profiler)
-
-                if profiler is not None:
-                    profiler.check_memory_usage('LR Fock')
 
                 comm_t0 = tm.time()
 
@@ -853,7 +841,6 @@ class LinearSolver:
 
                 if profiler is not None:
                     profiler.add_timing_info('FockComm', tm.time() - comm_t0)
-                    profiler.check_memory_usage('FockComm')
 
                 e2_ger = None
                 e2_ung = None
@@ -923,7 +910,6 @@ class LinearSolver:
 
                 if profiler is not None:
                     profiler.add_timing_info('PostProc', tm.time() - prep_t0)
-                    profiler.check_memory_usage('PostProc')
 
             self.comm.barrier()
 
@@ -945,7 +931,6 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('PostProc', tm.time() - prep_t0)
-                profiler.check_memory_usage('AppendSigmaVecs')
 
         prep_t0 = tm.time()
 
@@ -953,7 +938,6 @@ class LinearSolver:
 
         if profiler is not None:
             profiler.add_timing_info('Prep', tm.time() - prep_t0)
-            profiler.check_memory_usage('Append trial vecs')
 
         self.ostream.print_blank()
 
@@ -1110,7 +1094,6 @@ class LinearSolver:
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
             profiler.add_timing_info('(loadimb)', eri_load_imb)
-            profiler.check_memory_usage('FockERI')
 
         if self._dft:
             t0 = tm.time()
@@ -1129,7 +1112,6 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
-                profiler.check_memory_usage('FockXC')
 
         fock_mat_local = fock_mat.to_numpy()
         if fock_mat_erf_k is not None:

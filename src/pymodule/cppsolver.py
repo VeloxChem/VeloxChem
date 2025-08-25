@@ -404,7 +404,9 @@ class ComplexResponse(LinearSolver):
                 gradung = self.comm.bcast(gradung, root=mpi_master())
 
                 ave, res = divmod(gradger.shape[0], self.nodes)
-                counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+                counts = [
+                    ave + 1 if p < res else ave for p in range(self.nodes)
+                ]
                 displacements = [sum(counts[:p]) for p in range(self.nodes)]
 
                 start_idx = displacements[self.rank]
@@ -423,7 +425,8 @@ class ComplexResponse(LinearSolver):
                     gradger.imag.reshape(-1, 1),
                 ))
 
-                dist_v_grad = DistributedArray(grad_mat, self.comm,
+                dist_v_grad = DistributedArray(grad_mat,
+                                               self.comm,
                                                distribute=False)
 
                 if not self.restart:
@@ -434,7 +437,8 @@ class ComplexResponse(LinearSolver):
                         -gradger.imag.reshape(-1, 1),
                     ))
 
-                    dist_v_rhs = DistributedArray(rhs_mat, self.comm,
+                    dist_v_rhs = DistributedArray(rhs_mat,
+                                                  self.comm,
                                                   distribute=False)
 
                 for w in self.frequencies:
@@ -725,23 +729,27 @@ class ComplexResponse(LinearSolver):
 
                     # xv = np.dot(x_full, v_grad[(op, w)])
 
-                    x_real_np = (np.hstack((x_realger.data, x_realger.data)) +
-                                 np.hstack((x_realung.data, -x_realung.data)))
-                    x_imag_np = (np.hstack((x_imagung.data, -x_imagung.data)) +
-                                 np.hstack((x_imagger.data, x_imagger.data)))
+                    x_real_np = np.hstack((x_realger.data, x_realger.data))
+                    x_real_np += np.hstack((x_realung.data, -x_realung.data))
+                    x_imag_np = np.hstack((x_imagung.data, -x_imagung.data))
+                    x_imag_np += np.hstack((x_imagger.data, x_imagger.data))
 
-                    grad_real_np = (np.hstack((grad_rg.data, grad_rg.data)) +
-                                    np.hstack((grad_ru.data, -grad_ru.data)))
-                    grad_imag_np = (np.hstack((grad_iu.data, -grad_iu.data)) +
-                                    np.hstack((grad_ig.data, grad_ig.data)))
+                    grad_real_np = np.hstack((grad_rg.data, grad_rg.data))
+                    grad_real_np += np.hstack((grad_ru.data, -grad_ru.data))
+                    grad_imag_np = np.hstack((grad_iu.data, -grad_iu.data))
+                    grad_imag_np += np.hstack((grad_ig.data, grad_ig.data))
 
                     xv_real = (np.dot(x_real_np, grad_real_np) -
                                np.dot(x_imag_np, grad_imag_np))
                     xv_imag = (np.dot(x_real_np, grad_imag_np) +
                                np.dot(x_imag_np, grad_real_np))
 
-                    sum_xv_real = self.comm.reduce(xv_real, op=MPI.SUM, root=mpi_master())
-                    sum_xv_imag = self.comm.reduce(xv_imag, op=MPI.SUM, root=mpi_master())
+                    sum_xv_real = self.comm.reduce(xv_real,
+                                                   op=MPI.SUM,
+                                                   root=mpi_master())
+                    sum_xv_imag = self.comm.reduce(xv_imag,
+                                                   op=MPI.SUM,
+                                                   root=mpi_master())
 
                     if self.rank == mpi_master():
                         sum_xv = sum_xv_real + 1j * sum_xv_imag
@@ -773,13 +781,9 @@ class ComplexResponse(LinearSolver):
             self.ostream.print_info(
                 f'Time spent in reduced space solve: {iter_solv_dt:.2f} sec.')
             self.ostream.print_info(
-                f'Time spent in reduced space postproc. 1: {iter_post_dt_1:.2f} sec.')
-            self.ostream.print_info(
-                f'Time spent in reduced space postproc. 2: {iter_post_dt_2:.2f} sec.')
-            self.ostream.print_info(
-                f'Time spent in reduced space postproc. 3: {iter_post_dt_3:.2f} sec.')
-            self.ostream.print_info(
-                f'Time spent in reduced space postproc. 4: {iter_post_dt_4:.2f} sec.')
+                'Time spent in reduced space postproc.: ' +
+                f'{iter_post_dt_1 + iter_post_dt_2 + iter_post_dt_3 + iter_post_dt_4:.2f} sec.'
+            )
             self.ostream.print_blank()
 
             # write to output

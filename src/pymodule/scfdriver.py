@@ -1698,8 +1698,7 @@ class ScfDriver:
                 vxc_mat = integrate_vxc_fock_gpu(
                     molecule, basis, dmat, self._mol_grid,
                     self.xcfun.get_func_label(),
-                    screener.get_num_gpus_per_node(),
-                    self.rank, self.nodes)
+                    screener.get_num_gpus_per_node(), self.rank, self.nodes)
             else:
                 assert_msg_critical(
                     False, 'SCF driver: Unsupported XC functional type')
