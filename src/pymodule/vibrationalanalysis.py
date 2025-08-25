@@ -1241,7 +1241,7 @@ class VibrationalAnalysis:
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
-            The broadening value to use in cm^-1.
+            The broadening value (HWHM) to use in cm^-1.
         :param scaling_factor:
             A scaling factor for the frequencies.
         :param xmin:
@@ -1346,7 +1346,7 @@ class VibrationalAnalysis:
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
-            The broadening value to use in cm^-1.
+            The broadening value (HWHM) to use in cm^-1.
         :param scaling_factor:
             A scaling factor for the frequencies.
         :param xmin:
@@ -1682,21 +1682,28 @@ class VibrationalAnalysis:
 
     @staticmethod
     def lorentzian_broadening(x, y, xmin, xmax, xstep, br):
+        # Eq. 3.455 in Norman, Ruud, and Saue
         xi = np.arange(xmin, xmax, xstep)
         yi = np.zeros(len(xi))
         for i in range(len(xi)):
             for k in range(len(x)):
                 yi[i] = (yi[i] + y[k] * br / ((xi[i] - x[k])**2 +
-                                              (br / 2.0)**2) / np.pi)
+                                              br**2) / np.pi)
         return xi, yi
 
     @staticmethod
     def gaussian_broadening(x, y, xmin, xmax, xstep, br):
-        br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
+        # Eq. 8.164 in Norman, Ruud, and Saue
+        #br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
+        # calculate sigma from HWHM
+        br_g = br * np.sqrt(2) / np.sqrt(np.log(2))
         xi = np.arange(xmin, xmax, xstep)
         yi = np.zeros(len(xi))
         for i in range(len(xi)):
             for k in range(len(y)):
-                yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
-                                              (2 * br_g**2))
+                #yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
+                #                              (2 * br_g**2))
+                yi[i] = (yi[i] + y[k]
+                         * np.sqrt(2) / (br_g * np.sqrt(np.pi))
+                         * np.exp(-(2.0*(xi[i] - x[k])**2) / br_g**2))
         return xi, yi
