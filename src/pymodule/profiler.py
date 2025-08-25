@@ -30,14 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
 import numpy as np
 import time as tm
 import psutil
 import sys
 import os
-
-from .veloxchemlib import mpi_master
 
 
 class Profiler:
@@ -299,10 +296,6 @@ class Profiler:
             used_mem = max(0, self.start_avail_mem - avail_mem)
             self.memory_usage.append(
                 (tm.time() - self.start_time, used_mem, remark))
-
-            if MPI.COMM_WORLD.Get_rank() == mpi_master():
-                print(f'* Info * Time stamp [{remark}]: {tm.time() - self.start_time:.2f} sec\n')
-                sys.stdout.flush()
 
     def print_memory_usage(self, ostream, scf_flag=False):
         """

@@ -1316,10 +1316,8 @@ class ScfDriver:
             self._V_es = None
 
         if not self._first_step:
-            pass
-            # TODO
-            #self.write_checkpoint(molecule.get_element_ids(),
-            #                      ao_basis.get_label())
+            self.write_checkpoint(molecule.get_element_ids(),
+                                  ao_basis.get_label())
 
         if (not self._first_step) and self.is_converged:
 
@@ -1387,8 +1385,7 @@ class ScfDriver:
                 self._scf_tensors['dipole_moment'] = np.array(
                     self._scf_prop.get_property('dipole_moment'))
 
-                # TODO
-                #self._write_final_hdf5(molecule, ao_basis)
+                self._write_final_hdf5(molecule, ao_basis)
 
         if self.rank == mpi_master():
             self._print_scf_finish(diis_start_time)
