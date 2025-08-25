@@ -435,11 +435,13 @@ class DoubleResBetaDriver(NonlinearSolver):
             val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
             val_E3 = NaE3NbNc
 
-            #excited_state_dipole_moments.update({('x',self.initial_state,self.final_state): (val_E3 + val_A2 + ground_state_dipole_x).real})
-            excited_state_dipole_moments.update({('x',self.initial_state,self.final_state): (val_E3 + val_A2).real})
+            if self.initial_state == self.final_state:
+                # For diagonal elements, add ground state dipole moment
+                excited_state_dipole_moments.update({('x',self.initial_state,self.final_state): (val_E3 + val_A2 + ground_state_dipole_x).real})    
+            else:
+                excited_state_dipole_moments.update({('x',self.initial_state,self.final_state): (val_E3 + val_A2).real})
 
             # Double residue y-component
-
             ground_state_dipole_y = scf_prop.get_property('dipole moment')[1]
 
             A2Nc = self._a2_contract(kf, op_y, d_a_mo, nocc, norb)
@@ -453,8 +455,11 @@ class DoubleResBetaDriver(NonlinearSolver):
             val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
             val_E3 = NaE3NbNc
 
-            #excited_state_dipole_moments.update({('y',self.initial_state,self.final_state): (val_E3 + val_A2 + ground_state_dipole_y).real})
-            excited_state_dipole_moments.update({('y',self.initial_state,self.final_state): (val_E3 + val_A2).real})
+            if self.initial_state == self.final_state:
+                # For diagonal elements, add ground state dipole moment
+                excited_state_dipole_moments.update({('y',self.initial_state,self.final_state): (val_E3 + val_A2 + ground_state_dipole_y).real})
+            else:
+                excited_state_dipole_moments.update({('y',self.initial_state,self.final_state): (val_E3 + val_A2).real})
 
             # Double residue z-component
 
@@ -471,8 +476,11 @@ class DoubleResBetaDriver(NonlinearSolver):
             val_A2 = -(Nc_starA2Nc + NcA2Nc_star)
             val_E3 = NaE3NbNc
 
-            #excited_state_dipole_moments.update({('z',self.initial_state,self.final_state): (val_E3 + val_A2 + ground_state_dipole_z).real})
-            excited_state_dipole_moments.update({('z',self.initial_state,self.final_state): (val_E3 + val_A2 ).real})
+            if self.initial_state == self.final_state:
+                # For diagonal elements, add ground state dipole moment
+                excited_state_dipole_moments.update({('z',self.initial_state,self.final_state): (val_E3 + val_A2 + ground_state_dipole_z).real})
+            else:
+                excited_state_dipole_moments.update({('z',self.initial_state,self.final_state): (val_E3 + val_A2 ).real})
                 
 
         self.ostream.print_blank()
