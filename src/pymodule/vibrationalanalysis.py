@@ -1676,5 +1676,5 @@ class VibrationalAnalysis:
                 #                              (2 * br_g**2))
                 yi[i] = (yi[i] + y[k]
                          * np.sqrt(2) / (br_g * np.sqrt(np.pi))
-                         * np.exp(-(2.0*(xi[i] - x[k])**2) / br_g**2))
+                         * np.exp(-(2.0 * (xi[i] - x[k])**2) / br_g**2))
         return xi, yi
