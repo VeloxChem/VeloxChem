@@ -1307,15 +1307,17 @@ class VibrationalAnalysis:
 
         if invert_axes:
             ax.invert_xaxis()
-            ax.invert_yaxis()
-            ax2.invert_yaxis()
+            #ax.invert_yaxis()
+            #ax2.invert_yaxis()
 
     def plot_raman(self,
                    vib_results,
                    broadening_type='lorentzian',
+                   xmin=0,
+                   xmax=4000,
                    broadening_value=20,
                    scaling_factor=1.0,
-                   ax=None):
+                   invert_axes=False):
         """
         Plot Raman spectrum.
 
@@ -1323,87 +1325,96 @@ class VibrationalAnalysis:
             The dictionary containing vibrational analysis results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param xmin:
+            Minimum value on the x-axis
+        :param xmax:
+            Maximum value on the x-axis
         :param broadening_value:
             The broadening value to use in cm^-1.
         :param scaling_factor:
             A scaling factor for the frequencies.
-        :param ax:
-            A Matplotlib axis object.
         """
 
         import matplotlib.pyplot as plt
         import matplotlib.lines as mlines
 
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.set_xlabel('Wavenumber [cm$^{-1}$]')
-        ax.set_ylabel('Raman activity [' + r'${\AA}^4$' + '/amu]')
-        ax.set_title("Raman Spectrum")
-
-        ax2 = ax.twinx()
-
-        freqs = vib_results['vib_frequencies']
+        vib_freqs = vib_results['vib_frequencies']
+        ext_freqs = vib_results['external_frequencies']
         raman_results = vib_results['raman_activities']
-        # TODO: make the read of raman results consistent
-        if isinstance(raman_results, dict):
-            raman_act = raman_results["0"]
-        else:
-            raman_act = raman_results[0]
-        if broadening_type.lower() == 'lorentzian':
-            x, y = self.lorentzian_broadening(freqs, raman_act, 0, 4000, 1,
-                                              broadening_value)
-        elif broadening_type.lower() == 'gaussian':
-            x, y = self.gaussian_broadening(freqs, raman_act, 0, 4000, 1,
-                                            broadening_value)
 
-        ax2.plot(x * scaling_factor,
-                 y * 6.0220E-09,
-                 color="black",
-                 alpha=0.9,
-                 linewidth=2.5)
+        raman_type = 'Raman'
+        if self.do_resonance_raman:
+            raman_type = 'Resonance Raman'
 
-        legend_bars = mlines.Line2D([], [],
-                                    color='darkcyan',
-                                    alpha=0.7,
-                                    linewidth=2,
-                                    label='Raman activity')
-        label_spectrum = f'{broadening_type.capitalize()} '
-        label_spectrum += f'broadening ({broadening_value:.1f} ' + r'cm$^{-1}$)'
-        legend_spectrum = mlines.Line2D([], [],
-                                        color='black',
-                                        linestyle='-',
-                                        linewidth=2.5,
-                                        label=label_spectrum)
-        scaling = str(scaling_factor)
-        legend_scaling = mlines.Line2D([], [],
-                                       color='white',
-                                       linestyle='-',
-                                       alpha=0.0001,
-                                       label="Scaling factor: " + scaling)
-        ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
-                   frameon=False,
-                   borderaxespad=0.,
-                   loc='center left',
-                   bbox_to_anchor=(1.05, 0.5))
-        ax2.set_ylim(0, max(y * 6.0220E-09) * 1.1)
-        ax2.set_ylim(bottom=0)
-        ax2.set_xlim(0, 3900)
-        ax2.yaxis.set_ticks([])
+        # loop through the external frequencies and plot a spectrum for each
+        for i, w in enumerate(ext_freqs):
+            raman_act = raman_results[i]
 
-        for i in range(len(vib_results['vib_frequencies'])):
-            ax.plot(
-                [
-                    scaling_factor * vib_results['vib_frequencies'][i],
-                    scaling_factor * vib_results['vib_frequencies'][i]
-                ],
-                [0.0, raman_act[i]],
-                alpha=0.7,
-                linewidth=2,
-                color="darkcyan",
-            )
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax2 = ax.twinx()
 
-        ax.set_ylim(bottom=0)
+            ax.set_xlabel('Wavenumber [cm$^{-1}$]')
+            ax.set_ylabel('Scattering cross section')
+            ax2.set_ylabel('Raman activity [' + r'${\AA}^4$' + '/amu]')
+            #ax.set_title(f"Raman Spectrum ({w:2.4} a.u.)")
+            ax.set_title(f"{raman_type} Spectrum ({w:2.4} a.u.)")
+
+            if broadening_type.lower() == 'lorentzian':
+                x, y = self.lorentzian_broadening(vib_freqs, raman_act, xmin, xmax, 1,
+                                                  broadening_value)
+            elif broadening_type.lower() == 'gaussian':
+                x, y = self.gaussian_broadening(vib_freqs, raman_act, xmin, xmax, 1,
+                                                broadening_value)
+
+            ax.plot(x * scaling_factor,
+                    y,
+                    color="black",
+                    alpha=0.9,
+                    linewidth=2.0)
+
+            legend_bars = mlines.Line2D([], [],
+                                        color='darkcyan',
+                                        alpha=0.7,
+                                        linewidth=2,
+                                        label='Raman activity')
+            label_spectrum = f'{broadening_type.capitalize()} '
+            label_spectrum += f'broadening ({broadening_value:.1f} ' + r'cm$^{-1}$)'
+            legend_spectrum = mlines.Line2D([], [],
+                                            color='black',
+                                            linestyle='-',
+                                            linewidth=2.0,
+                                            label=label_spectrum)
+            scaling = str(scaling_factor)
+            legend_scaling = mlines.Line2D([], [],
+                                           color='white',
+                                           linestyle='-',
+                                           alpha=0.0001,
+                                           label="Scaling factor: " + scaling)
+            ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
+                       frameon=False,
+                       borderaxespad=0.,
+                       bbox_to_anchor=(1.10, 0.95))
+
+            ax.set_ylim(0, max(y) * 1.1)
+            ax.set_ylim(bottom=0)
+            ax.set_xlim(xmin, xmax)
+
+            for j, v in enumerate(vib_freqs):
+                ax2.plot(
+                    [
+                        scaling_factor * v,
+                        scaling_factor * v
+                    ],
+                    [0.0, raman_act[j]],
+                    alpha=0.7,
+                    linewidth=2,
+                    color="darkcyan",
+                )
+
+            ax2.set_ylim(bottom=0)
+
+            if invert_axes:
+                ax.invert_xaxis()
 
     def plot(self,
              vib_results,
@@ -1443,22 +1454,31 @@ class VibrationalAnalysis:
             self.plot_raman(vib_results,
                             broadening_type=broadening_type,
                             broadening_value=broadening_value,
-                            scaling_factor=scaling_factor)
+                            scaling_factor=scaling_factor,
+                            invert_axes=invert_axes)
 
         elif plot_type.lower() == 'vibrational':
-            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # NOTE due to the plot_raman looping through all external
+            # frequencies, I have removed the option of specifying
+            # an axis in the function call. This function will now
+            # return separate figures. -JHA
+
+            #fig, axs = plt.subplots(2, 1, figsize=(8, 10))
             # Increase the height space between subplots
-            fig.subplots_adjust(hspace=0.3)
+            #fig.subplots_adjust(hspace=0.3)
             self.plot_ir(vib_results,
                          broadening_type=broadening_type,
                          broadening_value=broadening_value,
                          scaling_factor=scaling_factor,
-                         ax=axs[0])
-            self.plot_raman(vib_results,
-                            broadening_type=broadening_type,
-                            broadening_value=broadening_value,
-                            scaling_factor=scaling_factor,
-                            ax=axs[1])
+                         invert_axes=invert_axes)
+            #             ax=axs[0])
+            if 'raman_activities' in vib_results:
+                self.plot_raman(vib_results,
+                                broadening_type=broadening_type,
+                                broadening_value=broadening_value,
+                                scaling_factor=scaling_factor,
+                                invert_axes=invert_axes)
+                                #ax=axs[1])
 
         else:
             assert_msg_critical(False, 'Invalid plot type')
