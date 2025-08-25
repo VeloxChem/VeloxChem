@@ -366,24 +366,36 @@ class ReactionMatcher:
                     return False
 
         # If every connected component is a subgraph, we need to verify it is a unique subgraph.
-        # This is done later, because we need to start with the largest component this time.
+        # This is done after the first routine, because we need to start with the largest component this time.
         cc_A.reverse()
         B = nx.Graph(B)
         for g in cc_A:
             A_sub = A.subgraph(g)
-            GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
+            GM = GraphMatcher(B,A_sub, categorical_node_match('elem', ''))
             if self._check_monomorphic:
                 self._mono_count += 1
                 if not GM.subgraph_is_monomorphic():
                     return False
-                map = next(GM.subgraph_monomorphisms_iter())
             else:
                 self._iso_count += 1
                 if not GM.subgraph_is_isomorphic():
                     return False
-                map = next(GM.subgraph_isomorphisms_iter())
 
-            B.remove_nodes_from(map.keys())
+            # find mapping that leaves least amount of connected components
+            maps = [map for map in GM.subgraph_monomorphisms_iter()]
+            best_map = maps[0]
+            B_copy = nx.Graph(B)
+            B_copy.remove_nodes_from(best_map.keys())
+            best_cc_count = len(list(nx.connected_components(B_copy)))
+            for map in maps[1:]:
+                B_copy = nx.Graph(B)
+                B_copy.remove_nodes_from(map.keys())
+                cc_count = len(list(nx.connected_components(B_copy)))
+                if cc_count < best_cc_count:
+                    best_cc_count = cc_count
+                    best_map = map
+
+            B.remove_nodes_from(best_map.keys())
         return True
 
     def _check_time(self, msg=None):
