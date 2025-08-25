@@ -897,24 +897,27 @@ class VibrationalAnalysis:
             self.ostream.print_blank()
             self.ostream.print_blank()
 
-            if self.print_depolarization_ratio:
-                column_string = '{:>16s}  {:>24s} {:>20s} {:>24s} {:>14s}'.format(
-                    'Frequency', 'Raman activity', 'Parallel',
-                    'Perpendicular', 'Depol. ratio')
-                unit_string = f'{"(a.u)":16s}  {"(A**4/amu)":24s} {"(A**4/amu)":20s} {"(A**4/amu)"}'
-                self.ostream.print_header(column_string.ljust(width))
-                self.ostream.print_header(unit_string.ljust(width))
-                self.ostream.print_header('-' * width)
+            # TODO figure out how to (maybe) also print depolarization infor
+            # with resonance Raman
 
-                # loop through the external frequencies
-                for i, freq in enumerate(freqs):
-                    raman_str = '{:16.6f} {:18.4f} {:18.4f} {:18.4f} {:18.4f}'.format(
-                        freq, self.raman_activities[i,k], self.int_pol[i,k],
-                        self.int_depol[i,k], self.depol_ratio[i,k])
-                    self.ostream.print_header(raman_str.ljust(width))
+            #if self.print_depolarization_ratio:
+            #    column_string = '{:>16s}  {:>24s} {:>20s} {:>24s} {:>14s}'.format(
+            #        'Frequency', 'Raman activity', 'Parallel',
+            #        'Perpendicular', 'Depol. ratio')
+            #    unit_string = f'{"(a.u)":16s}  {"(A**4/amu)":24s} {"(A**4/amu)":20s} {"(A**4/amu)"}'
+            #    self.ostream.print_header(column_string.ljust(width))
+            #    self.ostream.print_header(unit_string.ljust(width))
+            #    self.ostream.print_header('-' * width)
 
-                self.ostream.print_blank()
-                self.ostream.print_blank()
+            #    # loop through the external frequencies
+            #    for i, freq in enumerate(freqs):
+            #        raman_str = '{:16.6f} {:18.4f} {:18.4f} {:18.4f} {:18.4f}'.format(
+            #            freq, self.raman_activities[i,k], self.int_pol[i,k],
+            #            self.int_depol[i,k], self.depol_ratio[i,k])
+            #        self.ostream.print_header(raman_str.ljust(width))
+
+            #    self.ostream.print_blank()
+            #    self.ostream.print_blank()
 
         self.ostream.flush()
 
@@ -1147,14 +1150,13 @@ class VibrationalAnalysis:
 
         vib_group = 'vib/'
 
-        nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
-
         natm = molecule.number_of_atoms()
         nmodes = len(self.vib_frequencies)
 
-        hf.create_dataset(vib_group + "number_of_modes",
-                          data=np.array([nmodes]))
+        nuc_rep = molecule.nuclear_repulsion_energy()
+        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
+
+        hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))
 
         normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
         for n, Q in enumerate(self.normal_modes, 1):
@@ -1173,29 +1175,23 @@ class VibrationalAnalysis:
         if self.do_ir:
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
-        if self.do_raman:
+        if self.do_raman or self.do_resonance_raman:
             hf.create_dataset(vib_group + 'external_frequencies',
                               data=np.array(self.frequencies))
-            #raman_grp = hf.create_group(vib_group + 'raman_activities')
-            #rr_activities = np.zeros((len(self.frequencies), nmodes))
-            #for i in range(len(self.frequencies)):
-            #    raman_grp.create_dataset(str(freqs[i]),
-            #                             data=np.array(
-            #                                 self.raman_activities[freqs[i]]))
-            #    rr_activities[i] = np.array(self.raman_activities[freqs[i]])
-            rr = [s for s in self.raman_activities]
-            hf.create_dataset(vib_group + 'raman_activities', data=np.array(rr))
+            ra = [s for s in self.raman_activities]
+            hf.create_dataset(vib_group + 'raman_activities', data=np.array(ra))
 
-        if self.do_resonance_raman:
-            hf.create_dataset(vib_group + 'external_frequencies',
-                              data=np.array(self.frequencies))
-            rr = [s for s in self.raman_activities]
-            hf.create_dataset(vib_group + 'raman_activities', data=np.array(rr))
-            #freqs = self.frequencies
-            #raman_grp = hf.create_group(vib_group + 'resonance_raman_activities')
-            #for i in range(len(freqs)):
-            #    raman_grp.create_dataset(str(freqs[i]), data=np.array(
-            #                                 self.raman_activities[freqs[i]]))
+            raman_type = 'normal'
+            if self.do_resonance_raman:
+                raman_type = 'resonance'
+            hf.create_dataset(vib_group + 'raman_type', data=np.bytes_([raman_type]))
+
+        #if self.do_resonance_raman:
+        #    hf.create_dataset(vib_group + 'external_frequencies',
+        #                      data=np.array(self.frequencies))
+        #    rr = [s for s in self.raman_activities]
+        #    hf.create_dataset(vib_group + 'resonance_raman_activities', data=np.array(rr))
+
         hf.close()
 
     def print_header(self):
