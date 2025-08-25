@@ -333,6 +333,7 @@ class VibrationalAnalysis:
                 (self.raman_activities, self.int_pol, self.int_depol,
                  self.depol_ratio) = self.calculate_raman_activity(
                      self.raw_normal_modes)
+                vib_results['external_frequencies'] = self.frequencies
                 vib_results['raman_activities'] = self.raman_activities
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
@@ -449,18 +450,24 @@ class VibrationalAnalysis:
         # get information from polarizability gradient dictionary
         raman_conversion_factor = self.get_conversion_factor('raman')
 
-        # frequency of electric field
-        freqs = list(self.polarizability_gradient.keys())
+        # frequency of external electric field
+        ext_freqs = list(self.polarizability_gradient.keys())
+        n_ext_freqs = len(ext_freqs)
 
         number_of_modes = len(self.vib_frequencies)
 
         # dictionary for Raman activities
         raman_activities = {}
+        tmp_raman_activities = np.zeros((n_ext_freqs, number_of_modes))
         int_pol = None
         int_depol = None
         depol_ratio = None
+        if self.print_depolarization_ratio:
+            int_pol = np.zeros((n_ext_freqs, number_of_modes))
+            int_depol = np.zeros((n_ext_freqs, number_of_modes))
+            depol_ratio = np.zeros((n_ext_freqs, number_of_modes))
 
-        for freq in freqs:
+        for n, freq in enumerate(ext_freqs):
             # get gradient for current frequency
             current_polarizability_gradient = (
                 self.polarizability_gradient[freq])
@@ -489,14 +496,15 @@ class VibrationalAnalysis:
             alpha_bar_sq = np.abs(alpha_bar)**2
             raman_activities[freq] = (45.0 * alpha_bar_sq + 7.0 *
                                       gamma_bar_sq) * raman_conversion_factor
+            tmp_raman_activities[n] = (45.0 * alpha_bar_sq + 7.0 *
+                                       gamma_bar_sq) * raman_conversion_factor
 
-            if self.print_depolarization_ratio and (
-                    freq == 0.0):  # TODO dynamic also?
-                int_pol = 45.0 * alpha_bar_sq + 4.0 * gamma_bar_sq
-                int_depol = 3.0 * gamma_bar_sq
-                depol_ratio = int_depol / int_pol
+            if self.print_depolarization_ratio:
+                int_pol[n] = 45.0 * alpha_bar_sq + 4.0 * gamma_bar_sq
+                int_depol[n] = 3.0 * gamma_bar_sq
+                depol_ratio[n] = int_depol[n] / int_pol[n]
 
-        return raman_activities, int_pol, int_depol, depol_ratio
+        return tmp_raman_activities, int_pol, int_depol, depol_ratio
 
     def calculate_ir_intensity(self, normal_modes):
         """
@@ -773,30 +781,51 @@ class VibrationalAnalysis:
 
             if self.do_raman and (self.raman_activities is not None):
                 freq_unit = ' a.u.'
-                freqs = list(self.raman_activities.keys())
-                for freq in freqs:
+                #freqs = list(self.raman_activities.keys())
+                freqs = list(self.frequencies)
+                for i, freq in enumerate(freqs):
                     if freq == 0.0:
-                        this_freq = 'static'
+                        freq_str = 'static'
                     else:
-                        this_freq = str(round(freq, 4)) + freq_unit
+                        freq_str = str(round(freq, 4)) + freq_unit
                     raman_str = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
-                        'Raman activity:', this_freq,
-                        self.raman_activities[freq][k], 'A**4/amu')
+                        'Raman activity:', freq_str,
+                        # self.raman_activities[freq][k], 'A**4/amu')
+                        self.raman_activities[i,k], 'A**4/amu')
                     self.ostream.print_header(raman_str.ljust(width))
 
-                if self.print_depolarization_ratio:
-                    raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Parallel Raman:', self.int_pol[k], 'A**4/amu')
-                    self.ostream.print_header(raman_parallel_str.ljust(width))
+                    if self.print_depolarization_ratio:
+                        # raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        #     'Parallel Raman:', self.int_pol[k], 'A**4/amu')
+                        raman_parallel_str = '{:>16s} {:12s} {:12.4f}  {:8s}'.format(
+                            'Parallel: ', freq_str, self.int_pol[i,k], 'A**4/amu')
+                        self.ostream.print_header(raman_parallel_str.ljust(width))
 
-                    raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
-                    self.ostream.print_header(
-                        raman_perpendicular_str.ljust(width))
+                        # raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        #     'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
+                        raman_perpendicular_str = '{:>16s} {:12s} {:12.4f}  {:8s}'.format(
+                            'Perpendicular: ', freq_str, self.int_depol[i,k], 'A**4/amu')
+                        self.ostream.print_header(raman_perpendicular_str.ljust(width))
 
-                    depolarization_str = '{:22s}{:20.4f}'.format(
-                        'Depolarization ratio:', self.depol_ratio[k])
-                    self.ostream.print_header(depolarization_str.ljust(width))
+                        # depolarization_str = '{:22s}{:20.4f}'.format(
+                        #     'Depolarization ratio:', self.depol_ratio[k])
+                        depolarization_str = '{:>16s} {:12s} {:12.4f} {:8s}'.format(
+                            'Depol. ratio: ', freq_str, self.depol_ratio[i,k], ' ')
+                        self.ostream.print_header(depolarization_str.ljust(width))
+
+                # if self.print_depolarization_ratio:
+                #     raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
+                #         'Parallel Raman:', self.int_pol[k], 'A**4/amu')
+                #     self.ostream.print_header(raman_parallel_str.ljust(width))
+
+                #     raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
+                #         'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
+                #     self.ostream.print_header(
+                #         raman_perpendicular_str.ljust(width))
+
+                #     depolarization_str = '{:22s}{:20.4f}'.format(
+                #         'Depolarization ratio:', self.depol_ratio[k])
+                #     self.ostream.print_header(depolarization_str.ljust(width))
 
             normal_mode_string = '{:22s}'.format('Normal mode:')
             self.ostream.print_header(normal_mode_string.ljust(width))
@@ -831,7 +860,8 @@ class VibrationalAnalysis:
             pass
 
         number_of_modes = len(self.vib_frequencies)
-        freqs = list(self.raman_activities.keys())
+        #freqs = list(self.raman_activities.keys())
+        freqs = list(self.frequencies)
 
         title = 'Resonance Raman'
         self.ostream.print_header(title)
@@ -845,19 +875,33 @@ class VibrationalAnalysis:
             self.ostream.print_header(index_string.ljust(width))
             self.ostream.print_header('-' * width)
 
-            column_string = '{:>16s}  {:>24s}'.format('Frequency',
-                                                      'Raman activity')
+            column_string = '{:>16s}  {:>24s}'.format('Frequency (a.u.)',
+                                                      'Raman activity (A**4/amu)')
             self.ostream.print_header(column_string.ljust(width))
             self.ostream.print_header('-' * width)
 
             # loop through the external frequencies
-            for freq in freqs:
-                raman_str = '{:16.6f}  {:4s}  {:18.4f}  {:8s}'.format(
-                    freq, 'a.u.', self.raman_activities[freq][k], 'A**4/amu')
+            for i, freq in enumerate(freqs):
+                raman_str = '{:16.6f} {:18.4f}'.format(
+                    freq, self.raman_activities[i,k])
                 self.ostream.print_header(raman_str.ljust(width))
 
             self.ostream.print_blank()
             self.ostream.print_blank()
+
+            if self.print_depolarization_ratio:
+                column_string = '{:>16s}  {:>24s} {:>24s} {:>24s} {:>24s}'.format(
+                    'Frequency', 'Raman activity (A**4/amu)', 'Parallel (A**4/amu)',
+                    'Perpendicular (A**4/amu)', 'Depolarization ratio')
+                self.ostream.print_header(column_string.ljust(width))
+                self.ostream.print_header('-' * width)
+
+                # loop through the external frequencies
+                for i, freq in enumerate(freqs):
+                    raman_str = '{:16.6f}  {:4s}  {:18.4f}  {:18.4f} {:18.4f} {:18.4f}'.format(
+                        freq, 'a.u.', self.raman_activities[i,k], self.int_pol[i,k],
+                        self.int_depol[i,k], self.depol_ratio[i,k])
+                    self.ostream.print_header(raman_str.ljust(width))
 
         self.ostream.flush()
 
@@ -874,7 +918,8 @@ class VibrationalAnalysis:
             return
 
         number_of_modes = len(self.vib_frequencies)
-        freqs = list(self.raman_activities.keys())
+        #freqs = list(self.raman_activities.keys())
+        freqs = list(self.frequencies)
 
         # open output file
         with open(self.vib_results_txt_file, 'a') as fout:
@@ -887,30 +932,27 @@ class VibrationalAnalysis:
             width = 52
             for k in range(number_of_modes):
                 # print normal mode indices
-                #index_string = '{:22s}{:d}\n'.format('Vibrational Mode', k + 1)
                 index_string = f'{"Vibrational Mode":22s}{k+1:d}\n'
-                fout.write(index_string)#.ljust(width))
+                fout.write(index_string)
                 fout.write('-' * width)
                 fout.write('\n')
 
-                column_string = '{:>16s}  {:>24s}\n'.format('Frequency',
-                                                            'Raman activity')
-                fout.write(column_string)#.ljust(width))
+                # column_string = '{:>16s}  {:>24s}\n'.format('Frequency',
+                #                                             'Raman activity')
+                column_string = f'{"Frequency":>16s}  {"Raman activity":>24s}\n'
+                fout.write(column_string)
                 fout.write('-' * width)
                 fout.write('\n')
 
                 # loop through the external frequencies
-                for freq in freqs:
+                for i, freq in enumerate(freqs):
                     raman_str = '{:16.6f}  {:4s}  {:18.4f}  {:8s}\n'.format(
-                        freq, 'a.u.', self.raman_activities[freq][k], 'A**4/amu')
-                    fout.write(raman_str)#.ljust(width))
+                        freq, 'a.u.', self.raman_activities[i,k], 'A**4/amu')
+                    fout.write(raman_str)
 
                 fout.write('\n\n')
 
-    def print_vibrational_analysis_file(self,
-                                        molecule,
-                                        filename=None,
-                                        rsp_drv=None):
+    def print_vibrational_analysis_file(self, molecule, filename=None, rsp_drv=None):
         """
         Prints the results from the vibrational analysis to a txt formatted file.
 
@@ -973,35 +1015,42 @@ class VibrationalAnalysis:
 
             if self.do_raman and (self.raman_activities is not None):
                 freq_unit = ' a.u.'
-                freqs = list(self.raman_activities.keys())
-                for freq in freqs:
+                # freqs = list(self.raman_activities.keys())
+                freqs = list(self.frequencies)
+                for i, freq in enumerate(freqs):
                     if freq == 0.0:
-                        this_freq = 'static'
+                        freq_str = 'static'
                     else:
-                        this_freq = str(round(freq, 4)) + freq_unit
+                        freq_str = str(round(freq, 4)) + freq_unit
                     raman_str = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
-                        'Raman activity:', this_freq,
-                        self.raman_activities[freq][k], 'A**4/amu')
+                        'Raman activity:', freq_str,
+                        self.raman_activities[i,k], 'A**4/amu')
                     fout.write(raman_str.ljust(width))
                     fout.write('\n')
 
-                if self.print_depolarization_ratio:
-                    raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Parallel Raman:', self.int_pol[k], 'A**4/amu')
-                    fout.write(raman_parallel_str.ljust(width))
-                    fout.write('\n')
+                    if self.print_depolarization_ratio:
+                        # raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        #     'Parallel Raman:', self.int_pol[k], 'A**4/amu')
+                        raman_parallel_str = '{:<16s} {:12s} {:12.4f}  {:8s}'.format(
+                            'Parallel: ', freq_str, self.int_pol[i,k], 'A**4/amu')
+                        fout.write(raman_parallel_str.ljust(width))
+                        fout.write('\n')
 
-                    raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
-                    fout.write(raman_perpendicular_str.ljust(width))
-                    fout.write('\n')
+                        # raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        #     'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
+                        raman_perpendicular_str = '{:<16s} {:12s} {:12.4f}  {:8s}'.format(
+                            'Perpendicular: ', freq_str, self.int_depol[i,k], 'A**4/amu')
+                        fout.write(raman_perpendicular_str.ljust(width))
+                        fout.write('\n')
 
-                    depolarization_str = '{:22s}{:20.4f}'.format(
-                        'Depolarization ratio:', self.depol_ratio[k])
-                    fout.write(depolarization_str.ljust(width))
-                    fout.write('\n')
+                        # depolarization_str = '{:22s}{:20.4f}'.format(
+                        #     'Depolarization ratio:', self.depol_ratio[k])
+                        depolarization_str = '{:<16s} {:12s} {:12.4f} {:8s}'.format(
+                            'Depol. ratio: ', freq_str, self.depol_ratio[i,k], ' ')
+                        fout.write(depolarization_str.ljust(width))
+                        fout.write('\n')
 
-            normal_mode_string = '{:22s}'.format('Normal mode:')
+            normal_mode_string = f'{"Normal mode:":22s}'
             fout.write(normal_mode_string.ljust(width))
             fout.write('\n\n')
 
@@ -1110,12 +1159,17 @@ class VibrationalAnalysis:
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
         if self.do_raman:
-            freqs = self.frequencies
-            raman_grp = hf.create_group(vib_group + 'raman_activities')
-            for i in range(len(freqs)):
-                raman_grp.create_dataset(str(freqs[i]),
-                                         data=np.array(
-                                             self.raman_activities[freqs[i]]))
+            vib_group.create_dataset('external_frequencies', data=np.array(self.frequencies))
+            #raman_grp = hf.create_group(vib_group + 'raman_activities')
+            #rr_activities = np.zeros((len(self.frequencies), nmodes))
+            #for i in range(len(self.frequencies)):
+            #    raman_grp.create_dataset(str(freqs[i]),
+            #                             data=np.array(
+            #                                 self.raman_activities[freqs[i]]))
+            #    rr_activities[i] = np.array(self.raman_activities[freqs[i]])
+            rr = [s for s in self.raman_activities]
+            vib_group.create_dataset('raman_activities', data=np.array(rr))
+
         if self.do_resonance_raman:
             freqs = self.frequencies
             raman_grp = hf.create_group(vib_group + 'resonance_raman_activities')
