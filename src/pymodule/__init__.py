@@ -196,6 +196,7 @@ from .evbreporter import EvbReporter
 
 ## interpolation section
 
+from .atommapper import AtomMapper
 from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
