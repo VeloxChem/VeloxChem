@@ -203,6 +203,7 @@ from .interpolationdatapoint import InterpolationDatapoint
 from .openmmimdynamics import OpenMMIMDynamics
 
 ## external interfaces for Interpolation module
+from .clustermanager import ClusterManager
 from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
 from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
