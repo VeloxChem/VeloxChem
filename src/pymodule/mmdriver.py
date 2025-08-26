@@ -344,11 +344,13 @@ class MMDriver:
             abs(phase) < 1.0e-6 or abs(phase - 180.0) < 1.0e-6,
             'MMDriver: Invalid phase for dihedral potential')
 
+        # TODO: enable higher periodicity
+
         assert_msg_critical(
-            abs(periodicity) in [1, 2, 3, 4, 5, 6],
+            abs(periodicity) in [1, 2, 3, 4],
             'MMDriver: Invalid periodicity for dihedral potential')
 
-        F_coefs = {x: 0.0 for x in [1, 2, 3, 4, 5, 6]}
+        F_coefs = {x: 0.0 for x in [1, 2, 3, 4]}
         E_shift = 0.0
 
         if abs(phase) < 1.0e-6:
