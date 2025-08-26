@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - simd_master_test
       - multipsi_newcore
       - embedding_test
       - c_pcm
@@ -16,6 +15,7 @@ on:
       - tddft_grad_test
       - feature-test
       - merge-test
+      - restart-test
 
 jobs:
   vlx_ci:
