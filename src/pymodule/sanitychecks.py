@@ -381,13 +381,14 @@ def embedding_sanity_check(options):
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
 
-def gostshyp_sanity_check(obj, method_dict=None):
+def gostshyp_sanity_check(obj, method_dict):
     """
     Checks the GOSTSHYP settings and updates relevant attributes.
 
     :param method_dict:
         The dictionary of method settings.
     """
+    #print(method_dict)
 
     obj._gostshyp = (obj.pressure != 0.0)
 
@@ -410,10 +411,10 @@ def gostshyp_sanity_check(obj, method_dict=None):
             'filename': None,
             'homemade': False, #TODO: remove (added for testing of gradient with fixed cavity)
             'tess_file': None #TODO: remove (added for testing of gradient with fixed cavity)
-        }
+            }
 
         tessellation_drv.update_settings(method_dict)
-        obj.num_leb_points = tessellation_drv.update_num_points()
+        #obj.num_leb_points = tessellation_drv.update_num_points() #points are not updated correctly but likely a problem in the ScfDriver
 
         # TODO
         # keep self.pressure_units for user-tailored output

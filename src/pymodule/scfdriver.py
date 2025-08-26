@@ -529,7 +529,13 @@ class ScfDriver:
 
         pe_sanity_check(self, method_dict)
 
+        #print(self.tssf)
+        #print(self.num_leb_points)
+
         gostshyp_sanity_check(self, method_dict)
+
+        #print(self.tssf)
+        #print(self.num_leb_points)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -2349,7 +2355,7 @@ class ScfDriver:
                 density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
+            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution_occ(density_matrix)
             #e_pr, V_pr, g_time, f_time = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
             #print('Energy contribution from  GOSTSHYP: ', e_pr) #should be printed in ostream?
             #print(g_time, f_time)
@@ -2961,6 +2967,8 @@ class ScfDriver:
                     diff_te = 0.0
                     diff_den = 0.0
 
+                
+                
                 valstr = ' {:3d}   {:20.12f} {:15.10f} '.format(
                     self._num_iter, te, diff_te)
                 valstr += '{:15.8f} {:15.8f} {:15.8f} '.format(
