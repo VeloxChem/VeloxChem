@@ -34,10 +34,12 @@
 #define RIFockDriver_hpp
 
 #include <vector>
+#include <map>
 
 #include "SubMatrix.hpp"
 #include "Matrix.hpp"
 #include "T3FlatBuffer.hpp"
+#include "T3RectFlatBuffer.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 
@@ -146,8 +148,9 @@ class CRIFockDriver
     /// @brief Computes transformed Bq vector with K metric for given similarity transformed MOs.
     /// @param lambda_p The MOs augmented by particle single excitations.
     /// @param lambda_h The MOs augmented by hole single excitations.
+    /// @param indices The vector of active indices of Bq vector.
     /// @return The transformed Gamma vector.
-    auto compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> std::vector<double>;
+    auto compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const std::vector<size_t>& indices) const -> CT3RectFlatBuffer<double>;
     
     private:
     /// @brief Pointer to metric matrix for J fitting.

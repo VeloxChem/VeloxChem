@@ -91,8 +91,8 @@ class RIFockDriver:
         Prepare buffers for the RI Fock driver.
         """
 
-        assert_msg_critical(basis.get_label().lower().startswith('def2-'),
-                            'RI Fock driver: Invalid basis set for RI-J')
+        #assert_msg_critical(basis.get_label().lower().startswith('def2-'),
+        #                    'RI Fock driver: Invalid basis set for RI-J')
 
         if verbose:
             self.ostream.print_info(
@@ -204,7 +204,6 @@ class RIFockDriver:
         """
 
         if self.comm.Get_size() == 1:
-            self._ri_drv.compute_bq_vectors(lambda_p, lambda_h)
-            return None
+            return self._ri_drv.compute_bq_vector(lambda_p, lambda_h)
         else:
             return None

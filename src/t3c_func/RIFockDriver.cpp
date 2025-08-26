@@ -34,6 +34,8 @@
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 
+#include <ranges>
+
 #include <iostream>
 
 CRIFockDriver::CRIFockDriver()
@@ -184,16 +186,78 @@ CRIFockDriver::compute_local_bq_vector(const CMatrix &density) const -> std::vec
 }
 
 auto
-CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> std::vector<double>
+CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const std::vector<size_t>& indices) const -> CT3RectFlatBuffer<double>
 {
+    const auto nmos = lambda_p.number_of_columns();
+        
+    const auto naos = lambda_p.number_of_rows();
+    
+    const auto naux = _eri_buffer.indices().size();
+    
+    const auto nelems = naos * (naos + 1) / 2;
+        
+    CT3RectFlatBuffer<double> bmats(_eri_buffer.indices(), nmos);
+    
+    std::vector<double> tmat(nelems, 0.0);
+    
+    std::vector<double> rmat(naos * naos, 0.0);
+    
+    auto tmat_ptr = tmat.data();
+    
+    std::cout << "Dims (MOs, NAOs, NAUXs): " << nmos << " , " << naos << " , " << naux << std::endl;
+    
+    std::cout << "K metric: " << _k_metric->number_of_rows() << " , " << _k_metric->number_of_columns() << std::endl;
+    
+    for (size_t i = 0; i < naux; i++)
+    {
+        std::ranges::fill(tmat, 0.0);
+        
+        // perform summation over (P|Q)^-1/2
+        
+        for (size_t j = 0; j < naux; j++)
+        {
+            const auto fact = _k_metric->at({j, i});
+            
+            const auto fmat_ptr = _eri_buffer.data(j);
+            
+            #pragma omp simd
+            for (size_t k = 0; k < nelems; k++)
+            {
+                tmat_ptr[k] += fact * fmat_ptr[k];
+            }
+        }
+        
+        // expand to full square matrix
+        
+        for (size_t k = 0; k < naos; k++)
+        {
+            for (size_t l = k; l < naos; l++)
+            {
+                const auto fact = tmat[mathfunc::uplo_rm_index(k, l, naos)];
+                
+                rmat[k * naos + l] = fact;
+                
+                rmat[l * naos + k] = fact;
+            }
+        }
+        
+        // transform to MO basis
+        
+    }
+    
     const auto mask = _eri_buffer.mask_indices();
     
     if (!mask.empty())
     {
-        std::cout << "mask size:" << std::endl;
+//        std::cout << "mask size: " << mask.size() <<  std::endl;
+//        
+//        for (const auto [lidx, gidx] : mask)
+//        {
+//            std::cout << "(" << lidx << "," << gidx << ")" << std::endl; 
+//        }
     }
     
-    return std::vector<double>();
+    return bmats;
 }
 
 auto

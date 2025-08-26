@@ -426,6 +426,7 @@ export_general(py::module &m) -> void
     // CT3RectFlatBuffer class
     PyClass<CT3RectFlatBuffer<double>>(m, "T3RectFlatBuffer")
         .def(py::init<>())
+        .def(py::init<const std::vector<size_t>&, const size_t>())
         .def(py::init<const std::vector<size_t>&, const std::map<size_t, size_t>&, const size_t>())
         .def(py::init<const CT3RectFlatBuffer<double> &>())
         .def("indices", &CT3RectFlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
