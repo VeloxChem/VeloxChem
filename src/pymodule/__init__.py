@@ -193,10 +193,27 @@ from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
+
+## interpolation section
+
 from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .openmmimdynamics import OpenMMIMDynamics
+
+## external interfaces for Interpolation module
+from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
+from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
+from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
+from .externalscfdriver import ExternalScfDriver
+from .externalgradientdriver import ExternalGradientDriver
+from .externalhessiandriver import ExternalHessianDriver
+from .externaloptimdriver import ExternalOptimDriver
+from .localbayesresidual import LocalBayesResidual
+
+
+
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
