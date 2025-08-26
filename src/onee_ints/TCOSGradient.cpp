@@ -35,7 +35,7 @@
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
 
-#define PAD_SIZE 8
+#define CHUNK_SIZE 4
 
 #define MATH_CONST_PI 3.14159265358979323846
 
@@ -419,7 +419,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // S-S block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -537,7 +537,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // S-P block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -670,7 +670,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // S-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -810,7 +810,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // S-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -971,7 +971,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // P-P block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1115,7 +1115,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // P-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1284,7 +1284,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // P-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1477,7 +1477,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // D-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < dd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1671,7 +1671,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // D-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < df_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1925,7 +1925,7 @@ computeTCOSGradient(const             CMolecule& molecule,
 
     // F-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < ff_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();

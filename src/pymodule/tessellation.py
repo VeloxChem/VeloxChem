@@ -164,18 +164,21 @@ class TessellationDriver:
         neighbors = self.find_neighbors(molecule, vdw_radii, unscaled_w.max())
 
         # initialize the van der Waals surface object containing the following
-        # information for every grid point: x, y, z, A, n_x, n_y, n_z, atom_num, unscaled w, vdw_rad of atom, F
-        # unscaled w and vdw_rad to be used in area gradient
+        # information for every grid point: x, y, z, A, n_x, n_y, n_z, atom_num, 
+        # unscaled w, vdw_rad of atom, F
+        # NOTE: unscaled w and vdw_rad are used in area gradient
 
         vdw_surface = np.empty((11,0))
 
         for i, rad in enumerate(vdw_radii):
 
             # select the correctly scaled sphere, add the corresponding normal
-            # vector components  and mark it with the current atom number
+            # vector components and mark it with the current atom number,
+            # unscaled weight and vdw radii
             sphere = vdw_spheres[rad].copy()
             sphere = np.vstack((sphere, norm_vecs.copy(),
-                                np.full(sphere.shape[1], i), unscaled_w, np.full(sphere.shape[1], rad)))
+                                np.full(sphere.shape[1], i), unscaled_w, 
+                                np.full(sphere.shape[1], rad)))
 
             # translate sphere to the center of the respective atom
             sphere[:3, :] += np.array(molecule.get_atom_coordinates(i))[:, None]
@@ -197,11 +200,12 @@ class TessellationDriver:
 
         # output for testing
         ######################################################
-        # tot_surf_str = 'The total area of the van der Waals surface is '
-        # tot_surf_str += str(np.sum(vdw_surface[3, :]) * bohr_in_angstrom()**2)
-        # tot_surf_str += ' angstrom^2'
-        # print(tot_surf_str)
-        # print('with {} tessellation points'.format(vdw_surface.shape[1]))
+        tot_surf_str = 'The total area of the van der Waals surface is '
+        tot_surf_str += str(np.sum(vdw_surface[3, :]) * bohr_in_angstrom()**2)
+        tot_surf_str += ' angstrom^2'
+        print(tot_surf_str)
+        print('with {} tessellation points'.format(vdw_surface.shape[1]))
+        print('and {} points per atomic sphere'.format(self.num_leb_points))
         ######################################################
 
         return vdw_surface
@@ -225,10 +229,8 @@ class TessellationDriver:
         
         # move these to tessellation array
         vdw_radii = molecule.vdw_radii_to_numpy() * self.tssf
-        
+
         areas = tessellation[3, :] # current areas
-        sw_funcs = tessellation[-1, :] # current switching functions
-        weights = areas / sw_funcs # original weights for scaled spheres
         
         num_tes_points = tessellation.shape[1]
         
@@ -236,13 +238,11 @@ class TessellationDriver:
         area_grad = np.zeros((3, num_tes_points))
 
         # define parameters used to compute zetas in the iswig scheme
-        iswig_input = tessellation[8:10, :]
+        iswig_input = tessellation[8:, :]
         
         # define parameters used in the swig scheme
         gamma = np.sqrt(14.0 / self.num_leb_points)
         alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
-            
-        rad_M = vdw_radii[M]
         
         # array stating if the tessellation point belongs to a given atom or not (delta_iM)    
         delta_iM = 1.0 * (tessellation[7] == np.full((num_tes_points), M))
