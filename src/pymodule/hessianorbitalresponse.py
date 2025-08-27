@@ -33,6 +33,7 @@
 import numpy as np
 import time as tm
 import math
+from collections import Counter
 
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCMolecularHessian
@@ -158,18 +159,23 @@ class HessianOrbitalResponse(CphfSolver):
 
         if atom_pairs is None:
             local_atoms = partition_atoms(natm, self.rank, self.nodes)
+            self.ostream.print_info(
+                f"rank {self.rank} has local atoms {local_atoms}")  #atompair
         else:
-            if self.rank == mpi_master():
-                local_atoms = []
-                for i, j in atom_pairs:
-                    if i not in local_atoms:
-                        local_atoms.append(i)
-                    if j not in local_atoms:
-                        local_atoms.append(j)
-                # natm = len(local_atoms)
-            else:
-                local_atoms = []
+            atoms_in_pairs = []
+            for i, j in atom_pairs:
+                if i not in atoms_in_pairs:
+                    atoms_in_pairs.append(i)
+                if j not in atoms_in_pairs:
+                    atoms_in_pairs.append(j)
+            natm_in_pairs = len(atoms_in_pairs)
+            local_atoms = []
+            # todo atompairs, is this the best way to go about the ordering here?
+            for at in atoms_in_pairs:
+                if at % self.nodes == self.rank:
+                    local_atoms.append(at)
 
+        # Gathers information of which rank has which atom, and then broadcasts this to all ranks
         atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
         gathered_atom_idx_rank = self.comm.gather(atom_idx_rank)
         if self.rank == mpi_master():
@@ -272,57 +278,57 @@ class HessianOrbitalResponse(CphfSolver):
 
             if atom_pairs is None:
                 naos = basis.get_dimensions_of_basis()
-
                 batch_size = get_batch_size(None, natm * 3, naos, self.comm)
                 batch_size = batch_size // 3
 
                 num_batches = natm // batch_size
                 if natm % batch_size != 0:
                     num_batches += 1
+            else:
+                ao_map = basis.get_ao_basis_map(molecule)
+                # Create a dictionary of the amount of AOs per atom
+                aos_per_atom = dict(
+                    Counter(int(ao.strip().split()[0]) - 1 for ao in ao_map))
+                # Calculate total number of AOs for atoms in atoms_in_pairs
+                naos_in_pairs = sum(
+                    aos_per_atom.get(atom, 0) for atom in atoms_in_pairs)
+                batch_size = get_batch_size(None, natm_in_pairs * 3,
+                                            naos_in_pairs, self.comm)
+                batch_size = batch_size // 3
 
-                for batch_ind in range(num_batches):
+                num_batches = natm_in_pairs // batch_size
+                if natm % batch_size != 0:
+                    num_batches += 1
 
+            for batch_ind in range(num_batches):
+                if atom_pairs is None:
                     batch_start = batch_ind * batch_size
                     batch_end = min(batch_start + batch_size, natm)
 
                     atom_list = list(range(batch_start, batch_end))
+                else:
+                    batch_start = batch_ind * batch_size
+                    batch_end = min(batch_start + batch_size, natm_in_pairs)
 
-                    vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
-                        molecule, basis, gs_density, mol_grid,
-                        self.xcfun.get_func_label(), atom_list)
+                    atom_list = atoms_in_pairs[batch_start:batch_end]
 
-                    for vecind, (iatom, root_rank) in enumerate(
-                            all_atom_idx_rank[batch_start:batch_end]):
-                        # print(iatom)
-                        for x in range(3):
-                            vxc_deriv_ix = self.comm.reduce(
-                                vxc_deriv_batch[vecind * 3 + x])
+                vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
+                    molecule, basis, gs_density, mol_grid,
+                    self.xcfun.get_func_label(), atom_list)
 
-                            dist_vxc_deriv_ix = DistributedArray(
-                                vxc_deriv_ix, self.comm)
+                for vecind, (iatom, root_rank) in enumerate(
+                        all_atom_idx_rank[batch_start:batch_end]):
+                    # print(iatom)
+                    for x in range(3):
+                        vxc_deriv_ix = self.comm.reduce(
+                            vxc_deriv_batch[vecind * 3 + x])
 
-                            key_ix = (iatom, x)
-                            dist_fock_deriv_ao[
-                                key_ix].data += dist_vxc_deriv_ix.data
-            else:
-                if self.rank == mpi_master():
-                    vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
-                        molecule, basis, gs_density, mol_grid,
-                        self.xcfun.get_func_label(), local_atoms)
+                        dist_vxc_deriv_ix = DistributedArray(
+                            vxc_deriv_ix, self.comm)
 
-                    for vecind, (iatom,
-                                 root_rank) in enumerate(all_atom_idx_rank):
-                        # print(iatom)
-                        for x in range(3):
-                            vxc_deriv_ix = self.comm.reduce(
-                                vxc_deriv_batch[vecind * 3 + x])
-
-                            dist_vxc_deriv_ix = DistributedArray(
-                                vxc_deriv_ix, self.comm)
-
-                            key_ix = (iatom, x)
-                            dist_fock_deriv_ao[
-                                key_ix].data += dist_vxc_deriv_ix.data
+                        key_ix = (iatom, x)
+                        dist_fock_deriv_ao[
+                            key_ix].data += dist_vxc_deriv_ix.data
 
         profiler.stop_timer('dXC')
 
@@ -531,7 +537,7 @@ class HessianOrbitalResponse(CphfSolver):
         # fill up the missing values in dist_cphf_rhs with zeros so later indexing does not fail
         if atom_pairs is not None:
             for i in range(molecule.number_of_atoms()):
-                if i not in local_atoms:
+                if i not in atoms_in_pairs:
                     zer = np.zeros(len(dist_cphf_rhs[0].data))
                     for j in range(3):
                         empty_dist_arr = DistributedArray(zer,
