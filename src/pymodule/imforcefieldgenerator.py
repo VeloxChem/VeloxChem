@@ -225,9 +225,9 @@ class IMForceFieldGenerator:
         self.interpolation_settings = None
         self.interpolation_type = 'shepard'
         self.weightfunction_type = 'cartesian-hessian'
-        self.exponent_p = '4'
-        self.exponent_q = '2'
-        self.confidence_radius = '0.5'
+        self.exponent_p = 4
+        self.exponent_q = 2
+        self.confidence_radius = 0.5
         self.imforcefieldfiles = None
 
         self.reaction_coordinates = None

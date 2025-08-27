@@ -2322,7 +2322,7 @@ class IMDatabasePointCollecter:
             print('Norm for cos theta', (np.linalg.norm(gq) * np.linalg.norm(gi)), grad_mw, self.impes_drivers[self.current_state].impes_coordinate.gradient)
             cos_theta = np.dot(gq, gi) / (np.linalg.norm(gq) * np.linalg.norm(gi))
             print('Energy difference', energy_difference, energy_difference * hartree_in_kcalpermol(), 'kcal/mol', 'energy differences rmsd', energy_difference / natms * hartree_in_kcalpermol())
-            print('Gradient difference', grad_mw - self.impes_drivers[self.current_state].impes_coordinate.gradient, 'gradients alignment', cos_theta, 'rmsd gradient', rmsd_gradient, 'kcal/mol/bohr')
+            print('gradients alignment', cos_theta, 'rmsd gradient', rmsd_gradient, 'kcal/mol/bohr')
             error_source = 'energy'
             # if cos_theta < 0.8:
             #     exit()

@@ -524,7 +524,7 @@ class InterpolationDriver():
         min_distance = float('inf')
         self.time_step_reducer = False
         
-
+        print('Weightfunction Mode', self.weightfunction_type)
         if not self.use_symmetry and 1==2:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
