@@ -2398,7 +2398,7 @@ class IMDatabasePointCollecter:
                 self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
             print('len of molecules', len(self.allowed_molecules[self.current_state]['molecules']), self.use_opt_confidence_radius)
-            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or 1 == 1 and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
+            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
                 
                 if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) > 20 and 1 == 2:
                     self.add_a_point = True
@@ -2996,15 +2996,16 @@ class IMDatabasePointCollecter:
                                     self.gloabal_sim_informations['coordinates_ang'] = []
                                     self.gloabal_sim_informations['state'] = []
                                     self.gloabal_sim_informations['temperatures'] = []
-                                    for root in self.roots_to_follow:
-                                        self.write_qm_energy_determined_points(self.allowed_molecules[root]['molecules'][self.last_added: ],
-                                                                            self.allowed_molecules[root]['qm_energies'][self.last_added:],
-                                                                            self.allowed_molecules[root]['qm_gradients'][self.last_added:],
-                                                                            self.allowed_molecules[root]['im_energies'][self.last_added:],
-                                                                            [],
-                                                                            root)
-                                        self.last_added = len(self.allowed_molecules[root]['molecules'])
                         # exit()
+
+                        for root in self.roots_to_follow:
+                            self.write_qm_energy_determined_points(self.allowed_molecules[root]['molecules'][self.last_added: ],
+                                                                self.allowed_molecules[root]['qm_energies'][self.last_added:],
+                                                                self.allowed_molecules[root]['qm_gradients'][self.last_added:],
+                                                                self.allowed_molecules[root]['im_energies'][self.last_added:],
+                                                                [],
+                                                                root)
+                            self.last_added = len(self.allowed_molecules[root]['molecules'])
 
     def per_structure_grads(self, alphas, mols, qmE, qmG, imE,
                         dps, impes_dict, sym_dps, sym_dict):
@@ -3042,8 +3043,7 @@ class IMDatabasePointCollecter:
             # residuals
             dE_res = (new_im_energy - qm_e)          # kcal already
             dG_res = (new_im_gradient - qm_gradients[0])    # (natms,3)
-            sum_of_weight_grad_num = np.zeros_like(mol.get_coordinates_in_bohr())
-            sum_of_weight_grad = np.zeros_like(mol.get_coordinates_in_bohr())
+
             # print('DPS', len(dps), i)
             
             for j, dp in enumerate(dps[:]):
@@ -3054,10 +3054,18 @@ class IMDatabasePointCollecter:
                 # print('weight_prime', anal_grad_weight, num_weight_prime, anal_grad_weight - num_weight_prime)
                 
                 # sum_of_weight_grad += anal_grad_weight
-                # sum_of_weight_grad_num += num_weight_prime
+                # sum_of_weight_grad_num += 
+                dw = None
+                dw_prime = None
+
+                if interpolation_driver.weightfunction_type == 'cartesian':
             
-                dw        = interpolation_driver.trust_radius_weight_gradient(dp)          # scalar
-                dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient(dp) # (natms,3)
+                    dw        = interpolation_driver.trust_radius_weight_gradient(dp)          # scalar
+                    dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient(dp) # (natms,3)
+
+                else:
+                    dw        = interpolation_driver.trust_radius_weight_gradient_hessian(dp)          # scalar
+                    dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient_hessian(dp) # (natms,3)
                 # print('dwprime_dalpha', num_dwprime_dalpha, dw_prime, num_dwprime_dalpha - dw_prime)
                 P_j  = interpolation_driver.potentials[j]             # kcal
                 G_j  = interpolation_driver.gradients[j]             # (natms,3)
@@ -3441,10 +3449,13 @@ class IMDatabasePointCollecter:
             print('Here is the error value', sum_sq_error)
             return sum_sq_error
         
-        def obj_energy_function(alphas, structure_list, qm_e, qm_gradients, im_e, dps, impes_dict, sym_datapoints, sym_dict):
+        def obj_energy_function(alphas, structure_list, qm_e, qm_g, im_e, dps, impes_dict, sym_datapoints, sym_dict):
                 
             sum_sq_error = 0.0
             e_x = self.use_opt_confidence_radius[3]
+            natms = len(structure_list[0].get_labels())
+            beta = 0.8
+
             for i, dp in enumerate(dps[:]):
                 dp.confidence_radius = alphas[i]
 
@@ -3461,20 +3472,53 @@ class IMDatabasePointCollecter:
                 interpolation_driver.compute(mol)
                 new_im_energy = interpolation_driver.get_energy()
                 new_im_gradient = interpolation_driver.get_gradient()
-                diff_e_kcal = (new_im_energy - qm_e[i]) * hartree_in_kcalpermol()
-                diff_g_kcal = (new_im_gradient - qm_gradients[i]) * hartree_in_kcalpermol()
-                cos_theta = np.dot(qm_gradients[i].ravel(), new_im_gradient.ravel()) / (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient))
+
+                diff_e_kcal = (new_im_energy - qm_e[i])
                 
-                if (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient)) < 1.0e-5:                    # 'zero-vector' branch
-                    cos_theta   = 1.0
-                diff = 1.0 * e_x * (diff_e_kcal)**2 + 1.0 * (1.0 - e_x) * (diff_g_kcal**2).mean() + 1.0 * (1 - cos_theta)
+                h = qm_g[i].reshape(-1)
+                norm_h = np.linalg.norm(h)              
+                # define the parallel and perpendicular components of g
+
+                dg_reshaped = new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)
+                L_iso = (dg_reshaped @ dg_reshaped) / (natms * 3)
+
+                if norm_h > 1e-8:
+                    u = h / norm_h # define the unit vector
+                    tau = 1e-8
+                    gate   = (norm_h**2) / (norm_h**2 + tau**2)
+
+                    dg_parallel   = np.dot(u.T, dg_reshaped) * u
+                    dg_perpendicular = dg_reshaped - dg_parallel
+
+                    L_e = diff_e_kcal**2
+                    L_perp = 1.0 / (natms * 3) * (dg_perpendicular @ dg_perpendicular)
+                    L_para = (u.T @ dg_reshaped)**2
+
+                    L_F = gate * (beta * L_perp + (1.0 - beta) * L_para) + (1.0 - gate) * L_iso
+                else:
+                    L_e = diff_e_kcal**2
+                    L_F = L_iso
+
+                diff = e_x * L_e + 0.5 * (1.0 - e_x) * L_F
 
                 sum_sq_error += (diff)
+                
+                # cosine implementation (numerically due to the derivative of the cosine)
+                
+                # diff_e_kcal = (new_im_energy - qm_e[i]) * hartree_in_kcalpermol()
+                # diff_g_kcal = (new_im_gradient - qm_gradients[i]) * hartree_in_kcalpermol()
+                # cos_theta = np.dot(qm_gradients[i].ravel(), new_im_gradient.ravel()) / (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient))
+                
+                # if (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient)) < 1.0e-5:                    # 'zero-vector' branch
+                #     cos_theta   = 1.0
+                # diff = 1.0 * e_x * (diff_e_kcal)**2 + 1.0 * (1.0 - e_x) * (diff_g_kcal**2).mean() + 1.0 * (1 - cos_theta)
+
+                # sum_sq_error += (diff)
 
             print('sum_of_sqaure', sum_sq_error, alphas)
             return sum_sq_error
         
-        def obj_gradient_function(alphas, structure_list, qm_e, qm_gradients, im_e, dps, impes_dict, sym_datapoints, sym_dict):
+        def obj_gradient_function(alphas, structure_list, qm_e, qm_g, im_e, dps, impes_dict, sym_datapoints, sym_dict):
 
             def fd_dp(func, mol, dp, h=1e-8):
                 # func : callable(X) returning scalar or array
@@ -3533,6 +3577,7 @@ class IMDatabasePointCollecter:
             
             n_points = len(dps[:])
             natms = len(structure_list[0].get_labels())
+            beta = 0.8
             dF_dalphas = np.zeros(n_points, dtype=float)
             e_x = self.use_opt_confidence_radius[3]
             sum_sq_error = 0.0
@@ -3567,42 +3612,45 @@ class IMDatabasePointCollecter:
                 dE_res = (new_im_energy - qm_e[i]) * hartree_in_kcalpermol()          # kcal already
                 dG_res = (new_im_gradient - qm_gradients[i]) * hartree_in_kcalpermol()  # (natms,3)
                 # print('DPS', len(dps), i)
-                diff =  e_x * (dE_res)**2 + (1.0 - e_x) * (dG_res**2).mean()
+                
+                h = qm_g[i].reshape(-1)
+                norm_h = np.linalg.norm(h)
+                u = h / norm_h if norm_h > 1e-8 else h # define the unit vector
+                tau = 1e-12
+                gate   = (norm_h**2) / (norm_h**2 + tau**2)
+                
+                # define the parallel and perpendicular components of g
 
-                sum_sq_error += (diff)
-                for j, dp in enumerate(dps[:]):
-                    # print('j in dp loop', j ,dp.confidence_radius)
-                    # num_weight_prime, num_Gj, num_dwprime_dalpha = fd_dp(interpolation_driver, mol, dp)
-                    # anal_grad_weight = interpolation_driver.shepard_weight_gradient_test(dp, dp.confidence_radius)
+                dg_reshaped = new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)
+
+                dg_parallel   = np.dot(u.T, dg_reshaped) * u
+                dg_perpendicular = dg_reshaped - dg_parallel
+
+                dL_dg = 2.0 * (1.0 - gate) * dg_reshaped
+
+                if norm_h > 1e-8:
                     
-                    # sum_of_weight_grad += anal_grad_weight
-                    # sum_of_weight_grad_num += num_weight_prime
+                    dL_dg += 2.0 * gate * (
+                        (beta/(natms * 3)) * dg_perpendicular + (2*(1-beta)) * dg_parallel
+                    )
+
+                
+                # diff =  e_x * (dE_res)**2 + (1.0 - e_x) * (dG_res**2).mean()
+
+                # sum_sq_error += (diff)
+                for j, dp in enumerate(dps[:]):
                
-                    dw        = interpolation_driver.trust_radius_weight_gradient(dp)          # scalar
-                    dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient(dp) # (natms,3)
+                    dw = None
+                    dw_prime = None
 
-                    # num_grad = np.zeros_like(dw_prime)
+                    if interpolation_driver.weightfunction_type == 'cartesian':
+                
+                        dw        = interpolation_driver.trust_radius_weight_gradient(dp)          # scalar
+                        dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient(dp) # (natms,3)
 
-                    # # # numerical gradient
-                    # org_conf_radius = dp.confidence_radius
-                    # epsilon = 1e-6
-                    # dp.confidence_radius = org_conf_radius + epsilon
-                    # _, _, _, _, f_plus, _ = interpolation_driver.cartesian_distance_symmetry(dp)
-                    # dp.confidence_radius = org_conf_radius - 1.0 * epsilon
-                    # _, _, _, _, f_minus, _ = interpolation_driver.cartesian_distance_symmetry(dp)
-                    # dp.confidence_radius = org_conf_radius
-                    # num_grad += (f_plus - f_minus) / (2 * epsilon)
-
-                    # # analytical gradient
-
-                    # print("Analytical gradient:", dw_prime)
-                    # print("Numerical gradient:", num_grad)
-                    # print("Difference:", dw_prime - num_grad)
-
-                    # exit()
-                    # print('dwprime_dalpha', num_dwprime_dalpha, dw_prime, num_dwprime_dalpha - dw_prime)
-
-
+                    else:
+                        dw        = interpolation_driver.trust_radius_weight_gradient_hessian(dp)          # scalar
+                        dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient_hessian(dp) # (natms,3)
 
                     P_j  = interpolation_driver.potentials[j]            # kcal
                     G_j  = interpolation_driver.gradients[j]             # (natms,3)
@@ -3622,30 +3670,47 @@ class IMDatabasePointCollecter:
 
                     dE_dα = dw * (P_j - new_im_energy) * hartree_in_kcalpermol()  / S                    # scalar
 
-                    dot_g_gp = np.tensordot(dG_res, dG_dα_kcal, axes=((0,1),(0,1)))   # g · g'
-                    dmean_dα = 2.0 / (natms * 3) * dot_g_gp 
-
                     norm_g = np.linalg.norm(new_im_gradient)
-                    norm_h = np.linalg.norm(qm_gradients[i])
+                    norm_h = np.linalg.norm(qm_g[i])
                     den    = norm_g * norm_h
 
-                    if den < 1.0e-5:
-                        dcos_dα = 0.0
-                    else:
-                        g_prime_dot_h = np.tensordot(dG_dα, qm_gradients[i], axes=((0,1),(0,1))) # g'·h
-                        g_dot_h      = np.tensordot(new_im_gradient, qm_gradients[i], axes=((0,1),(0,1))) # g·h
-                        g_dot_gprime = np.tensordot(new_im_gradient, dG_dα, axes=((0,1),(0,1))) # g·g'
-                        dcos_dα = (g_prime_dot_h / den) - (g_dot_h * g_dot_gprime / (norm_g**2 * den))
-                        # cos_theta = np.dot(qm_gradients[i].ravel(), new_im_gradient.ravel()) / (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient))
-                        # # print("cosθ", cos_theta)
-                        # # print("g_prime_dot_h / den", g_prime_dot_h / den)
-                        # # print("(g_dot_h * g_dot_gprime)/(norm_g**2 * den)", 
-                        #     # (g_dot_h * g_dot_gprime)/(norm_g**2 * den))
 
-                    dF_dalphas[j] += (
-                             1.0 * 2.0 * e_x       * dE_res * dE_dα          # energy part
-                            +  1.0 * (1.0 - e_x)     * dmean_dα               # mean‑square grad part
-                            - 1.0 * dcos_dα )  
+
+                    dLdg_mat = dL_dg.reshape(natms, 3)
+
+                    # chain rule for forces
+                    dL_dgdg_dα = np.tensordot(dLdg_mat, dG_dα, axes=((0,1),(0,1)))
+
+                    dF_dalphas[j] += 2*e_x * dE_res * dE_dα + (1-e_x)* dL_dgdg_dα
+
+
+                    # cosine function part
+                    
+                    
+                    # dot_g_gp = np.tensordot(dG_res, dG_dα_kcal, axes=((0,1),(0,1)))   # g · g'
+                    # dmean_dα = 2.0 / (natms * 3) * dot_g_gp 
+
+                    # norm_g = np.linalg.norm(new_im_gradient)
+                    # norm_h = np.linalg.norm(qm_gradients[i])
+                    # den    = norm_g * norm_h
+
+                    # if den < 1.0e-5:
+                    #     dcos_dα = 0.0
+                    # else:
+                    #     g_prime_dot_h = np.tensordot(dG_dα, qm_gradients[i], axes=((0,1),(0,1))) # g'·h
+                    #     g_dot_h      = np.tensordot(new_im_gradient, qm_gradients[i], axes=((0,1),(0,1))) # g·h
+                    #     g_dot_gprime = np.tensordot(new_im_gradient, dG_dα, axes=((0,1),(0,1))) # g·g'
+                    #     dcos_dα = (g_prime_dot_h / den) - (g_dot_h * g_dot_gprime / (norm_g**2 * den))
+                    #     # cos_theta = np.dot(qm_gradients[i].ravel(), new_im_gradient.ravel()) / (np.linalg.norm(qm_gradients[i]) * np.linalg.norm(new_im_gradient))
+                    #     # # print("cosθ", cos_theta)
+                    #     # # print("g_prime_dot_h / den", g_prime_dot_h / den)
+                    #     # # print("(g_dot_h * g_dot_gprime)/(norm_g**2 * den)", 
+                    #     #     # (g_dot_h * g_dot_gprime)/(norm_g**2 * den))
+
+                    # dF_dalphas[j] += (
+                    #          1.0 * 2.0 * e_x       * dE_res * dE_dα          # energy part
+                    #         +  1.0 * (1.0 - e_x)     * dmean_dα               # mean‑square grad part
+                    #         - 1.0 * dcos_dα )  
             # print('DF alphaps', dF_dalphas)
 
             return dF_dalphas
@@ -3758,9 +3823,6 @@ class IMDatabasePointCollecter:
             print("Numerical gradient:", num_grad)
             print("Difference:", anal_grad - num_grad)
 
-
-            exit()
-
             
             if len(alphas) > 1000 and len(geom_list) > 10000:
             
@@ -3770,7 +3832,7 @@ class IMDatabasePointCollecter:
                     args = args,
                     method='L-BFGS-B',
                     jac = obj_gradient_function_parallel_gradient,
-                    bounds=[(-1.5, 1.5)],
+                    bounds=[(0.01, 1.5)],
                     options={'disp': True}
                 )
 
@@ -3785,7 +3847,7 @@ class IMDatabasePointCollecter:
                     args = args,
                     method='L-BFGS-B',
                     jac = obj_gradient_function,
-                    bounds=[(-1.5, 1.5)],
+                    bounds=[(0.01, 1.5)],
                     options={'disp': True}
                 )
 
@@ -3793,7 +3855,7 @@ class IMDatabasePointCollecter:
                 return res
         
 
-        inital_alphas = [0.5 for dp in datapoints]
+        inital_alphas = [dp.confidence_radius for dp in datapoints]
 
         print('INPUT Trust radius', inital_alphas)
 
@@ -3865,7 +3927,6 @@ class IMDatabasePointCollecter:
                 interpolation_driver.symmetry_information = sym_dict
                 interpolation_driver.qm_symmetry_data_points = sym_datapoints
                 interpolation_driver.distance_thrsh = 1000
-                interpolation_driver.exponent_p = 2
                 interpolation_driver.use_symmetry = False
                 interpolation_driver.qm_data_points = combined_datapoints
                 

@@ -224,6 +224,7 @@ class IMForceFieldGenerator:
         # variables for the interpolation
         self.interpolation_settings = None
         self.interpolation_type = 'shepard'
+        self.weightfunction_type = 'cartesian-hessian'
         self.exponent_p = '4'
         self.exponent_q = '2'
         self.confidence_radius = '0.5'
@@ -597,7 +598,8 @@ class IMForceFieldGenerator:
 
             for root in self.roots_to_follow:
                 imforcefieldfile = self.imforcefieldfiles[root]
-                self.states_interpolation_settings[root] = { 'interpolation_type':self.interpolation_type, 
+                self.states_interpolation_settings[root] = { 'interpolation_type':self.interpolation_type,
+                                    'weightfunction_type':self.weightfunction_type,
                                     'exponent_p':self.exponent_p,
                                     'exponent_q':self.exponent_q, 
                                     'confidence_radius':self.confidence_radius,
@@ -755,7 +757,8 @@ class IMForceFieldGenerator:
             assert_msg_critical(len(self.roots_to_follow) == 1, 'ImForceFieldGenerator: The root to follow is not defined!')
 
             imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
-            self.states_interpolation_settings[self.roots_to_follow[0]] = { 'interpolation_type':self.interpolation_type, 
+            self.states_interpolation_settings[self.roots_to_follow[0]] = { 'interpolation_type':self.interpolation_type,
+                                'weightfunction_type':self.weightfunction_type, 
                                 'exponent_p':self.exponent_p,
                                 'exponent_q':self.exponent_q, 
                                 'confidence_radius':self.confidence_radius,

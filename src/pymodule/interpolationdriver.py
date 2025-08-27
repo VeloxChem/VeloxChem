@@ -106,6 +106,7 @@ class InterpolationDriver():
         self.dihedral_function = None
         # simple or Shepard interpolation
         self.interpolation_type = 'shepard'
+        self.weightfunction_type = 'Cartesian'
         self.exponent_p = None
         self.scaling_time = False
         self.exponent_q = None
@@ -152,6 +153,8 @@ class InterpolationDriver():
             'im_settings': {
                 'interpolation_type':
                     ('str', 'type of interpolation (simple/Shepard)'),
+                'weightfunction_type':
+                    ('str', 'type of interpolation (Cartesian/Cartesian-Hessian)'),
                 'exponent_p': ('int', 'the main exponent'),
                 'exponent_q': ('int', 'the additional exponent (Shepard IM)'),
                 'confidence_radius': ('float', 'the confidence radius'),
@@ -532,15 +535,20 @@ class InterpolationDriver():
 
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vector))
         
+        elif self.weightfunction_type == 'Cartesian-Hessian':
+            for i, data_point in enumerate(self.qm_data_points[:]):
+                
+                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_hessian_distance(data_point)
+              
+                if abs(distance) < min_distance:
+                    min_distance = abs(distance)
+
+                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
+
         else:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_distance_symmetry(data_point)
-                
-                # grad = numerical_gradient(self.cartesian_distance_symmetry, self.molecule.get_coordinates_in_bohr(), data_point)
-                
-                # self.define_impes_coordinate(self.molecule.get_coordinates_in_bohr())
-                # print('Gradient difference ', weight_gradient - grad, weight_gradient[0,0], grad[0,0])
+                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_distance(data_point)
               
 
                 if abs(distance) < min_distance:
@@ -548,35 +556,25 @@ class InterpolationDriver():
 
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
 
-        # used_labels = []
         close_distances = None
         close_distances = [
             (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index) 
             for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients 
             if abs(distance) <= min_distance + self.distance_thrsh]
-        # distances_from_points = [] 
-        # internal_distance_dict = []
+
         for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
             
             weight_cart = 1.0 / (denominator_cart)
 
-            # used_labels.append(label_idx)
             sum_weights_cart += weight_cart
             sum_weight_gradients_cart += weight_grad_cart
 
 
             potential, gradient, r_i = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
-
-            # grad = numerical_gradient(self.compute_potential, self.molecule.get_coordinates_in_bohr(), qm_data_point)
-                
-            # self.define_impes_coordinate(self.molecule.get_coordinates_in_bohr())
-            # print('Gradient difference ', gradient - grad)
            
             gradients.append(gradient)
-            # bey_int_coord[self.symmetry_information[5]] = qm_data_point.internal_coordinates_values[self.symmetry_information[5]]
-            # _, var = qm_data_point.bayes_predict(bey_int_coord)
             averaged_int_dists.append(qm_data_point.internal_coordinates_values)
-            # beysian_error.append(var)
+
             hessian_error.append(r_i)
             potentials.append(potential)
             used_labels.append(label_idx)
@@ -584,16 +582,7 @@ class InterpolationDriver():
             self.potentials.append(potential)
             self.gradients.append(gradient)
             weight_gradients_cart.append(weight_grad_cart)
-            # distances_from_points.append(distance)
-
-        n_points = len(close_distances)
-        # if self.print:
-        #     for i in range(n_points - 1):
-        #         print('\nint distane \n', i, distances_from_points[i], np.linalg.norm(internal_distance_dict[i]), '\n',
-        #               i + 1, distances_from_points[i+ 1], np.linalg.norm(internal_distance_dict[i+ 1]), '\n\n', internal_distance_dict[i], '\n\n', internal_distance_dict[i + 1], '\n\n', internal_distance_dict[i] - internal_distance_dict[i + 1])
-        
-                
-        
+  
         # --- initialise accumulators -------------------------------------------------
         self.impes_coordinate.energy    = 0.0
         self.impes_coordinate.gradient  = np.zeros((natms, 3))
@@ -639,15 +628,6 @@ class InterpolationDriver():
         # self.sum_of_weights      = W_i.sum()          # if you really need it later
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
         
-            # self.impes_coordinate.energy += potentials[i]
-
-            # self.impes_coordinate.gradient += ( gradients[i])
-
-            # sigma_sq += weights_cart[i] * hessian_error[i]/0.5
-        
-        # print('Bey Error', np.sqrt(sigma_sq) * hartree_in_kcalpermol() )
-        
-        # print('Energy, Gradient', self.impes_coordinate.energy, self.impes_coordinate.gradient)
 
     def read_qm_data_points(self):
         """ Reads the QM data points to be used for interpolation
@@ -747,8 +727,6 @@ class InterpolationDriver():
             wprime = _smoother_prime(t) * dt_dθ
 
         return wprime * b_matrix_col
-    
-        
 
 
     def compute_potential(self, data_point, org_int_coords):
@@ -952,10 +930,6 @@ class InterpolationDriver():
 
             return pes, pes_prime, (grad + dist_hessian)
 
-
-        
-
-
     
     def te_weight_gradient(self, theta, b_matrix_col):
         
@@ -981,703 +955,6 @@ class InterpolationDriver():
         # multiply by the B-matrix column to obtain the Cartesian gradient
         return wprime * b_matrix_col        # same shape as b_matrix_col
             
-    def compute_gradient(self, data_point, mapping_list, current_internal_coordinates_values, org_int_coords, current_b_matrix, org_b_matrix):
-        """Calculates part of the cartesian gradient
-           for self.impes_coordinate based on the gradient
-           and Hessian of data_point.
-           J ( g_a + delta_a H_a )
-           eq. (4) JCTC 12, 5235-5246
-
-           :param data_point:
-                ImpesCoordinates object.
-        """
-
-        natm = data_point.cartesian_coordinates.shape[0]
-        gradient = None
-        if len(self.qm_symmetry_data_points) > 0:
-            # if self.qm_symmetry_data_points_1 is not None:
-            #     dp_label = data_point.point_label  
-            #     symmetry_data_point = self.qm_symmetry_data_points[dp_label]
-            #     symmetry_data_point_1 = self.qm_symmetry_data_points_1[data_point.point_label]
-            #     symmetry_data_point_2 = self.qm_symmetry_data_points_2[symmetry_data_point.point_label]
-                
-            #     energy = data_point.energy
-            #     grad = data_point.internal_gradient.copy()
-            #     grad_11 = data_point.internal_gradient.copy()
-            #     grad_12 = symmetry_data_point_1[0].internal_gradient.copy()
-            #     grad_13 = symmetry_data_point_1[1].internal_gradient.copy()
-
-
-            #     hessian_11 = data_point.internal_hessian
-            #     hessian_12 = symmetry_data_point_1[0].internal_hessian
-            #     hessian_13 = symmetry_data_point_1[1].internal_hessian
-
-
-            #     dist_check = (org_int_coords - data_point.internal_coordinates_values)
-            #     org_dist_check = (org_int_coords - data_point.internal_coordinates_values)
-                
-                
-            #     sym_energy = symmetry_data_point.energy
-            #     sym_grad = symmetry_data_point.internal_gradient.copy()
-            #     grad_21 = symmetry_data_point.internal_gradient.copy()
-            #     grad_22 = symmetry_data_point_2[0].internal_gradient.copy()
-            #     grad_23 = symmetry_data_point_2[1].internal_gradient.copy()
-                
-            #     hessian_21 = symmetry_data_point.internal_hessian
-            #     hessian_22 = symmetry_data_point_2[0].internal_hessian
-            #     hessian_23 = symmetry_data_point_2[1].internal_hessian
-            #     sym_dist_check = (org_int_coords - symmetry_data_point.internal_coordinates_values)
-                
-                
-            #     # org_sym_dist_check = (org_int_coords - symmetry_data_point.internal_coordinates_values)
-                
-
-            #     dist_check_11 = (org_int_coords - data_point.internal_coordinates_values)
-            #     dist_check_12 = (org_int_coords - symmetry_data_point_1[0].internal_coordinates_values)
-            #     dist_check_13 = (org_int_coords - symmetry_data_point_1[1].internal_coordinates_values)
-
-            #     dist_check_21 = (org_int_coords - symmetry_data_point.internal_coordinates_values)
-            #     dist_check_22 = (org_int_coords - symmetry_data_point_2[0].internal_coordinates_values)
-            #     dist_check_23 = (org_int_coords - symmetry_data_point_2[1].internal_coordinates_values)
-
-            #     sum_sym_dihedral_11_prime = np.zeros_like(data_point.internal_gradient)
-            #     sum_sym_dihedral_12_prime = sum_sym_dihedral_11_prime.copy()
-            #     sum_sym_dihedral_13_prime = sum_sym_dihedral_11_prime.copy()
-            #     sum_sym_dihedral_21_prime = sum_sym_dihedral_11_prime.copy()
-            #     sum_sym_dihedral_22_prime = sum_sym_dihedral_11_prime.copy()
-            #     sum_sym_dihedral_23_prime = sum_sym_dihedral_11_prime.copy()
-
-            #     sum_sym_dihedral_11 = 0.0
-            #     sum_sym_dihedral_12 = 0.0
-            #     sum_sym_dihedral_13 = 0.0
-            #     sum_sym_dihedral_21 = 0.0
-            #     sum_sym_dihedral_22 = 0.0
-            #     sum_sym_dihedral_23 = 0.0
-
-
-                
-
-                
-            #     org_molecule = Molecule(self.molecule.get_labels(), data_point.cartesian_coordinates, 'bohr')
-                
-            #     rot_molecule1 = Molecule(self.molecule.get_labels(), data_point.cartesian_coordinates, 'bohr')
-            #     rot_molecule1.set_dihedral([5,2,1,7], org_molecule.get_dihedral([5,2,1,7], 'radian') - 2.0 * np.pi/3.0, 'radian')
-
-                
-            #     rot_molecule_11 = Molecule(self.molecule.get_labels(), rot_molecule1.get_coordinates_in_bohr(), 'bohr')
-
-            #     rot_molecule2 = Molecule(self.molecule.get_labels(), data_point.cartesian_coordinates, 'bohr')
-
-            #     rot_molecule2.set_dihedral([5,2,1,7], org_molecule.get_dihedral([5,2,1,7], 'radian') - 4.0 * np.pi/3.0, 'radian')
-            #     rot_molecule_12 = Molecule(self.molecule.get_labels(), rot_molecule2.get_coordinates_in_bohr(), 'bohr')
-                
-
-            #     mapping_list_11, mapping_dict_11, assigned = self.perform_symmetry_assignment(self.symmetry_information[0], self.symmetry_information[1][0], 
-            #                                                         org_molecule.get_coordinates_in_bohr()[self.symmetry_information[1][0]], rot_molecule_11.get_coordinates_in_bohr()[self.symmetry_information[1][0]])
-                
-            #     mapping_list_12, mapping_dict_12, assigned = self.perform_symmetry_assignment(self.symmetry_information[0], self.symmetry_information[1][0], 
-            #                                                         org_molecule.get_coordinates_in_bohr()[self.symmetry_information[1][0]], rot_molecule_12.get_coordinates_in_bohr()[self.symmetry_information[1][0]])
-            #     print('mapping_list', mapping_list_11, mapping_list_12)
-
-            #     z_matrix_dict = {tuple(sorted(element)): i 
-            #         for i, element in enumerate(self.impes_coordinate.z_matrix)}
-                
-            #     reorded_int_coords = [org_int_coords]
-            #     b_matrices = [org_b_matrix]
-            #     mapping_lists = [mapping_list_11, mapping_list_12]
-            #     mapping_dict = [mapping_dict_11, mapping_dict_12]
-            #     reordered_int_coord_values = org_int_coords.copy()
-            #     for ord in range(2):
-            #         org_mask = [i for i in range(len(self.impes_coordinate.z_matrix))]
-            #         org_b_matrix_cp = org_b_matrix.copy()
-            #         mask = []
-            #         for i, element in enumerate(self.impes_coordinate.z_matrix):
-            #             # Otherwise, reorder the element
-            #             if len(element) == 4 or 1 == 1:
-            #                 reordered_element = [mapping_dict[ord].get(x, x) for x in element]
-            #                 key = tuple(sorted(reordered_element))
-
-            #                 z_mat_index = z_matrix_dict.get(key)
-            #                 mask.append(z_mat_index)
-            #                 reordered_int_coord_values[i] = (float(org_int_coords[z_mat_index]))
-
-            #             else:
-            #                 mask.append(i)
-            #                 reordered_int_coord_values[i] = (float(org_int_coords[i]))
-
-            #             # print(z_mat_index, key, element)
-            #         org_b_matrix_cp[org_mask] = org_b_matrix[mask]
-            #         org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()), 3)
-            #         org_b_matrix_cp = org_b_matrix_cp[:, mapping_lists[ord], :]
-            #         org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()) * 3)
-
-            #         b_matrices.append(org_b_matrix_cp)
-            #         reorded_int_coords.append(reordered_int_coord_values)
-                    
-            #         # print('B-matrix', self.symmetry_information[0], b_matrices[0] - b_matrices[1], '\n org B-Matrix \n')
-
-            #     for i, element in enumerate(self.impes_coordinate.z_matrix): 
-            #         if len(element) == 4:                                       
-                                
-            #                 # dist_check[i] = 1.0/2.0*np.sin(3.0*dist_check[i])
-                            
-            #                 # dist_check[i] = 0.5*(1+np.sin(3.0*dist_check[i] - np.pi/2.0))
-            #                 # dist_check[i] = 3.0/2.0*np.sin(dist_check[i])**2
-            #                 # org scheme
-            #                 dist_check_11[i] = np.sin(dist_check[i])
-            #                 grad_11[i] *= np.cos(dist_check[i])
-            #                 sum_sym_dihedral_11 += self.te_weight(dist_check[i])
-            #                 sum_sym_dihedral_11_prime += self.te_weight_gradient(dist_check[i], b_matrices[0][i,:])
-
-            #                 dist_check_12[i] = np.sin(dist_check_12[i])
-            #                 grad_12[i] *= np.cos(org_int_coords[i] - symmetry_data_point_1[0].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_12 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_1[0].internal_coordinates_values[i]))
-            #                 sum_sym_dihedral_12_prime += self.te_weight_gradient(1.0*(org_int_coords[i] - symmetry_data_point_1[0].internal_coordinates_values[i]), b_matrices[0][i,:])
-
-            #                 dist_check_13[i] = np.sin(dist_check_13[i])
-            #                 grad_13[i] *= np.cos(org_int_coords[i] - symmetry_data_point_1[1].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_13 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_1[1].internal_coordinates_values[i]))
-            #                 sum_sym_dihedral_13_prime += self.te_weight_gradient(1.0*(org_int_coords[i] - symmetry_data_point_1[1].internal_coordinates_values[i]), b_matrices[0][i,:])
-                            
-
-            #                 dist_check_21[i] = np.sin(sym_dist_check[i])
-            #                 grad_21[i] *= np.cos(sym_dist_check[i])
-            #                 sum_sym_dihedral_21 += self.te_weight(sym_dist_check[i])
-            #                 sum_sym_dihedral_21_prime += self.te_weight_gradient(sym_dist_check[i], b_matrices[0][i,:])
-
-            #                 dist_check_22[i] = np.sin(dist_check_22[i])
-            #                 grad_22[i] *= np.cos(org_int_coords[i] - symmetry_data_point_2[0].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_22 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_2[0].internal_coordinates_values[i]))
-            #                 sum_sym_dihedral_22_prime += self.te_weight_gradient(1.0*(org_int_coords[i] - symmetry_data_point_2[0].internal_coordinates_values[i]), b_matrices[0][i,:])
-
-
-            #                 dist_check_23[i] = np.sin(dist_check_23[i])
-            #                 grad_23[i] *= np.cos(org_int_coords[i] - symmetry_data_point_2[1].internal_coordinates_values[i])
-            #                 sum_sym_dihedral_23 += self.te_weight(1.0*(org_int_coords[i] - symmetry_data_point_2[1].internal_coordinates_values[i]))
-            #                 sum_sym_dihedral_23_prime += self.te_weight_gradient(1.0*(org_int_coords[i] - symmetry_data_point_2[1].internal_coordinates_values[i]), b_matrices[0][i,:])
-                            
-            #                 # dist_check_12[i] = np.sin(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0))
-            #                 # grad_12[i] *= np.cos(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0))
-            #                 # sum_sym_dihedral_12 += self.te_weight(-1.0*(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0)))
-            #                 # sum_sym_dihedral_12_prime += self.te_weight_gradient(-1.0*(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0)), b_matrices[0][i,:])
-
-            #                 # dist_check_13[i] = np.sin(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0))
-            #                 # grad_13[i] *= np.cos(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0))
-            #                 # sum_sym_dihedral_13 += self.te_weight(-1.0*(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0)))
-            #                 # sum_sym_dihedral_13_prime += self.te_weight_gradient(-1.0*(org_int_coords[i] - (data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0)), b_matrices[0][i,:])
-                            
-
-            #                 # dist_check_21[i] = np.sin(sym_dist_check[i])
-            #                 # grad_21[i] *= np.cos(sym_dist_check[i])
-            #                 # sum_sym_dihedral_21 += self.te_weight(-1.0*(sym_dist_check[i]))
-            #                 # sum_sym_dihedral_21_prime += self.te_weight_gradient(-1.0*(org_int_coords[i] - symmetry_data_point.internal_coordinates_values[i]), b_matrices[0][i,:])
-
-            #                 # dist_check_22[i] = np.sin(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0))
-            #                 # grad_22[i] *= np.cos(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0))
-            #                 # sum_sym_dihedral_22 += self.te_weight(-1.0*(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0)))
-            #                 # sum_sym_dihedral_22_prime += self.te_weight_gradient(-1.0*(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 2.0*np.pi/3.0)), b_matrices[0][i,:])
-
-
-            #                 # dist_check_23[i] = np.sin(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0))
-            #                 # grad_23[i] *= np.cos(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0))
-            #                 # sum_sym_dihedral_23 += self.te_weight(-1.0*(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0)))
-            #                 # sum_sym_dihedral_23_prime += self.te_weight_gradient(-1.0*(org_int_coords[i] - (symmetry_data_point.internal_coordinates_values[i] + 4.0*np.pi/3.0)), b_matrices[0][i,:])
-
-                
-                
-            #     v11, v12, v13, v21, v22, v23 = sum_sym_dihedral_11, sum_sym_dihedral_12, sum_sym_dihedral_13, sum_sym_dihedral_21, sum_sym_dihedral_22, sum_sym_dihedral_23
-                
-            #     print('unnormalized weights', v11, v12, v13, v21, v22, v23)
-
-            #     v11_prime, v12_prime, v13_prime, v21_prime, v22_prime, v23_prime = sum_sym_dihedral_11_prime.reshape(natm, 3), sum_sym_dihedral_12_prime.reshape(natm, 3), sum_sym_dihedral_13_prime.reshape(natm, 3), sum_sym_dihedral_21_prime.reshape(natm, 3), sum_sym_dihedral_22_prime.reshape(natm, 3), sum_sym_dihedral_23_prime.reshape(natm, 3)
-
-            #     total_weight_sum = v11 + v12 + v13 + v21 + v22 + v23
-            #     total_weight_grad_sum = v11_prime + v12_prime + v13_prime + v21_prime + v22_prime + v23_prime
-
-
-
-            #     w11 = v11 / total_weight_sum
-            #     w12 = v12 / total_weight_sum    
-            #     w13 = v13 / total_weight_sum
-            #     w21 = v21 / total_weight_sum
-            #     w22 = v22 / total_weight_sum
-            #     w23 = v23 / total_weight_sum
-
-            #     w11_prime = (v11_prime * total_weight_sum - v11 * total_weight_grad_sum) / total_weight_sum**2
-            #     w12_prime = (v12_prime * total_weight_sum - v12 * total_weight_grad_sum) / total_weight_sum**2
-            #     w13_prime = (v13_prime * total_weight_sum - v13 * total_weight_grad_sum) / total_weight_sum**2
-            #     w21_prime = (v21_prime * total_weight_sum - v21 * total_weight_grad_sum) / total_weight_sum**2
-            #     w22_prime = (v22_prime * total_weight_sum - v22 * total_weight_grad_sum) / total_weight_sum**2
-            #     w23_prime = (v23_prime * total_weight_sum - v23 * total_weight_grad_sum) / total_weight_sum**2
-
-            #     sum_w_prime = (w11_prime + w12_prime + w13_prime + w21_prime + w22_prime + w23_prime).sum(axis=(0,1))
-            #     print('weights', w11, w12, w13, w21, w22, w23)
-            #     print('sum_w_prime', sum_w_prime, total_weight_sum)
-            #     # exit()
-
-            #     pes_11 = (energy + np.matmul(dist_check_11.T, grad_11) +
-            #         0.5 * np.linalg.multi_dot([dist_check_11.T, hessian_11, dist_check_11]))
-            #     pes_12 = (symmetry_data_point_1[0].energy + np.matmul(dist_check_12.T, grad_12) +
-            #         0.5 * np.linalg.multi_dot([dist_check_12.T, hessian_12, dist_check_12]))
-            #     pes_13 = (symmetry_data_point_1[1].energy + np.matmul(dist_check_13.T, grad_13) +
-            #         0.5 * np.linalg.multi_dot([dist_check_13.T, hessian_13, dist_check_13]))
-            #     pes_21 = (sym_energy + np.matmul(dist_check_21.T, grad_21) +
-            #         0.5 * np.linalg.multi_dot([dist_check_21.T, hessian_21, dist_check_21]))
-            #     pes_22 = (symmetry_data_point_2[0].energy + np.matmul(dist_check_22.T, grad_22) +
-            #         0.5 * np.linalg.multi_dot([dist_check_22.T, hessian_22, dist_check_22]))
-            #     pes_23 = (symmetry_data_point_2[1].energy + np.matmul(dist_check_23.T, grad_23) +
-            #         0.5 * np.linalg.multi_dot([dist_check_23.T, hessian_23, dist_check_23]))
-                
-            #     dist_hessian_11 = np.matmul(dist_check_11.T, hessian_11)
-            #     dist_hessian_12 = np.matmul(dist_check_12.T, hessian_12)
-            #     dist_hessian_13 = np.matmul(dist_check_13.T, hessian_13)
-            #     dist_hessian_21 = np.matmul(dist_check_21.T, hessian_21)
-            #     dist_hessian_22 = np.matmul(dist_check_22.T, hessian_22)
-            #     dist_hessian_23 = np.matmul(dist_check_23.T, hessian_23)
-                
-            #     for i, element in enumerate(self.impes_coordinate.z_matrix):
-            #         if len(element) == 4:
-
-            #             dist_hessian_11[i] *= np.cos(dist_check[i])
-            #             dist_hessian_12[i] *= np.cos(org_int_coords[i] - symmetry_data_point_1[0].internal_coordinates_values[i])
-            #             dist_hessian_13[i] *= np.cos(org_int_coords[i] - symmetry_data_point_1[1].internal_coordinates_values[i])
-            #             dist_hessian_21[i] *= np.cos(sym_dist_check[i])
-            #             dist_hessian_22[i] *= np.cos(org_int_coords[i] - symmetry_data_point_2[0].internal_coordinates_values[i])
-            #             dist_hessian_23[i] *= np.cos(org_int_coords[i] - symmetry_data_point_2[1].internal_coordinates_values[i])
-                
-            #     pes_11_prime = (np.matmul(b_matrices[0].T, (grad_11 + dist_hessian_11))).reshape(natm, 3)
-            #     pes_12_prime = (np.matmul(b_matrices[0].T, (grad_12 + dist_hessian_12))).reshape(natm, 3)
-            #     pes_13_prime = (np.matmul(b_matrices[0].T, (grad_13 + dist_hessian_13))).reshape(natm, 3)
-            #     pes_21_prime = (np.matmul(b_matrices[0].T, (grad_21 + dist_hessian_21))).reshape(natm, 3)
-            #     pes_22_prime = (np.matmul(b_matrices[0].T, (grad_22 + dist_hessian_22))).reshape(natm, 3)
-            #     pes_23_prime = (np.matmul(b_matrices[0].T, (grad_23 + dist_hessian_23))).reshape(natm, 3)
-                
-            #     if mapping_list is not None:
-            #         print('mapping_list, org', mapping_list_11, self.symmetry_information[0])
-            #         print('old_map_list', mapping_list[1], mapping_list[0])
-                
-
-            #      # self.impes_coordinate.gradient += (
-            # #     weights_cart[i] * gradients[i] +
-            # #     potentials[i] * weight_gradients_cart[i] / sum_weights_cart -
-            # #     potentials[i] * weights_cart[i] * sum_weight_gradients_cart / sum_weights_cart)
-            #     pes_weight_11_prime = w11_prime * pes_11 + w11 * pes_11_prime
-            #     pes_weight_12_prime = w12_prime * pes_12 + w12 * pes_12_prime
-            #     pes_weight_13_prime = w13_prime * pes_13 + w13 * pes_13_prime
-            #     pes_weight_21_prime = w21_prime * pes_21 + w21 * pes_21_prime
-            #     pes_weight_22_prime = w22_prime * pes_22 + w22 * pes_22_prime
-            #     pes_weight_23_prime = w23_prime * pes_23 + w23 * pes_23_prime
-
-            #     # pes_weight_12_prime[mapping_list_11] = pes_weight_12_prime[self.symmetry_information[0]]
-            #     # pes_weight_13_prime[mapping_list_12] = pes_weight_13_prime[self.symmetry_information[0]]
-            #     # pes_weight_22_prime[mapping_list_11] = pes_weight_22_prime[self.symmetry_information[0]]
-            #     # pes_weight_23_prime[mapping_list_12] = pes_weight_23_prime[self.symmetry_information[0]]
-                
-            #     gradient = pes_weight_11_prime + pes_weight_12_prime + pes_weight_13_prime + pes_weight_21_prime + pes_weight_22_prime + pes_weight_23_prime
-
-                
-            #     # print('gradient', gradient)
-
-
-
-
-
-            # gradient_2p = 0.0
-
-            # dp_label = data_point.point_label  
-            # symmetry_data_point = self.qm_symmetry_data_points[dp_label][1]
-            
-            # energy = data_point.energy
-
-            # org_molecule = Molecule(self.molecule.get_labels(), data_point.cartesian_coordinates, 'bohr')
-            
-            # rot_molecule1 = Molecule(self.molecule.get_labels(), data_point.cartesian_coordinates.copy(), 'bohr')
-            # rot_molecule1.set_dihedral([7,2,1,5], org_molecule.get_dihedral([7,2,1,5], 'radian') - 2.0 * np.pi/3.0, 'radian')
-
-            # print('org_mol_1', org_molecule.get_dihedral([4,2,1,3], 'radian'))
-            # rot_molecule_11 = Molecule(self.molecule.get_labels(), rot_molecule1.get_coordinates_in_bohr(), 'bohr')
-
-            # rot_molecule2 = Molecule(self.molecule.get_labels(), data_point.cartesian_coordinates.copy(), 'bohr')
-
-            # rot_molecule2.set_dihedral([7,2,1,5], org_molecule.get_dihedral([7,2,1,5], 'radian') - 4.0 * np.pi/3.0, 'radian')
-            # print('org_mol_2', org_molecule.get_dihedral([4,2,1,3], 'radian'))
-            
-            # rot_molecule_12 = Molecule(self.molecule.get_labels(), rot_molecule2.get_coordinates_in_bohr(), 'bohr')
-            
-            # print(org_molecule.get_xyz_string())
-            # print('dihedrals', np.sin(rot_molecule_11.get_dihedral([4,2,1,3], 'radian')), np.sin(rot_molecule_12.get_dihedral([4,2,1,3], 'radian')))
-
-            # mapping_list_11, mapping_dict_11, assigned = self.perform_symmetry_assignment(self.symmetry_information[0], self.symmetry_information[1][0], 
-            #                                                       org_molecule.get_coordinates_in_bohr()[self.symmetry_information[1][0]], rot_molecule_11.get_coordinates_in_bohr()[self.symmetry_information[1][0]])
-            
-            # mapping_list_12, mapping_dict_12, assigned = self.perform_symmetry_assignment(self.symmetry_information[0], self.symmetry_information[1][0], 
-            #                                                       org_molecule.get_coordinates_in_bohr()[self.symmetry_information[1][0]], rot_molecule_12.get_coordinates_in_bohr()[self.symmetry_information[1][0]])
-            # print('mapping_list', mapping_list_11, mapping_list_12)
-
-            # z_matrix_dict = {tuple(sorted(element)): i 
-            #       for i, element in enumerate(self.impes_coordinate.z_matrix)}
-            
-            # mapping_lists = [mapping_list_11, mapping_list_12]
-            # mapping_dict = [mapping_dict_11, mapping_dict_12]
-            
-            # org_mask = [i for i in range(len(self.impes_coordinate.z_matrix))]
-            # org_b_matrix_cp = org_b_matrix.copy()
-            # reorded_int_coords_1 = [data_point.internal_coordinates_values.copy()]
-            # reorded_int_coords_2 = [symmetry_data_point.internal_coordinates_values.copy()]
-            # b_matrices = [org_b_matrix]
-            # masks = [org_mask]
-            # for ord in range(2):
-            #     mask = []
-            #     reorded_int_coord_1 = np.zeros_like(data_point.internal_coordinates_values)
-            #     reorded_int_coord_2 = np.zeros_like(data_point.internal_coordinates_values)
-            #     for i, element in enumerate(self.impes_coordinate.z_matrix):
-            #         # Otherwise, reorder the element
-            #         if len(element) == 4 or 1 == 1:
-            #             reordered_element = [mapping_dict[ord].get(x, x) for x in element]
-            #             key = tuple(sorted(reordered_element))
-
-            #             z_mat_index = z_matrix_dict.get(key)
-            #             mask.append(z_mat_index)
-            #             reorded_int_coord_1[i] = (float(reorded_int_coords_1[0][z_mat_index]))
-            #             reorded_int_coord_2[i] = (float(reorded_int_coords_2[0][z_mat_index]))
-
-            #         else:
-            #             mask.append(i)
-            #             reordered_int_coord_values[i] = (float(org_int_coords[i]))
-
-            #         # print(z_mat_index, key, element)
-            #     org_b_matrix_cp[org_mask] = org_b_matrix[mask]
-            #     org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()), 3)
-            #     org_b_matrix_cp = org_b_matrix_cp[:, mapping_lists[ord], :]
-            #     org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()) * 3)
-
-            #     b_matrices.append(org_b_matrix_cp)
-            #     reorded_int_coords_1.append(reorded_int_coord_1)
-            #     reorded_int_coords_2.append(reorded_int_coord_2)
-
-                
-            #     masks.append(mask)
-
-
-
-            # grad = data_point.internal_gradient.copy()
-            # grad_11 = data_point.internal_gradient.copy()
-            # grad_12 = data_point.internal_gradient.copy()
-            # grad_13 = data_point.internal_gradient.copy()
-
-            # hessian_11 = data_point.internal_hessian.copy()
-            # hessian_12 = data_point.internal_hessian.copy()
-            # hessian_13 = data_point.internal_hessian.copy()
-
-            # dist_check = (org_int_coords - data_point.internal_coordinates_values)
-            
-            # # symmetry point section
-            # sym_energy = symmetry_data_point.energy
-
-            # grad_21 = symmetry_data_point.internal_gradient.copy()
-            # grad_22 = symmetry_data_point.internal_gradient.copy()
-            # grad_23 = symmetry_data_point.internal_gradient.copy()
-            
-            # hessian_21 = symmetry_data_point.internal_hessian.copy()
-            # hessian_22 = symmetry_data_point.internal_hessian.copy()
-            # hessian_23 = symmetry_data_point.internal_hessian.copy()
-
-
-
-            # sym_dist_check = (org_int_coords - symmetry_data_point.internal_coordinates_values)
-            
-
-
-            # dist_check_11 = (org_int_coords - reorded_int_coords_1[0])
-            # dist_check_12 = (org_int_coords - reorded_int_coords_1[1])
-            # dist_check_13 = (org_int_coords - reorded_int_coords_1[2])
-
-            # dist_check_21 = (org_int_coords - reorded_int_coords_2[0])
-            # dist_check_22 = (org_int_coords - reorded_int_coords_2[1])
-            # dist_check_23 = (org_int_coords - reorded_int_coords_2[2])
-
-            # dist_org_11 = (org_int_coords - reorded_int_coords_1[0])
-            # dist_org_12 = (org_int_coords - reorded_int_coords_1[1])
-            # dist_org_13 = (org_int_coords - reorded_int_coords_1[2])
-
-            # dist_org_21 = (org_int_coords - reorded_int_coords_2[0])
-            # dist_org_22 = (org_int_coords - reorded_int_coords_2[1])
-            # dist_org_23 = (org_int_coords - reorded_int_coords_2[2])
-
-            # grad_12[masks[0]] = grad_12[masks[1]]
-            # grad_13[masks[0]] = grad_13[masks[2]]
-            # grad_22[masks[0]] = grad_22[masks[1]]
-            # grad_23[masks[0]] = grad_23[masks[2]]
-
-            
-            # hessian_12[masks[0], masks[0]] = hessian_12[masks[1], masks[1]]
-            # hessian_13[masks[0], masks[0]] = hessian_13[masks[2], masks[2]]
-            # hessian_22[masks[0], masks[0]] = hessian_22[masks[1], masks[1]]
-            # hessian_23[masks[0], masks[0]] = hessian_23[masks[2], masks[2]]
-
-
-
-            # sum_sym_dihedral_11_prime = np.zeros_like(data_point.internal_gradient)
-            # sum_sym_dihedral_12_prime = np.zeros_like(data_point.internal_gradient)
-            # sum_sym_dihedral_13_prime = np.zeros_like(data_point.internal_gradient)
-            # sum_sym_dihedral_21_prime = np.zeros_like(data_point.internal_gradient)
-            # sum_sym_dihedral_22_prime = np.zeros_like(data_point.internal_gradient)
-            # sum_sym_dihedral_23_prime = np.zeros_like(data_point.internal_gradient)
-
-            # sum_sym_dihedral_11 = 0.0
-            # sum_sym_dihedral_12 = 0.0
-            # sum_sym_dihedral_13 = 0.0
-            # sum_sym_dihedral_21 = 0.0
-            # sum_sym_dihedral_22 = 0.0
-            # sum_sym_dihedral_23 = 0.0
-
-            # for i, element in enumerate(self.impes_coordinate.z_matrix): 
-            #     if len(element) == 4:   
-
-            #             dist_check_11[i] = np.sin(dist_org_11[i])
-            #             grad_11[i] *= np.cos(dist_org_11[i])
-            #             sum_sym_dihedral_11 += self.te_weight(dist_org_11[i])
-            #             sum_sym_dihedral_11_prime += self.te_weight_gradient(dist_org_11[i], b_matrices[0][i,:])                                    
-                        
-            #             dist_check_12[i] = np.sin(dist_org_12[i])
-            #             grad_12[i] *= np.cos(dist_org_12[i])
-            #             sum_sym_dihedral_12 += self.te_weight(1.0*(dist_org_12[i]))
-            #             sum_sym_dihedral_12_prime += self.te_weight_gradient(1.0*(dist_org_12[i]), b_matrices[0][i,:])
-
-            #             dist_check_13[i] = np.sin(dist_org_13[i])
-            #             grad_13[i] *= np.cos(dist_org_13[i])
-            #             sum_sym_dihedral_13 += self.te_weight(1.0*(dist_org_13[i]))
-            #             sum_sym_dihedral_13_prime += self.te_weight_gradient(1.0*(dist_org_13[i]), b_matrices[0][i,:])
-
-            #             dist_check_21[i] = np.sin(dist_org_21[i])
-            #             grad_21[i] *= np.cos(dist_org_21[i])
-            #             sum_sym_dihedral_21 += self.te_weight(1.0*(dist_org_21[i]))
-            #             sum_sym_dihedral_21_prime += self.te_weight_gradient(1.0*(dist_org_21[i]), b_matrices[0][i,:])
-
-            #             dist_check_22[i] = np.sin(dist_org_22[i])
-            #             grad_22[i] *= np.cos(dist_org_22[i])
-            #             sum_sym_dihedral_22 += self.te_weight(1.0*(dist_org_22[i]))
-            #             sum_sym_dihedral_22_prime += self.te_weight_gradient(1.0*(dist_org_22[i]), b_matrices[0][i,:])
-
-
-            #             dist_check_23[i] = np.sin(dist_org_23[i])
-            #             grad_23[i] *= np.cos(dist_org_23[i])
-            #             sum_sym_dihedral_23 += self.te_weight(1.0*(dist_org_23[i]))
-            #             sum_sym_dihedral_23_prime += self.te_weight_gradient(1.0*(dist_org_23[i]), b_matrices[0][i,:])
-
-            #             print('distances 2p', dist_check_11[i], dist_check_12[i], dist_check_13[i], dist_check_21[i], dist_check_22[i], dist_check_23[i])
-            #             print('sum_sym_dihedral_11', sum_sym_dihedral_11, sum_sym_dihedral_12, sum_sym_dihedral_13, sum_sym_dihedral_21, sum_sym_dihedral_22, sum_sym_dihedral_23)
-            
-            
-            # v11, v12, v13, v21, v22, v23 = sum_sym_dihedral_11, sum_sym_dihedral_12, sum_sym_dihedral_13, sum_sym_dihedral_21, sum_sym_dihedral_22, sum_sym_dihedral_23
-            
-            # print('unnormalized weights', v11, v12, v13, v21, v22, v23)
-
-            # v11_prime, v12_prime, v13_prime, v21_prime, v22_prime, v23_prime = sum_sym_dihedral_11_prime.reshape(natm, 3), sum_sym_dihedral_12_prime.reshape(natm, 3), sum_sym_dihedral_13_prime.reshape(natm, 3), sum_sym_dihedral_21_prime.reshape(natm, 3), sum_sym_dihedral_22_prime.reshape(natm, 3), sum_sym_dihedral_23_prime.reshape(natm, 3)
-
-            # total_weight_sum = v11 + v12 + v13 + v21 + v22 + v23
-            # total_weight_grad_sum = v11_prime + v12_prime + v13_prime + v21_prime + v22_prime + v23_prime
-
-
-
-            # w11 =  v11 / total_weight_sum
-            # w12 =  v12 / total_weight_sum    
-            # w13 =  v13 / total_weight_sum
-            # w21 =  v21 / total_weight_sum
-            # w22 =  v22 / total_weight_sum
-            # w23 =  v23 / total_weight_sum
-
-            # w11_prime = (v11_prime * total_weight_sum - v11 * total_weight_grad_sum) / total_weight_sum**2
-            # w12_prime = (v12_prime * total_weight_sum - v12 * total_weight_grad_sum) / total_weight_sum**2
-            # w13_prime = (v13_prime * total_weight_sum - v13 * total_weight_grad_sum) / total_weight_sum**2
-            # w21_prime = (v21_prime * total_weight_sum - v21 * total_weight_grad_sum) / total_weight_sum**2
-            # w22_prime = (v22_prime * total_weight_sum - v22 * total_weight_grad_sum) / total_weight_sum**2
-            # w23_prime = (v23_prime * total_weight_sum - v23 * total_weight_grad_sum) / total_weight_sum**2
-
-            # sum_w_prime = (w11_prime + w12_prime + w13_prime + w21_prime + w22_prime + w23_prime).sum(axis=(0,1))
-            # print('weights', w11, w12, w13, w21, w22, w23)
-            # print('sum_w_prime', sum_w_prime, total_weight_sum)
-            # # exit()
-
-            # pes_11 = (energy + np.matmul(dist_check_11.T, grad_11) +
-            #     0.5 * np.linalg.multi_dot([dist_check_11.T, hessian_11, dist_check_11]))       
-            # pes_12 = (energy + np.matmul(dist_check_12.T, grad_12) +
-            #     0.5 * np.linalg.multi_dot([dist_check_12.T, hessian_12, dist_check_12]))
-            # pes_13 = (energy + np.matmul(dist_check_13.T, grad_13) +
-            #     0.5 * np.linalg.multi_dot([dist_check_13.T, hessian_13, dist_check_13]))
-            
-            # pes_21 = (sym_energy + np.matmul(dist_check_21.T, grad_21) +
-            #     0.5 * np.linalg.multi_dot([dist_check_21.T, hessian_21, dist_check_21]))
-            # pes_22 = (sym_energy + np.matmul(dist_check_22.T, grad_22) +
-            #     0.5 * np.linalg.multi_dot([dist_check_22.T, hessian_22, dist_check_22]))
-            # pes_23 = (sym_energy + np.matmul(dist_check_23.T, grad_23) +
-            #     0.5 * np.linalg.multi_dot([dist_check_23.T, hessian_23, dist_check_23]))
-            
-            # dist_hessian_11 = np.matmul(dist_check_11.T, hessian_11)
-            # dist_hessian_12 = np.matmul(dist_check_12.T, hessian_12)
-            # dist_hessian_13 = np.matmul(dist_check_13.T, hessian_13)
-            # dist_hessian_21 = np.matmul(dist_check_21.T, hessian_21)
-            # dist_hessian_22 = np.matmul(dist_check_22.T, hessian_22)
-            # dist_hessian_23 = np.matmul(dist_check_23.T, hessian_23)
-            
-            # for i, element in enumerate(self.impes_coordinate.z_matrix):
-            #     if len(element) == 4:
-
-            #         dist_hessian_11[i] *= np.cos(dist_org_11[i])
-            #         dist_hessian_12[i] *= np.cos(dist_org_12[i])
-            #         dist_hessian_13[i] *= np.cos(dist_org_13[i])
-            #         dist_hessian_21[i] *= np.cos(dist_org_21[i])
-            #         dist_hessian_22[i] *= np.cos(dist_org_22[i])
-            #         dist_hessian_23[i] *= np.cos(dist_org_23[i])
-            
-            # pes_11_prime = (np.matmul(b_matrices[0].T, (grad_11 + dist_hessian_11))).reshape(natm, 3)
-            # pes_12_prime = (np.matmul(b_matrices[0].T, (grad_12 + dist_hessian_12))).reshape(natm, 3)
-            # pes_13_prime = (np.matmul(b_matrices[0].T, (grad_13 + dist_hessian_13))).reshape(natm, 3)
-            # pes_21_prime = (np.matmul(b_matrices[0].T, (grad_21 + dist_hessian_21))).reshape(natm, 3)
-            # pes_22_prime = (np.matmul(b_matrices[0].T, (grad_22 + dist_hessian_22))).reshape(natm, 3)
-            # pes_23_prime = (np.matmul(b_matrices[0].T, (grad_23 + dist_hessian_23))).reshape(natm, 3)
-            
-            
-            # pes_weight_11_prime = w11_prime * pes_11 + w11 * pes_11_prime
-            # pes_weight_12_prime = w12_prime * pes_12 + w12 * pes_12_prime
-            # pes_weight_13_prime = w13_prime * pes_13 + w13 * pes_13_prime
-            # pes_weight_21_prime = w21_prime * pes_21 + w21 * pes_21_prime
-            # pes_weight_22_prime = w22_prime * pes_22 + w22 * pes_22_prime
-            # pes_weight_23_prime = w23_prime * pes_23 + w23 * pes_23_prime
-
-            # print('PESPES GRADIENT SECTION', w11 * pes_11 + w12 * pes_12 + w13 * pes_13 + w21 * pes_21 + w22 * pes_22 + w23 * pes_23)
-            # gradient = pes_weight_11_prime + pes_weight_12_prime + pes_weight_13_prime + pes_weight_21_prime + pes_weight_22_prime + pes_weight_23_prime
-            # print('Gradient_1', gradient)
-            # # gradient[mapping_list[0]] = gradient[mapping_list[1]]
-            # # print('gradient', gradient - gradient_2p)
-        
-            dp_label = data_point.point_label 
-
-                
-            symmetry_data_points = self.qm_symmetry_data_points[dp_label]
-    
-            symmetry_weights = []
-            potentials = []
-            pot_gradients = []
-            symmetry_weight_gradients = []
-
-            for symmetry_data_point in symmetry_data_points:
-                    energy = symmetry_data_point.energy
-                    masks = symmetry_data_point.mapping_masks
-
-                    for mask in masks:
-                        
-                        grad = symmetry_data_point.internal_gradient.copy()
-                        grad[masks[0]] = grad[mask]
-
-                        hessian = symmetry_data_point.internal_hessian.copy()
-                        hessian[masks[0], masks[0]] = hessian[mask, mask]
-
-                        dist_org = (org_int_coords - symmetry_data_point.internal_coordinates_values[mask])
-                        dist_check = (org_int_coords - symmetry_data_point.internal_coordinates_values[mask])
-                        
-                        sum_sym_dihedral_prime = np.zeros_like(symmetry_data_point.internal_gradient)
-                        sum_sym_dihedral = 0.0
-
-                        for i, element in enumerate(self.impes_coordinate.z_matrix): 
-                            if len(element) == 4:   
-
-                                    dist_check[i] = np.sin(dist_org[i])
-                                    grad[i] *= np.cos(dist_org[i])
-                                    sum_sym_dihedral += self.te_weight(dist_org[i])
-                                    sum_sym_dihedral_prime += self.te_weight_gradient(dist_org[i], org_b_matrix[i,:])
-
-                        symmetry_weights.append(sum_sym_dihedral)
-                        symmetry_weight_gradients.append(sum_sym_dihedral_prime.reshape(natm, 3))
-
-                        pes = (energy + np.matmul(dist_check.T, grad) +
-                            0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
-                        
-                        potentials.append(pes)
-
-                        dist_hessian = np.matmul(dist_check.T, hessian)
-
-                        for i, element in enumerate(self.impes_coordinate.z_matrix):
-                            if len(element) == 4:
-
-                                dist_hessian[i] *= np.cos(dist_org[i])
-                        
-                        pes_prime = (np.matmul(org_b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
-
-                        pot_gradients.append(pes_prime)
-        
-
-            total_weight_sum = sum(symmetry_weights)
-            total_weight_grad_sum = sum(symmetry_weight_gradients)
-
-            weights = np.array(symmetry_weights) / total_weight_sum
-            potentials = np.array(potentials)
-            potentials_prime = np.array(pot_gradients)
-            weights_prime = np.array(symmetry_weight_gradients)
-            
-            gradient = np.zeros_like(potentials_prime[0])
-
-
-            for i in range(len(weights)):
-                gradient += potentials_prime[i] * weights[i] + potentials[i] * weights_prime[i] / total_weight_sum - potentials[i] * weights[i] * total_weight_grad_sum / total_weight_sum    
-
-
-            # exit()
-        
-        
-        grad = data_point.internal_gradient.copy()
-        org_grad = data_point.internal_gradient.copy()
-        hessian = data_point.internal_hessian
-            
-    
-        dist_check = (current_internal_coordinates_values - data_point.internal_coordinates_values)
-        dist_org = (current_internal_coordinates_values - data_point.internal_coordinates_values)
-        gradient_1 = None
-        
-        for i, element in enumerate(self.impes_coordinate.z_matrix):
-            if len(element) == 4:
-                if mapping_list is not None and 1==2:
-    
-                    dist_check[i] = 1/3*np.sin(3.0*dist_check[i])
-                    grad[i] *= 3.0/3.0 * np.cos(3.0*dist_org[i])
-                    # old code:
-                    # dist_check[i] = np.sin(dist_check[i])
-                    # grad[i] *= np.cos(dist_org[i])
-                else:
-                    
-                    # dist_check[i] = 1.0/2.0*np.sin(3.0*dist_check[i])
-                    # grad[i] *= 3.0/2.0 * np.cos(3.0*dist_org[i])
-                    # dist_check[i] = 0.5*(1+np.sin(3.0*dist_check[i] - np.pi/2.0))
-                    # grad[i] *= 3.0/2.0 * np.cos(-3.0*dist_org[i] + np.pi/2.0)
-                    dist_check[i] = np.sin(dist_check[i])
-                    grad[i] *= np.cos(dist_org[i])
-                    
-        
-        dist_hessian = np.matmul(dist_check.T, hessian)
-        for i, element in enumerate(self.impes_coordinate.z_matrix):
-            if len(element) == 4:
-                if mapping_list is not None and 1 == 2:
-                    dist_hessian[i] *= 3.0/3.0 * np.cos(3.0 * dist_org[i])
-                    # org scheme
-                    # dist_hessian[i] *= np.cos(dist_org[i])
-                else:
-                    # dist_hessian[i] *= 3.0/3.0 * np.cos(3.0 * dist_org[i])
-                    # dist_hessian[i] *= 3.0/2.0 * np.cos(3.0 * dist_org[i])
-                    # dist_hessian[i] *= 3.0/2.0 * np.cos(-3.0*dist_org[i] + np.pi/2.0)
-                    # print('dist_hessian', dist_hessian[i])
-                    # org scheme
-                    dist_hessian[i] *= np.cos(dist_org[i])
-        internal_gradient_hess_cos = grad + dist_hessian
-        gradient_1 = (np.matmul(current_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
-        # print('gradient', gradient)
-        # if mapping_list is not None:
-        #     gradient_1[mapping_list[1]] = gradient_1[mapping_list[0]]
-        
-        # print('gradient 2', gradient_1)
-            # exit()
-        if gradient is None:
-            gradient = gradient_1
-        return gradient
 
     def simple_weight_gradient(self, distance_vector, distance):
         """ Returns the derivative of an unormalized simple interpolation
@@ -1699,7 +976,7 @@ class InterpolationDriver():
         
         confidence_radius = datapoint.confidence_radius
 
-        distance, _, _, _, _, _ = self.cartesian_distance_symmetry(datapoint)
+        distance, _, _, _, _, _ = self.cartesian_hessian_distance(datapoint)
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))
@@ -1711,7 +988,7 @@ class InterpolationDriver():
         
         confidence_radius = datapoint.confidence_radius
 
-        distance, _, _, _, _, _ = self.cartesian_distance_symmetry(datapoint)
+        distance, _, _, _, _, _ = self.cartesian_distance(datapoint)
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))
@@ -1722,23 +999,11 @@ class InterpolationDriver():
     def trust_radius_weight_gradient_gradient(self, datapoint):
         
         confidence_radius = datapoint.confidence_radius
-        distance, _, _, _, distance_vector, _ = self.cartesian_distance_symmetry(datapoint)
+        distance, _, _, _, distance_vector, _ = self.cartesian_distance(datapoint)
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))
         
-        
-        # trust_radius_weight_gradient_gradient_1_nominator = (((-2.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
-        #                                         - (2.0 * self.exponent_q**2.0 * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)) 
-
-        # trust_radius_weight_gradient_gradient_2_nominator = ( 4.0 * (((self.exponent_p * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_p)))
-        #                                         + ( self.exponent_q * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_q))) * (((-2.0 * (distance/confidence_radius)**(2.0 * self.exponent_p) * self.exponent_p) / confidence_radius) 
-        #                                                                                        - ((2.0 * (distance/confidence_radius)**(2.0 * self.exponent_q) * self.exponent_q) / confidence_radius))) 
-
         
         trust_radius_weight_gradient_gradient_1_nominator = (((-4.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
                                                 /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
@@ -1759,25 +1024,11 @@ class InterpolationDriver():
     def trust_radius_weight_gradient_gradient_hessian(self, datapoint):
         
         confidence_radius = datapoint.confidence_radius
-        distance, _, _, _, distance_vector, grad_s = self.cartesian_distance_symmetry(datapoint)
+        distance, _, _, _, _, grad_s = self.cartesian_hessian_distance(datapoint)
    
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))
-        
-        # trust_radius_weight_gradient_gradient_1_nominator = (((-2.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
-        #                                         - (2.0 * self.exponent_q**2.0 * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)) 
-
-        # trust_radius_weight_gradient_gradient_2_nominator = ( 4.0 * (((self.exponent_p * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_p)))
-        #                                         + ( self.exponent_q * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-        #                                         /(confidence_radius**(2.0 * self.exponent_q))) * (((-2.0 * (distance/confidence_radius)**(2.0 * self.exponent_p) * self.exponent_p) / confidence_radius) 
-        #                                                                                        - ((2.0 * (distance/confidence_radius)**(2.0 * self.exponent_q) * self.exponent_q) / confidence_radius))) 
-
-        # trust_radius_weight_gradient_gradient = -2.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
-        
 
         trust_radius_weight_gradient_gradient_nominator_1_1 = 2.0 * ((2.0 * self.exponent_p * (distance / confidence_radius)**(2 * self.exponent_p - 1) / confidence_radius) + (2.0 * self.exponent_q * (distance / confidence_radius)**(2 * self.exponent_q - 1) / confidence_radius))
         trust_radius_weight_gradient_gradient_nominator_1_2 = ((-2.0 * self.exponent_p * (distance / confidence_radius)**(2 * self.exponent_p) / confidence_radius) - ( 2.0 * self.exponent_q * (distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))
@@ -1785,98 +1036,10 @@ class InterpolationDriver():
         trust_radius_weight_gradient_gradient_nominator_2 = ((-2.0 * self.exponent_p * (2 * self.exponent_p - 1) * (distance / confidence_radius)**(2 * self.exponent_p - 1) / confidence_radius**2) - (2.0 * self.exponent_p * (distance / confidence_radius)**(2 * self.exponent_p - 1) / confidence_radius**2) -
                                                                     (2.0 * self.exponent_q * (2 * self.exponent_q - 1) * (distance / confidence_radius)**(2 * self.exponent_q - 1) / confidence_radius**2) - (2.0 * self.exponent_q * (distance / confidence_radius)**(2 * self.exponent_q - 1) / confidence_radius**2))
         
-        # trust_radius_weight_gradient_gradient_nominator_2 = ((-4.0 * self.exponent_p**2 * (distance / confidence_radius)**(2 * self.exponent_p) / (confidence_radius*distance)) -
-        #                                                             (4.0 * self.exponent_q**2 * (distance / confidence_radius)**(2 * self.exponent_q) / (confidence_radius*distance)))
-        
-
         trust_radius_weight_gradient_gradient = (((trust_radius_weight_gradient_gradient_nominator_1_1 * trust_radius_weight_gradient_gradient_nominator_1_2 ) / denominator**3) - trust_radius_weight_gradient_gradient_nominator_2 / denominator**2) * grad_s
 
 
         return trust_radius_weight_gradient_gradient
-    
-    def trust_radius_weight_gradient_gradient_test(self, confidence_radius, datapoint):
-        
-        distance, _, _, _, distance_vector, _ = self.cartesian_distance_symmetry(datapoint)
-        denominator = (
-                (distance / confidence_radius)**(2 * self.exponent_p) +
-                (distance / confidence_radius)**(2 * self.exponent_q))
-        
-        
-        trust_radius_weight_gradient_gradient_1_nominator = (((-2.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
-                                                - (2.0 * self.exponent_q**2.0 * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)) 
-
-        trust_radius_weight_gradient_gradient_2_nominator = ( 4.0 * (((self.exponent_p * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_p)))
-                                                + ( self.exponent_q * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
-                                                /(confidence_radius**(2.0 * self.exponent_q))) * (((-2.0 * (distance/confidence_radius)**(2.0 * self.exponent_p) * self.exponent_p) / confidence_radius) 
-                                                                                               - ((2.0 * (distance/confidence_radius)**(2.0 * self.exponent_q) * self.exponent_q) / confidence_radius))) 
-
-        trust_radius_weight_gradient_gradient = -2.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
-
-
-
-        return np.linalg.norm(trust_radius_weight_gradient_gradient)
-    
-    
-    def shepard_weight_test(self, confidence_radius, dp):
-        """ Returns the derivative of an unormalized Shepard interpolation
-            weight with respect to the Cartesian coordinates in
-            self.impes_coordinate
-
-            :param distance_vector:
-                The Cartesian distance vector between
-                the current data_point and self.impes_coordinate.
-            :param distance:
-                The norm of the distance vector * sqrt(N), N number of atoms.
-        """
-
-        weight_gradient = None
-
-        distance, _, _, _, distance_vector, _ = self.cartesian_distance_symmetry(dp)
-        
-    
-        denominator = (
-            (distance / confidence_radius)**(2 * self.exponent_p) +
-            (distance / confidence_radius)**(2 * self.exponent_q))
-        
-        weight = 1.0 / denominator
-        
-        return weight
-    
-    def shepard_weight_gradient_test(self, dp, confidence_radius):
-        """ Returns the derivative of an unormalized Shepard interpolation
-            weight with respect to the Cartesian coordinates in
-            self.impes_coordinate
-
-            :param distance_vector:
-                The Cartesian distance vector between
-                the current data_point and self.impes_coordinate.
-            :param distance:
-                The norm of the distance vector * sqrt(N), N number of atoms.
-        """
-
-        weight_gradient = None
-
-        distance, _, _, _, distance_vector, _ = self.cartesian_distance_symmetry(dp)
-    
-        denominator = (
-            (distance / confidence_radius)**(2 * self.exponent_p) +
-            (distance / confidence_radius)**(2 * self.exponent_q))
-        derivative_p = (self.exponent_p * distance_vector *
-                        distance**(2 * self.exponent_p - 2) /
-                        confidence_radius**(2 * self.exponent_p))
-        derivative_q = (self.exponent_q * distance_vector *
-                        distance**(2 * self.exponent_q - 2) /
-                        confidence_radius**(2 * self.exponent_q))
-        
-        weight_gradient = (-1.0 * (2.0 * (derivative_p + derivative_q)) *
-                       (1.0 / (denominator**2)))
-        # weight_gradient = (1.0 / (denominator**2))
-        
-
-        return weight_gradient
     
     def numerical_weight_gradient(self,
             X, Xi, A, exponent_p, exponent_q, confidence_radius,
@@ -1939,7 +1102,7 @@ class InterpolationDriver():
 
             return grad
     
-    def shepard_weight_gradient_hessian(self, distance_vector, quad_distance, confidence_radius, grad_s):
+    def shepard_weight_gradient_hessian(self, quad_distance, confidence_radius, grad_s):
         """ Returns the derivative of an unormalized Shepard interpolation
             weight with respect to the Cartesian coordinates in
             self.impes_coordinate
@@ -1997,6 +1160,14 @@ class InterpolationDriver():
    
         return  denominator, weight_gradient
     
+    
+    def calculate_translation_coordinates(self, given_coordinates):
+        """Center the molecule by translating its geometric center to (0, 0, 0)."""
+        center = np.mean(given_coordinates, axis=0)
+        translated_coordinates = given_coordinates - center
+
+        return translated_coordinates
+
     def cartesian_distance(self, data_point):
         """Calculates and returns the cartesian distance between
            self.coordinates and data_point coordinates.
@@ -2006,58 +1177,39 @@ class InterpolationDriver():
            :param data_point:
                 InterpolationDatapoint object
         """
+
         # First, translate the cartesian coordinates to zero
-        target_coordinates = data_point.calculate_translation_coordinates()
-        reference_coordinates = (
-            self.impes_coordinate.calculate_translation_coordinates())
+        target_coordinates = data_point.cartesian_coordinates.copy()
+        reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
 
-        # Then, determine the rotation matrix which
-        # aligns data_point (target_coordinates)
-        # to self.impes_coordinate (reference_coordinates)
+        active_atoms = np.delete(np.arange(reference_coordinates.shape[0]), self.symmetry_information[4])
 
-        rotation_matrix = geometric.rotate.get_rot(target_coordinates,
-                                                   reference_coordinates)
+        target_coordinates_core = target_coordinates[active_atoms]
+        reference_coordinates_core = reference_coordinates[active_atoms]
 
-        # Rotate the data point
-        rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-        # rotation_weights = geometric.rotate.get_rot(rotated_coordinates,
-        #                                             target_coordinates)
+        center_target_coordinates_core = self.calculate_translation_coordinates(target_coordinates_core)
+        center_reference_coordinates_core = self.calculate_translation_coordinates(reference_coordinates_core)
 
-        # Calculate the Cartesian distance
-        distance = (np.linalg.norm(rotated_coordinates - reference_coordinates))
-        # Calculate the gradient of the interpolation weights
-        # (required for energy gradient interpolation)
-        distance_vector = (reference_coordinates - rotated_coordinates)
-        
-        distance_vector_norm = np.zeros(reference_coordinates.shape[0])
-        for i in range(len(distance_vector_norm)):
-            distance_vector_norm[i] += np.linalg.norm(distance_vector[i])
-       
-        confidence_radius = data_point.confidence_radius
+        distance = 0
+        distance_vector = 0
+        grad_s = 1.0
+        Xc = center_reference_coordinates_core     # variable (current geometry)
+        Yc = center_target_coordinates_core        # fixed (datapoint)
+        R  = geometric.rotate.get_rot(Yc, Xc)
 
-        # natm = data_point.cartesian_coordinates.shape[0]
-        # deriv_int_denominator = 0.0
-        # deriv_int_nominator = np.zeros_like(distance_vector)
+        rotated_current = (R @ Yc.T).T
+        distance_vector =  Xc - rotated_current
+        distance = np.linalg.norm(distance_vector)
+
+
         dihedral_dist = 0.0
-        # for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
-
-        #     # print('ELEMENT', sorted(element))
-        #     if tuple(sorted(element)) in self.symmetry_information[6][3]:
-        #         dihedral_dist =+ 1/2*(1 + np.sin(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) - np.pi/2))
-        #         deriv_int_nominator += (self.impes_coordinate.b_matrix[i,:] * 
-        #                     3.0/2.0 * np.cos(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) + np.pi/2.0)).reshape(natm, 3)
-        #         deriv_int_denominator += dihedral_dist
-        
-        # if abs(deriv_int_denominator) < 1e-6:
-        #     deriv_int_denominator = 1e-6
-        #     deriv_int_nominator[:] = 0 
-        # print(deriv_int_denominator.shape, distance_vector.shape)
-        if distance < 1e-9:
+        if distance < 1e-8:
             distance = 1e-8
             distance_vector[:] = 0
+
         if self.interpolation_type == 'shepard':
             denominator, weight_gradient = self.shepard_weight_gradient(
-                distance_vector, distance, confidence_radius, calc_cart=True)
+                distance_vector, distance, data_point.confidence_radius)        
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
                 distance_vector, distance)
@@ -2066,19 +1218,10 @@ class InterpolationDriver():
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
         
-        # print('dihedral_dist', 1/dihedral_dist, 1/denominator)
-        # print('deriv_int_denominator', deriv_int_denominator)
 
+        return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
 
-        return distance, denominator, weight_gradient, distance_vector, dihedral_dist
-    def calculate_translation_coordinates(self, given_coordinates):
-        """Center the molecule by translating its geometric center to (0, 0, 0)."""
-        center = np.mean(given_coordinates, axis=0)
-        translated_coordinates = given_coordinates - center
-
-        return translated_coordinates
-
-    def cartesian_distance_symmetry(self, data_point):
+    def cartesian_hessian_distance(self, data_point):
         """Calculates and returns the cartesian distance between
            self.coordinates and data_point coordinates.
            Besides the distance, it also returns the weight gradient,
@@ -2149,200 +1292,62 @@ class InterpolationDriver():
             # Final symmetrization to remove numeric dust
             return 0.5 * (Hspd + Hspd.T)
         
-
-        
         # First, translate the cartesian coordinates to zero
         target_coordinates = data_point.cartesian_coordinates.copy()
         reference_coordinates = self.impes_coordinate.cartesian_coordinates.copy()
 
-        target_coordinates_core = np.delete(target_coordinates, self.symmetry_information[4], axis=0)
-        reference_coordinates_core = np.delete(reference_coordinates, self.symmetry_information[4], axis=0)
+        active_atoms = np.delete(np.arange(reference_coordinates.shape[0]), self.symmetry_information[4])
+
+        target_coordinates_core = target_coordinates[active_atoms]
+        reference_coordinates_core = reference_coordinates[active_atoms]
 
         center_target_coordinates_core = self.calculate_translation_coordinates(target_coordinates_core)
         center_reference_coordinates_core = self.calculate_translation_coordinates(reference_coordinates_core)
 
-        # Then, determine the rotation matrix which
-        # aligns data_point (target_coordinates)
-        # to self.impes_coordinate (reference_coordinates)
-
-        # rotation_matrix = geometric.rotate.get_rot(center_target_coordinates_core,
-        #                                            center_reference_coordinates_core)
-
-        # # Rotate the data point
-        # rotated_coordinates = np.dot(rotation_matrix, center_target_coordinates_core.T).T
-
-        
-        # # rotation_weights = geometric.rotate.get_rot(rotated_coordinates,
-        # #                                             target_coordinates)
-
-        # org_reference_coord = center_reference_coordinates_core.copy()
-        # org_mapping_list = [i for i in range(reference_coordinates.shape[0])]
-        # mapping_list = [[i for i in range(reference_coordinates.shape[0])]]
-        # swapped = None
-    
-        # non_group_atoms = []
-        # for i in range(len(self.molecule.get_labels())):
-        #     if i not in self.symmetry_information[1][0]:
-        #         non_group_atoms.append(i)
-        # current_molecule_trunc_coords = np.delete(reference_coordinates, self.symmetry_information[3], axis=0)
-        # data_point_molecule_trun_coords = np.delete(rotated_coordinates, self.symmetry_information[3], axis=0)
-        # mapping_list, mapping_dict, assigned = self.perform_symmetry_assignment(self.symmetry_information[0], self.symmetry_information[3], 
-        #                                                           current_molecule_trunc_coords, data_point_molecule_trun_coords)
-        # org_reference_coord[org_mapping_list] = reference_coordinates[mapping_list[0]]
-
-        # org_reference_coord[self.symmetry_information[3]] = rotated_coordinates[self.symmetry_information[3]]
-        assigned = False
-        
-        # if assigned and 1 == 2:
-            
-        #     swapped = (org_mapping_list, mapping_list[0], reference_coordinates, mapping_dict)
-        #     print(swapped)
-            # exit()
-        # mapping_list = atom_mapper.perform(atom_map_1=self.symmetry_information[0], env_groups_1=self.symmetry_information[1])
-
-        # # # # # Calculate the Cartesian distance
-        # rotation_matrix = geometric.rotate.get_rot(target_coordinates, org_reference_coord)
-        # # Rotate the data point
-        # rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-
-        # # Calculate the Cartesian distance
-        # distance = (np.linalg.norm(rotated_coordinates - org_reference_coord))
-        # # Calculate the gradient of the interpolation weights
-        # # (required for energy gradient interpolation)
-        # distance_vector = (org_reference_coord - rotated_coordinates)
         distance = 0
         distance_vector = 0
         grad_s = 1.0
-        Xc = center_reference_coordinates_core     # variable (current geometry)
-        Yc = center_target_coordinates_core        # fixed (datapoint)
-        R  = geometric.rotate.get_rot(Yc, Xc)
-        dU = geometric.rotate.get_rot_der(Yc, Xc)   
-
-        rotated_current = (R @ Yc.T).T
-        distance_vector =  Xc - rotated_current
-        distance = np.linalg.norm(distance_vector)
 
     
-        # Xc = center_reference_coordinates_core     # variable (current geometry)
-        # Yc = center_target_coordinates_core        # fixed (datapoint)
-        # R_x  = geometric.rotate.get_rot(Xc, Yc)
-        # dU_x = geometric.rotate.get_rot_der(Xc, Yc)   
+        Xc = center_reference_coordinates_core     # variable (current geometry)
+        Yc = center_target_coordinates_core        # fixed (datapoint)
+        R_x  = geometric.rotate.get_rot(Xc, Yc)
+        dU_x = geometric.rotate.get_rot_der(Xc, Yc)   
         
-        # rotated_current = (R_x @ Xc.T).T
-        # distance_vector =  rotated_current - Yc
-        # distance = np.linalg.norm(distance_vector) 
-
-        # Nc = Xc.shape[0]
-        # J = np.eye(Nc) - np.ones((Nc, Nc))/Nc      # (Nc,Nc)
-        # J3 = np.kron(J, np.eye(3))                 # (3Nc,3Nc)
-
-        # Hc = J3.T @ data_point.hessian @ J3 
-        # E_ref = 1e-3 / 0.001593 # in hartree to scale the distance making it unitless
+        rotated_current = (R_x @ Xc.T).T
+        distance_vector =  rotated_current - Yc
+        distance = np.linalg.norm(distance_vector) 
         
-        # Hc_ul = Hc * E_ref
-        # H_spd = make_spd_hessian(Hc_ul, floor_abs=1e-6)
-        # # distance (use a small epsilon!)
-        # eps = 1e-8
-        #      # <-- this is the “quad_distance”
+        H_full = data_point.hessian                          # (3N,3N)
+
+        idx3 = np.concatenate([3*active_atoms[:,None] + np.array([0,1,2])], axis=1).ravel()
+        H_SS = H_full[np.ix_(idx3, idx3)]
+
+        Nc = Xc.shape[0]
+        J = np.eye(Nc) - np.ones((Nc, Nc))/Nc      # (Nc,Nc)
+        J3 = np.kron(J, np.eye(3))                 # (3Nc,3Nc)
+
+        Hc = J3.T @ H_SS @ J3 
+        E_ref = 1e-3 / 0.001593 # in hartree to scale the distance making it unitless
+        
+        Hc_ul = Hc * E_ref
+        H_spd = make_spd_hessian(Hc_ul, floor_abs=1e-6)
  
-        # distance_2     = (distance_vector.reshape(-1) @ ((1.0 * H_spd) @ distance_vector.reshape(-1)))
-        # org_distance = (distance_vector.reshape(-1) @ ((1.0 * H_spd) @ distance_vector.reshape(-1)))
-        # distance = np.sqrt(distance_2)
-        # # print('distance check', distance, 1/distance)
-        # # if 1/distance > 2000:
-        # #     exit()
-        # y = ((1.0 * H_spd) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
+        distance_2     = (distance_vector.reshape(-1) @ ((1.0 * H_spd) @ distance_vector.reshape(-1)))
+        distance = np.sqrt(distance_2)
 
-        # rigid = y @ R_x                           # (Nc,3)
-        # S = y.T @ Xc                                    # (3,3)
+        y = ((1.0 * H_spd) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
 
-        # resp = np.einsum('baij,ij->ba', dU_x, S, optimize=True)   # (Nc,3)
+        rigid = y @ R_x                           # (Nc,3)
+        S = y.T @ Xc                                    # (3,3)
 
-        # z_mat = rigid + resp                            # (Nc,3)
-        # z_mat = apply_Jc(z_mat)                        # (Nc,3)
+        resp = np.einsum('baij,ij->ba', dU_x, S, optimize=True)   # (Nc,3)
 
-        # grad_s = 1.0 * z_mat / distance                            # (Nc,3) 
+        z_mat = rigid + resp                            # (Nc,3)
+        z_mat = apply_Jc(z_mat)                        # (Nc,3)
 
-        # def s_of_X(X_core, Yc):
-        #     Xc = apply_Jc(X_core)
-        #     R  = geometric.rotate.get_rot(Xc, Yc)
-        #     Delta = (R @ Xc.T).T - Yc
-        #     return float(Delta.reshape(-1) @ (H @ Delta.reshape(-1)))
+        grad_s = 1.0 * z_mat / distance                            # (Nc,3) 
 
-        # u = np.random.randn(*Xc.shape); u = apply_Jc(u)   # kill translations
-        # u /= np.linalg.norm(u)
-        # for eps in [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]:
-        #     s_plus  = s_of_X(Xc + eps*u, Yc)
-        #     s_minus = s_of_X(Xc - eps*u, Yc)
-        #     lhs = (s_plus - s_minus) / (2*eps)
-        #     rhs = (grad_s.reshape(Xc.shape) * u).sum()
-        #     print(f"eps={eps:.0e}, FD={lhs}, grad={rhs}, diff={lhs-rhs}")
-        # # exit()
-     
-        # rotation_matrix_org = geometric.rotate.get_rot(target_coordinates,
-        #                                            org_reference_coord)
-
-        # # Rotate the data point
-        # rotated_coordinates_org = np.dot(rotation_matrix_org, target_coordinates.T).T
-        
-        
-
-        # # rotation_weights = geometric.rotate.get_rot(rotated_coordinates,
-        # #                                             target_coordinates)
-
-        # # Calculate the Cartesian distance
-        # distance_org = (np.linalg.norm(rotated_coordinates_org - org_reference_coord))
-        # distance_vec_org = ((rotated_coordinates_org - org_reference_coord))
-
-
-
-        # for i in range(len(distance_vector)):
-
-        #     print('Distance vector', i, distance, distance_org, distance_vector[i], distance_vec_org[i])
-        
-        # # print('\n\n')
-        # natm = data_point.cartesian_coordinates.shape[0]
-        
-        # # for i in range(15, len(self.z_matrix)):
-        # deriv_int_denominator = 0.0
-        # deriv_int_nominator = np.zeros_like(distance_vector)
-
-        # for i in range(15, len(self.z_matrix)):
-        #     dihedral_dist = 1/2*(1 + np.sin(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) - np.pi/2))
-        #     deriv_int_nominator += (self.impes_coordinate.b_matrix[i,:] * 
-        #                 3.0/2.0 * np.cos(3.0*(self.impes_coordinate.internal_coordinates_values[i] - data_point.internal_coordinates_values[i]) + np.pi/2.0)).reshape(natm, 3)
-        #     deriv_int_denominator += (dihedral_dist)**2
-
-        # if abs(deriv_int_denominator) < 1e-6:
-        #     deriv_int_denominator = 1e-6
-        #     deriv_int_nominator[:] = 0 
-        
-        # distance_vector_norm = np.zeros(reference_coordinates.shape[0])
-        # for i in range(len(distance_vector_norm)):
-        #     distance_vector_norm[i] += np.linalg.norm(distance_vector[i])
-        confidence_radius = data_point.confidence_radius
-        # w, v = np.linalg.eigh(data_point.hessian)
-        # w_reg = np.where(w > 1e-8, w, 1e-8)   # clip eigenvalues
-        # H_inv = (v / w_reg**0.5) @ v.T
-        # w, V = np.linalg.eigh(data_point.hessian)
-        # # set floor relative to a robust positive scale if available
-        # pos = w[w > 0]
-        # lam_floor = (np.median(pos) if pos.size else 1.0) * 1e-6
-        # w_clipped = np.clip(w, lam_floor, None)
-        # # Hq^{-gamma} (gamma=1 -> inverse; gamma=0.5 -> inverse sqrt)
-        # invpow = w_clipped**(0.5)
-        # Mq = (V * invpow) @ V.T
-        # H_inv = 0.5*(Mq + Mq.T)
-        # H_iden = np.ones_like(data_point.hessian)
-        # I = np.eye(data_point.cartesian_coordinates.shape[0])
-        # Rbig = np.kron(I, rotation_matrix)            # (3N,3N)
-
-        # rotated_hessian = np.linalg.multi_dot([Rbig, data_point.hessian, Rbig.T])
-        # quad_distance = np.linalg.multi_dot([distance_vector.flatten().T, rotated_hessian, distance_vector.flatten()])
-        # print('quad_distance', quad_distance, distance)
-
-        if not isinstance(confidence_radius, (float, int)):
-            confidence_radius = 0.5
 
         dihedral_dist = 0.0
         if distance < 1e-8:
@@ -2350,43 +1355,15 @@ class InterpolationDriver():
             distance_vector[:] = 0
             s = 1e-8
 
-        # if distance_x < 1e-8:
-        #     distance_x = 1e-8
-        #     distance_vector_x[:] = 0
-        #     s = 1e-8
-
         if self.interpolation_type == 'shepard':
-            # weight_grad_numerical = self.numerical_weight_gradient(org_reference_coord, rotated_coordinates, rotated_hessian, self.exponent_p, self.exponent_q, confidence_radius)
-            # denominator, weight_gradient = self.shepard_weight_gradient_hessian(
-            #     distance_vector, distance, confidence_radius, grad_s)
-            denominator, weight_gradient = self.shepard_weight_gradient(
-                distance_vector, distance, confidence_radius)
-            
-            # denominator_x, weight_gradient_x = self.shepard_weight_gradient(
-            #     distance_vector_x, distance_x, confidence_radius)
-            
-            # weight_gradient_x = weight_gradient_x - weight_gradient_x.mean(axis=0, keepdims=True)
-
-            # print('Difference in weight gradient', weight_gradient - weight_gradient_x)
-            # exit()
-            # print('Numerical weight gradient', weight_grad_numerical)
-            # print('Analytical weight gradient', weight_gradient_hess)
-            # print('difference', weight_grad_numerical - weight_gradient_hess)
+            denominator, weight_gradient = self.shepard_weight_gradient_hessian(distance, data_point.confidence_radius, grad_s)  
         elif self.interpolation_type == 'simple':
-            weight_gradient = self.simple_weight_gradient(
-                distance_vector, distance)
+            weight_gradient = self.simple_weight_gradient(distance_vector, distance)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
         
-        # print('weight gradient hess before the rotational derivative', weight_gradient_hess)
-        # weight_gradient_hess = weight_gradient_hess * grad_s
-        # print('Different distance metrics:', s, distance)
-        # print('weight hess', weight_gradient_hess, 'orginal hessian', weight_gradient)
-       
-        # distance = s
-        # exit()
 
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
 

@@ -1761,6 +1761,22 @@ class AtomTypeIdentifier:
                         info['ConnectedAtoms'].index('H')]
                     self.atom_types_dict[f'H{atom_num}'] = hydrogen_type
                     self.bad_hydrogen = True
+            
+            
+            ##### This code was sepcifically added for H2 + OH --> H2O + H reaction using interpolation mechanics
+            elif (info['AtomicSymbol'] == 'H' and
+                info['NumConnectedAtoms'] == 1 and
+                self.atom_info_dict[info['ConnectedAtomsNumbers'][0]]['AtomicSymbol'] == 'H'):
+
+                hydrogen_type = {'opls': 'opls_H2', 'gaff': 'h2'}
+                self.atom_types_dict[f"H{info['AtomNumber']}"] = hydrogen_type
+                continue  # Skip the rest of the loop for this atom
+
+            elif (info['AtomicSymbol'] == 'H' and info['NumConnectedAtoms'] == 0):
+                hydrogen_type = {'opls': 'opls_H', 'gaff': 'hx'}  # or 'h_free'
+                self.atom_types_dict[f"H{info['AtomNumber']}"] = hydrogen_type
+                continue
+            ############
 
             # Decision for Transition Metals
 
