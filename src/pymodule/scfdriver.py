@@ -2355,7 +2355,7 @@ class ScfDriver:
                 density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution_occ(density_matrix)
+            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
             #e_pr, V_pr, g_time, f_time = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
             #print('Energy contribution from  GOSTSHYP: ', e_pr) #should be printed in ostream?
             #print(g_time, f_time)
