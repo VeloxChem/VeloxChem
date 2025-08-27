@@ -413,17 +413,18 @@ class ScfHessianDriver(HessianDriver):
         # RHS contracted with CPHF coefficients (ov)
         hessian_cphf_coeff_rhs = np.zeros((natm, 3, natm, 3))
 
-        atom_pair_atoms = []
+        atoms = []
         if atom_pairs is not None:
             for i, j in atom_pairs:
-                if i not in atom_pair_atoms:
-                    atom_pair_atoms.append(i)
-                if j not in atom_pair_atoms:
-                    atom_pair_atoms.append(j)
-
-            atoms = atom_pair_atoms
+                if i not in atoms:
+                    atoms.append(i)
+                if j not in atoms:
+                    atoms.append(j)
         else:
             atoms = range(natm)
+
+        # TODO: use alternative way to partition atoms
+        local_atoms = atoms[self.rank::self.nodes]
 
         for i in atoms:
             for x in range(3):
@@ -528,11 +529,6 @@ class ScfHessianDriver(HessianDriver):
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
-        # TODO: use alternative way to partition atoms
-        if atom_pairs is None:
-            atoms = list(range(natm))
-        local_atoms = atoms[self.rank::self.nodes]
-
         for i in local_atoms:
 
             ovlp_hess_200_mats = ovlp_hess_200_drv.compute(
@@ -619,7 +615,7 @@ class ScfHessianDriver(HessianDriver):
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
         else:
             all_atom_pairs = copy.copy(atom_pairs)
-            for i in atom_pair_atoms:
+            for i in atoms:
                 all_atom_pairs.append((i, i))
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
 
@@ -746,7 +742,6 @@ class ScfHessianDriver(HessianDriver):
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
             profiler.stop_timer('DFT')
 
-        #todo atompairs, ask zilvinas
         # nuclei-point charges contribution
         if self.scf_driver.point_charges is not None:
 
