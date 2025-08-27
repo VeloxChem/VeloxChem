@@ -166,15 +166,20 @@ class EvbForceFieldBuilder():
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
         if not self.skip_reaction_matching:
+            breaking_bonds_insert = "no breaking bonds"
+            if len(self.breaking_bonds)>0:
+                breaking_bonds_insert = f"breaking bonds: {self.breaking_bonds}"
             self.ostream.print_info(
-                "Matching reactant and product force fields")
+                "Matching reactant and product force fields with " + breaking_bonds_insert)
             self.ostream.flush()
+            # adjust for 1-indexed input of breaking bonds
+            breaking_bonds = {(bond[0]-1,bond[1]-1) for bond in self.breaking_bonds}
             self.product, product_mapping = self._match_reactant_and_product(
                 self.reactant,
                 self.reactant.molecule.get_element_ids(),
                 self.product,
                 self.product.molecule.get_element_ids(),
-                self.breaking_bonds,
+                breaking_bonds,
             )
         else:
             self.ostream.print_info("Skipping reaction matching")
@@ -552,7 +557,8 @@ class EvbForceFieldBuilder():
                 "Could not find a mapping between the reactant and product force fields."
             )
         total_mapping = {v: k for k, v in total_mapping.items()}
-        self.ostream.print_info(f"Mapping: {total_mapping}")
+        print_mapping = {k + 1: v + 1 for k, v in total_mapping.items()}
+        self.ostream.print_info(f"Mapping: {print_mapping}")
         self.ostream.flush()
         product_ff = EvbForceFieldBuilder._apply_mapping_to_forcefield(
             product_ff,
@@ -671,10 +677,10 @@ class EvbForceFieldBuilder():
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
-            id0 = bond_key[0]
+            id0 = bond_key[0]+1
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
-            id1 = bond_key[1]
+            id1 = bond_key[1]+1
             self.ostream.print_info(
                 f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}"
             )
@@ -686,10 +692,10 @@ class EvbForceFieldBuilder():
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
-            id0 = bond_key[0]
+            id0 = bond_key[0]+1
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
-            id1 = bond_key[1]
+            id1 = bond_key[1]+1
             self.ostream.print_info(
                 f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}"
             )

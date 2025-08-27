@@ -150,7 +150,7 @@ class EvbDriver():
             mm_opt_constrain_bonds (list[tuple[int, int]]): Bonds to constrain during MM optimization.
             reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
             product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
-            breaking_bonds (list[tuple[int, int]]): (List of) Bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
+            breaking_bonds (list[tuple[int, int]]): List of bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
             mute_ff_scf (bool): If True, mutes SCF output from RESP calculations. Has no effect if mute_ff_build is True. Defaults to True.
             optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
             optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.

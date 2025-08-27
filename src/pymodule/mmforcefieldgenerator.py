@@ -3479,6 +3479,52 @@ class MMForceFieldGenerator:
                 ff_data["impropers"])
         return forcefield
 
+    def print_bonds(self):
+        s = "Bonds: \n"
+        s += f"{'Bond':>9} {'fc (kJ/mol nm^2)':>18} {'eq (nm)':>10} {'comment'}\n"
+        for bond, params in self.bonds.items():
+            s += f"{bond[0]+1:>3d} - {bond[1]+1:>3d} {params['force_constant']:>18.1f} {params['equilibrium']:>10.5f} {params['comment']}\n"
+        self.ostream.print_info(s)
+        self.ostream.flush()
+
+    def print_angles(self):
+        s = "Angles: \n"
+        s += f"{'Angle':>15} {'fc (kJ/mol rad^2)':>18} {'eq (rad)':>10} {'comment'}\n"
+        for angle, params in self.angles.items():
+            s += f"{angle[0]+1:>3d} - {angle[1]+1:>3d} - {angle[2]+1:>3d} {params['force_constant']:>18.1f} {params['equilibrium']:>10.5f} {params['comment']}\n"
+        self.ostream.print_info(s)
+        self.ostream.flush()
+    
+    def print_dihedrals(self):
+        s = "Proper dihedrals: \n"
+        s += self.get_torsion_print_string(self.dihedrals)
+        self.ostream.print_info(s)
+        self.ostream.flush()
+
+    def print_impropers(self):
+        s = "Improper dihedrals: \n"
+        s += self.get_torsion_print_string(self.impropers)
+        self.ostream.print_info(s)
+        self.ostream.flush()
+
+    @staticmethod
+    def get_torsion_print_string(torsions):
+        s = ""
+        s += f"{'Torsion':>21} {'barrier (kJ/mol rad^2)':>22} {'phase (rad)':>11} {'periodicity':>12} {'comment'}\n"
+        for torsion, params in torsions.items():
+            if params.get("multiple", False):
+                for barrier, phase, periodicity, comment in zip(params['barrier'], params['phase'], params['periodicity'], params['comment']):
+                    if barrier ==0:
+                        continue
+                    s += f"{torsion[0]+1:>3d} - {torsion[1]+1:>3d} - {torsion[2]+1:>3d} - {torsion[3]+1:>3d} "
+                    s += f"{barrier:>22.1f} {phase:>11.2f} {periodicity:>12d} {comment}\n"
+            else:
+                if params['barrier'] == 0:
+                    continue
+                s += f"{torsion[0]+1:>3d} - {torsion[1]+1:>3d} - {torsion[2]+1:>3d} - {torsion[3]+1:>3d} "
+                s += f"{params['barrier']:>22.1f} {params['phase']:>11.2f} {params['periodicity']:>12d} {params['comment']}\n"
+        return s
+
     @staticmethod
     def save_forcefield_as_json(forcefield, path: str):
         """

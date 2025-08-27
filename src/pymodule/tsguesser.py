@@ -165,7 +165,7 @@ class TransitionStateGuesser():
             product=product,
         )
 
-        self.molecule = self.reactant.molecule
+        self.molecule = Molecule.read_xyz_string(self.reactant.molecule.get_xyz_string())
 
         self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
@@ -283,7 +283,7 @@ class TransitionStateGuesser():
             #make sure E1 is monotonically increasing
             #make sure E2 is monotonically decreasing
             if not self.skip_conformer_search and not self.force_conformer_search:
-                self._print_rescan_mm_header()
+                printed_header = False
                 for i, l in enumerate(self.lambda_vec):
                     rescan = False
                     if i < len(self.lambda_vec) - 1:
@@ -291,6 +291,9 @@ class TransitionStateGuesser():
                     if i > 0:
                         rescan = rescan or E2[i - 1] <= E2[i]
                     if rescan:
+                        if not printed_header:
+                            self._print_rescan_mm_header()
+                            printed_header = True
                         em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
                             self.topology,
                             self.systems[l],
@@ -300,6 +303,8 @@ class TransitionStateGuesser():
                             pro_sim,
                             True,
                         )
+                        if n_conf == -1:
+                            n_conf = 'N/A'
                         if e_int < energies_int[i]:
                             positions[i] = pos
                             energies[i] = em
@@ -307,16 +312,14 @@ class TransitionStateGuesser():
                             E2[i] = e2
                             energies_int[i] = e_int
                             N_conf[i] = n_conf
-                    if n_conf == -1:
-                        n_conf = 'N/A'
-                    self._print_mm_iter(
-                        l,
-                        E1[i],
-                        E2[i],
-                        energies[i],
-                        energies_int[i],
-                        N_conf[i],
-                    )
+                        self._print_mm_iter(
+                            l,
+                            E1[i],
+                            E2[i],
+                            energies[i],
+                            energies_int[i],
+                            N_conf[i],
+                        )
 
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
@@ -355,7 +358,7 @@ class TransitionStateGuesser():
             self.molecule.set_multiplicity(mult)
             self.molecule.set_charge(charge)
             self._save_results(self.results_file, self.results)
-            return self.molecule, self.results
+            return self.results
         else:
             self.ostream.flush()
             self.results.update(results)
@@ -545,14 +548,17 @@ class TransitionStateGuesser():
 
         if ts_results is None:
             if self.results is not None:
+                self.ostream.print_info("Loading self.results")
                 ts_results = self.results
             else:
                 try:
                     if filename is not None:
                         self.results_file = filename
+                    self.ostream.print_info(f"Loading results from {self.results_file}")
                     ts_results = self.load_results(self.results_file)
                 except Exception as e:
                     raise e
+        self.ostream.flush()
 
         mm_energies = ts_results['mm_energies']
         geometries = ts_results['xyz_geometries']
@@ -756,7 +762,6 @@ class TransitionStateGuesser():
             '    E2',
             '    Em',
         )
-        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
         self.ostream.print_header(valstr)
         self.ostream.print_header(45 * '-')
         self.ostream.flush()
@@ -773,7 +778,6 @@ class TransitionStateGuesser():
             '    Em',
             'n_conf',
         )
-        # self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
         self.ostream.print_header(valstr)
         self.ostream.print_header(50 * '-')
         self.ostream.flush()

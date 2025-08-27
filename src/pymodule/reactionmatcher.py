@@ -66,7 +66,7 @@ class ReactionMatcher:
         self._iso_count = 0
         self._mono_count = 0
         self._start_time = 0
-        self._verbose = True
+        self._verbose = False
         self.max_time = 600
 
         self.max_break_attempts_guess = 1e5
@@ -181,7 +181,7 @@ class ReactionMatcher:
 
         insert = "monomorphisms" if self._check_monomorphic else "isomorphisms"
         self.ostream.print_info(
-            f"Found subgraph {insert} with breaking bonds: {list(breaking_edges)} and forced breaking bonds: {list(forced_breaking_edges)}, continuing to find forming bonds"
+            f"Found subgraph {insert} with breaking bonds: {self._print_bond_list(breaking_edges)} and forced breaking bonds: {self._print_bond_list(forced_breaking_edges)}, continuing to find forming bonds"
         )
         self.ostream.flush()
         forming_edges = self._find_forming_edges(
@@ -198,7 +198,7 @@ class ReactionMatcher:
             return None, None, None
 
         self.ostream.print_info(
-            f"Found forming bonds: {forming_edges}. Finding mapping from isomorphism."
+            f"Found forming bonds: {self._print_bond_list(forming_edges)}. Finding mapping from isomorphism."
         )
         self.ostream.flush()
         # print(forming_edges)
@@ -237,14 +237,14 @@ class ReactionMatcher:
                 A.remove_edge(*edge)
                 if self._verbose:
                     self.ostream.print_info(
-                        f"Trying to find breaking edge {edge} at depth {depth}")
+                        f"Trying to find breaking edge {self._print_bond(edge)} at depth {depth}")
                 self.ostream.flush()
                 edges = self._find_breaking_edges(A, B, depth - 1,
                                                   B_composition)
                 if edges is not None:
                     edges.add(edge)
                     self.ostream.print_info(
-                        f"Found breaking edges: {edges} at depth {depth}.")
+                        f"Found breaking edges: {self._print_bond_list(edges)} at depth {depth}.")
                     self.ostream.flush()
                     return edges
                 A.add_edge(*edge)
@@ -294,7 +294,7 @@ class ReactionMatcher:
                     A.add_edge(node_i, node_j)
                     if self._verbose:
                         self.ostream.print_info(
-                            f"Trying to find bond {bond_count}: ({node_i}, {node_j})"
+                            f"Trying to find bond {bond_count}: {self._print_bond((node_i, node_j))}"
                         )
                         self.ostream.flush()
                     if not self._connected_components_are_subgraphs(A, B):
@@ -305,7 +305,7 @@ class ReactionMatcher:
 
                     edge = (node_i, node_j)
                     forming_edges.append(edge)
-                    self._check_time(f"finding bond {bond_count}: {edge}")
+                    self._check_time(f"finding bond {bond_count}: {self._print_bond(edge)}")
                     self.ostream.flush()
                     break
                 if edge is not None:
@@ -348,7 +348,6 @@ class ReactionMatcher:
         cc_B = list(nx.connected_components(B))
         cc_B.sort(key=len)
         max_nodes = len(cc_B[-1])
-        # self.ostream.print_info(f"number of connected components in A: {len(connected_components)}")
         for g in cc_A:
             if len(g) > max_nodes:
                 return False
@@ -412,3 +411,12 @@ class ReactionMatcher:
             )
             return False
         return True
+
+    @staticmethod
+    def _print_bond_list(bonds):
+        bonds = list(bonds)
+        return {"[{', '.join([ReactionMatcher._print_bond(bond) for bond in bonds])}]"}
+
+    @staticmethod
+    def _print_bond(bond):
+        return f"({bond[0]+1}, {bond[1]+1})"
