@@ -157,6 +157,7 @@ class GostshypDriver:
         amplitudes = self.pressure * self.tessellation[3] / f_tilde
 
         amplitudes_mask = amplitudes >= 0.0
+        np.savetxt('amps_mask.txt', amplitudes_mask, fmt="%5i")
 
         self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
 
@@ -227,7 +228,7 @@ class GostshypDriver:
         amplitudes = self.pressure * self.tessellation[3] / f_tilde
 
         amplitudes_mask = amplitudes >= 0.0
-
+        
         self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
 
         centers = (self.tessellation[:3].T[amplitudes_mask]).copy()

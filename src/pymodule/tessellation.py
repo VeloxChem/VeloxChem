@@ -700,7 +700,7 @@ class TessellationDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def visualize_grid(self, molecule):
+    def visualize_grid(self, molecule, amps_mask):
         """
         Visualizes grid for surface discretization.
 
@@ -720,13 +720,27 @@ class TessellationDriver:
         assert_msg_critical(grid.shape[1] == 11,
                             'TessellationDriver.visualize_grid: Invalid grid size')
 
-        grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
+        amps_mask = amps_mask > 0
 
-        grid_xyz_string = f'{grid_in_angstrom.shape[0]}\n\n'
+        num_points = np.sum(amps_mask)
 
-        for i in range(grid_in_angstrom.shape[0]):
+        grid_in_angstrom = grid[amps_mask, :3] * bohr_in_angstrom()
+
+        num_neg_amp = grid.shape[0] - num_points
+
+        grid_in_angstrom_neg_amp = grid[~amps_mask, :3] * bohr_in_angstrom()
+
+        grid_xyz_string = f'{num_points}\n\n'
+
+        grid_xyz_string_neg_amp = f'{num_neg_amp}\n\n'
+
+        for i in range(num_points):
             x, y, z = grid_in_angstrom[i]
             grid_xyz_string += f'He {x} {y} {z}\n'
+
+        for i in range(num_neg_amp):
+            x, y, z = grid_in_angstrom_neg_amp[i]
+            grid_xyz_string_neg_amp += f'B {x} {y} {z}\n'
 
         v = p3d.view(width=600, height=600)
 
@@ -738,7 +752,15 @@ class TessellationDriver:
                    {'sphere': {
                        'radius': 0.05,
                        'color': 'red',
-                       'opacity': 0.5
+                       'opacity': 0.7
+                   }})
+        
+        v.addModel(grid_xyz_string_neg_amp, 'xyz')
+        v.setStyle({'elem': 'B'},
+                   {'sphere': {
+                       'radius': 0.05,
+                       'color': 'blue',
+                       'opacity': 0.8
                    }})
 
         v.zoomTo()
