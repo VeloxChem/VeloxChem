@@ -197,9 +197,6 @@ def _worker_gradient_grad(mol, qm_e_i, qm_grad_i, alphas, z_matrix,
     dF_loc = np.empty(n, dtype=float)
     dE_res = (E_hat - qm_e_i)          # kcal already
     dG_res = (G_hat - qm_grad_i)    # (natms,3)
-    sum_of_weight_grad_num = np.zeros_like(mol.get_coordinates_in_bohr())
-    sum_of_weight_grad = np.zeros_like(mol.get_coordinates_in_bohr())
-    # print('DPS', len(dps), i)
 
     for j, dp in enumerate(dps[:]):
         
@@ -1133,15 +1130,10 @@ class IMDatabasePointCollecter:
                     print('Current Density', self.density_around_data_point[0][root], '-->', self.desired_datpoint_density, self.unadded_cycles)   
                 print('Current State (PES):', self.current_state) 
                 print('-' * 60)   
-            # self.output_file_writer(self.summary_output)
+
             self.step += 1
 
             self.simulation.step(1)
-            
-                #print('cooridnates', simulation.context.getState(getPositions=True).getPositions())
-
-            # if step == self.nsteps and self.density_around_data_point[0] != self.desired_datpoint_density:
-            #     step = 0
             
             for root in self.roots_to_follow:
                 if self.density_around_data_point[0][root] >= self.desired_datpoint_density and self.expansion:
@@ -2319,8 +2311,8 @@ class IMDatabasePointCollecter:
                 internal_coordinate_datapoints.append(self.qm_data_point_dict[self.current_state][label])
                 if cumulative_weight >= 0.8 * total_weight:
                     break
-            # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
-            constraints = self.impes_drivers[self.current_state].determine_important_internal_coordinates(qm_energy, grad_mw, molecule, self.z_matrix, internal_coordinate_datapoints, 'energy')
+            # # qm_datapoints_weighted = [qm_datapoint for qm_datapoint in enumerate if ]
+            # constraints = self.impes_drivers[self.current_state].determine_important_internal_coordinates(qm_energy, grad_mw, molecule, self.z_matrix, internal_coordinate_datapoints, 'energy')
 
 
 
@@ -3185,7 +3177,6 @@ class IMDatabasePointCollecter:
                 interpolation_driver.symmetry_information = sym_dict
                 interpolation_driver.qm_symmetry_data_points = sym_datapoints
                 interpolation_driver.distance_thrsh = 1000
-                interpolation_driver.exponent_p = 2
                 interpolation_driver.print = False
                 interpolation_driver.qm_data_points = combined_datapoints
                 
@@ -3360,10 +3351,7 @@ class IMDatabasePointCollecter:
 
                     dE_dalpha = dw * (P_j - new_im_energy * hartree_in_kcalpermol()) / S  
 
-                    dF_dalphas[j] += 2.0 * diff * dE_dalpha   
-                    
-
-            
+                    dF_dalphas[j] += 2.0 * diff * dE_dalpha            
 
             return dF_dalphas
         
