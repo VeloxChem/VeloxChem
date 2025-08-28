@@ -456,9 +456,8 @@ class VibrationalAnalysis:
 
         number_of_modes = len(self.vib_frequencies)
 
-        # dictionary for Raman activities
-        raman_activities = {}
-        tmp_raman_activities = np.zeros((n_ext_freqs, number_of_modes))
+        # arrays for Raman activities
+        raman_activities = np.zeros((n_ext_freqs, number_of_modes))
         int_pol = None
         int_depol = None
         depol_ratio = None
@@ -494,17 +493,15 @@ class VibrationalAnalysis:
                         gamma_bar_tmp_2)**2
 
             alpha_bar_sq = np.abs(alpha_bar)**2
-            raman_activities[freq] = (45.0 * alpha_bar_sq + 7.0 *
-                                      gamma_bar_sq) * raman_conversion_factor
-            tmp_raman_activities[n] = (45.0 * alpha_bar_sq + 7.0 *
-                                       gamma_bar_sq) * raman_conversion_factor
+            raman_activities[n] = (45.0 * alpha_bar_sq + 7.0 *
+                                   gamma_bar_sq) * raman_conversion_factor
 
             if self.print_depolarization_ratio:
                 int_pol[n] = 45.0 * alpha_bar_sq + 4.0 * gamma_bar_sq
                 int_depol[n] = 3.0 * gamma_bar_sq
                 depol_ratio[n] = int_depol[n] / int_pol[n]
 
-        return tmp_raman_activities, int_pol, int_depol, depol_ratio
+        return raman_activities, int_pol, int_depol, depol_ratio
 
     def calculate_ir_intensity(self, normal_modes):
         """
@@ -1151,13 +1148,9 @@ class VibrationalAnalysis:
 
         hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))
 
-        #normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
-        #for n, Q in enumerate(self.normal_modes, 1):
-        #    normal_mode_grp.create_dataset(str(n),
-        #                                   data=np.array(Q).reshape(natm, 3))
         hf.create_dataset(vib_group + 'normal_modes',
-                          data=np.array(self.normal_modes).reshape(
-                              nmodes, natm, 3))
+                          data=np.array(self.normal_modes.reshape(
+                              nmodes, natm, 3)))
 
         hf.create_dataset(vib_group + 'hessian', data=self.hessian)
         hf.create_dataset(vib_group + 'vib_frequencies',
@@ -1167,8 +1160,11 @@ class VibrationalAnalysis:
         hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array(self.reduced_masses))
         if self.do_ir:
+            hf.create_dataset(vib_group + 'dipole_gradient',
+                              data=np.array(self.dipole_gradient.reshape(3, natm, 3)))
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
+
         if self.do_raman or self.do_resonance_raman:
             hf.create_dataset(vib_group + "number_of_external_frequencies",
                               data=np.array([nfreqs]))
@@ -1181,7 +1177,7 @@ class VibrationalAnalysis:
             if self.do_resonance_raman:
                 raman_type = 'resonance'
             hf.create_dataset(vib_group + 'raman_type', data=np.bytes_([raman_type]))
-           
+
         hf.close()
 
     def print_header(self):
