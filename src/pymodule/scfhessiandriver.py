@@ -165,6 +165,9 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
         self.profiler = profiler
+        self.ostream.unmute()
+        self.ostream.print_info("Creating profiler for Hessian driver...")
+        self.ostream.mute()
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
