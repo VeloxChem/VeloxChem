@@ -2390,7 +2390,7 @@ class IMDatabasePointCollecter:
                 self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
             print('len of molecules', len(self.allowed_molecules[self.current_state]['molecules']), self.use_opt_confidence_radius)
-            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
+            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or 1 == 1 and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
                 
                 if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) > 20 and 1 == 2:
                     self.add_a_point = True
@@ -3441,7 +3441,7 @@ class IMDatabasePointCollecter:
                 
             sum_sq_error = 0.0
             e_x = self.use_opt_confidence_radius[3]
-            natms = len(structure_list[0].get_labels())
+            natms = len(sym_dict[3])
             beta = 0.8
 
             for i, dp in enumerate(dps[:]):
@@ -3461,13 +3461,21 @@ class IMDatabasePointCollecter:
                 new_im_energy = interpolation_driver.get_energy()
                 new_im_gradient = interpolation_driver.get_gradient()
 
-                diff_e_kcal = (new_im_energy - qm_e[i])
+                diff_e_kcal = (new_im_energy - qm_e[i]) * hartree_in_kcalpermol()
                 
-                h = qm_g[i].reshape(-1)
-                norm_h = np.linalg.norm(h)              
-                # define the parallel and perpendicular components of g
+                flattend_indices = [outer_i * 3 + inner_i for outer_i in sym_dict[3] for inner_i in range(3)]
+                
+                idx = np.asarray(flattend_indices, dtype=int)   # length = 3*N_sub
+                nsub = idx.size
 
-                dg_reshaped = new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)
+                # full residuals (flattened)
+                dg_full = (new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)) * hartree_in_kcalpermol()
+
+                # subspace projections
+                dg_reshaped = dg_full[idx]
+                h  = qm_g[i].reshape(-1)[idx] * hartree_in_kcalpermol()
+                norm_h = np.linalg.norm(h)              
+
                 L_iso = (dg_reshaped @ dg_reshaped) / (natms * 3)
 
                 if norm_h > 1e-8:
@@ -3487,7 +3495,7 @@ class IMDatabasePointCollecter:
                     L_e = diff_e_kcal**2
                     L_F = L_iso
 
-                diff = e_x * L_e + 0.5 * (1.0 - e_x) * L_F
+                diff = 1.0 * e_x * L_e + 0.5 * (1.0 - e_x) * L_F
 
                 sum_sq_error += (diff)
                 
@@ -3564,7 +3572,7 @@ class IMDatabasePointCollecter:
                 return out_weight, out_g_j, out_dwprime_dalpha
             
             n_points = len(dps[:])
-            natms = len(structure_list[0].get_labels())
+            natms = len(sym_dict[3])
             beta = 0.8
             dF_dalphas = np.zeros(n_points, dtype=float)
             e_x = self.use_opt_confidence_radius[3]
@@ -3591,38 +3599,61 @@ class IMDatabasePointCollecter:
                 
                 # print('g_prime', num_g, new_im_gradient, num_g - new_im_gradient)
 
-                S = interpolation_driver.sum_of_weights 
-                S_prime = interpolation_driver.sum_of_weights_grad
+                S = interpolation_driver.sum_of_weights
+                S_prime = interpolation_driver.sum_of_weights_grad 
                 
                 # print('S prime', num_s_prime, S_prime, num_s_prime - S_prime)
                 
                 # residuals
+
+                # --- indices of subpart (flattened xyz) ---
+
                 dE_res = (new_im_energy - qm_e[i]) * hartree_in_kcalpermol()          # kcal already
-                dG_res = (new_im_gradient - qm_gradients[i]) * hartree_in_kcalpermol()  # (natms,3)
+                # dG_res = (new_im_gradient - qm_gradients[i]) * hartree_in_kcalpermol()  # (natms,3)
                 # print('DPS', len(dps), i)
+
+                flattend_indices = [outer_i * 3 + inner_i for outer_i in sym_dict[3] for inner_i in range(3)]
                 
-                h = qm_g[i].reshape(-1)
+                idx = np.asarray(flattend_indices, dtype=int)   # length = 3*N_sub
+                nsub = idx.size
+
+                # full residuals (flattened)
+                dg_full = (new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)) * hartree_in_kcalpermol()
+
+                # subspace projections
+                dg_reshaped = dg_full[idx]
+                h  = qm_g[i].reshape(-1)[idx] * hartree_in_kcalpermol()
+                
+                # h = qm_g[i].reshape(-1)
                 norm_h = np.linalg.norm(h)
                 u = h / norm_h if norm_h > 1e-8 else h # define the unit vector
-                tau = 1e-12
+                tau = 1e-8
                 gate   = (norm_h**2) / (norm_h**2 + tau**2)
                 
                 # define the parallel and perpendicular components of g
 
-                dg_reshaped = new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)
+                # dg_reshaped = new_im_gradient.reshape(-1) - qm_g[i].reshape(-1)
 
                 dg_parallel   = np.dot(u.T, dg_reshaped) * u
                 dg_perpendicular = dg_reshaped - dg_parallel
 
-                dL_dg = 2.0 * (1.0 - gate) * dg_reshaped
+                dL_dg = 0.0
+
+                nsub = idx.size  # number of components in the subspace (3 * N_sub)
 
                 if norm_h > 1e-8:
-                    
-                    dL_dg += 2.0 * gate * (
-                        (beta/(natms * 3)) * dg_perpendicular + (2*(1-beta)) * dg_parallel
+                    dL_dg = (
+                        2.0 * gate * (
+                            (beta / nsub) * dg_perpendicular
+                            + (1.0 - beta) * dg_parallel        # <-- no extra 2 here
+                        )
+                        + 2.0 * (1.0 - gate) / nsub * dg_reshaped  # <-- outside the gate block
                     )
+                else:
+                    dL_dg = 2.0 / nsub * dg_reshaped
 
-                
+                dL_dg_full = np.zeros_like(dg_full)
+                dL_dg_full[idx] = dL_dg
                 # diff =  e_x * (dE_res)**2 + (1.0 - e_x) * (dG_res**2).mean()
 
                 # sum_sq_error += (diff)
@@ -3637,15 +3668,36 @@ class IMDatabasePointCollecter:
                         dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient(dp) # (natms,3)
 
                     else:
-                        dw        = interpolation_driver.trust_radius_weight_gradient_hessian(dp)          # scalar
+                        dw        = interpolation_driver.trust_radius_weight_gradient_hessian(dp)        # scalar
                         dw_prime  = interpolation_driver.trust_radius_weight_gradient_gradient_hessian(dp) # (natms,3)
 
                     P_j  = interpolation_driver.potentials[j]            # kcal
-                    G_j  = interpolation_driver.gradients[j]             # (natms,3)
+                    G_j  = interpolation_driver.gradients[j]            # (natms,3)
                     # print('G_j', G_j, num_Gj, G_j - num_Gj)
+
+                    # num_grad = np.zeros_like(dw_prime)
+
+                    # # # numerical gradient
+                    # org_conf_radius = dp.confidence_radius
+                    # epsilon = 1e-6
+                    # dp.confidence_radius = org_conf_radius + epsilon
+                    # _, _, _, f_plus, _, _ = interpolation_driver.cartesian_hessian_distance(dp)
+                    # dp.confidence_radius = org_conf_radius - 1.0 * epsilon
+                    # _, _, _, f_minus, _, _ = interpolation_driver.cartesian_hessian_distance(dp)
+                    # dp.confidence_radius = org_conf_radius
+                    # num_grad += (f_plus - f_minus) / (2 * epsilon)
+
+                    # # analytical gradient
+
+                    # print("Analytical gradient:", dw_prime)
+                    # print("Numerical gradient:", num_grad)
+                    # print("Difference:", dw_prime - num_grad)
+
+                    # exit()
+
                     
                     # ---- derivative of gradient wrt α_j --------------------------
-                    term1_kcal = dw_prime * (P_j - new_im_energy) * hartree_in_kcalpermol() / S            # (natms,3)
+                    term1_kcal = dw_prime * (P_j - new_im_energy) * hartree_in_kcalpermol()  / S            # (natms,3)
                     term2_kcal = dw       * (G_j - new_im_gradient) * hartree_in_kcalpermol() / S            # (natms,3)
                     term3_kcal = dw       * (P_j - new_im_energy) * hartree_in_kcalpermol() * S_prime / S**2 # (natms,3)  MINUS sign later
                     term1 = dw_prime * (P_j - new_im_energy) / S            # (natms,3)
@@ -3655,21 +3707,15 @@ class IMDatabasePointCollecter:
                     dG_dα = (term1 + term2 - term3) 
 
                     # print('weight_prime', anal_grad_weight - num_weight_prime, '\n dG_res', dG_res, '\n dG_dalpha', dG_dα)
+ 
+                    dE_dα = dw * (P_j - new_im_energy) * hartree_in_kcalpermol() / S                   # scalar
 
-                    dE_dα = dw * (P_j - new_im_energy) * hartree_in_kcalpermol()  / S                    # scalar
-
-                    norm_g = np.linalg.norm(new_im_gradient)
-                    norm_h = np.linalg.norm(qm_g[i])
-                    den    = norm_g * norm_h
-
-
-
-                    dLdg_mat = dL_dg.reshape(natms, 3)
+                    dLdg_mat = dL_dg_full.reshape(-1, 3)
 
                     # chain rule for forces
-                    dL_dgdg_dα = np.tensordot(dLdg_mat, dG_dα, axes=((0,1),(0,1)))
+                    dL_dgdg_dα = np.tensordot(dLdg_mat, dG_dα_kcal, axes=((0,1),(0,1)))
 
-                    dF_dalphas[j] += 2*e_x * dE_res * dE_dα + (1-e_x)* dL_dgdg_dα
+                    dF_dalphas[j] += 1.0 * 2*e_x * dE_res * dE_dα + 0.5 * (1-e_x)* dL_dgdg_dα
 
 
                     # cosine function part
@@ -3796,7 +3842,7 @@ class IMDatabasePointCollecter:
             num_grad = np.zeros_like(alphas)
 
             # # numerical gradient
-            epsilon = 1e-6
+            epsilon = 1e-5
             for i in range(len(alphas)):
                 delta = np.zeros_like(alphas)
                 delta[i] = epsilon

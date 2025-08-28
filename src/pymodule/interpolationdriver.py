@@ -518,13 +518,12 @@ class InterpolationDriver():
         weight_gradients_cart = []
         used_labels = []
 
-        sum_weight_gradients_cart = np.zeros((natms - len(self.symmetry_information[4]), 3))
+        sum_weight_gradients_cart = np.zeros((natms, 3))
 
         distances_and_gradients = []
         min_distance = float('inf')
         self.time_step_reducer = False
         
-        print('Weightfunction Mode', self.weightfunction_type)
         if not self.use_symmetry and 1==2:
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
@@ -535,7 +534,7 @@ class InterpolationDriver():
 
                 distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vector))
         
-        elif self.weightfunction_type == 'Cartesian-Hessian':
+        elif self.weightfunction_type == 'cartesian-hessian':
             for i, data_point in enumerate(self.qm_data_points[:]):
                 
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_hessian_distance(data_point)
@@ -610,15 +609,15 @@ class InterpolationDriver():
         self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
 
         # ∇U = Σ Wᵢ ∇Uᵢ  +  Σ Uᵢ ∇Wᵢ
-        if len(self.symmetry_information[3]) != natms:
-            self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
-            # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
-            # Add contributions only to the selected rows
+        # if len(self.symmetry_information[3]) != natms:
+        #     self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
+        #     # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
+        #     # Add contributions only to the selected rows
             
-            self.impes_coordinate.gradient[self.symmetry_information[3]] += np.tensordot(potentials, grad_W_i, axes=1)
-        else:
+        #     self.impes_coordinate.gradient[self.symmetry_information[3]] = np.tensordot(potentials, grad_W_i, axes=1)
+        # else:
 
-            self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
+        self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
 
 
         # --- 4.  book-keeping (optional) ---------------------------------------------
@@ -1208,7 +1207,7 @@ class InterpolationDriver():
             distance_vector[:] = 0
 
         if self.interpolation_type == 'shepard':
-            denominator, weight_gradient = self.shepard_weight_gradient(
+            denominator, weight_gradient_sub = self.shepard_weight_gradient(
                 distance_vector, distance, data_point.confidence_radius)        
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
@@ -1217,6 +1216,9 @@ class InterpolationDriver():
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
+        
+        weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
+        weight_gradient[self.symmetry_information[3]] = weight_gradient_sub
         
 
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
@@ -1346,8 +1348,10 @@ class InterpolationDriver():
         z_mat = rigid + resp                            # (Nc,3)
         z_mat = apply_Jc(z_mat)                        # (Nc,3)
 
-        grad_s = 1.0 * z_mat / distance                            # (Nc,3) 
+        grad_s_sub = 1.0 * z_mat / distance                            # (Nc,3) 
 
+        grad_s = np.zeros_like(reference_coordinates)   # (natms,3)
+        grad_s[self.symmetry_information[3]] = grad_s_sub
 
         dihedral_dist = 0.0
         if distance < 1e-8:
@@ -1363,6 +1367,8 @@ class InterpolationDriver():
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
             raise ValueError(errtxt)
+        
+
         
 
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
