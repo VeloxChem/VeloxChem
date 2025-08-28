@@ -848,6 +848,19 @@ class MMForceFieldGenerator:
         )
         self.ostream.flush()
 
+        return {
+            'dihedral_angles':
+            np.array(fitted_dihedral_results['dihedral_angles']),
+            'qm_scan_kJpermol':
+            np.array(fitted_dihedral_results['qm_scan_kJpermol']),
+            'mm_scan_kJpermol':
+            np.array(fitted_dihedral_results['mm_scan_kJpermol']),
+            'maximum_difference':
+            self.fitting_summary['maximum_difference'],
+            'standard_deviation':
+            self.fitting_summary['standard_deviation'],
+        }
+
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
         Reads QM scan xyz files.
@@ -3494,7 +3507,7 @@ class MMForceFieldGenerator:
             s += f"{angle[0]+1:>3d} - {angle[1]+1:>3d} - {angle[2]+1:>3d} {params['force_constant']:>18.1f} {params['equilibrium']:>10.5f} {params['comment']}\n"
         self.ostream.print_info(s)
         self.ostream.flush()
-    
+
     def print_dihedrals(self):
         s = "Proper dihedrals: \n"
         s += self.get_torsion_print_string(self.dihedrals)
@@ -3513,8 +3526,10 @@ class MMForceFieldGenerator:
         s += f"{'Torsion':>21} {'barrier (kJ/mol rad^2)':>22} {'phase (rad)':>11} {'periodicity':>12} {'comment'}\n"
         for torsion, params in torsions.items():
             if params.get("multiple", False):
-                for barrier, phase, periodicity, comment in zip(params['barrier'], params['phase'], params['periodicity'], params['comment']):
-                    if barrier ==0:
+                for barrier, phase, periodicity, comment in zip(
+                        params['barrier'], params['phase'],
+                        params['periodicity'], params['comment']):
+                    if barrier == 0:
                         continue
                     s += f"{torsion[0]+1:>3d} - {torsion[1]+1:>3d} - {torsion[2]+1:>3d} - {torsion[3]+1:>3d} "
                     s += f"{barrier:>22.1f} {phase:>11.2f} {periodicity:>12d} {comment}\n"
