@@ -165,6 +165,9 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
         self.profiler = profiler
+        self.ostream.unmute()
+        self.ostream.print_info("Creating profiler for Hessian driver...")
+        self.ostream.mute()
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
@@ -431,8 +434,6 @@ class ScfHessianDriver(HessianDriver):
                 dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
 
                 for j in atoms:
-                    if j < i:
-                        continue
                     if atom_pairs is not None:
                         if i != j and (i, j) not in atom_pairs and (
                                 j, i) not in atom_pairs:
@@ -614,11 +615,12 @@ class ScfHessianDriver(HessianDriver):
         if atom_pairs is None:
             all_atom_pairs = [(i, j) for i in range(natm)
                               for j in range(i, natm)]
+            local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
         else:
             all_atom_pairs = copy.copy(atom_pairs)
             for i in atoms:
                 all_atom_pairs.append((i, i))
-        local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
+            local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
 
         for i, j in local_atom_pairs:
 
