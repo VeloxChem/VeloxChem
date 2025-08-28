@@ -446,10 +446,13 @@ class PolarizabilityGradient:
             # initiate polarizability gradient variable with data type set in init()
             pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
+            # overlap gradient driver
+            ovlp_grad_drv = OverlapGeom100Driver()
+
             # kinetic energy gradient driver
             kin_grad_drv = KineticEnergyGeom100Driver()
 
-            # nuclear potential gradienr drivers
+            # nuclear potential gradient drivers
             npot_grad_100_drv = NuclearPotentialGeom100Driver()
             npot_grad_010_drv = NuclearPotentialGeom010Driver()
 
@@ -483,7 +486,7 @@ class PolarizabilityGradient:
                 gmat_hcore = Matrices()
 
                 # overlap contribution to gradient
-                ovlp_grad_drv = OverlapGeom100Driver()
+                #ovlp_grad_drv = OverlapGeom100Driver()
                 gmats_ovlp = ovlp_grad_drv.compute(molecule, basis, iatom)
 
                 for icoord, label in enumerate(['X', 'Y', 'Z']):
@@ -549,14 +552,8 @@ class PolarizabilityGradient:
             profiler.check_memory_usage(f"ERI grad")
 
             pol_gradient += eri_contrib
-            #pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             del eri_contrib
-
-            # if self.rank == mpi_master():
-            #     for x in range(dof):
-            #         for y in range(x + 1, dof):
-            #             pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
                 profiler.start_timer("XC")
@@ -566,8 +563,6 @@ class PolarizabilityGradient:
                     molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao, profiler)
 
                 # add contribution to the SCF polarizability gradient
-               # if self.rank == mpi_master():
-               #     pol_gradient += polgrad_xc_contrib
                 pol_gradient += polgrad_xc_contrib
 
                 profiler.stop_timer("XC")
@@ -582,7 +577,6 @@ class PolarizabilityGradient:
                     for y in range(x + 1, dof):
                         pol_gradient[y, x] += pol_gradient[x, y]
 
-#            if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
             profiler.stop_timer('total')

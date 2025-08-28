@@ -474,7 +474,7 @@ class VibrationalAnalysis:
             size_y = current_polarizability_gradient.shape[1]
             size_k = self.raw_normal_modes.shape[0]
 
-            # einsum 'xyi,ik->xyk'
+            # 'xyi,ik->xyk'
             raman_transmom = np.matmul(
                 current_polarizability_gradient.reshape(size_x * size_y, -1),
                 normal_modes.T).reshape(size_x, size_y, size_k)
@@ -539,7 +539,7 @@ class VibrationalAnalysis:
         m_to_A = 1e+10  # meters in Angstroms
 
         # diagonalizes Hessian and calculates the reduced masses
-        # einsum 'ki->i'
+        # 'ki->i'
         reduced_masses = 1.0 / np.sum(self.raw_normal_modes.T**2, axis=0)
 
         force_constants = (4.0 * np.pi**2 *
@@ -1161,7 +1161,7 @@ class VibrationalAnalysis:
                           data=np.array(self.reduced_masses))
         if self.do_ir:
             hf.create_dataset(vib_group + 'dipole_gradient',
-                              data=np.array(self.dipole_gradient.reshape(3, natm, 3)))
+                              data=np.array(self.dipole_gradient))
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
 
