@@ -39,4 +39,4 @@ class TestTransitionStateGuesser:
         assert results['formed_bonds'] == {
             tuple(reference_results['formed_bonds'][0])
         }
-        assert results['final_lambda'] == reference_results['final_lambda']
+        assert results['max_scf_lambda'] == reference_results['final_lambda']

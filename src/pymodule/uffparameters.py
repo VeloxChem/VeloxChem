@@ -113,10 +113,6 @@ def get_uff_parameters():
     for idx, (x, D) in enumerate(zip(uff_x_values, uff_D_values)):
         key = periodic_table[idx]
 
-        # rename C to cx, H to hx, etc.
-        if key in ['C', 'H', 'O', 'N', 'S', 'P']:
-            key = key.lower() + 'x'
-
         sigma = 0.1 * x / 2.0**(1.0 / 6.0)
         epsilon = D * 4.184
 
