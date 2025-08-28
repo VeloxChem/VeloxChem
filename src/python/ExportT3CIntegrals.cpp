@@ -90,7 +90,10 @@ export_t3cintegrals(py::module& m)
              (&CRIFockDriver::compute, py::const_),
              "Computes Coulomb Fock matrix for given density.")
         .def("local_compute", &CRIFockDriver::local_compute, "Computes local Coulomb Fock matrix for given density.")
-        .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.")
+        .def("compute_bq_vector", py::overload_cast<const CMatrix&> (&CRIFockDriver::compute_bq_vector, py::const_),
+             "Computes transformed Gamma vector for given density.")
+        .def("compute_bq_vector", py::overload_cast<const CSubMatrix&, const CSubMatrix&> (&CRIFockDriver::compute_bq_vector, py::const_),
+             "Computes transformed Bq vector for given similarity transformed MOs.")
         .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.");
     
     // CRIFockGradDriver class
