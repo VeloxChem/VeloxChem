@@ -165,7 +165,8 @@ class TransitionStateGuesser():
             product=product,
         )
 
-        self.molecule = Molecule.read_xyz_string(self.reactant.molecule.get_xyz_string())
+        self.molecule = Molecule.read_xyz_string(
+            self.reactant.molecule.get_xyz_string())
 
         self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
@@ -380,10 +381,15 @@ class TransitionStateGuesser():
     ):
         if not conformer_search:
             integrator = mm.VerletIntegrator(self.mm_step_size)
+            # TODO add more flexible options if we need them, coordinate with conformergenerator as well
+            # platform settings for small molecule
+            platform = mm.Platform.getPlatformByName("CPU")
+            platform.setPropertyDefaultValue("Threads", "1")
             simulation = mmapp.Simulation(
                 topology,
                 system,
                 integrator,
+                platform,
             )
             simulation.context.setPositions(init_pos)
             simulation.context.setVelocitiesToTemperature(300 * mmunit.kelvin)
@@ -554,7 +560,8 @@ class TransitionStateGuesser():
                 try:
                     if filename is not None:
                         self.results_file = filename
-                    self.ostream.print_info(f"Loading results from {self.results_file}")
+                    self.ostream.print_info(
+                        f"Loading results from {self.results_file}")
                     ts_results = self.load_results(self.results_file)
                 except Exception as e:
                     raise e
@@ -768,7 +775,9 @@ class TransitionStateGuesser():
 
     def _print_rescan_mm_header(self):
         self.ostream.print_blank()
-        self.ostream.print_header(f"Scanning MM conformers with {self.conformer_snapshots} snapshots and {self.conformer_steps} steps")
+        self.ostream.print_header(
+            f"Scanning MM conformers with {self.conformer_snapshots} snapshots and {self.conformer_steps} steps"
+        )
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {} | {}'.format(
             'Lambda',
