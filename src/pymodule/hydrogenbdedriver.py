@@ -64,19 +64,37 @@ class HydrogenBdeDriver:
         self.ostream = ostream
 
         #set basis
-        self.basis_sets = [
-        ]  #two basis sets needed for optimization and final single point energy calculation
-        self.xcfunctionals = []
+        self.basis_sets = ["def2-svp","def2-tzvp"]  #two basis sets needed for optimization and final single point energy calculation
+        self.xcfunctionals = ["blyp","b3lyp"]
         #whole molecule optimization workflow
         self.mol_scf_drv = ScfRestrictedDriver()
+        self.mol_scf_drv.conv_thresh = 1e-3
+        self.mol_scf_drv.ri_coulomb = True
+        self.mol_scf_drv.grid_level = 2
         self.mol_opt_drv = OptimizationDriver(self.mol_scf_drv)
+        self.mol_opt_drv.conv_energy = 1e-04
+        self.mol_opt_drv.conv_drms = 1e-02
+        self.mol_opt_drv.conv_dmax = 2e-02
+        self.mol_opt_drv.conv_grms = 4e-03
+        self.mol_opt_drv.conv_gmax = 8e-03
         self.mol_final_scf_drv = ScfRestrictedDriver()
+        self.mol_final_scf_drv.conv_thresh = 1e-3
         #radical optimization workflow
         self.radical_scf_drv = ScfUnrestrictedDriver()
+        self.radical_scf_drv.conv_thresh = 1e-3
+        self.radical_scf_drv.ri_coulomb = True
+        self.radical_scf_drv.grid_level = 2
         self.radical_opt_drv = OptimizationDriver(self.radical_scf_drv)
+        self.radical_opt_drv.conv_energy = 1e-04
+        self.radical_opt_drv.conv_drms = 1e-02
+        self.radical_opt_drv.conv_dmax = 2e-02
+        self.radical_opt_drv.conv_grms = 4e-03
+        self.radical_opt_drv.conv_gmax = 8e-03
         self.radical_final_scf_drv = ScfUnrestrictedDriver()
+        self.radical_final_scf_drv.conv_thresh = 1e-3
         #hydrogen radical scf driver
         self.hydrogen_final_scf_drv = ScfUnrestrictedDriver()
+        self.hydrogen_final_scf_drv.conv_thresh = 1e-3
         #analyze all atoms in the molecule, setting for _atom_analyzer
         self.analyze_allatoms = False
         self.target_atom = "H"
@@ -553,7 +571,7 @@ class HydrogenBdeDriver:
             #add bde based on coords and unique_bde_au
             for i in range(len(bdes_coords)):
                 #bde coords is a list of tuple [(bde, (x, y, z)),(bde, (x, y, z))]
-                bde_kj = round(bdes_coords[i][0], 1)
+                bde_kj = round(bdes_coords[i][0], 0) #only show the integer part
                 viewer.addLabel(
                     f'{bde_kj}', {
                         'position': {
