@@ -664,16 +664,16 @@ class VibrationalAnalysis:
             lr_drv.damping = polgrad_drv.damping
             # get absorption cross section from CPP calculations
             lr_drv.cpp_flag = 'absorption'
-            # save response results in the vib sub-folder of the checkpoint file
-            lr_drv.group_label = 'vib/rsp'
+            # don't save the solution vectors
+            lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = polgrad_drv.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
         else:
             lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
-            # save response results in the vib subfolder of the cehckpoint file
-            lr_drv.group_label = 'vib/rsp'
+            # don't save the solution vectors
+            lr_drv.save_solutions = False
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = self.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
