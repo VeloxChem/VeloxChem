@@ -1152,16 +1152,20 @@ class VibrationalAnalysis:
 
         natm = molecule.number_of_atoms()
         nmodes = len(self.vib_frequencies)
+        nfreqs = len(self.frequencies)
 
         nuc_rep = molecule.nuclear_repulsion_energy()
         hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         hf.create_dataset(vib_group + "number_of_modes", data=np.array([nmodes]))
 
-        normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
-        for n, Q in enumerate(self.normal_modes, 1):
-            normal_mode_grp.create_dataset(str(n),
-                                           data=np.array(Q).reshape(natm, 3))
+        #normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
+        #for n, Q in enumerate(self.normal_modes, 1):
+        #    normal_mode_grp.create_dataset(str(n),
+        #                                   data=np.array(Q).reshape(natm, 3))
+        hf.create_dataset(vib_group + 'normal_modes',
+                          data=np.array(self.normal_modes).reshape(
+                              nmodes, natm, 3))
 
         hf.create_dataset(vib_group + 'hessian', data=self.hessian)
         hf.create_dataset(vib_group + 'dipole_gradient',
@@ -1176,6 +1180,8 @@ class VibrationalAnalysis:
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
         if self.do_raman or self.do_resonance_raman:
+            hf.create_dataset(vib_group + "number_of_external_frequencies",
+                              data=np.array([nfreqs]))
             hf.create_dataset(vib_group + 'external_frequencies',
                               data=np.array(self.frequencies))
             ra = [s for s in self.raman_activities]
@@ -1185,13 +1191,7 @@ class VibrationalAnalysis:
             if self.do_resonance_raman:
                 raman_type = 'resonance'
             hf.create_dataset(vib_group + 'raman_type', data=np.bytes_([raman_type]))
-
-        #if self.do_resonance_raman:
-        #    hf.create_dataset(vib_group + 'external_frequencies',
-        #                      data=np.array(self.frequencies))
-        #    rr = [s for s in self.raman_activities]
-        #    hf.create_dataset(vib_group + 'resonance_raman_activities', data=np.array(rr))
-
+           
         hf.close()
 
     def print_header(self):
