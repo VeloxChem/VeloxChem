@@ -44,7 +44,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys,
+                         write_lr_rsp_results_to_hdf5)
 
 
 class LinearResponseSolver(LinearSolver):
@@ -82,6 +83,9 @@ class LinearResponseSolver(LinearSolver):
                 ostream = OutputStream(None)
 
         super().__init__(comm, ostream)
+
+        # checkpoint
+        self.save_response_functions = True
 
         # operators and frequencies
         self.a_operator = 'electric dipole'
@@ -531,6 +535,8 @@ class LinearResponseSolver(LinearSolver):
                             final_h5_fname)
                         self.ostream.print_blank()
 
+                    iso_pol, aniso_pol = self._calculate_polarizability(rsp_funcs)
+
                     self._print_results(rsp_funcs, self.ostream)
 
                     return {
@@ -540,6 +546,8 @@ class LinearResponseSolver(LinearSolver):
                         'b_components': self.b_components,
                         'response_functions': rsp_funcs,
                         'solutions': solutions,
+                        'isotropic_polarizability': iso_pol,
+                        'anisotropic_polarizability': aniso_pol
                     }
                 else:
                     return {'solutions': solutions}
@@ -705,6 +713,38 @@ class LinearResponseSolver(LinearSolver):
         dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
 
         return dist_new_ger, dist_new_ung
+
+    def _calculate_polarizability(self, rsp_funcs):
+        """
+        Calculates the isotropic and anisotropic polarizabilities.
+
+        :param rsp_funcs:
+            The response functions.
+        :return iso_pol:
+            The isotropic polarizability.
+        :return aniso_pol:
+            The anisotropic polarizability.
+        """
+        dipole_ops = ['dipole', 'electric dipole', 'electric_dipole']
+
+        if self.a_operator in dipole_ops and self.b_operator in dipole_ops:
+
+            iso_pol = {}
+            aniso_pol = {}
+
+            for w in self.frequencies:
+                a_xx = -rsp_funcs[('x', 'x', w)]
+                a_yy = -rsp_funcs[('y', 'y', w)]
+                a_zz = -rsp_funcs[('z', 'z', w)]
+
+                iso_pol[w] = (a_xx + a_yy + a_zz)/3.0
+                aniso_pol[w] = 1.0 / np.sqrt(2) * np.sqrt(
+                    (a_xx - a_yy)**2 + (a_yy - a_zz)**2 + (a_zz - a_xx)**2
+                )
+
+            return iso_pol, aniso_pol
+
+        return None, None
 
     def _print_results(self, rsp_funcs, ostream):
         """
