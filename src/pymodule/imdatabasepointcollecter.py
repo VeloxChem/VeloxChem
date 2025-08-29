@@ -2390,7 +2390,7 @@ class IMDatabasePointCollecter:
                 self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
             print('len of molecules', len(self.allowed_molecules[self.current_state]['molecules']), self.use_opt_confidence_radius)
-            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or 1 == 1 and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
+            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
                 
                 if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) > 20 and 1 == 2:
                     self.add_a_point = True

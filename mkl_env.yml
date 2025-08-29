@@ -1,4 +1,4 @@
-name: vlxenv
+name: vlxenv_impes_0_1_lyra
 channels:
   - conda-forge
 dependencies:
