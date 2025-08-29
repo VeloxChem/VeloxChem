@@ -228,6 +228,7 @@ class GostshypDriver:
         amplitudes = self.pressure * self.tessellation[3] / f_tilde
 
         amplitudes_mask = amplitudes >= 0.0
+        np.savetxt('amps_mask.txt', amplitudes_mask, fmt="%5i")
         
         self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
 
@@ -675,7 +676,7 @@ class GostshypDriver:
             self.tessellation = np.genfromtxt(tess_data_file)
 
         else:
-            self.tessellation = tessellation_drv.compute(self.molecule)
+            self.tessellation = tessellation_drv.compute_occ(self.molecule)
 
         # TODO error message if an empty tessellation is returned!
         self.num_tes_points = self.tessellation.shape[1]

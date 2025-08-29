@@ -51,6 +51,7 @@ class TessellationDriver:
         - num_leb_points: The number of Lebedev points per van der Waals sphere.
         - tssf: The tessellation sphere scaling factor.
         - discretization: The surface discretization method.
+        - r_ext: The extension radius for the outer cavity correction in angstrom
         - switching_thresh: The (I)SWIG switching function threshold.
         - atom: The atom index of which the grid point areas geometric derivatives are computed wrt
         - comm: The MPI communicator.
@@ -79,6 +80,7 @@ class TessellationDriver:
         self.discretization = 'fixed'
         self.switching_thresh = 1.0e-8
         self.homemade = False #TODO: remove (added for testing of gradient with fixed cavity)
+        self.r_ext = 0.0
         
         # cavity derivative setup
         self.atom = None
@@ -104,6 +106,7 @@ class TessellationDriver:
                 'discretization': ('str', 'surface discretization method'),
                 'switching_thresh': ('float', 'switching function threshold'),
                 'filename': ('str', 'filename for writing the tessellation'),
+                'r_ext': ('float', 'extension radius for outer cavity correction')
             }
         }
 
@@ -185,6 +188,85 @@ class TessellationDriver:
 
             # remove non-contributing points
             contribution_mask, sw_functions = self.get_contribution_mask(sphere,
+                i, neighbors, molecule, vdw_radii, unscaled_w)
+
+            contribution = np.vstack((sphere[:, contribution_mask],
+                                      sw_functions[contribution_mask]))
+
+            vdw_surface = np.hstack((vdw_surface, contribution))
+        
+        # correct the surface areas
+        vdw_surface[3, :] *= vdw_surface[-1, :]
+
+        # write surface to file for testing purposes:
+        #self.write_grid_to_file(vdw_surface)
+
+        # output for testing
+        ######################################################
+        tot_surf_str = 'The total area of the van der Waals surface is '
+        tot_surf_str += str(np.sum(vdw_surface[3, :]) * bohr_in_angstrom()**2)
+        tot_surf_str += ' angstrom^2'
+        print(tot_surf_str)
+        print('with {} tessellation points'.format(vdw_surface.shape[1]))
+        print('and {} points per atomic sphere'.format(self.num_leb_points))
+        ######################################################
+
+        return vdw_surface
+    
+    def compute_occ(self, molecule):
+        """
+        Solves for the van der Waals surface discretized with a Lebedev grid.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The coordinates, surface area, normal vector coordinates and
+            reference atoms of the grid points.
+        """
+
+        # check wether the requested number of points is valid
+        self.update_num_points()
+
+        unit_sphere = self.generate_lebedev_grid()
+
+        norm_vecs = self.get_norm_vecs(unit_sphere)
+
+        vdw_radii = molecule.vdw_radii_to_numpy() * self.tssf
+
+        # create a scaled sphere for every unique atom type
+        vdw_spheres = {
+            i: self.scale_sphere_occ(unit_sphere, i) for i in np.unique(vdw_radii)
+        }
+
+        unscaled_w = unit_sphere[:, 3] * 4.0 * np.pi
+
+        # find neighboring atoms for a more efficient removal of points
+        neighbors = self.find_neighbors(molecule, vdw_radii, unscaled_w.max())
+
+        # initialize the van der Waals surface object containing the following
+        # information for every grid point: x, y, z, A, n_x, n_y, n_z, atom_num, 
+        # unscaled w, vdw_rad of atom, F
+        # NOTE: unscaled w and vdw_rad are used in area gradient
+
+        vdw_surface = np.empty((15,0))
+
+        for i, rad in enumerate(vdw_radii):
+
+            # select the correctly scaled sphere, add the corresponding normal
+            # vector components and mark it with the current atom number,
+            # unscaled weight and vdw radii
+            sphere = vdw_spheres[rad].copy()
+            sphere = np.vstack((sphere, norm_vecs.copy(),
+                                np.full(sphere.shape[1], i), unscaled_w, 
+                                np.full(sphere.shape[1], rad)))
+
+            # translate sphere to the center of the respective atom
+            sphere[:3, :] += np.array(molecule.get_atom_coordinates(i))[:, None]
+            sphere[4:7, :] += np.array(molecule.get_atom_coordinates(i))[:, None]
+
+            # remove non-contributing points
+            contribution_mask, sw_functions = self.get_contribution_mask_occ(sphere,
                 i, neighbors, molecule, vdw_radii, unscaled_w)
 
             contribution = np.vstack((sphere[:, contribution_mask],
@@ -402,6 +484,82 @@ class TessellationDriver:
             mask = sw_funcs > self.switching_thresh
 
         return mask, sw_funcs
+    
+    def get_contribution_mask_occ(self, sphere, idx, neighbors, molecule, vdw_radii,
+                              weights):
+        """
+        Masks grid points of a sphere that don't contribute to the van der Waals
+        surface.
+
+        :param sphere:
+            The grid points of the full sphere.
+        :param idx:
+            The index of the current atom.
+        :param neighbors:
+            The dictionary of neighboring atoms.
+        :param molecule:
+            The molecule.
+        :param vdw_radii:
+            The scaled van der Waals radii.
+        :param weights:
+            The Lebedev integration weights.
+
+        :return:
+            The mask for the remaining grid points that contribute to the van
+            der Waals surface.
+        """
+
+        mask = [True] * sphere.shape[1]
+        
+        sw_funcs = np.ones(sphere.shape[1])
+
+        if self.discretization.lower() == 'fixed':
+            for j in neighbors[idx]:
+                diff = sphere[:3, :] - np.array(
+                                      molecule.get_atom_coordinates(j))[:, None]
+                distances = np.linalg.norm(diff, axis=0)
+                neighbor_mask = distances > vdw_radii[j]
+                mask = [a and b for a, b in zip(mask, neighbor_mask)]
+
+            sw_funcs[~np.array(mask)] = 0.0
+
+        elif self.discretization.lower() in ['swig', 'iswig']:
+
+            r_i = vdw_radii[idx] + self.r_ext / bohr_in_angstrom()
+
+            gamma = np.sqrt(14.0 / self.num_leb_points)
+            alpha = 0.5 + 1.0 / gamma - np.sqrt(1.0 / gamma**2 - 1.0 / 28.0)
+
+            # TODO: give error for largest grid "combo X grid points and "iswig" option not compatible"
+            if self.discretization.lower() == 'iswig':
+                zeta = self.get_zeta(self.num_leb_points)
+
+            for j in neighbors[idx]:
+
+                r_j = vdw_radii[j] + self.r_ext / bohr_in_angstrom()
+
+                diff = sphere[:3, :] - np.array(
+                                      molecule.get_atom_coordinates(j))[:, None]
+                distances = np.linalg.norm(diff, axis=0)
+
+                if self.discretization.lower() == 'swig':
+                    sw_radius = r_j * gamma
+                    inner_j = r_j - alpha * sw_radius
+
+                    elem_sw_funcs = [self.swig_elem_sw_func(
+                                  (d - inner_j) / sw_radius) for d in distances]
+
+                elif self.discretization.lower() == 'iswig':
+                    zetas = zeta / (r_i * np.sqrt(weights))
+
+                    elem_sw_funcs = [self.iswig_elem_sw_func(
+                                   x, z, r_j) for x, z in zip(distances, zetas)]
+
+                sw_funcs *= elem_sw_funcs
+
+            mask = sw_funcs > self.switching_thresh
+
+        return mask, sw_funcs
 
     def swig_elem_sw_func(self, x):
         """
@@ -497,6 +655,38 @@ class TessellationDriver:
         # make weights sum to the total surface area in bohr^2
         surface_area = 4.0 * np.pi * radius**2
         scaled_sphere[3, :] = grid[:, 3] * surface_area
+
+        return scaled_sphere
+    
+    def scale_sphere_occ(self, grid, radius):
+        """
+        Scales the unit sphere Lebedev grid to a sphere of a given radius.
+
+        :param grid:
+            The grid points on the unit sphere.
+        :param radius:
+            The radius of the scaled sphere.
+
+        :return:
+            The grid points of the scaled sphere.
+        """
+
+        scaled_sphere = np.zeros((8, self.num_leb_points))
+
+        scaled_sphere[0, :] = grid[:, 0] * radius
+        scaled_sphere[1, :] = grid[:, 1] * radius
+        scaled_sphere[2, :] = grid[:, 2] * radius
+
+        # make weights sum to the total surface area in bohr^2
+        surface_area = 4.0 * np.pi * radius**2
+        scaled_sphere[3, :] = grid[:, 3] * surface_area
+        
+        scaled_sphere[4, :] = grid[:, 0] * (radius + self.r_ext / bohr_in_angstrom())
+        scaled_sphere[5, :] = grid[:, 1] * (radius + self.r_ext / bohr_in_angstrom())
+        scaled_sphere[6, :] = grid[:, 2] * (radius + self.r_ext / bohr_in_angstrom())
+    
+        surface_area_occ = 4.0 * np.pi * (radius + self.r_ext / bohr_in_angstrom())**2
+        scaled_sphere[7, :] = grid[:, 3] * surface_area_occ
 
         return scaled_sphere
 
@@ -766,3 +956,130 @@ class TessellationDriver:
         v.zoomTo()
         v.show()
 
+    def visualize_grid_occ(self, molecule):
+        """
+        Visualizes grid for surface discretization.
+
+        :param molecule:
+            The molecule.
+        :param grid:
+            The grid.
+        """
+
+        grid = self.compute_occ(molecule).T
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        assert_msg_critical(grid.shape[1] == 15,
+                            'TessellationDriver.visualize_grid: Invalid grid size')
+
+        num_points = grid.shape[0]
+
+        inner_grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
+
+        outer_grid_in_angstrom = grid[:, 4:7] * bohr_in_angstrom()
+
+        inner_grid_xyz_string = f'{num_points}\n\n'
+
+        outer_grid_xyz_string = f'{num_points}\n\n'
+
+        for i in range(num_points):
+            x, y, z = inner_grid_in_angstrom[i]
+            inner_grid_xyz_string += f'He {x} {y} {z}\n'
+
+        for i in range(num_points):
+            x, y, z = outer_grid_in_angstrom[i]
+            outer_grid_xyz_string += f'B {x} {y} {z}\n'
+
+        v = p3d.view(width=600, height=600)
+
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+
+        v.addModel(inner_grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'He'},
+                   {'sphere': {
+                       'radius': 0.05,
+                       'color': 'red',
+                       'opacity': 0.7
+                   }})
+        
+        v.addModel(outer_grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'B'},
+                   {'sphere': {
+                       'radius': 0.05,
+                       'color': 'blue',
+                       'opacity': 0.5
+                   }})
+
+        v.zoomTo()
+        v.show()
+
+    def visualize_neg_amp_occ(self, molecule, amps_mask):
+        """
+        Visualizes grid for surface discretization.
+
+        :param molecule:
+            The molecule.
+        :param grid:
+            The grid.
+        """
+
+        grid = self.compute_occ(molecule).T
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        assert_msg_critical(grid.shape[1] == 15,
+                            'TessellationDriver.visualize_grid: Invalid grid size')
+
+        amps_mask = amps_mask > 0
+
+        num_points = np.sum(amps_mask)
+
+        grid_in_angstrom = grid[amps_mask, :3] * bohr_in_angstrom()
+
+        num_neg_amp = grid.shape[0] - num_points
+
+        grid_in_angstrom_neg_amp = grid[~amps_mask, :3] * bohr_in_angstrom()
+
+        grid_xyz_string = f'{num_points}\n\n'
+
+        grid_xyz_string_neg_amp = f'{num_neg_amp}\n\n'
+
+        for i in range(num_points):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f'He {x} {y} {z}\n'
+
+        for i in range(num_neg_amp):
+            x, y, z = grid_in_angstrom_neg_amp[i]
+            grid_xyz_string_neg_amp += f'B {x} {y} {z}\n'
+
+        v = p3d.view(width=600, height=600)
+
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+
+        v.addModel(grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'He'},
+                   {'sphere': {
+                       'radius': 0.05,
+                       'color': 'red',
+                       'opacity': 0.7
+                   }})
+        
+        v.addModel(grid_xyz_string_neg_amp, 'xyz')
+        v.setStyle({'elem': 'B'},
+                   {'sphere': {
+                       'radius': 0.05,
+                       'color': 'blue',
+                       'opacity': 0.8
+                   }})
+
+        v.zoomTo()
+        v.show()

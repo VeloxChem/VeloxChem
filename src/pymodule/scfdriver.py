@@ -247,6 +247,7 @@ class ScfDriver:
         self.discretization = 'fixed'
         self.homemade = False #TODO: remove (added for testing of gradient with fixed cavity)
         self.tess_file = None #TODO: remove (added for testing of gradient with fixed cavity)
+        self.r_ext = 0.0
 
         # solvation model
         self.solvation_model = None
@@ -340,6 +341,7 @@ class ScfDriver:
                 'discretization': ('str', 'surface discretization method'),
                 'homemade': ('bool', 'read tessellation data from file'), #TODO: remove (added for testing of gradient with fixed cavity)
                 'tess_file': ('str', 'tessellation data file name'),#TODO: remove (added for testing of gradient with fixed cavity)
+                'r_ext': ('float', 'extension to vdw radii for outer cavity correction in angstrom'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('int', 'number of grid points per sphere (C-PCM)'),
@@ -895,7 +897,8 @@ class ScfDriver:
                 'discretization': self.discretization,
                 'filename': self.filename,
                 'homemade': self.homemade, #TODO: remove (added for testing of gradient with fixed cavity)
-                'tess_file': self.tess_file #TODO: remove (added for testing of gradient with fixed cavity)
+                'tess_file': self.tess_file, #TODO: remove (added for testing of gradient with fixed cavity)
+                'r_ext': self.r_ext
             }
 
             tess_t0 = tm.time()
@@ -2355,7 +2358,7 @@ class ScfDriver:
                 density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
+            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution_occ(density_matrix)
             #e_pr, V_pr, g_time, f_time = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
             #print('Energy contribution from  GOSTSHYP: ', e_pr) #should be printed in ostream?
             #print(g_time, f_time)
@@ -2877,6 +2880,9 @@ class ScfDriver:
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Grid Points per Atomic Sphere   : '
             cur_str += f'{self.num_leb_points}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Extension radius for OCC        : '
+            cur_str += f'{self.r_ext}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
 
