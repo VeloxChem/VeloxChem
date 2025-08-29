@@ -429,6 +429,7 @@ conda activate vlxenv_new_compile
                     else:
                         file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD\n')
                     
+                    file.write(f'%moinp "current_input.gbw"\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.qm_driver.nprocs * 2}\n')
