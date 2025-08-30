@@ -66,6 +66,7 @@ class HydrogenBdeDriver:
         #set basis
         self.basis_sets = ["def2-svp","def2-tzvp"]  #two basis sets needed for optimization and final single point energy calculation
         self.xcfunctionals = ["blyp","b3lyp"]
+        self.radical_level_shifting = 0.5
         #whole molecule optimization workflow
         self.mol_scf_drv = ScfRestrictedDriver()
         self.mol_scf_drv.conv_thresh = 1e-3
@@ -111,6 +112,7 @@ class HydrogenBdeDriver:
         self.only_hartree_fock = False
         self.mute_output = False
         self.energy_unit = "kj"  #kcal, kj, au
+        
 
     def check_scf_mute(self):
         if self.mute_output:
@@ -121,6 +123,13 @@ class HydrogenBdeDriver:
             self.hydrogen_final_scf_drv.ostream.mute()
             self.mol_opt_drv.ostream.mute()
             self.radical_opt_drv.ostream.mute()
+            
+    def check_radical_level_shifting(self):
+        if self.radical_level_shifting is not None:
+            self.radical_scf_drv.level_shifting = self.radical_level_shifting
+            self.radical_final_scf_drv.level_shifting = self.radical_level_shifting
+            self.radical_opt_drv.level_shifting = self.radical_level_shifting
+            
 
     def check_functionals(self):
         """
@@ -596,6 +605,7 @@ class HydrogenBdeDriver:
         """
         self.check_scf_mute()
         self.check_functionals()
+        self.check_radical_level_shifting()
         hydrogen_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_hydrogen_keys, unique_hydrogen_indices = self._fetch_unique_H(
             hydrogen_atoms_dict,
