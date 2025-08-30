@@ -696,4 +696,4 @@ class HydrogenBdeDriver:
                                    atom_indices=atom_indices,
                                    atom_labels=atom_labels,
                                    one_indexed=True,
-                                   bdes_coords=self.bdes_coords)
+                                   bdes_coords=bdes_coords)
