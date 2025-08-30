@@ -667,7 +667,7 @@ class HydrogenBdeDriver:
                 'bdes_coords': self.bdes_coords,
                 'unique_hydrogen_keys': self.unique_hydrogen_keys,
                 'unique_BDEs_au': self.unique_BDEs_au,
-                'unique_hydrogen_bdes_coords':self.unique_hydrogen_bdes_coords
+                'unique_hydrogen_bdes_coords':self.unique_hydrogen_bdes_coords,
                 'opt_whole_molecule': self.opt_whole_molecule,
             }
             self.mols_bdes_list.append(mol_bde_dict)
