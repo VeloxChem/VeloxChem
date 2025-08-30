@@ -370,9 +370,11 @@ class HydrogenBdeDriver:
         au2kcal = 627.509
         au2kj = 2625.5
         hydrogen_bdes_kj_coords = []
+        unique_hydrogen_bdes_kj_coords=[]
         for i in range(len(unique_hydrogen_keys)):
             key = unique_hydrogen_keys[i]
             energy_au = unique_hydrogen_dissociation_energies[i]
+            unique_hydrogen_bdes_kj_coords.append((energy_au * au2kj, hydrogen_atoms_dict[key]["coord"]))
             equiv_group = hydrogen_atoms_dict[key]["equiv_group"]
             for j in equiv_group:
                 hydrogen_atoms_dict[
@@ -385,7 +387,7 @@ class HydrogenBdeDriver:
                 hydrogen_bdes_kj_coords.append(
                     (energy_au * au2kj,
                      hydrogen_atoms_dict["H_" + str(j)]["coord"]))
-        return (hydrogen_atoms_dict, hydrogen_bdes_kj_coords)
+        return (hydrogen_atoms_dict, hydrogen_bdes_kj_coords,unique_hydrogen_bdes_kj_coords)
 
     def _print_hydrogen_bond_dissociation_energy(self,
                                                  hydrogen_atoms_dict,
@@ -581,6 +583,7 @@ class HydrogenBdeDriver:
             for i in range(len(bdes_coords)):
                 #bde coords is a list of tuple [(bde, (x, y, z)),(bde, (x, y, z))]
                 bde_kj = round(bdes_coords[i][0], 0) #only show the integer part
+                bde_kj = int(bde_kj)
                 viewer.addLabel(
                     f'{bde_kj}', {
                         'position': {
@@ -642,7 +645,7 @@ class HydrogenBdeDriver:
         self.unique_hydrogen_keys = unique_hydrogen_keys
         # loop the unique_hydrogen_indices to remove the H atoms from the molecule and calulate the dissciation energy but save the energy for all equivalent H atoms
         # print the dissociation energy for each H atom
-        self.hydrogen_atoms_dict, self.bdes_coords = self._update_equiv_hydrogen_dissociation_energy(
+        self.hydrogen_atoms_dict, self.bdes_coords,self.unique_hydrogen_bdes_coords = self._update_equiv_hydrogen_dissociation_energy(
             unique_BDEs_au, unique_hydrogen_keys, hydrogen_atoms_dict)
         self._print_hydrogen_bond_dissociation_energy(self.hydrogen_atoms_dict,
                                                       unit=self.energy_unit)
@@ -664,6 +667,7 @@ class HydrogenBdeDriver:
                 'bdes_coords': self.bdes_coords,
                 'unique_hydrogen_keys': self.unique_hydrogen_keys,
                 'unique_BDEs_au': self.unique_BDEs_au,
+                'unique_hydrogen_bdes_coords':self.unique_hydrogen_bdes_coords
                 'opt_whole_molecule': self.opt_whole_molecule,
             }
             self.mols_bdes_list.append(mol_bde_dict)
@@ -672,18 +676,24 @@ class HydrogenBdeDriver:
              atom_indices=False,
              atom_labels=False,
              width=400,
-             height=300):
+             height=300,
+             unique_hydrogen=True):
         """
         this function is to visualize the hydrogen bond dissociation energies (BDEs) on the hydrogen atoms in the molecule.
         allow atom indices and labels to be shown.
         """
         for item in self.mols_bdes_list:
             mol = item['opt_whole_molecule']
-            bdes_coords = item['bdes_coords']
+            
+            if unique_hydrogen:
+                bdes_coords = item['unique_hydrogen_bdes_coords']
+            else:
+                bdes_coords = item['bdes_coords']
+                
             self._show_bde_on_atom(mol,
                                    width=width,
                                    height=height,
                                    atom_indices=atom_indices,
                                    atom_labels=atom_labels,
                                    one_indexed=True,
-                                   bdes_coords=bdes_coords)
+                                   bdes_coords=self.bdes_coords)
