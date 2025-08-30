@@ -700,7 +700,7 @@ class VibrationalAnalysis:
         self.ostream.print_blank()
 
         number_of_modes = len(self.vib_frequencies)
-        n_dom_modes = 5
+        n_dom_modes = 500
 
         if number_of_modes <= n_dom_modes:
             normal_mode_idx_lst = range(number_of_modes)
@@ -1172,6 +1172,10 @@ class VibrationalAnalysis:
                               data=np.array(self.frequencies))
             ra = [s for s in self.raman_activities]
             hf.create_dataset(vib_group + 'raman_activities', data=np.array(ra))
+
+            polgrad = [self.polarizability_gradient[key] for key in self.frequencies]
+            hf.create_dataset(vib_group + 'polarizability_gradient',
+                              data=np.array(polgrad))
 
             raman_type = 'normal'
             if self.do_resonance_raman:
