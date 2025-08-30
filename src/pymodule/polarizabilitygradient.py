@@ -35,6 +35,8 @@ import math
 import sys
 from mpi4py import MPI
 import numpy as np
+import h5py
+from pathlib import Path
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import MolecularGrid
@@ -57,9 +59,9 @@ from .inputparser import parse_input
 from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
-                           #polgrad_sanity_check)
-
+                           dft_sanity_check, polgrad_sanity_check_1,
+                           polgrad_sanity_check_2)
+from .checkpoint import check_rsp_hdf5
 
 class PolarizabilityGradient:
     """
@@ -74,6 +76,10 @@ class PolarizabilityGradient:
         - do_four_point: Four-point numerical differentiation
         - frequencies: The frequencies
         - vector_components: Cartesian components of the tensor
+        - filename: The filename.
+        - checkpoint_file: The name of checkpoint file.
+        - force_checkpoint: The flag for writing checkpoint for ERI contribution
+        - program_end_time: The end time of the program.
     """
 
     def __init__(self, scf_drv, comm=None, ostream=None):
@@ -91,14 +97,23 @@ class PolarizabilityGradient:
         if comm is None:
             comm = MPI.COMM_WORLD
 
+        # output stream
         if ostream is None:
             ostream = OutputStream(sys.stdout)
+        self.ostream = ostream
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.ostream = ostream
+        # restart information
+        self.restart = True
+        self.checkpoint_file = None
+        self.force_checkpoint = False
+        self.filename = None
+
+        # program end time for graceful exit
+        self.program_end_time = None
 
         # timing and profiling
         self.timing = False
@@ -145,6 +160,10 @@ class PolarizabilityGradient:
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'filename': ('str', 'base name of output files'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
+                'force_checkpoint': ('bool', 'write ERI restart info')
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -186,10 +205,23 @@ class PolarizabilityGradient:
 
         dft_sanity_check(self, 'update_settings')
 
+        # NOTE WIP
+        # ERI derivative contributions will be written to pol.
+        # orbital response checkpoint
+        if 'program_end_time' in grad_dict:
+            self.program_end_time = grad_dict['program_end_time']
+        if 'filename' in grad_dict:
+            self.filename = grad_dict['filename']
+            if 'checkpoint_file' not in grad_dict:
+                self.checkpoint_file = f'{self.filename}_polorbrsp.h5'
+
         self.frequencies = list(self.frequencies)
 
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
+
+        # DEBUG
+        self.ostream.print_info(f'FORCE_CHECKPOINT: {self.force_checkpoint}')
 
     def compute(self, molecule, basis, scf_tensors, lr_results=None):
         """
@@ -229,6 +261,7 @@ class PolarizabilityGradient:
                 error_message = 'PolarizabilityGradient missing input: LR results'
                 error_message += 'for analytical gradient'
                 raise ValueError(error_message)
+
             if self.rank == mpi_master():
                 polgrad_sanity_check_2(self, self.flag, lr_results)
                 # FIXME should this be moved to sanitychecks?
@@ -547,7 +580,7 @@ class PolarizabilityGradient:
             profiler.start_timer("ERI")
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                                    rel_dm_ao, x_plus_y_ao, x_minus_y_ao,
-                                                   local_atoms)
+                                                   local_atoms, w)
             profiler.stop_timer("ERI")
             profiler.check_memory_usage(f"ERI grad")
 
@@ -602,7 +635,7 @@ class PolarizabilityGradient:
         return polgrad_results
 
     def compute_eri_contrib(self, molecule, basis, gs_dm, rel_dm_ao,
-                            x_plus_y_ao, x_minus_y_ao, local_atoms):
+                            x_plus_y_ao, x_minus_y_ao, local_atoms, freq):
         """
         Directs the computation of the contribution from ERI derivative integrals
         to the polarizability gradient.
@@ -621,6 +654,8 @@ class PolarizabilityGradient:
             The X-Y response vectors.
         :param local_atoms:
             The atom partition for the MPI node.
+        :param freq:
+            The external frequency.
 
         :return eri_deriv_contrib:
             The ERI derivative integral contribution to the polarizability gradient.
@@ -634,12 +669,17 @@ class PolarizabilityGradient:
         else:
             eri_deriv_contrib = self.compute_eri_contrib_real(molecule, basis, gs_dm,
                                                               rel_dm_ao, x_plus_y_ao,
-                                                              x_minus_y_ao, local_atoms)
+                                                              x_minus_y_ao, local_atoms,
+                                                              freq)
 
+        # DEBUG
+        self.comm.barrier()
+        self.ostream.flush()
         return eri_deriv_contrib
 
     def compute_eri_contrib_real(self, molecule, basis, gs_dm, rel_dm_ao,
-                                 x_plus_y_ao, x_minus_y_ao, local_atoms):
+                                 x_plus_y_ao, x_minus_y_ao, local_atoms,
+                                 freq):
         """
         Computes the contribution from ERI derivative integrals
         to the real polarizability gradient.
@@ -658,6 +698,8 @@ class PolarizabilityGradient:
             The X-Y response vectors.
         :param local_atoms:
             The atom partition for the MPI node.
+        :param freq:
+            The external frequency.
 
         :return eri_deriv_contrib:
             The ERI derivative integral contribution to the polarizability gradient.
@@ -695,6 +737,21 @@ class PolarizabilityGradient:
 
         # ERI gradient
         for iatom in local_atoms:
+            if self.restart:
+                # DEBUG
+                print('TRYING RESTART FROM CHECKPOINT')
+                eri_from_chk = (
+                    self._read_checkpoint_for_eri_contrib(molecule, basis, iatom, freq)
+                )
+                if eri_from_chk is not None:
+                    eri_deriv_contrib[:, :, iatom] += eri_from_chk
+                    # DEBUG
+                    print(f'ERI deriv from chk for atom {iatom}\n')
+                    print(eri_from_chk.round(6))
+                    continue
+                else:
+                    print('FAILED TO RETRIEVE ARRAY FROM CHECKPOINT')
+
             # screening
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
@@ -769,6 +826,19 @@ class PolarizabilityGradient:
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy)
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx)
                 eri_deriv_contrib[x, y, iatom] *= factor
+
+            # DEBUG
+            print(f'ERI deriv contrib for atom {iatom}\n')
+            print(eri_deriv_contrib[:,:,iatom].round(6))
+
+            if self.force_checkpoint:
+                self._write_checkpoint_for_eri_contrib(molecule, basis, iatom,
+                                                       eri_deriv_contrib, freq)
+            self.ostream.flush()
+
+        # DEBUG
+        print('Total ERI deriv contrib \n')
+        print(eri_deriv_contrib.round(6))
 
         return eri_deriv_contrib
 
@@ -2053,3 +2123,99 @@ class PolarizabilityGradient:
             error_text = 'Mismatch between LR results and polgrad settings!'
             error_text += 'One is complex, the other is not.'
             raise ValueError(error_text)
+
+    def _write_checkpoint_for_eri_contrib(self, molecule, basis, iatom,
+                                          eri_contrib, freq):
+        """
+        Writes checkpoint file entry for ERI contribution to polarizability
+        gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param iatom:
+            The atom index.
+        :param eri_contrib:
+            The array with ERI contributions.
+        :param freq:
+            The external frequency.
+        """
+
+        if self.filename is None:
+            return
+
+        # path for directory where checkpoints will be kept
+        chkdir = self.filename + '_polgrad_checkpoint'
+        hfpath = Path(chkdir)
+        hfpath.mkdir(parents=True, exist_ok=True)
+
+        checkpoint_file = f'{chkdir}/polgrad_atom_{iatom}.h5'
+
+        t0 = tm.time()
+
+        hf = h5py.File(checkpoint_file, 'a')
+
+        # the datasets will be labeled by external frequency
+        label = f'eri_deriv_{freq}'
+        if label in hf:
+            # if the key exists, there is no need to write it again
+            return
+
+        # DEBUG
+        self.ostream.print_info(f'WRITE CHECKPOINT {checkpoint_file} FOR KEY {label}')
+
+        # eri_contrib will have dimensions dof*dof*3
+        hf.create_dataset(label, data=np.array(eri_contrib[:, :, iatom]))
+
+        hf.close()
+
+        checkpoint_text = 'Time spent in writing checkpoint file: '
+        checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _read_checkpoint_for_eri_contrib(self, molecule, basis, iatom, freq):
+        """
+        Reads ERI derivative contributions to polarizability gradient.
+
+        :param:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param iatom:
+            The atom index.
+        :param freq:
+            The external frequency.
+
+        :return eri_contrib:
+            The array with ERI derivative contributions.
+        """
+
+        chkdir = self.filename + '_polgrad_checkpoint'
+        checkpoint_file = f'{chkdir}/polgrad_atom_{iatom}.h5'
+
+        try:
+            hf = h5py.File(checkpoint_file, 'r')
+        except FileNotFoundError:
+            print(f'Checkpoint file {checkpoint_file} not found for restart.')
+            return None
+
+        #  TODO check if valid checkpoint (content is valid)
+
+        label = f'eri_deriv_{freq}'
+
+        # DEBUG
+        print(f'READ CHECKPOINT {checkpoint_file} FOR KEY {label}')
+
+        if label in hf:
+            print(f'FOUND KEY {label} IN CHECKPOINT')
+            eri_deriv_contrib = np.array(hf.get(label))
+        else:
+            print(f'FAILED TO FIND KEY {label} IN CHECKPOINT')
+            eri_deriv_contrib = None
+
+        hf.close()
+
+        return eri_deriv_contrib

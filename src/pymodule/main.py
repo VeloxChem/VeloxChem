@@ -516,6 +516,8 @@ def main():
 
         polgrad_dict = (task.input_dict['polarizability_gradient']
                         if 'polarizability_gradient' in task.input_dict else {})
+        polgrad_dict['program_end_time'] = program_end_time
+        polgrad_dict['filename'] = task.input_dict['filename']
 
         orbrsp_dict = (task.input_dict['orbital_response']
                        if 'orbital_response' in task.input_dict else {})
