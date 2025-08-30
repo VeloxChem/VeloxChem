@@ -225,7 +225,7 @@ class HydrogenBdeDriver:
         for group in equiv_atoms_groups:
             if atom_idx in group:
                 return group
-        return []
+        return [atom_idx]
 
     def _atoms_analyzer(self, molecule):
         """
