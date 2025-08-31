@@ -1,0 +1,40 @@
+name: vlxenv
+channels:
+  - conda-forge
+dependencies:
+  - cmake
+  - ninja
+  - scikit-build
+  - cxx-compiler
+  - eigen
+  - mpich
+  - mpi4py
+  - numpy
+
+  # choose NumPy backend
+  # option 1: use OpenBLAS with OpenMP
+  - libblas=*=*openblas
+  - libopenblas=*=openmp*
+  # option 2: use Intel MKL
+  # - libblas=*=*mkl
+
+  - h5py
+  - pip
+  - setuptools
+  - wheel
+  - pybind11-global
+  - python>=3.9
+  - psutil
+  - pytest
+  - mdanalysis
+  - openmm
+  - scipy
+  - rdkit
+  - dftd4-python
+  - geometric
+  - libxc
+  - clang-format
+  - yapf
+  - toml
+  - flake8
+  - pymbar
