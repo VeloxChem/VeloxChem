@@ -2894,6 +2894,7 @@ class IMDatabasePointCollecter:
                         #         self.qm_data_point_dict[state + i] = self.qm_data_point_dict[state + i][:cut_off - 1]
                         #         exit()  
                         impes_coordinate.write_hdf5(self.interpolation_settings[state + number]['imforcefield_file'], new_label)
+
                         if label_counter == 0:
                             if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 1:
                                 
@@ -2904,7 +2905,7 @@ class IMDatabasePointCollecter:
                                     sym_dict = self.non_core_symmetry_groups['es']
                                 
                                 
-                                for run_through in range(2):
+                                for run_through in range(1):
                                     indices = [i for i in range(len(self.allowed_molecules[state + number]['molecules']) - 1)]
                                     if len(self.qm_data_point_dict[state + number]) > 2 and len(self.allowed_molecules[state + number]['molecules']) > 10 and run_through == 0 and 1 == 2:
                                         alphas = [dp.confidence_radius for dp in self.qm_data_point_dict[state + number]]
