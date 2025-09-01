@@ -47,6 +47,13 @@ from .optimizationdriver import OptimizationDriver
 
 
 class HydrogenBdeDriver:
+    """
+    This class implements the hydrogen bond dissociation energy (BDE) driver.
+    Use self.compute to calculate the BDE for each unique hydrogen atom
+    Use self.show to show the results in kJ/mol 
+    (default is to calculate hydrogens only for sp3 carbon atoms)
+    two sets of basis or exchange correlation functionals are needed for optimization and single point calculation separately
+    """
 
     def __init__(self, comm=None, ostream=None):
         if comm is None:
@@ -64,8 +71,10 @@ class HydrogenBdeDriver:
         self.ostream = ostream
 
         #set basis
-        self.basis_sets = ["def2-svp","def2-tzvp"]  #two basis sets needed for optimization and final single point energy calculation
-        self.xcfunctionals = ["blyp","b3lyp"]
+        self.basis_sets = [
+            "def2-svp", "def2-tzvp"
+        ]  #two basis sets needed for optimization and final single point energy calculation
+        self.xcfunctionals = ["blyp", "b3lyp"]
         self.radical_level_shifting = 0.5
         #whole molecule optimization workflow
         self.mol_scf_drv = ScfRestrictedDriver()
@@ -112,7 +121,6 @@ class HydrogenBdeDriver:
         self.only_hartree_fock = False
         self.mute_output = False
         self.energy_unit = "kj"  #kcal, kj, au
-        
 
     def check_scf_mute(self):
         if self.mute_output:
@@ -123,13 +131,12 @@ class HydrogenBdeDriver:
             self.hydrogen_final_scf_drv.ostream.mute()
             self.mol_opt_drv.ostream.mute()
             self.radical_opt_drv.ostream.mute()
-            
+
     def check_radical_level_shifting(self):
         if self.radical_level_shifting is not None:
             self.radical_scf_drv.level_shifting = self.radical_level_shifting
             self.radical_final_scf_drv.level_shifting = self.radical_level_shifting
             self.radical_opt_drv.level_shifting = self.radical_level_shifting
-            
 
     def check_functionals(self):
         """
@@ -140,11 +147,13 @@ class HydrogenBdeDriver:
         if len(self.xcfunctionals) == 0:
             if self.only_hartree_fock:
                 #warning
-                self.ostream.print_info("No functionals provided, using HF for all calculations")
+                self.ostream.print_info(
+                    "No functionals provided, using HF for all calculations")
                 self.ostream.flush()
                 return
             else:
-                self.ostream.print_warning("No functionals provided, checking scf drv functionals")
+                self.ostream.print_warning(
+                    "No functionals provided, checking scf drv functionals")
                 self.ostream.flush()
                 if self.mol_scf_drv.xcfun is not None:
                     self.xcfunctionals.append(self.mol_scf_drv.xcfun)
@@ -161,7 +170,8 @@ class HydrogenBdeDriver:
                         self.xcfunctionals.append(self.radical_scf_drv.xcfun)
                 else:
                     assert_msg_critical(
-                        "No exchange-correlation functionals provided and no functional found in scf drivers, please provide functionals or set only_hartree_fock=True"
+                        "No exchange-correlation functionals provided and no functional found in scf drivers, "
+                        "please provide functionals or set only_hartree_fock=True"
                     )
         elif len(self.xcfunctionals) == 1:
             self.xcfunctionals.append(self.xcfunctionals[0])
@@ -370,11 +380,12 @@ class HydrogenBdeDriver:
         au2kcal = 627.509
         au2kj = 2625.5
         hydrogen_bdes_kj_coords = []
-        unique_hydrogen_bdes_kj_coords=[]
+        unique_hydrogen_bdes_kj_coords = []
         for i in range(len(unique_hydrogen_keys)):
             key = unique_hydrogen_keys[i]
             energy_au = unique_hydrogen_dissociation_energies[i]
-            unique_hydrogen_bdes_kj_coords.append((energy_au * au2kj, hydrogen_atoms_dict[key]["coord"]))
+            unique_hydrogen_bdes_kj_coords.append(
+                (energy_au * au2kj, hydrogen_atoms_dict[key]["coord"]))
             equiv_group = hydrogen_atoms_dict[key]["equiv_group"]
             for j in equiv_group:
                 hydrogen_atoms_dict[
@@ -387,7 +398,8 @@ class HydrogenBdeDriver:
                 hydrogen_bdes_kj_coords.append(
                     (energy_au * au2kj,
                      hydrogen_atoms_dict["H_" + str(j)]["coord"]))
-        return (hydrogen_atoms_dict, hydrogen_bdes_kj_coords,unique_hydrogen_bdes_kj_coords)
+        return (hydrogen_atoms_dict, hydrogen_bdes_kj_coords,
+                unique_hydrogen_bdes_kj_coords)
 
     def _print_hydrogen_bond_dissociation_energy(self,
                                                  hydrogen_atoms_dict,
@@ -582,7 +594,8 @@ class HydrogenBdeDriver:
             #add bde based on coords and unique_bde_au
             for i in range(len(bdes_coords)):
                 #bde coords is a list of tuple [(bde, (x, y, z)),(bde, (x, y, z))]
-                bde_kj = round(bdes_coords[i][0], 0) #only show the integer part
+                bde_kj = round(bdes_coords[i][0],
+                               0)  #only show the integer part
                 bde_kj = int(bde_kj)
                 viewer.addLabel(
                     f'{bde_kj}', {
@@ -602,7 +615,41 @@ class HydrogenBdeDriver:
         except ImportError:
             raise ImportError('Unable to import py3Dmol')
 
-    def _compute_single_molecule(self, whole_molecule):
+    def _generate_radical_molecules(self, whole_molecule: object):
+        """
+        only applied to single molecule
+        Generate radical molecules from the whole molecule by removing hydrogen atoms.
+
+        :param whole_molecule: The whole molecule object to generate radicals from.
+        :return: A tuple, containing the radical molecules, their corresponding carbon indices, and guess messages.
+
+        """
+        self.check_scf_mute()
+        self.check_functionals()
+        self.check_radical_level_shifting()
+        hydrogen_atoms_dict = self._atoms_analyzer(whole_molecule)
+        unique_hydrogen_keys, unique_hydrogen_indices = self._fetch_unique_H(
+            hydrogen_atoms_dict,
+            use_equiv=self.use_equiv,
+            only_sp3_carbon_hydrogen=self.only_sp3_carbon_hydrogen)
+        #self.ostream.print_info(f'unique_hydrogen_indices {unique_hydrogen_indices}')
+        carbon_indices = []
+        # Generate radical molecules by removing hydrogen atoms
+        conn_mat = whole_molecule.get_connectivity_matrix()
+        for x in unique_hydrogen_indices:
+            assert list(conn_mat[x]).count(1) == 1
+            carbon_indices.append(list(conn_mat[x]).index(1))
+        #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
+        opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule)
+        radical_molecules, radical_carbon_indices = self._remove_atom_by_idx(
+            opt_whole_molecule, unique_hydrogen_indices, carbon_indices)
+        guess_msg = []
+        for i in range(len(radical_molecules)):
+            guess = f"guess_unpaired_electrons = {radical_carbon_indices[i]+1}(1.0)"
+            guess_msg.append(guess)
+        return radical_molecules, radical_carbon_indices, guess_msg
+
+    def _compute_single_molecule(self, whole_molecule: object):
         """
         used to compute hydrogen bond dissociation energies (BDEs) for a single molecule.
         """
@@ -645,7 +692,7 @@ class HydrogenBdeDriver:
         self.unique_hydrogen_keys = unique_hydrogen_keys
         # loop the unique_hydrogen_indices to remove the H atoms from the molecule and calulate the dissciation energy but save the energy for all equivalent H atoms
         # print the dissociation energy for each H atom
-        self.hydrogen_atoms_dict, self.bdes_coords,self.unique_hydrogen_bdes_coords = self._update_equiv_hydrogen_dissociation_energy(
+        self.hydrogen_atoms_dict, self.bdes_coords, self.unique_hydrogen_bdes_coords = self._update_equiv_hydrogen_dissociation_energy(
             unique_BDEs_au, unique_hydrogen_keys, hydrogen_atoms_dict)
         self._print_hydrogen_bond_dissociation_energy(self.hydrogen_atoms_dict,
                                                       unit=self.energy_unit)
@@ -667,7 +714,7 @@ class HydrogenBdeDriver:
                 'bdes_coords': self.bdes_coords,
                 'unique_hydrogen_keys': self.unique_hydrogen_keys,
                 'unique_BDEs_au': self.unique_BDEs_au,
-                'unique_hydrogen_bdes_coords':self.unique_hydrogen_bdes_coords,
+                'unique_hydrogen_bdes_coords': self.unique_hydrogen_bdes_coords,
                 'opt_whole_molecule': self.opt_whole_molecule,
             }
             self.mols_bdes_list.append(mol_bde_dict)
@@ -684,12 +731,12 @@ class HydrogenBdeDriver:
         """
         for item in self.mols_bdes_list:
             mol = item['opt_whole_molecule']
-            
+
             if unique_hydrogen:
                 bdes_coords = item['unique_hydrogen_bdes_coords']
             else:
                 bdes_coords = item['bdes_coords']
-                
+
             self._show_bde_on_atom(mol,
                                    width=width,
                                    height=height,
