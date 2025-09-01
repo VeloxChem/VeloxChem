@@ -1190,28 +1190,28 @@ class InterpolationDriver():
         center_reference_coordinates_core = self.calculate_translation_coordinates(reference_coordinates_core)
 
         distance = 0
-        distance_vector = 0
+        distance_vector_sub = 0
         grad_s = 1.0
         Xc = center_reference_coordinates_core     # variable (current geometry)
         Yc = center_target_coordinates_core        # fixed (datapoint)
         R  = geometric.rotate.get_rot(Yc, Xc)
 
         rotated_current = (R @ Yc.T).T
-        distance_vector =  Xc - rotated_current
-        distance = np.linalg.norm(distance_vector)
+        distance_vector_sub =  Xc - rotated_current
+        distance = np.linalg.norm(distance_vector_sub)
 
 
         dihedral_dist = 0.0
         if distance < 1e-8:
             distance = 1e-8
-            distance_vector[:] = 0
+            distance_vector_sub[:] = 0
 
         if self.interpolation_type == 'shepard':
             denominator, weight_gradient_sub = self.shepard_weight_gradient(
-                distance_vector, distance, data_point.confidence_radius)        
+                distance_vector_sub, distance, data_point.confidence_radius)        
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
-                distance_vector, distance)
+                distance_vector_sub, distance)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
@@ -1219,6 +1219,10 @@ class InterpolationDriver():
         
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
         weight_gradient[self.symmetry_information[3]] = weight_gradient_sub
+
+        distance_vector = np.zeros_like(reference_coordinates)   # (natms,3)
+        distance_vector[self.symmetry_information[3]] = distance_vector_sub
+        
         
 
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s

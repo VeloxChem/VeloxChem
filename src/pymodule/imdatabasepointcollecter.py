@@ -3446,18 +3446,19 @@ class IMDatabasePointCollecter:
             natms = len(sym_dict[3])
             beta = 0.8
 
+            interpolation_driver = InterpolationDriver(self.z_matrix)
+            interpolation_driver.update_settings(impes_dict)
+            interpolation_driver.symmetry_information = sym_dict
+            interpolation_driver.qm_symmetry_data_points = sym_datapoints
+            interpolation_driver.distance_thrsh = 1000
+            interpolation_driver.exponent_p = 2
+            interpolation_driver.print = False
+            interpolation_driver.qm_data_points = dps[:]
+
             for i, dp in enumerate(dps[:]):
                 dp.confidence_radius = alphas[i]
 
             for i, mol in enumerate(structure_list):
-                interpolation_driver = InterpolationDriver(self.z_matrix)
-                interpolation_driver.update_settings(impes_dict)
-                interpolation_driver.symmetry_information = sym_dict
-                interpolation_driver.qm_symmetry_data_points = sym_datapoints
-                interpolation_driver.distance_thrsh = 1000
-                interpolation_driver.exponent_p = 2
-                interpolation_driver.print = False
-                interpolation_driver.qm_data_points = dps[:]
                 
                 interpolation_driver.compute(mol)
                 new_im_energy = interpolation_driver.get_energy()
@@ -3579,18 +3580,19 @@ class IMDatabasePointCollecter:
             dF_dalphas = np.zeros(n_points, dtype=float)
             e_x = self.use_opt_confidence_radius[3]
             sum_sq_error = 0.0
+            
+            interpolation_driver = InterpolationDriver(self.z_matrix)
+            interpolation_driver.update_settings(impes_dict)
+            interpolation_driver.symmetry_information = sym_dict
+            interpolation_driver.qm_symmetry_data_points = sym_datapoints
+            interpolation_driver.distance_thrsh = 1000
+            interpolation_driver.exponent_p = 2
+            interpolation_driver.qm_data_points = dps[:]
 
             for i, dp in enumerate(dps[:]):
                 dp.confidence_radius = alphas[i]
 
             for i, mol in enumerate(structure_list):
-                interpolation_driver = InterpolationDriver(self.z_matrix)
-                interpolation_driver.update_settings(impes_dict)
-                interpolation_driver.symmetry_information = sym_dict
-                interpolation_driver.qm_symmetry_data_points = sym_datapoints
-                interpolation_driver.distance_thrsh = 1000
-                interpolation_driver.exponent_p = 2
-                interpolation_driver.qm_data_points = dps[:]
                 
                 interpolation_driver.compute(mol)
 
@@ -3833,31 +3835,31 @@ class IMDatabasePointCollecter:
             
             
             
-            from scipy.optimize import check_grad
-            err = check_grad(obj_energy_function,
-                            obj_gradient_function,
-                            alphas, *args, epsilon=1e-4)
-            print("gradient check:", err)
-            # exit()
+            # from scipy.optimize import check_grad
+            # err = check_grad(obj_energy_function,
+            #                 obj_gradient_function,
+            #                 alphas, *args, epsilon=1e-4)
+            # print("gradient check:", err)
+            # # exit()
 
-            # alphas = np.array([0.6, 0.6])
-            num_grad = np.zeros_like(alphas)
+            # # alphas = np.array([0.6, 0.6])
+            # num_grad = np.zeros_like(alphas)
 
-            # # numerical gradient
-            epsilon = 1e-5
-            for i in range(len(alphas)):
-                delta = np.zeros_like(alphas)
-                delta[i] = epsilon
-                f_plus = obj_energy_function(alphas + delta, *args)
-                f_minus = obj_energy_function(alphas - delta, *args)
-                num_grad[i] = (f_plus - f_minus) / (2 * epsilon)
+            # # # numerical gradient
+            # epsilon = 1e-5
+            # for i in range(len(alphas)):
+            #     delta = np.zeros_like(alphas)
+            #     delta[i] = epsilon
+            #     f_plus = obj_energy_function(alphas + delta, *args)
+            #     f_minus = obj_energy_function(alphas - delta, *args)
+            #     num_grad[i] = (f_plus - f_minus) / (2 * epsilon)
 
-            # analytical gradient
-            anal_grad = obj_gradient_function(alphas, *args)
+            # # analytical gradient
+            # anal_grad = obj_gradient_function(alphas, *args)
 
-            print("Analytical gradient:", anal_grad)
-            print("Numerical gradient:", num_grad)
-            print("Difference:", anal_grad - num_grad)
+            # print("Analytical gradient:", anal_grad)
+            # print("Numerical gradient:", num_grad)
+            # print("Difference:", anal_grad - num_grad)
 
             
             if len(alphas) > 1000 and len(geom_list) > 10000:
