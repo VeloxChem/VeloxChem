@@ -2403,7 +2403,7 @@ class IMDatabasePointCollecter:
                         self.last_point_added = self.point_checker - 1
                         self.point_checker = 0
                 
-                elif energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) < 100 and self.use_opt_confidence_radius[0] and 1==2:
+                elif energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) < 100 and self.use_opt_confidence_radius[0] or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) < 10 and self.use_opt_confidence_radius[0] or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) < 100 and self.use_opt_confidence_radius[0]:
   
                     # self.sampled_molecules[self.current_state]['molecules'].append(molecule)
                     # self.sampled_molecules[self.current_state]['im_energies'].append(self.impes_drivers[self.current_state].impes_coordinate.energy)
@@ -2896,7 +2896,7 @@ class IMDatabasePointCollecter:
                         impes_coordinate.write_hdf5(self.interpolation_settings[state + number]['imforcefield_file'], new_label)
 
                         if label_counter == 0:
-                            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 1:
+                            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 20:
                                 
                                 trust_radius = None
 
