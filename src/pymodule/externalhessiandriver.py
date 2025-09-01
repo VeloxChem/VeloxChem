@@ -303,17 +303,17 @@ conda activate vlxenv_new_compile
 
 
 
-            # current_path = os.getcwd()
+            current_path = os.getcwd()
 
-            # pattern = os.path.join(current_path, 'current_*')
-            # files_to_remove = glob.glob(pattern)
+            pattern = os.path.join(current_path, 'current_*')
+            files_to_remove = glob.glob(pattern)
         
-            # for file in files_to_remove:
-            #     try:
-            #         os.remove(file)
-            #         print(f'Removed file: {file}')
-            #     except Exception as e:
-            #         print(f'Error removing file {file} : {e}')
+            for file in files_to_remove:
+                try:
+                    os.remove(file)
+                    print(f'Removed file: {file}')
+                except Exception as e:
+                    print(f'Error removing file {file} : {e}')
             return hessians
         except Exception as e:
             print(f"Error extracting gradients: {e}")
