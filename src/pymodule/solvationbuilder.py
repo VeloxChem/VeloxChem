@@ -106,6 +106,7 @@ class SolvationBuilder:
         self.number_of_attempts = 100
         self.random_rotation = True
         self.failures_factor = 0.7
+        self.constraint_solute = False
 
         # Molecules
         # Solute
@@ -141,7 +142,7 @@ class SolvationBuilder:
         # Standard forcefield
         self.parent_forcefield = 'amber03'
 
-    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False):
+    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False, constraint_solute=True):
         """
         Create a solvated system with the most typical solvent molecules.
 
@@ -171,6 +172,7 @@ class SolvationBuilder:
 
         # Save the solvent name
         self.solvent_name = solvent
+        self.constraint_solute = constraint_solute
         
         header_msg = "VeloxChem System Builder"
         self.ostream.print_header(header_msg)
@@ -704,6 +706,36 @@ class SolvationBuilder:
                                         nonbondedCutoff=1.0*unit.nanometers, 
                                         constraints=app.HBonds, 
                                         )
+        
+        frozen_indices = []
+        for atom in topology.atoms():
+            
+            if atom.residue.name == "MOL":   # adjust to your residue name(s)
+                frozen_indices.append(atom.index)
+
+        
+        if self.constraint_solute:
+            k = 100000 * unit.kilojoule_per_mole / unit.nanometer**2  # fairly strong
+
+            # Define a harmonic positional restraint to the initial coordinates
+            rest = mm.CustomExternalForce(
+                "0.5 * k * periodicdistance(x, y, z, x0, y0, z0)^2"
+            )
+            rest.addGlobalParameter("k", k)
+            rest.addPerParticleParameter("x0")
+            rest.addPerParticleParameter("y0")
+            rest.addPerParticleParameter("z0")
+
+            # Select which atoms to restrain (e.g., chromophore heavy atoms)
+            restrained = []
+            for atom in topology.atoms():
+                if atom.residue.name == "MOL" and atom.element.symbol != "H":  # heavy atoms only
+                    idx = atom.index
+                    pos = positions[idx].value_in_unit(unit.nanometer)
+                    rest.addParticle(idx, pos)  # (x0,y0,z0) in nm
+                    restrained.append(idx)
+
+            system.addForce(rest)
         
         # Set the temperature and pressure
         integrator = mm.LangevinIntegrator(self.temperature*unit.kelvin, 1.0/unit.picosecond, 2*unit.femtosecond)

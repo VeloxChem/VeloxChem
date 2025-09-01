@@ -534,7 +534,8 @@ class IMDatabasePointCollecter:
             sys_builder.solvate(solute=molecule, 
                                 solvent=solvent,
                                 padding=self.padding,
-                                equilibrate=True
+                                equilibrate=True,
+                                constraint_solute=True
                                 )
             sys_builder.write_openmm_files(solute_ff=ff_gen)
             if solvent == 'spce':
@@ -2270,6 +2271,7 @@ class IMDatabasePointCollecter:
                 in the IM dynamics.
         """
         
+
         for state, key in enumerate(self.drivers.keys()):
             
             drivers = None
