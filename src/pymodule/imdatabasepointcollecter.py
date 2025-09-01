@@ -3893,7 +3893,7 @@ class IMDatabasePointCollecter:
                 return res
         
 
-        inital_alphas = [dp.confidence_radius for dp in datapoints]
+        inital_alphas = [0.5 for dp in datapoints]
 
         print('INPUT Trust radius', inital_alphas)
 
