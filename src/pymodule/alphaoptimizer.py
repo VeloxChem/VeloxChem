@@ -210,6 +210,12 @@ class AlphaOptimizer:
         self.M              = len(dps)
         self.S              = len(structure_list)
         self.idx            = np.asarray([o*3 + i for o in sym_dict[3] for i in range(3)], dtype=int)
+        
+        # 🔒 Force each worker to a single core
+        os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["MKL_NUM_THREADS"] = "1"
+        os.environ["OPENBLAS_NUM_THREADS"] = "1"
+        os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
         self._pool = ProcessPoolExecutor(
             max_workers=(n_workers or os.cpu_count() or 2),
@@ -242,6 +248,8 @@ class AlphaOptimizer:
 
         self._cache_key  = key
         self._cache_grad = sum_grad
+
+        print('Current alpha and loss', sum_loss, key)
         return float(sum_loss)
 
     def jac(self, alphas):

@@ -2984,7 +2984,7 @@ class IMDatabasePointCollecter:
             opt = AlphaOptimizer(self.z_matrix, impes_dict, sym_dict, sym_datapoints, dps,
                  geom_list, E_ref_list, G_ref_list,
                  e_x=self.use_opt_confidence_radius[3],
-                 beta=0.8, n_workers=8)  # pick sensible n_workers
+                 beta=0.8, n_workers=os.cpu_count())  # pick sensible n_workers
 
             minimizer_kwargs = {"method": "L-BFGS-B", "jac": opt.jac, "bounds": bounds, "options": {"disp": True, "gtol": 1e-4, "ftol": 1e-9, "maxls": 20}}
             res = basinhopping(opt.fun, x0=alphas, minimizer_kwargs=minimizer_kwargs, niter=20)
