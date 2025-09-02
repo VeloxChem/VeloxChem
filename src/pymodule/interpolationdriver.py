@@ -142,6 +142,11 @@ class InterpolationDriver():
         self.qm_symmetry_data_points_1 = None
         self.qm_symmetry_data_points_2 = None
 
+        # Confidence radii optimization information
+        self.dw_dalpha_list = []
+        self.dw_dX_dalpha_list = []
+        self.calc_optim_trust_radius = False
+
         self.bond_rmsd = None
         self.angle_rmsd = None
         self.dihedral_rmsd = None
@@ -517,6 +522,10 @@ class InterpolationDriver():
         averaged_int_dists = []
         weight_gradients_cart = []
         used_labels = []
+        self.potentials = []
+        self.gradients = []
+        self.dw_dalpha_list = []
+        self.dw_dX_dalpha_list = []
 
         sum_weight_gradients_cart = np.zeros((natms, 3))
 
@@ -971,11 +980,20 @@ class InterpolationDriver():
 
         return weight_gradient
     
-    def trust_radius_weight_gradient_hessian(self, datapoint):
+    # def trust_radius_weight_gradient_hessian_compare(self, datapoint):
         
-        confidence_radius = datapoint.confidence_radius
+    #     confidence_radius = datapoint.confidence_radius
 
-        distance, _, _, _, _, _ = self.cartesian_hessian_distance(datapoint)
+    #     distance, _, _, _, _, _ = self.cartesian_hessian_distance(datapoint)
+    #     denominator = (
+    #             (distance / confidence_radius)**(2 * self.exponent_p) +
+    #             (distance / confidence_radius)**(2 * self.exponent_q))
+    #     trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((distance / confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
+    #                                          (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
+    #     return trust_radius_weight_gradient
+    
+    def trust_radius_weight_gradient_hessian(self, confidence_radius, distance):
+
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))
@@ -983,11 +1001,22 @@ class InterpolationDriver():
                                              (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
         return trust_radius_weight_gradient
 
-    def trust_radius_weight_gradient(self, datapoint):
+    # def trust_radius_weight_gradient_compare(self, datapoint):
         
-        confidence_radius = datapoint.confidence_radius
+    #     confidence_radius = datapoint.confidence_radius
 
-        distance, _, _, _, _, _ = self.cartesian_distance(datapoint)
+    #     distance, _, _, _, _, _ = self.cartesian_distance(datapoint)
+    #     denominator = (
+    #             (distance / confidence_radius)**(2 * self.exponent_p) +
+    #             (distance / confidence_radius)**(2 * self.exponent_q))
+    #     trust_radius_weight_gradient = -1.0 * ((( -2.0 * self.exponent_p * ((distance / confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
+    #                                          (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
+    #     return trust_radius_weight_gradient
+
+    
+    def trust_radius_weight_gradient(self, confidence_radius, distance):
+        
+
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))
@@ -995,6 +1024,33 @@ class InterpolationDriver():
                                              (2.0 * self.exponent_q * ((distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))) / denominator**2)
         return trust_radius_weight_gradient
 
+    
+    # def trust_radius_weight_gradient_gradient_compare(self, datapoint):
+        
+    #     confidence_radius = datapoint.confidence_radius
+    #     distance, _, _, _, distance_vector, _ = self.cartesian_distance(datapoint)
+    #     denominator = (
+    #             (distance / confidence_radius)**(2 * self.exponent_p) +
+    #             (distance / confidence_radius)**(2 * self.exponent_q))
+        
+        
+    #     trust_radius_weight_gradient_gradient_1_nominator = (((-4.0 * self.exponent_p**2 * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) 
+    #                                             /(confidence_radius**(2.0 * self.exponent_p) * confidence_radius))
+    #                                             - (4.0 * self.exponent_q**2.0 * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) 
+    #                                             /(confidence_radius**(2.0 * self.exponent_q) * confidence_radius)) 
+
+    #     trust_radius_weight_gradient_gradient_2_nominator = ( 2.0 * (((2.0 * self.exponent_p * distance_vector * distance**(2.0 * self.exponent_p - 2.0)) /(confidence_radius**(2.0 * self.exponent_p)))
+    #                                             + (2.0 * self.exponent_q * distance_vector * distance**(2.0 * self.exponent_q - 2.0)) / (confidence_radius**(2.0 * self.exponent_q))) 
+    #                                             * (((-2.0 * (distance/confidence_radius)**(2.0 * self.exponent_p) * self.exponent_p) / confidence_radius) 
+    #                                             - ((2.0 * (distance/confidence_radius)**(2.0 * self.exponent_q) * self.exponent_q) / confidence_radius))) 
+
+        
+    #     trust_radius_weight_gradient_gradient = -1.0 * trust_radius_weight_gradient_gradient_1_nominator / denominator**2 + trust_radius_weight_gradient_gradient_2_nominator / denominator**3
+
+
+    #     return trust_radius_weight_gradient_gradient
+
+    
     def trust_radius_weight_gradient_gradient(self, datapoint):
         
         confidence_radius = datapoint.confidence_radius
@@ -1020,10 +1076,30 @@ class InterpolationDriver():
 
         return trust_radius_weight_gradient_gradient
 
-    def trust_radius_weight_gradient_gradient_hessian(self, datapoint):
+    
+    # def trust_radius_weight_gradient_gradient_hessian_compare(self, datapoint):
         
-        confidence_radius = datapoint.confidence_radius
-        distance, _, _, _, _, grad_s = self.cartesian_hessian_distance(datapoint)
+    #     confidence_radius = datapoint.confidence_radius
+    #     distance, _, _, _, _, grad_s = self.cartesian_hessian_distance(datapoint)
+   
+    #     denominator = (
+    #             (distance / confidence_radius)**(2 * self.exponent_p) +
+    #             (distance / confidence_radius)**(2 * self.exponent_q))
+
+    #     trust_radius_weight_gradient_gradient_nominator_1_1 = 2.0 * ((2.0 * self.exponent_p * (distance / confidence_radius)**(2 * self.exponent_p - 1) / confidence_radius) + (2.0 * self.exponent_q * (distance / confidence_radius)**(2 * self.exponent_q - 1) / confidence_radius))
+    #     trust_radius_weight_gradient_gradient_nominator_1_2 = ((-2.0 * self.exponent_p * (distance / confidence_radius)**(2 * self.exponent_p) / confidence_radius) - ( 2.0 * self.exponent_q * (distance / confidence_radius)**(2 * self.exponent_q) / confidence_radius))
+
+    #     trust_radius_weight_gradient_gradient_nominator_2 = ((-2.0 * self.exponent_p * (2 * self.exponent_p - 1) * (distance / confidence_radius)**(2 * self.exponent_p - 1) / confidence_radius**2) - (2.0 * self.exponent_p * (distance / confidence_radius)**(2 * self.exponent_p - 1) / confidence_radius**2) -
+    #                                                                 (2.0 * self.exponent_q * (2 * self.exponent_q - 1) * (distance / confidence_radius)**(2 * self.exponent_q - 1) / confidence_radius**2) - (2.0 * self.exponent_q * (distance / confidence_radius)**(2 * self.exponent_q - 1) / confidence_radius**2))
+        
+    #     trust_radius_weight_gradient_gradient = (((trust_radius_weight_gradient_gradient_nominator_1_1 * trust_radius_weight_gradient_gradient_nominator_1_2 ) / denominator**3) - trust_radius_weight_gradient_gradient_nominator_2 / denominator**2) * grad_s
+
+
+    #     return trust_radius_weight_gradient_gradient
+
+    
+    def trust_radius_weight_gradient_gradient_hessian(self, confidence_radius, distance, grad_s):
+        
    
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
@@ -1200,15 +1276,24 @@ class InterpolationDriver():
         distance_vector_sub =  Xc - rotated_current
         distance = np.linalg.norm(distance_vector_sub)
 
+        distance_vector = np.zeros_like(reference_coordinates)   # (natms,3)
+        distance_vector[self.symmetry_information[3]] = distance_vector_sub
+
 
         dihedral_dist = 0.0
         if distance < 1e-8:
             distance = 1e-8
             distance_vector_sub[:] = 0
+            
 
         if self.interpolation_type == 'shepard':
             denominator, weight_gradient_sub = self.shepard_weight_gradient(
-                distance_vector_sub, distance, data_point.confidence_radius)        
+                distance_vector_sub, distance, data_point.confidence_radius)
+            if self.calc_optim_trust_radius:
+                dw_dalhpa_i = self.trust_radius_weight_gradient(data_point.confidence_radius, distance)
+                dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient(data_point.confidence_radius, distance, distance_vector)
+                self.dw_dalpha_list.append(dw_dalhpa_i)
+                self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)        
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
                 distance_vector_sub, distance)
@@ -1219,9 +1304,6 @@ class InterpolationDriver():
         
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
         weight_gradient[self.symmetry_information[3]] = weight_gradient_sub
-
-        distance_vector = np.zeros_like(reference_coordinates)   # (natms,3)
-        distance_vector[self.symmetry_information[3]] = distance_vector_sub
         
         
 
@@ -1365,6 +1447,12 @@ class InterpolationDriver():
 
         if self.interpolation_type == 'shepard':
             denominator, weight_gradient = self.shepard_weight_gradient_hessian(distance, data_point.confidence_radius, grad_s)  
+            if self.calc_optim_trust_radius:
+                dw_dalhpa_i = self.trust_radius_weight_gradient_hessian(data_point.confidence_radius, distance)
+                dw_dX_dalpha_i = self.trust_radius_weight_gradient_gradient_hessian(data_point.confidence_radius, distance, grad_s)
+                self.dw_dalpha_list.append(dw_dalhpa_i)
+                self.dw_dX_dalpha_list.append(dw_dX_dalpha_i)
+            
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(distance_vector, distance)
         else:

@@ -201,6 +201,7 @@ from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .alphaoptimizer import AlphaOptimizer
 from .openmmimdynamics import OpenMMIMDynamics
 
 ## external interfaces for Interpolation module
