@@ -519,13 +519,15 @@ class HydrogenBdeDriver:
         basis_set1 = MolecularBasis.read(mol, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(mol, self.basis_sets[1])
         self.radical_scf_drv.filename = f'bde_{run_idx+1}'
-        self.radical_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}(1.0)'
+        if self.mol_rad_multiplicity != 1:
+            self.radical_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
         scf_resultsmol = self.radical_scf_drv.compute(mol, basis_set1)
         opt_results_rad = self.radical_opt_drv.compute(mol, basis_set1,
                                                        scf_resultsmol)
         mol = Molecule.read_xyz_string(opt_results_rad["final_geometry"])
         mol.set_multiplicity(self.mol_rad_multiplicity)
-        self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}(1.0)'
+        if self.mol_rad_multiplicity != 1:
+            self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
         scf_results_rad_big = self.radical_final_scf_drv.compute(mol, basis_set2)
         step_end = time.time()
         self.ostream.print_info("-" * 50)
