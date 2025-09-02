@@ -108,6 +108,10 @@ class HydrogenBdeDriver:
         #analyze all atoms in the molecule, setting for _atom_analyzer
         self.analyze_allatoms = False
         self.target_atom = "H"
+        self.target_atom_multiplicity = 2
+        self.target_atom_charge = 0
+        self.mol_rad_multiplicity = 2
+        self.mol_rad_charge = 0
         self.show_mol = False
         #attributes for atom analysis
         self.atom_idx = None
@@ -302,8 +306,8 @@ class HydrogenBdeDriver:
 
         :return: A string containing the H connected atom information,this string is in the format of "atomlabel_atomindex_atomtype".
         """
-        # if the atom is not H, then return ''
-        if labels[atom_idx] != "H":
+        # if the atom is not H or target_atom_type, then return ''
+        if labels[atom_idx] != self.target_atom:
             return ""
         else:
             # search it in connectivity matrix to get the connected atom index
@@ -341,7 +345,7 @@ class HydrogenBdeDriver:
         hydrogen_record = []
         unique_hydrogen_keys = []
         for key in hydrogen_atoms_dict.keys():
-            if key.split("_")[0] == "H" and int(
+            if key.split("_")[0] == self.target_atom and int(
                     key.split("_")[1]) not in hydrogen_record:
                 hydrogen_record.extend(hydrogen_atoms_dict[key]["equiv_group"])
                 unique_hydrogen_keys.append(key)
@@ -450,10 +454,8 @@ class HydrogenBdeDriver:
         opt_molecule = Molecule.read_xyz_string(opt_results["final_geometry"])
 
         # final energy
-        final_single_point_scf_result = self.mol_final_scf_drv.compute(
-            opt_molecule, basis_set2)
-        self.whole_mol_single_point_scf_energy = self.mol_final_scf_drv.get_scf_energy(
-        )
+        final_single_point_scf_result = self.mol_final_scf_drv.compute(opt_molecule, basis_set2)
+        self.whole_mol_single_point_scf_energy = self.mol_final_scf_drv.get_scf_energy()
         return opt_molecule
 
     def _compute_hydrogen_radical_scf_energy(self):
@@ -462,12 +464,12 @@ class HydrogenBdeDriver:
         open shell with ScfUnrestrictedDriver
         """
 
-        hydrogen = Molecule.read_str(""" H 0.0 0.0 0.0 """)
-        hydrogen.set_multiplicity(2)
+        hydrogen = Molecule.read_str(f"{self.target_atom} 0.0 0.0 0.0")
+        hydrogen.set_multiplicity(self.target_atom_multiplicity)
+        hydrogen.set_charge(self.target_atom_charge)
         basis_set2 = MolecularBasis.read(hydrogen, self.basis_sets[1])
         scf_resultsH = self.hydrogen_final_scf_drv.compute(hydrogen, basis_set2)
-        self.hydrogen_single_point_scf_energy = self.hydrogen_final_scf_drv.get_scf_energy(
-        )
+        self.hydrogen_single_point_scf_energy = self.hydrogen_final_scf_drv.get_scf_energy()
 
     def _remove_atom_by_idx(self, mol, atom_indices_to_remove, carbon_indices):
         """
@@ -513,7 +515,8 @@ class HydrogenBdeDriver:
         :return: The SCF energy of the radical molecule.
         """
         step_start = time.time()
-        mol.set_multiplicity(2)
+        mol.set_multiplicity(self.mol_rad_multiplicity)
+        mol.set_charge(self.mol_rad_charge)
         basis_set1 = MolecularBasis.read(mol, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(mol, self.basis_sets[1])
         self.radical_scf_drv.filename = f'bde_{run_idx+1}'
@@ -524,16 +527,14 @@ class HydrogenBdeDriver:
         mol = Molecule.read_xyz_string(opt_results_rad["final_geometry"])
         mol.set_multiplicity(2)
         self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}(1.0)'
-        scf_results_rad_big = self.radical_final_scf_drv.compute(
-            mol, basis_set2)
+        scf_results_rad_big = self.radical_final_scf_drv.compute(mol, basis_set2)
 
         step_end = time.time()
         self.ostream.print_info("-" * 50)
         self.ostream.print_info(
             f"time cost : {round(step_end - step_start, 2)} seconds")
         self.ostream.flush()
-        radical_single_point_scf_energy = self.radical_final_scf_drv.get_scf_energy(
-        )
+        radical_single_point_scf_energy = self.radical_final_scf_drv.get_scf_energy()
         return radical_single_point_scf_energy
 
     def _show_bde_on_atom(self,
