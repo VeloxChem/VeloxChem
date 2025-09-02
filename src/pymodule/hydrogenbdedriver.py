@@ -316,7 +316,7 @@ class HydrogenBdeDriver:
             connected_atom_idx = np.where(con_info == 1)[0]
             if len(connected_atom_idx) != 1:
                 assert_msg_critical(
-                    "H atom should have only one connected atom")
+                    f"{self.target_atom} atom should have only one connected atom")
             connected_atom = labels[connected_atom_idx[0]]
             connected_atom_type = atoms_types[connected_atom_idx[0]]
             h_connected_atom_info = (str(connected_atom) + "_" +
@@ -393,15 +393,14 @@ class HydrogenBdeDriver:
             equiv_group = hydrogen_atoms_dict[key]["equiv_group"]
             for j in equiv_group:
                 hydrogen_atoms_dict[
-                    "H_" + str(j)]["dissociation_energy_au"] = energy_au
-                hydrogen_atoms_dict["H_" +
-                                    str(j)]["dissociation_energy_kcal"] = (
-                                        energy_au * au2kcal)
-                hydrogen_atoms_dict["H_" + str(j)]["dissociation_energy_kj"] = (
+                    str(self.target_atom)+"_" + str(j)]["dissociation_energy_au"] = energy_au
+                hydrogen_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kcal"] = (
+                    energy_au * au2kcal)
+                hydrogen_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kj"] = (
                     energy_au * au2kj)
                 hydrogen_bdes_kj_coords.append(
                     (energy_au * au2kj,
-                     hydrogen_atoms_dict["H_" + str(j)]["coord"]))
+                     hydrogen_atoms_dict[str(self.target_atom)+"_" + str(j)]["coord"]))
         return (hydrogen_atoms_dict, hydrogen_bdes_kj_coords,
                 unique_hydrogen_bdes_kj_coords)
 
@@ -412,7 +411,7 @@ class HydrogenBdeDriver:
         this function is used to print the bond dissociation energy of hydrogen atoms, with targeting energy units
         """
         self.ostream.print_info("-" * 50)
-        self.ostream.print_info("bond dissociation energy of hydrogen atoms:")
+        self.ostream.print_info(f"bond dissociation energy of {self.target_atom} atoms:")
         self.ostream.flush()
         for key in hydrogen_atoms_dict.keys():
             if "dissociation_energy_au" in hydrogen_atoms_dict[key].keys():
@@ -525,10 +524,9 @@ class HydrogenBdeDriver:
         opt_results_rad = self.radical_opt_drv.compute(mol, basis_set1,
                                                        scf_resultsmol)
         mol = Molecule.read_xyz_string(opt_results_rad["final_geometry"])
-        mol.set_multiplicity(2)
+        mol.set_multiplicity(self.mol_rad_multiplicity)
         self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}(1.0)'
         scf_results_rad_big = self.radical_final_scf_drv.compute(mol, basis_set2)
-
         step_end = time.time()
         self.ostream.print_info("-" * 50)
         self.ostream.print_info(
