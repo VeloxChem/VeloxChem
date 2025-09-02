@@ -75,6 +75,7 @@ class OptimizationEngine(geometric.engine.Engine):
         g_molecule.xyzs = [
             molecule.get_coordinates_in_bohr() * geometric.nifty.bohr2ang
         ]
+        g_molecule.build_topology()
 
         super().__init__(g_molecule)
 
