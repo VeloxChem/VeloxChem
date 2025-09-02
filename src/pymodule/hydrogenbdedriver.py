@@ -528,6 +528,7 @@ class HydrogenBdeDriver:
         mol.set_multiplicity(self.mol_rad_multiplicity)
         if self.mol_rad_multiplicity != 1:
             self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
+        mol.set_charge(self.mol_rad_charge)
         scf_results_rad_big = self.radical_final_scf_drv.compute(mol, basis_set2)
         step_end = time.time()
         self.ostream.print_info("-" * 50)
