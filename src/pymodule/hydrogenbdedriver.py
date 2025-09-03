@@ -452,7 +452,7 @@ class HydrogenBdeDriver:
 
         opt_molecule = Molecule.read_xyz_string(opt_results["final_geometry"])
         opt_molecule.set_charge(molecule.get_charge())
-        opt_molecule.set_multiplicity()(molecule.get_multiplicity())
+        opt_molecule.set_multiplicity(molecule.get_multiplicity())
 
         # final energy
         final_single_point_scf_result = self.mol_final_scf_drv.compute(opt_molecule, basis_set2)
