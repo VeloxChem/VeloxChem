@@ -1349,11 +1349,18 @@ class InterpolationDriver():
         
         Hc_ul = Hc * E_ref
         H_spd = make_spd_hessian(Hc_ul, floor_abs=1e-6)
+
+        w, U   = np.linalg.eigh(H_spd)
+        lam_med = np.median(w)
+        lam_lo  = 0.05 * lam_med
+        lam_hi  = 10.0 * lam_med
+        w_clip  = np.clip(w, lam_lo, lam_hi)
+        H_clip  = (U * w_clip) @ U.T
  
-        distance_2     = (distance_vector.reshape(-1) @ ((1.0 * H_spd) @ distance_vector.reshape(-1)))
+        distance_2     = (distance_vector.reshape(-1) @ ((1.0 * H_clip) @ distance_vector.reshape(-1)))
         distance = np.sqrt(distance_2)
 
-        y = ((1.0 * H_spd) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
+        y = ((1.0 * H_clip) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
 
         rigid = y @ R_x                           # (Nc,3)
         S = y.T @ Xc                                    # (3,3)
