@@ -522,10 +522,11 @@ class ScfGradientDriver(GradientDriver):
                 'discretization': self.scf_driver.discretization,
                 'filename': self.scf_driver.filename,
                 'homemade': self.scf_driver.homemade, #TODO: remove (added for testing of gradient with fixed cavity)
-                'tess_file': self.scf_driver.tess_file #TODO: remove (added for testing of gradient with fixed cavity)
+                'tess_file': self.scf_driver.tess_file, #TODO: remove (added for testing of gradient with fixed cavity)
+                'r_ext': self.scf_driver.r_ext
             }
 
-            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad_new_ints(2 * D, tessellation_settings)
+            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad_new_ints_occ(2 * D, tessellation_settings)
 
             self.gradient += gostshyp_grad
 
@@ -906,10 +907,11 @@ class ScfGradientDriver(GradientDriver):
                 'discretization': self.scf_driver.discretization,
                 'filename': self.scf_driver.filename,
                 'homemade': self.scf_driver.homemade, #TODO: remove (added for testing purposes)
-                'tess_file': self.scf_driver.tess_file #TODO: remove (added for testing purposes)
+                'tess_file': self.scf_driver.tess_file, #TODO: remove (added for testing purposes)
+                'r_ext': self.scf_driver.r_ext
             }
 
-            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad(Da + Db, tessellation_settings)
+            gostshyp_grad = self._gostshyp_drv.get_gostshyp_grad_new_ints_occ(Da + Db, tessellation_settings)
 
             self.gradient += gostshyp_grad
         

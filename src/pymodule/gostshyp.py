@@ -384,6 +384,125 @@ class GostshypDriver:
         
         return grad
     
+
+    def get_gostshyp_grad_new_ints_occ(self, den_mat, tessellation_settings=None):
+        """
+        Computes gradient of SCF energy with respect to nuclear coordinates using the GOSTSHYP model
+
+        Pausch, Zeller, Neudecker: J. Chem. Theory Comput. 2025, 21, 747-761 
+        
+        :param den_mat:
+            The density matrix
+        :param tessellation_settings:
+            The dictionary of tessellation settings
+            
+        :return:
+            The SCF energy gradient at the input pressure 
+        """
+
+        # tessellation driver needed for area gradients
+        tessellation_drv = TessellationDriver(self.comm, self.ostream)
+        tessellation_drv.update_settings(tessellation_settings)
+
+        # tessellation data is generated
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+
+        #tesserae areas are extracted
+        areas = self.tessellation[3]
+
+        # f_tilde is computed for all tesserae
+        f_tilde = compute_tco_p_values(self.molecule, 
+                                       self.basis, 
+                                       (self.tessellation[:3].T).copy(), 
+                                       (np.pi * np.log(2.0) / areas), 
+                                       np.full((self.num_tes_points), 1.0), 
+                                       (self.tessellation[8:11].T).copy(), 
+                                       den_mat)
+        
+        # amplitudes are computed
+        amplitudes = self.pressure * areas / f_tilde
+        amps_mask = amplitudes >= 0.0
+        num_pos_amps = np.sum(amps_mask)
+        self._neg_p_amp = self.num_tes_points - num_pos_amps
+
+        # gaussian information is extracted
+        centers = (self.tessellation[:3].T[amps_mask]).copy()
+        exponents = (np.pi * np.log(2.0) / areas)[amps_mask]
+        amps = amplitudes[amps_mask]
+        norms = (self.tessellation[8:11].T[amps_mask]).copy()
+
+        # implemention of gradient
+        # J. Chem. Theory Comput. 2025, 21, 747-761, eq. (30)
+
+        # amplitudes divided by areas
+        amps_div_areas = (amplitudes / areas)[amps_mask]
+
+        # terms proportional to the area derivative
+        g_tilde_term = compute_tco_s_values(self.molecule, 
+                                            self.basis, 
+                                            centers, 
+                                            exponents, 
+                                            amps_div_areas, 
+                                            den_mat)
+    
+        d_tilde_term = compute_tco_d_values(self.molecule,
+                                            self.basis,
+                                            centers,
+                                            exponents,
+                                            (amps_div_areas * exponents),
+                                            den_mat)
+        
+        e_tilde_term = compute_tco_f_values(self.molecule,
+                                            self.basis,
+                                            centers,
+                                            exponents,
+                                            (g_tilde_term * exponents / f_tilde[amps_mask]),
+                                            norms,
+                                            den_mat)
+        
+        # terms of constant gaussian exponent
+        # sum of bra and ket side gradients
+        g_tilde_grad = np.array(compute_tco_s_gradient(self.molecule,
+                                                       self.basis,
+                                                       centers,
+                                                       exponents,
+                                                       amps,
+                                                       den_mat))
+        
+        # sum of bra and ket side gradients
+        f_tilde_grad = np.array(compute_tco_p_gradient(self.molecule,
+                                                       self.basis,
+                                                       centers,
+                                                       exponents,
+                                                       (g_tilde_term * areas[amps_mask] / f_tilde[amps_mask]),
+                                                       norms,
+                                                       den_mat))
+        
+        natoms = self.molecule.number_of_atoms()
+        a_grads = np.zeros((num_pos_amps, natoms, 3))
+        
+        for atom in range(natoms):
+            
+            # area gradients
+            a_grads[:, atom] = tessellation_drv.comp_area_grad_occ(self.molecule,
+                                                                   self.tessellation[:, amps_mask],
+                                                                   atom).T
+            
+            # gaussian center gradient is added using translational invariance
+            tess_ids = (self.tessellation[11, amps_mask] == atom)
+            
+            g_tilde_grad[tess_ids, atom] -= np.sum(g_tilde_grad, axis = 1)[tess_ids]
+            f_tilde_grad[tess_ids, atom] -= np.sum(f_tilde_grad, axis = 1)[tess_ids]
+        
+        # terms proportional to area gradient multiplied by the area gradient
+        area_grad_term = np.sum(np.reshape(np.repeat((2 * g_tilde_term - d_tilde_term + e_tilde_term), natoms * 3), (num_pos_amps, natoms, 3)) * a_grads, axis = 0)
+        
+        # collecting terms for the gradient
+        grad = area_grad_term + np.sum(g_tilde_grad - f_tilde_grad, axis = 0)
+        
+        return grad
+    
     # def get_gostshyp_contribution(self, den_mat, tessellation_settings=None):
     #     """
     #     Computes contributions to the total energy and Fock matrix from
