@@ -1242,7 +1242,7 @@ class OpenMMIMDynamics:
         self.nsteps = nsteps
 
         self.im_driver = im_driver
-
+      
         if isinstance(self.im_driver, InterpolationDriver):
             interpolation_settings_dict = {}
             if len(interpolation_settings) != len(roots_to_follow):
@@ -1417,11 +1417,14 @@ class OpenMMIMDynamics:
                 print('Total Energy:', total)
                 print('Current State (PES):', self.current_state)  
                 print('-' * 60)   
-                
+
+                self.dynamic_molecules.append(self.current_molecule)    
 
             self.simulation.step(1)
             self.step += 1
 
+
+        self.structures_to_xyz_file(self.dynamic_molecules, 'snapshots_traj.xyz')
         end_time = time()
         elapsed_time = end_time - start_time
         elapsed_time_days = elapsed_time / (24 * 3600)
@@ -2480,15 +2483,15 @@ class OpenMMIMDynamics:
                 positions_ang[atom1] = positions_ang[atom2] - direction * self.linking_atom_distance
 
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
-            self.dynamic_molecules.append(new_molecule)
+            self.current_molecule = new_molecule
+ 
 
         else:
             # Atom labels for the QM region
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
-            self.dynamic_molecules.append(new_molecule)
-
+            self.current_molecule = new_molecule
         for root in self.roots_to_follow:
             self.im_drivers[root].qm_data_points = self.qm_data_point_dict[root]
             self.im_drivers[root].compute(new_molecule)
@@ -2976,8 +2979,6 @@ class OpenMMIMDynamics:
   
             return new_groups, rot_groups
 
-        
-        self.z_matrix = self.define_z_matrix(molecule)
         angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), 0)
         dihedral_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 4), 0)
 
