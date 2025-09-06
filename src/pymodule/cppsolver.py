@@ -384,6 +384,27 @@ class ComplexResponse(LinearSolver):
             self.nonlinear = (v_grad is not None)
         self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
 
+        if self.nonlinear:
+            rsp_vector_labels = [
+                'CLR_bger_half_size', 'CLR_bung_half_size',
+                'CLR_e2bger_half_size', 'CLR_e2bung_half_size', 'CLR_Fock_ger',
+                'CLR_Fock_ung'
+            ]
+        else:
+            rsp_vector_labels = [
+                'CLR_bger_half_size', 'CLR_bung_half_size',
+                'CLR_e2bger_half_size', 'CLR_e2bung_half_size'
+            ]
+
+        # check validity of checkpoint file
+        # note: we need to check and update self.restart before computing dist_rhs
+        if self.restart:
+            if self.rank == mpi_master():
+                self.restart = check_rsp_hdf5(self.checkpoint_file,
+                                              rsp_vector_labels, molecule,
+                                              basis, dft_dict, pe_dict)
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
+
         dist_grad = {}
         dist_rhs = {}
 
@@ -471,25 +492,8 @@ class ComplexResponse(LinearSolver):
 
         profiler.check_memory_usage('Precond')
 
-        if self.nonlinear:
-            rsp_vector_labels = [
-                'CLR_bger_half_size', 'CLR_bung_half_size',
-                'CLR_e2bger_half_size', 'CLR_e2bung_half_size', 'CLR_Fock_ger',
-                'CLR_Fock_ung'
-            ]
-        else:
-            rsp_vector_labels = [
-                'CLR_bger_half_size', 'CLR_bung_half_size',
-                'CLR_e2bger_half_size', 'CLR_e2bung_half_size'
-            ]
-
-        # check validity of checkpoint file
-        if self.restart:
-            if self.rank == mpi_master():
-                self.restart = check_rsp_hdf5(self.checkpoint_file,
-                                              rsp_vector_labels, molecule,
-                                              basis, dft_dict, pe_dict)
-            self.restart = self.comm.bcast(self.restart, root=mpi_master())
+        # note: we have already checked validity of checkpoint file,
+        #       updated self.restart, and defined rsp_vector_labels
 
         # read initial guess from restart file
         if self.restart:
