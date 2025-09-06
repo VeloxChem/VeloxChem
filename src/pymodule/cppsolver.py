@@ -95,6 +95,9 @@ class ComplexResponse(LinearSolver):
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
 
+        self.benchmark = False
+        self.benchmark_fock_count = None
+
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
             'a_components': ('str_lower', 'Cartesian components of A operator'),
@@ -102,6 +105,8 @@ class ComplexResponse(LinearSolver):
             'b_components': ('str_lower', 'Cartesian components of B operator'),
             'frequencies': ('seq_range', 'frequencies'),
             'damping': ('float', 'damping parameter'),
+            'benchmark': ('bool', 'flag for benchmarking Fock builds'),
+            'benchmark_fock_count': ('int', 'number of Fock builds'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -409,11 +414,19 @@ class ComplexResponse(LinearSolver):
         dist_rhs = {}
 
         if not self.nonlinear:
+            prop_grad_t0 = tm.time()
+
             # TODO: make this screening temporary
             b_grad = self.get_complex_prop_grad(self.b_operator,
                                                 self.b_components, molecule,
                                                 basis, scf_tensors,
                                                 eri_dict['screening'])
+
+            prop_grad_dt = tm.time() - prop_grad_t0
+            self.ostream.print_info(
+                f'Time spent in complex property gradient: {prop_grad_dt:.2f} sec.'
+            )
+            self.ostream.print_blank()
 
             for comp_idx, op in enumerate(self.b_components):
 
@@ -503,7 +516,30 @@ class ComplexResponse(LinearSolver):
         else:
             bger, bung = self._setup_trials(dist_rhs, precond)
 
-            profiler.set_timing_key(f'Initial guess')
+            profiler.set_timing_key('Initial guess')
+
+            if self.benchmark and self.benchmark_fock_count is not None:
+                # for user-provided benchmark_fock_count, figure out appropriate
+                # numbers of gerade and ungerade trial vectors
+                n_focks = bger.data.shape[1] + bung.data.shape[1]
+                n_excess_fock = n_focks - self.benchmark_fock_count
+
+                assert_msg_critical(
+                    n_excess_fock >= 0,
+                    'ComplexResponse: benchmark_fock_count too large')
+
+                n_excess_fock_ger = int(n_excess_fock *
+                                        (bger.data.shape[1] / n_focks))
+                n_excess_fock_ung = int(n_excess_fock *
+                                        (bung.data.shape[1] / n_focks))
+
+                if n_excess_fock_ger >= n_excess_fock_ung:
+                    n_excess_fock_ger = n_excess_fock - n_excess_fock_ung
+                else:
+                    n_excess_fock_ung = n_excess_fock - n_excess_fock_ger
+
+                bger.data = bger.data[:, :-n_excess_fock_ger].copy()
+                bung.data = bung.data[:, :-n_excess_fock_ung].copy()
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
                                 eri_dict, dft_dict, pe_dict, profiler)
@@ -823,6 +859,10 @@ class ComplexResponse(LinearSolver):
 
             profiler.stop_timer('ReducedSpace')
 
+            if self.benchmark:
+                # stop here when benchmarking Fock builds
+                break
+
             # check convergence
 
             self._check_convergence(relative_residual_norm)
@@ -856,7 +896,7 @@ class ComplexResponse(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
-            if self.force_checkpoint:
+            if self.force_checkpoint and (not self.benchmark):
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
 
@@ -875,8 +915,9 @@ class ComplexResponse(LinearSolver):
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                               rsp_vector_labels)
+        if not self.benchmark:
+            self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                                   rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
