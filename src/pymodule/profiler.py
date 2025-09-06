@@ -142,9 +142,9 @@ class Profiler:
             import io
             self.pr.disable()
             s = io.StringIO()
-            sortby = 'time'
+            sortby = 'cumulative'
             ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-            ps.print_stats(50)
+            ps.print_stats(30)
 
             valstr = 'Profiling summary'
             ostream.print_info('   ' + valstr)
@@ -162,6 +162,7 @@ class Profiler:
                     line = '{:s} ...{:s}:{:s}'.format(text, fname, lineno)
                 ostream.print_info(line)
             ostream.print_blank()
+            ostream.flush()
 
     def print_memory_tracing(self, ostream):
         """
@@ -187,6 +188,7 @@ class Profiler:
                 ostream.print_info('{:<45s} {:s}'.format(
                     text, self.memory_to_string(stat.size)))
             ostream.print_blank()
+            ostream.flush()
 
     def set_timing_key(self, key):
         """
@@ -261,8 +263,11 @@ class Profiler:
             ostream.print_header(valstr.ljust(width))
             ostream.print_header(('-' * len(valstr)).ljust(width))
 
-            key_0 = list(self.timing_dict.keys())[0]
-            labels = list(self.timing_dict[key_0].keys())
+            labels = []
+            for key in reversed(self.timing_dict.keys()):
+                for label in self.timing_dict[key]:
+                    if label not in labels:
+                        labels.append(label)
 
             valstr = '{:<18s}'.format('')
             for label in labels:
@@ -282,6 +287,7 @@ class Profiler:
 
             ostream.print_blank()
             ostream.print_blank()
+            ostream.flush()
 
     def check_memory_usage(self, remark=''):
         """
@@ -327,6 +333,7 @@ class Profiler:
 
             ostream.print_blank()
             ostream.print_blank()
+            ostream.flush()
 
     def comp_memory_object(self, obj, counted_ids=None):
         """
