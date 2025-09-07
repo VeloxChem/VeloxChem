@@ -346,7 +346,7 @@ class ComplexResponse(LinearSolver):
 
         # initialize profiler
         profiler = Profiler({
-            'timing': self.timing,
+            'timing': (self.timing or self.benchmark),
             'profiling': self.profiling,
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
@@ -928,6 +928,33 @@ class ComplexResponse(LinearSolver):
 
         profiler.check_memory_usage('End of CPP solver')
         profiler.print_memory_usage(self.ostream)
+
+        # print benchmark summary
+        if self.benchmark:
+            if self.benchmark_fock_count is None:
+                bench_text = 'benchmark_fock_count not set. '
+                bench_text += 'Skipping printing of benchmark summary.'
+                self.ostream.print_info(bench_text)
+                self.ostream.print_blank()
+            else:
+                bench_timing_dict = profiler.timing_dict['Initial guess']
+
+                fock_time = bench_timing_dict['FockERI']
+                if 'FockXC' in bench_timing_dict:
+                    fock_time += bench_timing_dict['FockXC']
+                fock_time += bench_timing_dict['FockComm']
+
+                fock_per_sec = self.benchmark_fock_count / fock_time
+                fock_per_hour = fock_per_sec * 3600
+
+                width = 92
+                valstr = 'Benchmark Summary'
+                self.ostream.print_header(valstr.ljust(width))
+                self.ostream.print_header(('-' * len(valstr)).ljust(width))
+                valstr = f'{fock_per_hour:.1f} Fock matrices per hour'
+                self.ostream.print_header(valstr.ljust(width))
+                self.ostream.print_blank()
+            self.ostream.flush()
 
         self._dist_bger = None
         self._dist_bung = None
