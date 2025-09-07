@@ -233,7 +233,9 @@ class ScfDriver:
             self.comm)
 
         # may be used in rare cases when user wants to skip the writing of h5
+        # for now we use both _skip_writing_h5 and write_h5 for this purpose
         self._skip_writing_h5 = False
+        self.write_h5 = True
 
         # input keywords
         self._input_keywords = {
@@ -248,6 +250,7 @@ class ScfDriver:
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
+                'write_h5': ('bool', 'write checkpoint and final h5'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
@@ -1002,7 +1005,7 @@ class ScfDriver:
             Name of the basis set.
         """
 
-        if self._skip_writing_h5:
+        if self._skip_writing_h5 or (not self.write_h5):
             return
 
         if self.checkpoint_file is None and self._filename is None:
@@ -2422,7 +2425,7 @@ class ScfDriver:
             The AO basis set.
         """
 
-        if self._skip_writing_h5:
+        if self._skip_writing_h5 or (not self.write_h5):
             return
 
         if self.checkpoint_file is None:
