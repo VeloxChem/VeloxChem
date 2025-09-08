@@ -159,8 +159,6 @@ class HessianOrbitalResponse(CphfSolver):
 
         if atom_pairs is None:
             local_atoms = partition_atoms(natm, self.rank, self.nodes)
-            self.ostream.print_info(
-                f"rank {self.rank} has local atoms {local_atoms}")  #atompair
         else:
             atoms_in_pairs = []
             for i, j in atom_pairs:
@@ -318,7 +316,7 @@ class HessianOrbitalResponse(CphfSolver):
 
                 for vecind, (iatom, root_rank) in enumerate(
                         all_atom_idx_rank[batch_start:batch_end]):
-                    # print(iatom)
+
                     for x in range(3):
                         vxc_deriv_ix = self.comm.reduce(
                             vxc_deriv_batch[vecind * 3 + x])
