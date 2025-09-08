@@ -609,6 +609,7 @@ conda activate vlxenv_new_compile
         """
         print('Giving of the current input file', self.input_filename)
         try:
+            print('Self program is here', self.program)
             if self.program == 'MOLCAS':
                 with open(self.input_filename, 'w') as file:
                     file.write("&GATEWAY\n")
@@ -648,15 +649,19 @@ conda activate vlxenv_new_compile
 
                 full_path = os.path.abspath(self.qm_driver.xyz_filename)
                 with open(input_file, 'w') as file:
+                    basis_set = self.qm_driver.basis_set_label
+                    if "RIJK" in basis_set:
+                        basis_set = basis_set.replace("RIJK", "RIJCOSX")
                     if self.qm_driver.solvation[0] is True:
-                        file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} freq {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
+                        file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {basis_set} freq {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
                     else:
-                        file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} freq\n')
+                        file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {basis_set} freq\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.qm_driver.nprocs * 4}\n')
                     file.write('END\n')
                     file.write(f'* xyz {self.qm_driver.charge} {self.qm_driver.spin} \n')
+                    print('File is printed', file)
                     with open(full_path, 'r') as geometry_lines:
                         for i, line in enumerate(geometry_lines):
                             if i < 2:

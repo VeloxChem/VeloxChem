@@ -101,6 +101,7 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, beta,
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
     driver = InterpolationDriver(z_matrix)
+    driver.use_symmetry = True
     driver.update_settings(impes_dict)
     driver.symmetry_information = sym_dict
     driver.qm_symmetry_data_points = sym_datapoints

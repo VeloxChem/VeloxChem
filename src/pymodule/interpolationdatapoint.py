@@ -187,7 +187,6 @@ class InterpolationDatapoint:
 
         assert_msg_critical(self.z_matrix is not None, 'InterpolationDatapoint: No Z-matrix defined.')
         self.internal_coordinates = []
-
         for z in self.z_matrix:
             
             if len(z) == 2:

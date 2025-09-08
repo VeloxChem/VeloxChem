@@ -929,6 +929,11 @@ class InterpolationDriver():
                 grad[i] *= np.cos(dist_org[i])
                 dist_hessian[i] *= np.cos(dist_org[i])
             
+            # bond_break_idx = self.z_matrix.index([2,6])
+            
+            # grad[bond_break_idx] *= 0.0
+            # dist_hessian[bond_break_idx] *= 0.0
+
             # masses = self.molecule.get_masses().copy()
             # masses_cart = np.repeat(masses, 3)
             # inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
@@ -1001,10 +1006,10 @@ class InterpolationDriver():
         return trust_radius_weight_gradient
 
     
-    def trust_radius_weight_gradient_gradient(self, datapoint):
+    def trust_radius_weight_gradient_gradient(self, confidence_radius, distance, distance_vector):
         
-        confidence_radius = datapoint.confidence_radius
-        distance, _, _, _, distance_vector, _ = self.cartesian_distance(datapoint)
+        # confidence_radius = datapoint.confidence_radius
+        # distance, _, _, _, distance_vector, _ = self.cartesian_distance(datapoint)
         denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))

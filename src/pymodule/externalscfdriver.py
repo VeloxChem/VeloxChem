@@ -309,7 +309,7 @@ conda activate vlxenv_simd_master
             
             elif self.program == 'ORCA':
                 print('Here is the file that is being opend', self.output_files[0])
-                with open(self.output_files[0], 'r') as file:
+                with open(self.output_files[0], 'r', encoding="utf-8", errors="ignore") as file:
                     content = file.read()
                 # Extract ground state energy
                 ground_state_match = re.search(r'FINAL SINGLE POINT ENERGY\s*([-0-9.]+)', content)

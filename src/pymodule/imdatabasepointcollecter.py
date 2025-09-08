@@ -82,6 +82,17 @@ try:
 except ImportError:
     pass
 
+
+# --- put the custom reporter here ---
+class GhostSafePDBReporter(app.PDBReporter):
+    def report(self, simulation, state):
+        positions = state.getPositions(asNumpy=True)
+        n_atoms = simulation.topology.getNumAtoms()
+        trimmed_positions = positions[:n_atoms]
+        app.PDBFile.writeModel(simulation.topology, trimmed_positions, self._out, self._nextModel)
+        self._nextModel += 1
+
+
 class IMDatabasePointCollecter:
     """
     Implements the OpenMMDynamics.
@@ -166,6 +177,8 @@ class IMDatabasePointCollecter:
         self.cutoff = 1.0
         self.scaling_factor = 0.0
         self.integrator = None
+        self.bias_force_reaction_idx = None
+        self.bias_force_reaction_prop = None
 
         # OpenMM objects
         self.system = None
@@ -427,7 +440,37 @@ class IMDatabasePointCollecter:
         
         self.phase = phase
 
-    def add_bias_force(self, atoms, force_constant, target):
+
+    def compute_tetrahedral_anchor(self, positions, Cbeta, Calpha, Hbeta1, Hbeta2, bond_length=0.109):
+        def normalize(v):
+            return v / np.linalg.norm(v)
+
+        rC  = positions[Cbeta].value_in_unit(unit.nanometer)
+        rCa = positions[Calpha].value_in_unit(unit.nanometer)
+        rH1 = positions[Hbeta1].value_in_unit(unit.nanometer)
+        rH2 = positions[Hbeta2].value_in_unit(unit.nanometer)
+
+        v1 = normalize(rCa - rC)
+        v2 = normalize(rH1 - rC)
+        v3 = normalize(rH2 - rC)
+
+        # Compute plane normal (sp2 plane)
+        normal = normalize(np.cross(v2 - v1, v3 - v1))
+
+        # Average substituent direction (points roughly into the sp2 plane)
+        avg = normalize(v1 + v2 + v3)
+
+        # The ghost should point mostly along -avg, but tilted out of the plane
+        # Combine avg and normal with weights to get ~109.5° separation
+        alpha = np.cos(np.deg2rad(109.5))   # ~ -0.333
+        beta  = np.sqrt(1 - alpha**2)      # ~ 0.943
+        vghost = normalize(alpha * avg + beta * normal)
+
+        anchor = rC + bond_length * vghost
+        return anchor
+
+
+    def add_bias_force(self, atoms, force_constant, target=0.109, anchor=False):
         """
         Method to add a biasing force to the system.
 
@@ -441,7 +484,21 @@ class IMDatabasePointCollecter:
 
         assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
 
-        if len(atoms) == 2:
+        if len(atoms) == 2 and anchor:
+            msg = f'Adding stretch force between atom {atoms[0]} and anchor {atoms[1]} with force constant {force_constant}.'
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+            for force in self.system.getForces():
+                if isinstance(force, mm.NonbondedForce):
+                    force.addParticle(0.0, 1.0, 0.0)  
+
+            force = mm.CustomBondForce("0.5*k*(max(0, r-r0))^2")
+            force.addGlobalParameter("k", force_constant)
+            force.addGlobalParameter("r0", 0.109)  # nm
+            force.addBond(atoms[0], atoms[1])
+            self.system.addForce(force)
+        
+        elif len(atoms) == 2:
             msg = f'Adding stretch force between atoms {atoms[0]} and {atoms[1]} with force constant {force_constant}.'
             self.ostream.print_info(msg)
             self.ostream.flush()
@@ -760,6 +817,28 @@ class IMDatabasePointCollecter:
         self.topology = self.pdb.topology
 
         self.positions = self.pdb.positions
+
+        # Compute anchor from geometry
+        if self.bias_force_reaction_prop is not None:
+
+            if self.bias_force_reaction_prop[3]:
+
+            
+                ghost_index = self.system.addParticle(0.0)
+
+                self.add_bias_force((self.bias_force_reaction_prop[0][0], ghost_index), self.bias_force_reaction_prop[1], anchor=self.bias_force_reaction_prop[3])
+
+                
+                Cbeta, Calpha, H1beta, H2beta = self.bias_force_reaction_idx[0], self.bias_force_reaction_idx[1], self.bias_force_reaction_idx[2],self.bias_force_reaction_idx[3]
+                anchor = self.compute_tetrahedral_anchor(self.positions, Cbeta, Calpha, H1beta, H2beta)
+    
+            
+                anchor_pos = np.array(anchor) * unit.nanometer
+
+                self.positions = list(self.positions) + [anchor_pos]
+
+            else:
+                self.add_bias_force(self.bias_force_reaction_prop[0], self.bias_force_reaction_prop[1], self.bias_force_reaction_prop[2])   
         
         self.simulation = app.Simulation(self.topology, self.system, new_integrator)
 
@@ -777,7 +856,12 @@ class IMDatabasePointCollecter:
         self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
         # Set up reporting
         self.simulation.reporters.clear()
-        self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
+
+        if self.bias_force_reaction_prop is not None and self.bias_force_reaction_prop[3]:
+            self.simulation.reporters.append(GhostSafePDBReporter(self.out_file, save_freq))
+        else:
+            self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
+
 
         # Print header
         print('QM/MM Simulation Parameters')
@@ -904,6 +988,7 @@ class IMDatabasePointCollecter:
         for step in range(self.nsteps):
 
             self.update_forces(self.simulation.context)
+
             
             # Potential energies
             # QM region
@@ -960,6 +1045,7 @@ class IMDatabasePointCollecter:
 
             self.step += 1
 
+            
             self.simulation.step(1)
             
             for root in self.roots_to_follow:
@@ -2226,7 +2312,7 @@ class IMDatabasePointCollecter:
                 self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
             print('len of molecules', len(self.allowed_molecules[self.current_state]['molecules']), self.use_opt_confidence_radius)
-            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10 or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) > 10:
+            if energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold or rmsd_gradient > self.gradient_rmsd_thrsh or cos_theta < self.force_orient_thrsh:
                 
                 if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) > 20 and 1 == 2:
                     self.add_a_point = True
@@ -2237,7 +2323,7 @@ class IMDatabasePointCollecter:
                         self.last_point_added = self.point_checker - 1
                         self.point_checker = 0
                 
-                elif energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) < 100 and self.use_opt_confidence_radius[0] or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) < 10 and self.use_opt_confidence_radius[0] or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) < 100 and self.use_opt_confidence_radius[0]:
+                elif energy_difference / natms * hartree_in_kcalpermol() > self.energy_threshold and len(self.allowed_molecules[self.current_state]['molecules']) < 10 and self.use_opt_confidence_radius[0] or rmsd_gradient > self.gradient_rmsd_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) < 10 and self.use_opt_confidence_radius[0] or cos_theta < self.force_orient_thrsh and len(self.allowed_molecules[self.current_state]['molecules']) < 10 and self.use_opt_confidence_radius[0]:
  
                     self.allowed_molecules[self.current_state]['molecules'].append(molecule)
                     self.allowed_molecules[self.current_state]['im_energies'].append(self.impes_drivers[self.current_state].impes_coordinate.energy)
@@ -2261,7 +2347,6 @@ class IMDatabasePointCollecter:
                 self.allowed_molecules[self.current_state]['im_energies'].append(self.impes_drivers[self.current_state].impes_coordinate.energy)
                 self.allowed_molecules[self.current_state]['qm_energies'].append(qm_energy[0])
                 self.allowed_molecules[self.current_state]['qm_gradients'].append(gradients[0])
-
 
                 
                 self.add_a_point = False
@@ -3002,13 +3087,13 @@ class IMDatabasePointCollecter:
                  e_x=self.use_opt_confidence_radius[3],
                  beta=0.8, n_workers=os.cpu_count())  # pick sensible n_workers
 
-            minimizer_kwargs = {"method": "L-BFGS-B", "jac": opt.jac, "bounds": bounds, "options": {"disp": True, "gtol": 1e-4, "ftol": 1e-9, "maxls": 20}}
-            res = basinhopping(opt.fun, x0=alphas, minimizer_kwargs=minimizer_kwargs, niter=20)
+            minimizer_kwargs = {"method": "L-BFGS-B", "jac": opt.jac, "bounds": bounds, "options": {"disp": True, "gtol": 1e-4, "ftol": 1e-9, "maxls": 10}}
+            res = basinhopping(opt.fun, x0=alphas, minimizer_kwargs=minimizer_kwargs, niter=10)
 
             return res
         
 
-        inital_alphas = [0.5 for dp in datapoints]
+        inital_alphas = [dp.confidence_radius for dp in datapoints]
 
         print('INPUT Trust radius', inital_alphas)
 
@@ -3119,11 +3204,11 @@ class IMDatabasePointCollecter:
             qm_driver.ostream.unmute()
         
         elif isinstance(qm_driver, ExternalScfDriver):
-            qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())
+            qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)
             print('qm_energy', qm_energy)
         
         elif isinstance(qm_driver, ExternalExcitedStatesScfDriver):
-            qm_energy = qm_driver.compute_energy(molecule, basis.get_main_basis_label())
+            qm_energy = qm_driver.compute_energy(molecule, qm_driver.basis_set_label)
 
         if qm_energy is None:
             error_txt = "Could not compute the QM energy. "
