@@ -1079,21 +1079,17 @@ class LinearSolver:
             exchange_timing += np.array(
                 [float(dt.split()[0]) for dt in local_screening.get_exchange_time()])
 
-        all_eri_timing = local_comm.allgather(coulomb_timing + exchange_timing)
-
-        all_eri_timing = np.array(all_eri_timing).reshape(-1)
-
-        max_eri_timing = np.max(all_eri_timing)
-
-        if max_eri_timing > 0.0:
-            eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
-                all_eri_timing.size * max_eri_timing)
-        else:
-            eri_load_imb = 0.0
+        #all_eri_timing = local_comm.allgather(coulomb_timing + exchange_timing)
+        #all_eri_timing = np.array(all_eri_timing).reshape(-1)
+        #max_eri_timing = np.max(all_eri_timing)
+        #if max_eri_timing > 0.0:
+        #    eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
+        #        all_eri_timing.size * max_eri_timing)
+        #else:
+        #    eri_load_imb = 0.0
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
-            profiler.add_timing_info('(loadimb)', eri_load_imb)
 
         if self._dft:
             t0 = tm.time()

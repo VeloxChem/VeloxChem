@@ -528,6 +528,11 @@ class ComplexResponse(LinearSolver):
                     n_excess_fock >= 0,
                     'ComplexResponse: benchmark_fock_count too large')
 
+                self.ostream.print_info(
+                    f'Using {self.benchmark_fock_count} of the {n_focks} ' +
+                    'trial vectors for benchmarking purposes.')
+                self.ostream.print_blank()
+
                 n_excess_fock_ger = int(n_excess_fock *
                                         (bger.data.shape[1] / n_focks))
                 n_excess_fock_ung = int(n_excess_fock *
@@ -944,16 +949,32 @@ class ComplexResponse(LinearSolver):
                     fock_time += bench_timing_dict['FockXC']
                 fock_time += bench_timing_dict['FockComm']
 
-                fock_per_sec = self.benchmark_fock_count / fock_time
-                fock_per_hour = fock_per_sec * 3600
+                fock_time_list = self.comm.gather(fock_time)
 
-                width = 92
-                valstr = 'Benchmark Summary'
-                self.ostream.print_header(valstr.ljust(width))
-                self.ostream.print_header(('-' * len(valstr)).ljust(width))
-                valstr = f'{fock_per_hour:.1f} Fock matrices per hour'
-                self.ostream.print_header(valstr.ljust(width))
-                self.ostream.print_blank()
+                if self.rank == mpi_master():
+                    fock_time_max = max(fock_time_list)
+                    fock_time_ave = sum(fock_time_list) / len(fock_time_list)
+                    fock_load_imb = 1.0 - fock_time_ave / fock_time_max
+
+                    fock_per_sec = self.benchmark_fock_count / fock_time_max
+                    fock_per_hour = fock_per_sec * 3600
+
+                    width = 92
+                    valstr = 'Benchmark Summary'
+                    title_len = len(valstr)
+                    self.ostream.print_header(valstr.ljust(width))
+                    self.ostream.print_header(('-' * title_len).ljust(width))
+                    valstr = f'Fock time(max): {fock_time_max:.2f} sec'
+                    self.ostream.print_header(valstr.ljust(width))
+                    valstr = f'Fock time(ave): {fock_time_ave:.2f} sec'
+                    self.ostream.print_header(valstr.ljust(width))
+                    valstr = f'Load imbalance: {fock_load_imb:.2f}'
+                    self.ostream.print_header(valstr.ljust(width))
+                    self.ostream.print_header(('-' * title_len).ljust(width))
+                    valstr = f'{fock_per_hour:.1f} Fock matrices per hour (based on max Fock time)'
+                    self.ostream.print_header(valstr.ljust(width))
+                    self.ostream.print_blank()
+                    self.ostream.print_blank()
             self.ostream.flush()
 
         self._dist_bger = None

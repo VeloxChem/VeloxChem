@@ -1677,21 +1677,18 @@ class ScfDriver:
         # TODO: add beta density
 
         if self.timing:
-            all_eri_timing = self.comm.gather(coulomb_timing + exchange_timing)
+            #all_eri_timing = self.comm.gather(coulomb_timing + exchange_timing)
 
             if self.rank == mpi_master():
-                all_eri_timing = np.array(all_eri_timing).reshape(-1)
-
-                max_eri_timing = np.max(all_eri_timing)
-
-                if max_eri_timing > 0.0:
-                    eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
-                        all_eri_timing.size * max_eri_timing)
-                else:
-                    eri_load_imb = 0.0
+                #all_eri_timing = np.array(all_eri_timing).reshape(-1)
+                #max_eri_timing = np.max(all_eri_timing)
+                #if max_eri_timing > 0.0:
+                #    eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
+                #        all_eri_timing.size * max_eri_timing)
+                #else:
+                #    eri_load_imb = 0.0
 
                 profiler.add_timing_info('FockERI', tm.time() - eri_t0)
-                profiler.add_timing_info('(loadimb)', eri_load_imb)
 
         vxc_t0 = tm.time()
 
