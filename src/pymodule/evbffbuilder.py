@@ -103,13 +103,13 @@ class EvbForceFieldBuilder():
                                                   | None] | None = None
         self.product_hessians: np.ndarray | list[np.ndarray
                                                  | None] | None = None
-        
+
         self.mute_scf: bool = True
         self.skip_reaction_matching: bool = False
         #Todo get a better functional and basis set from here https://pubs.acs.org/doi/10.1021/acs.jctc.3c00558
-        self.hessian_xc_fun:str = 'B3LYP' 
-        self.hessian_basis = 'def2-SVPD' # Can be scaled up to def2-TZVPPD, and if only we had our ECP's by now
-        
+        self.hessian_xc_fun: str = 'B3LYP'
+        self.hessian_basis = 'def2-SVPD'  # Can be scaled up to def2-TZVPPD, and if only we had our ECP's by now
+
         self.keywords = {
             "optimize_mol": bool,
             "reparameterize": bool,
@@ -127,7 +127,6 @@ class EvbForceFieldBuilder():
             "skip_reaction_matching": bool,
             "hessian_xc_fun": str,
             "hessian_basis": str
-
         }
 
     def read_keywords(self, **kwargs):
@@ -167,13 +166,15 @@ class EvbForceFieldBuilder():
 
         if not self.skip_reaction_matching:
             breaking_bonds_insert = "no breaking bonds"
-            if len(self.breaking_bonds)>0:
+            if len(self.breaking_bonds) > 0:
                 breaking_bonds_insert = f"breaking bonds: {self.breaking_bonds}"
             self.ostream.print_info(
-                "Matching reactant and product force fields with " + breaking_bonds_insert)
+                "Matching reactant and product force fields with " +
+                breaking_bonds_insert)
             self.ostream.flush()
             # adjust for 1-indexed input of breaking bonds
-            breaking_bonds = {(bond[0]-1,bond[1]-1) for bond in self.breaking_bonds}
+            breaking_bonds = {(bond[0] - 1, bond[1] - 1)
+                              for bond in self.breaking_bonds}
             self.product, product_mapping = self._match_reactant_and_product(
                 self.reactant,
                 self.reactant.molecule.get_element_ids(),
@@ -184,26 +185,32 @@ class EvbForceFieldBuilder():
         else:
             self.ostream.print_info("Skipping reaction matching")
 
-        formed_bonds, broken_bonds = self._summarise_reaction(
+        forming_bonds, breaking_bonds = self._summarise_reaction(
             self.reactant, self.product)
 
+        for bond in breaking_bonds:
+            self.reactant.bonds[bond]['comment'] += ', broken in reaction'
+        for bond in forming_bonds:
+            self.product.bonds[bond]['comment'] += ', formed in reaction'
+
+        self.ostream.flush()
         if self.optimize_ff:
             if len(reactants) > 1:
                 self.reactant.molecule = self._optimize_molecule(
                     self.reactant.molecule.get_element_ids(),
                     self.reactant,
-                    formed_bonds,
+                    forming_bonds,
                     note='reactant',
                 )
             if len(products) > 1:
                 self.product.molecule = self._optimize_molecule(
                     self.product.molecule.get_element_ids(),
                     self.product,
-                    broken_bonds,
+                    breaking_bonds,
                     note='product',
                 )
 
-        return self.reactant, self.product, formed_bonds, broken_bonds, reactants, products, product_mapping
+        return self.reactant, self.product, forming_bonds, breaking_bonds, reactants, products, product_mapping
 
     def _create_combined_forcefield(
         self,
@@ -374,9 +381,9 @@ class EvbForceFieldBuilder():
                 forcefield.atoms[atom_id]['name'] = forcefield.atoms[atom_id][
                     'name'][0] + str(atom_id)
             for bond_id in forcefield.bonds.keys():
-                forcefield.bonds[bond_id] = water_model['bonds']
+                forcefield.bonds[bond_id] = copy.copy(water_model['bonds'])
             for ang_id in forcefield.angles.keys():
-                forcefield.angles[ang_id] = water_model['angles']
+                forcefield.angles[ang_id] = copy.copy(water_model['angles'])
 
         #Reparameterize the forcefield if necessary and requested
         unknown_params = set()
@@ -387,18 +394,20 @@ class EvbForceFieldBuilder():
 
         for key, angle in forcefield.angles.items():
             if angle['comment'] == 'Guessed':
-                sorted_tuple = tuple(sorted((key[0],key[1])))
+                sorted_tuple = tuple(sorted((key[0], key[1])))
                 unknown_params.add(sorted_tuple)
-                sorted_tuple = tuple(sorted((key[1],key[2])))
+                sorted_tuple = tuple(sorted((key[1], key[2])))
                 unknown_params.add(sorted_tuple)
-        
+
         if self.reparameterize and len(unknown_params) > 0:
             self.ostream.print_info("Reparameterising force field.")
             self.ostream.flush()
             if hessian is None:
+                # self.ostream.print_info(
+                #     f"Calculating hessian submatrices for atom pairs {unknown_params} to reparameterise the force field."
+                # )
                 self.ostream.print_info(
-                    f"Calculating hessian submatrices for atom pairs {unknown_params} to reparameterise the force field."
-                )
+                    f"Calculating hessian to reparameterise the force field.", )
                 if molecule.get_multiplicity() == 1:
                     scf_drv = ScfRestrictedDriver()
                 else:
@@ -413,7 +422,7 @@ class EvbForceFieldBuilder():
                 hess_drv = ScfHessianDriver(scf_drv)
                 if self.mute_scf:
                     hess_drv.ostream.mute()
-                hess_drv.atom_pairs = list(unknown_params)
+                # hess_drv.atom_pairs = list(unknown_params)
                 hess_drv.compute(molecule, basis)
                 hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
             else:
@@ -677,10 +686,10 @@ class EvbForceFieldBuilder():
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
-            id0 = bond_key[0]+1
+            id0 = bond_key[0] + 1
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
-            id1 = bond_key[1]+1
+            id1 = bond_key[1] + 1
             self.ostream.print_info(
                 f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}"
             )
@@ -692,10 +701,10 @@ class EvbForceFieldBuilder():
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
-            id0 = bond_key[0]+1
+            id0 = bond_key[0] + 1
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
-            id1 = bond_key[1]+1
+            id1 = bond_key[1] + 1
             self.ostream.print_info(
                 f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}"
             )

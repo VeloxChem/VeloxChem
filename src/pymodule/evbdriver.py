@@ -131,12 +131,8 @@ class EvbDriver():
 
         self.ostream.flush()
 
-    def build_ff_from_molecules(
-        self,
-        reactant: Molecule | list[Molecule],
-        product: Molecule | list[Molecule],
-        **kwargs
-    ):
+    def build_ff_from_molecules(self, reactant: Molecule | list[Molecule],
+                                product: Molecule | list[Molecule], **kwargs):
         """_summary_
 
         Args:

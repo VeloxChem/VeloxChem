@@ -228,7 +228,9 @@ class ReactionMatcher:
                 if B_composition.get(key, 0) < val:
                     required_elements.add(key)
 
-            for edge in A.edges():
+            # Sorted edges has all edges involving H first, prioritizing a solution that breaks bonds with Hydrogen atoms
+            sorted_edges = self._sort_edges(A)
+            for edge in sorted_edges:
                 if len(required_elements) > 0:
                     comb = self._get_elem_comb(edge[0], edge[1], A)
                     if comb not in required_elements:
@@ -237,14 +239,16 @@ class ReactionMatcher:
                 A.remove_edge(*edge)
                 if self._verbose:
                     self.ostream.print_info(
-                        f"Trying to find breaking edge {self._print_bond(edge)} at depth {depth}")
+                        f"Trying to find breaking edge {self._print_bond(edge)} at depth {depth}"
+                    )
                 self.ostream.flush()
                 edges = self._find_breaking_edges(A, B, depth - 1,
                                                   B_composition)
                 if edges is not None:
                     edges.add(edge)
                     self.ostream.print_info(
-                        f"Found breaking edges: {self._print_bond_list(edges)} at depth {depth}.")
+                        f"Found breaking edges: {self._print_bond_list(edges)} at depth {depth}."
+                    )
                     self.ostream.flush()
                     return edges
                 A.add_edge(*edge)
@@ -305,7 +309,8 @@ class ReactionMatcher:
 
                     edge = (node_i, node_j)
                     forming_edges.append(edge)
-                    self._check_time(f"finding bond {bond_count}: {self._print_bond(edge)}")
+                    self._check_time(
+                        f"finding bond {bond_count}: {self._print_bond(edge)}")
                     self.ostream.flush()
                     break
                 if edge is not None:
@@ -326,6 +331,20 @@ class ReactionMatcher:
             else:
                 composition[comb] += 1
         return composition
+    
+    @staticmethod
+    def _sort_edges(A):
+        H_edges = []
+        other_edges = []
+        # TODO: add more sorting, for example based on metals
+        for edge in A.edges():
+            comb = ReactionMatcher._get_elem_comb(edge[0], edge[1], A)
+            if 1.0 in comb:
+                H_edges.append(edge)
+            else:
+                other_edges.append(edge)
+        sorted_edges = H_edges + other_edges
+        return sorted_edges
 
     @staticmethod
     def _get_elem_comb(node1, node2, A):
@@ -370,7 +389,7 @@ class ReactionMatcher:
         B = nx.Graph(B)
         for g in cc_A:
             A_sub = A.subgraph(g)
-            GM = GraphMatcher(B,A_sub, categorical_node_match('elem', ''))
+            GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
             if self._check_monomorphic:
                 self._mono_count += 1
                 if not GM.subgraph_is_monomorphic():
@@ -415,7 +434,9 @@ class ReactionMatcher:
     @staticmethod
     def _print_bond_list(bonds):
         bonds = list(bonds)
-        return {"[{', '.join([ReactionMatcher._print_bond(bond) for bond in bonds])}]"}
+        return {
+            "[{', '.join([ReactionMatcher._print_bond(bond) for bond in bonds])}]"
+        }
 
     @staticmethod
     def _print_bond(bond):
