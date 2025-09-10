@@ -568,7 +568,7 @@ class InterpolationDriver():
         close_distances = [
             (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index) 
             for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients 
-            if abs(distance) <= min_distance + self.distance_thrsh]
+            if abs(distance) <= min_distance + self.distance_thrsh + 1000]
 
         for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
             

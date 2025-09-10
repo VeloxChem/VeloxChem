@@ -95,6 +95,7 @@ class ConformerGenerator:
         # TODO: double check the thresholds
         self.rmsd_threshold = 1.2
         self.energy_threshold = 1.2
+        self.dihedral_candidates = None
 
         self.implicit_solvent_model = None
         self.solute_dielectric = 1.0
@@ -466,7 +467,7 @@ class ConformerGenerator:
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
             self._get_dihedral_candidates(molecule, top_file_name,
                                           self.partial_charges))
-
+        self.dihedral_candidates = dihedrals_candidates
         # exit early if there is no candidate dihedral to rotate
         if not dihedrals_candidates:
             self.ostream.print_info(

@@ -2201,13 +2201,18 @@ class IMDatabasePointCollecter:
             print('############# Energy is QM claculated ############')
             current_basis = MolecularBasis.read(molecule, self.basis_set_label)
             qm_energy, scf_tensors = self.compute_energy(drivers[0], molecule, current_basis)
+        
             if scf_tensors is None and isinstance(drivers[0], ScfRestrictedDriver):
+                if drivers[0].is_converged is False:
+                    print('the original scf is not converged', drivers[0].is_converged)
                 emergency_qm_driver = ScfRestrictedDriver()
                 emergency_qm_driver.xcfun = drivers[0].xcfun
                 emergency_qm_driver.ri_coulomb = drivers[0].ri_coulomb
                 scf_tensors = emergency_qm_driver.compute(molecule, current_basis)
                 qm_energy = emergency_qm_driver.scf_energy
                 qm_energy = np.array([qm_energy])
+                if emergency_qm_driver.is_converged is False:
+                    print('the original scf is not converged', emergency_qm_driver.is_converged)
 
             energy_difference = (abs(qm_energy[0] - self.impes_drivers[self.current_state].impes_coordinate.energy))
             gradients = self.compute_gradient(drivers[1], molecule, current_basis, scf_tensors)
@@ -2566,6 +2571,8 @@ class IMDatabasePointCollecter:
                         scf_results = emergency_qm_driver.compute(mol_basis[0], mol_basis[1])
                         qm_energy = emergency_qm_driver.scf_energy
                         energies = np.array([qm_energy])
+
+                        print('Energies two', energies, scf_results)
                         
 
                     gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)

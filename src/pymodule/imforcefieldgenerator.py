@@ -554,7 +554,7 @@ class IMForceFieldGenerator:
                 self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
 
 
-        if self.reaction_molecules_dict is not None and extract_z_matrix is not None:
+        if self.reaction_molecules_dict is not None and extract_z_matrix is None:
             self.atom_transfer_reaction_path = self.determine_atom_transfer_reaction_path(self.reaction_molecules_dict['reactants'], self.reaction_molecules_dict['products'])
 
         if self.add_conformal_structures:
@@ -887,7 +887,7 @@ class IMForceFieldGenerator:
                                     opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
                                     opt_constraint_list.append(opt_constraint)
                             opt_drv.constraints = opt_constraint_list
-                            
+
                             opt_results = opt_drv.compute(reaction_mol, current_basis, scf_results)
                             optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                             mol = optimized_molecule
