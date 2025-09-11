@@ -98,6 +98,8 @@ class ComplexResponse(LinearSolver):
         self.benchmark = False
         self.benchmark_fock_count = None
 
+        self.write_h5 = True
+
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
             'a_components': ('str_lower', 'Cartesian components of A operator'),
@@ -107,6 +109,7 @@ class ComplexResponse(LinearSolver):
             'damping': ('float', 'damping parameter'),
             'benchmark': ('bool', 'flag for benchmarking Fock builds'),
             'benchmark_fock_count': ('int', 'number of Fock builds'),
+            'write_h5': ('bool', 'write checkpoint and final h5'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -901,9 +904,10 @@ class ComplexResponse(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
-            if self.force_checkpoint and (not self.benchmark):
-                self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                                       rsp_vector_labels)
+            if self.force_checkpoint:
+                if (not self.benchmark) and self.write_h5:
+                    self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                                           rsp_vector_labels)
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build prep'.format(iteration + 1))
@@ -920,7 +924,7 @@ class ComplexResponse(LinearSolver):
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        if not self.benchmark:
+        if (not self.benchmark) and self.write_h5:
             self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                    rsp_vector_labels)
 
@@ -999,7 +1003,7 @@ class ComplexResponse(LinearSolver):
                     rsp_funcs = {}
 
                     # create h5 file for response solutions
-                    if (self.save_solutions and
+                    if (self.save_solutions and self.write_h5 and
                             self.checkpoint_file is not None):
                         final_h5_fname = str(
                             Path(self.checkpoint_file).with_suffix(
@@ -1016,7 +1020,7 @@ class ComplexResponse(LinearSolver):
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
                         # write to h5 file for response solutions
-                        if (self.save_solutions and
+                        if (self.save_solutions and self.write_h5 and
                                 self.checkpoint_file is not None):
                             solution_keys = [
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
@@ -1027,7 +1031,7 @@ class ComplexResponse(LinearSolver):
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
-                    if (self.save_solutions and
+                    if (self.save_solutions and self.write_h5 and
                             self.checkpoint_file is not None):
                         checkpoint_text = 'Response solution vectors written to file: '
                         checkpoint_text += final_h5_fname
