@@ -331,7 +331,7 @@ class ReactionMatcher:
             else:
                 composition[comb] += 1
         return composition
-    
+
     @staticmethod
     def _sort_edges(A):
         H_edges = []
@@ -434,9 +434,7 @@ class ReactionMatcher:
     @staticmethod
     def _print_bond_list(bonds):
         bonds = list(bonds)
-        return {
-            "[{', '.join([ReactionMatcher._print_bond(bond) for bond in bonds])}]"
-        }
+        return f"[{', '.join([ReactionMatcher._print_bond(bond) for bond in bonds])}]"
 
     @staticmethod
     def _print_bond(bond):
