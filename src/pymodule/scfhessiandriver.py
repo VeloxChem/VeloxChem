@@ -165,9 +165,6 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
         self.profiler = profiler
-        self.ostream.unmute()
-        self.ostream.print_info("Creating profiler for Hessian driver...")
-        self.ostream.mute()
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
@@ -185,14 +182,8 @@ class ScfHessianDriver(HessianDriver):
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
         else:
-            if self.atom_pairs is not None:
-                atom_pairs = []
-                for pair in self.atom_pairs:
-                    atom_pairs.append((pair[0] - 1, pair[1] - 1))
-            else:
-                atom_pairs = None
-
-            self.compute_analytical(molecule, ao_basis, profiler, atom_pairs)
+            self.compute_analytical(molecule, ao_basis, profiler,
+                                    self.atom_pairs)
 
         if self.rank == mpi_master():
             # print Hessian

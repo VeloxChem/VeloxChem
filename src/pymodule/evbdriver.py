@@ -45,7 +45,7 @@ from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
-from .evbffbuilder import EvbForceFieldBuilder
+from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
 from .evbsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
@@ -96,6 +96,8 @@ class EvbDriver():
 
         self.t_label = int(time.time())
         self.water_model = 'spce'
+        
+        self.ffbuilder = ReactionForceFieldBuilder()
 
     def build_and_run_default_water_EVB(
         self,
@@ -151,13 +153,11 @@ class EvbDriver():
             optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
             optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
         """
+        self.ffbuilder.read_keywords(**kwargs)
 
-        ffbuilder = EvbForceFieldBuilder(ostream=self.ostream)
-        ffbuilder.read_keywords(**kwargs)
+        self.ffbuilder.water_model = self.water_model
 
-        ffbuilder.water_model = self.water_model
-
-        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = ffbuilder.build_forcefields(
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, self.reactants, self.products, self.product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,
         )

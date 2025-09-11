@@ -64,7 +64,7 @@ except ImportError:
     pass
 
 
-class EvbForceFieldBuilder():
+class ReactionForceFieldBuilder():
 
     def __init__(self, comm=None, ostream=None):
         if comm is None:
@@ -88,7 +88,8 @@ class EvbForceFieldBuilder():
         self.product: MMForceFieldGenerator = None
 
         self.optimize_mol: bool = False
-        self.reparameterize: bool = True
+        self.reparameterize_bonds: bool = True
+        self.reparameterize_angles: bool = False
         self.optimize_ff: bool = True
         self.mm_opt_constrain_bonds: bool = False
         self.water_model: str = 'spce'
@@ -111,22 +112,12 @@ class EvbForceFieldBuilder():
         self.hessian_basis = 'def2-SVPD'  # Can be scaled up to def2-TZVPPD, and if only we had our ECP's by now
 
         self.keywords = {
-            "optimize_mol": bool,
-            "reparameterize": bool,
-            "optimize_ff": bool,
-            "mm_opt_constrain_bonds": bool,
-            "water_model": str,
-            "reactant_total_multiplicity": int,
-            "product_total_multiplicity": int,
-            "breaking_bonds": set | tuple,
             "reactant_partial_charges": list | None,
             "product_partial_charges": list | None,
             "reactant_hessians": np.ndarray | list | None,
             "product_hessians": np.ndarray | list | None,
-            "mute_scf": bool,
-            "skip_reaction_matching": bool,
-            "hessian_xc_fun": str,
-            "hessian_basis": str
+            "reactant_total_multiplicity": int,
+            "product_total_multiplicity": int,
         }
 
     def read_keywords(self, **kwargs):
@@ -281,7 +272,6 @@ class EvbForceFieldBuilder():
 
         return combined_ff, single_ffs, total_charge
 
-    # todo add hessian option
     # Transforms input difctionary with keys 'molecule', 'charges', 'forcefield', 'optimize' into a forcefield generator
     # If the forcefield is not provided, it will be created from the molecule and charges
     # Calculates resp charges with some fallbacks, does optimization if specified, reparameterizes the forcefield if necessary
@@ -386,28 +376,30 @@ class EvbForceFieldBuilder():
                 forcefield.angles[ang_id] = copy.copy(water_model['angles'])
 
         #Reparameterize the forcefield if necessary and requested
+        unknown_pairs = set()
         unknown_params = set()
-        for key, bond in forcefield.bonds.items():
-            if bond['comment'] == 'Guessed':
-                sorted_tuple = tuple(sorted(key))
-                unknown_params.add(sorted_tuple)
+        if self.reparameterize_bonds:
+            for key, bond in forcefield.bonds.items():
+                if bond['comment'] == 'Guessed':
+                    sorted_tuple = tuple(sorted(key))
+                    unknown_pairs.add(sorted_tuple)
+                    unknown_params.add(key)
+        if self.reparameterize_angles:
+            for key, angle in forcefield.angles.items():
+                if angle['comment'] == 'Guessed':
+                    sorted_tuple = tuple(sorted((key[0], key[1])))
+                    unknown_pairs.add(sorted_tuple)
+                    sorted_tuple = tuple(sorted((key[1], key[2])))
+                    unknown_pairs.add(sorted_tuple)
+                    unknown_params.add(key)
 
-        for key, angle in forcefield.angles.items():
-            if angle['comment'] == 'Guessed':
-                sorted_tuple = tuple(sorted((key[0], key[1])))
-                unknown_params.add(sorted_tuple)
-                sorted_tuple = tuple(sorted((key[1], key[2])))
-                unknown_params.add(sorted_tuple)
-
-        if self.reparameterize and len(unknown_params) > 0:
+        if len(unknown_pairs) > 0:
             self.ostream.print_info("Reparameterising force field.")
             self.ostream.flush()
             if hessian is None:
-                # self.ostream.print_info(
-                #     f"Calculating hessian submatrices for atom pairs {unknown_params} to reparameterise the force field."
-                # )
                 self.ostream.print_info(
-                    f"Calculating hessian to reparameterise the force field.", )
+                    f"Calculating hessian submatrices for atom pairs {unknown_pairs} to reparameterise the force field."
+                )
                 if molecule.get_multiplicity() == 1:
                     scf_drv = ScfRestrictedDriver()
                 else:
@@ -419,10 +411,20 @@ class EvbForceFieldBuilder():
                 scf_drv.xcfun = self.hessian_xc_fun
                 scf_drv.dispersion = True
                 scf_drv.compute(molecule, basis)
+                if scf_drv.is_converged is False:
+                    self.ostream.print_warning(
+                        "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
+                    )
+                    self.ostream.flush()
+                    scf_drv.conv_thresh = 1.0e-4
+                    scf_drv.max_iter = 200
+                    scf_drv.compute(molecule, basis)
+                assert scf_drv.is_converged, f"SCF calculation for Hessian did not converge, aborting"
+                
                 hess_drv = ScfHessianDriver(scf_drv)
                 if self.mute_scf:
                     hess_drv.ostream.mute()
-                # hess_drv.atom_pairs = list(unknown_params)
+                hess_drv.atom_pairs = list(unknown_pairs)
                 hess_drv.compute(molecule, basis)
                 hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
             else:
@@ -432,7 +434,8 @@ class EvbForceFieldBuilder():
                 msg += f" of atoms 3*{molecule.number_of_atoms()}={3*molecule.number_of_atoms()} in the molecule."
                 assert_msg_critical(cond, msg)
             self.ostream.flush()
-            forcefield.reparameterize(hessian)
+            forcefield.reparameterize(hessian,
+                                      reparameterize_keys=unknown_params)
         return forcefield
 
     # Guesses how to combine molecular structures without overlapping them
@@ -569,12 +572,12 @@ class EvbForceFieldBuilder():
         print_mapping = {k + 1: v + 1 for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {print_mapping}")
         self.ostream.flush()
-        product_ff = EvbForceFieldBuilder._apply_mapping_to_forcefield(
+        product_ff = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
             product_ff,
             total_mapping,
         )
 
-        product_ff.molecule = EvbForceFieldBuilder._apply_mapping_to_molecule(
+        product_ff.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
             product_ff.molecule,
             total_mapping,
         )
@@ -599,7 +602,7 @@ class EvbForceFieldBuilder():
             # Shift all atom keys by the current atom count so that every atom has a unique ID
             shift = atom_count
             mapping = {atom_key: atom_key + shift for atom_key in ff.atoms}
-            EvbForceFieldBuilder._apply_mapping_to_forcefield(ff, mapping)
+            ReactionForceFieldBuilder._apply_mapping_to_forcefield(ff, mapping)
             atom_count += len(ff.atoms)
             for atom in ff.atoms.values():
                 atom['name'] = f"{atom['name']}{l+1}"
@@ -629,13 +632,13 @@ class EvbForceFieldBuilder():
         # Sort the atoms by index
         forcefield.atoms = dict(sorted(new_product_atoms.items()))
 
-        forcefield.bonds = EvbForceFieldBuilder._apply_mapping_to_parameters(
+        forcefield.bonds = ReactionForceFieldBuilder._apply_mapping_to_parameters(
             forcefield.bonds, mapping)
-        forcefield.angles = EvbForceFieldBuilder._apply_mapping_to_parameters(
+        forcefield.angles = ReactionForceFieldBuilder._apply_mapping_to_parameters(
             forcefield.angles, mapping)
-        forcefield.dihedrals = EvbForceFieldBuilder._apply_mapping_to_parameters(
+        forcefield.dihedrals = ReactionForceFieldBuilder._apply_mapping_to_parameters(
             forcefield.dihedrals, mapping)
-        forcefield.impropers = EvbForceFieldBuilder._apply_mapping_to_parameters(
+        forcefield.impropers = ReactionForceFieldBuilder._apply_mapping_to_parameters(
             forcefield.impropers, mapping)
         return forcefield
 

@@ -31,7 +31,7 @@ class TestHessianAtomPair:
         H      102.224000000    97.640900000    97.837700000""")
 
         basis = MolecularBasis.read(mol, 'sto-3g')
-        atom_pairs = [(1, 4), (7, 10)]
+        atom_pairs = [(0, 3), (6, 9)]
         scf_drv = ScfRestrictedDriver()
         scf_drv.compute(mol, basis)
         hess_drv = ScfHessianDriver(scf_drv)

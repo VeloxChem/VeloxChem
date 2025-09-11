@@ -5,7 +5,7 @@ import sys
 
 from veloxchem.molecule import Molecule
 from veloxchem.evbdriver import EvbDriver
-from veloxchem.evbffbuilder import EvbForceFieldBuilder
+from veloxchem.reaffbuilder import ReactionForceFieldBuilder
 from veloxchem.evbsystembuilder import EvbSystemBuilder
 from veloxchem.evbdataprocessing import EvbDataProcessing
 from veloxchem.xtbdriver import XtbDriver
@@ -29,7 +29,7 @@ class TestEvb:
     def test_forcefield_builder(self):
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
 
-        ffbuilder = EvbForceFieldBuilder()
+        ffbuilder = ReactionForceFieldBuilder()
         ffbuilder.water_model = 'spce'
         ethanol_xyz = """
         9

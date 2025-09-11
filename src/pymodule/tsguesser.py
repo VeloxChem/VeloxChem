@@ -49,7 +49,7 @@ from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
-from .evbffbuilder import EvbForceFieldBuilder
+from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
 
 try:
@@ -101,6 +101,8 @@ class TransitionStateGuesser():
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
+        
+        self.ffbuilder = ReactionForceFieldBuilder()
 
     def find_TS(
         self,
@@ -150,17 +152,15 @@ class TransitionStateGuesser():
         return self.molecule, self.results
 
     def build_forcefields(self, reactant, product, constraints=[], **ts_kwargs):
-
-        ffbuilder = EvbForceFieldBuilder()
         if self.mute_ff_build:
-            ffbuilder.ostream.mute()
+            self.ffbuilder.ostream.mute()
             self.ostream.print_info(
                 "Building forcefields. Disable mute_ff_builder to see detailed output."
             )
             self.ostream.flush()
-        ffbuilder.read_keywords(**ts_kwargs)
+        self.ffbuilder.read_keywords(**ts_kwargs)
 
-        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = ffbuilder.build_forcefields(
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
             reactant=reactant,
             product=product,
         )
