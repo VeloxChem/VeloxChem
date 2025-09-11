@@ -109,7 +109,9 @@ class ReactionForceFieldBuilder():
         self.skip_reaction_matching: bool = False
         #Todo get a better functional and basis set from here https://pubs.acs.org/doi/10.1021/acs.jctc.3c00558
         self.hessian_xc_fun: str = 'B3LYP'
-        self.hessian_basis = 'def2-SVPD'  # Can be scaled up to def2-TZVPPD, and if only we had our ECP's by now
+        #Todo get better basis set once we have f-functionals
+        # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
+        self.hessian_basis = 'def2-SV_P_'
 
         self.keywords = {
             "reactant_partial_charges": list | None,
@@ -174,6 +176,7 @@ class ReactionForceFieldBuilder():
                 breaking_bonds,
             )
         else:
+            product_mapping = None
             self.ostream.print_info("Skipping reaction matching")
 
         forming_bonds, breaking_bonds = self._summarise_reaction(

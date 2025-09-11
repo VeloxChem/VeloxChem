@@ -419,6 +419,7 @@ class ScfHessianDriver(HessianDriver):
                     atoms.append(j)
         else:
             atoms = range(natm)
+        atoms = sorted(atoms)
 
         # TODO: use alternative way to partition atoms
         local_atoms = atoms[self.rank::self.nodes]
