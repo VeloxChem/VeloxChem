@@ -30,14 +30,14 @@ class TestReactionMatcher:
             pro_charges.append(q)
 
         evb = EvbDriver()
+        evb.ffbuilder.reparameterize_bonds = False
+        evb.ffbuilder.optimize_ff = False
         evb.build_ff_from_molecules(
             rea,
             pro,
             reactant_partial_charges=rea_charges,
             product_partial_charges=pro_charges,
             breaking_bonds=breaking_bonds,
-            reparameterize=False,
-            optimize_ff=False,
         )
         return evb.breaking_bonds, evb.forming_bonds
 

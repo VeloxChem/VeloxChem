@@ -120,6 +120,7 @@ class ReactionForceFieldBuilder():
             "product_hessians": np.ndarray | list | None,
             "reactant_total_multiplicity": int,
             "product_total_multiplicity": int,
+            "breaking_bonds": set | tuple,
         }
 
     def read_keywords(self, **kwargs):
