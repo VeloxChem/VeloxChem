@@ -249,6 +249,7 @@ class DistributedArray:
         """
 
         if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
+                self.data.size > 0 and dist_array.data.size > 0 and
                 self.data.dtype == np.float64 and
                 dist_array.data.dtype == np.float64):
             mat = matmul_gpu(self.data.T, dist_array.data)
@@ -276,6 +277,7 @@ class DistributedArray:
         """
 
         if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
+                self.data.size > 0 and dist_array.data.size > 0 and
                 self.data.dtype == np.float64 and
                 dist_array.data.dtype == np.float64):
             mat = matmul_gpu(self.data.T, dist_array.data)
@@ -303,6 +305,7 @@ class DistributedArray:
         """
 
         if (self.data.ndim == 2 and array.ndim == 2 and
+                self.data.size > 0 and array.size > 0 and
                 self.data.dtype == np.float64 and array.dtype == np.float64):
             seg_mat = matmul_gpu(self.data, array)
         else:
@@ -445,11 +448,6 @@ class DistributedArray:
             data = np.array(dset[row_start:row_end, :])
             hf.close()
             comm.barrier()
-
-        if rank == mpi_master():
-            print(f'* Info * Time spent in reading hdf5: {tm.time() - t0:.2f} sec\n')
-            import sys
-            sys.stdout.flush()
 
         return cls(data, comm, distribute=False)
 
