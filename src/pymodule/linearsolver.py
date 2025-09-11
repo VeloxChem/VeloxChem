@@ -184,6 +184,9 @@ class LinearSolver:
         # serial ratio as in Amdahl's law for estimating parallel efficiency
         self.serial_ratio = 0.1
 
+        # user-defined subcomm_size for distributed Fock builds
+        self.subcomm_size = None
+
         # input keywords
         self._input_keywords = {
             'response': {
@@ -205,6 +208,7 @@ class LinearSolver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
+                'subcomm_size': ('int', 'size of subcommunicators'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -652,28 +656,34 @@ class LinearSolver:
             norb = None
             fa_mo = None
 
-        if self.rank == mpi_master():
-            dt_and_subcomm_size = []
+        if self.subcomm_size is None:
+            if self.rank == mpi_master():
+                dt_and_subcomm_size = []
 
-            for subcomm_size in range(1, self.nodes + 1):
-                if self.nodes % subcomm_size != 0:
-                    continue
+                for subcomm_size in range(1, self.nodes + 1):
+                    if self.nodes % subcomm_size != 0:
+                        continue
 
-                n_subcomms = self.nodes // subcomm_size
+                    n_subcomms = self.nodes // subcomm_size
 
-                ave, res = divmod(n_total, n_subcomms)
-                counts = [ave + 1 if p < res else ave for p in range(n_subcomms)]
+                    ave, res = divmod(n_total, n_subcomms)
+                    counts = [ave + 1 if p < res else ave for p in range(n_subcomms)]
 
-                time_per_fock = self.serial_ratio + (1 - self.serial_ratio) / subcomm_size
-                dt = max(counts) * time_per_fock
+                    time_per_fock = self.serial_ratio + (1 - self.serial_ratio) / subcomm_size
+                    dt = max(counts) * time_per_fock
 
-                dt_and_subcomm_size.append((dt, subcomm_size))
+                    dt_and_subcomm_size.append((dt, subcomm_size))
 
-            dt_and_subcomm_size.sort()
-            subcomm_size = dt_and_subcomm_size[0][1]
+                dt_and_subcomm_size.sort()
+                subcomm_size = dt_and_subcomm_size[0][1]
+            else:
+                subcomm_size = None
+            subcomm_size = self.comm.bcast(subcomm_size, root=mpi_master())
         else:
-            subcomm_size = None
-        subcomm_size = self.comm.bcast(subcomm_size, root=mpi_master())
+            subcomm_size = self.subcomm_size
+            assert_msg_critical(
+                (self.nodes % subcomm_size == 0) and (subcomm_size <= self.nodes),
+                'LinearSolver: Invalid subcomm_size')
 
         grps = [p // subcomm_size for p in range(self.nodes)]
         subcomm = SubCommunicators(self.comm, grps)
@@ -1167,6 +1177,7 @@ class LinearSolver:
             checkpoint_text += f'{(tm.time() - t0):.2f} sec'
             self.ostream.print_info(checkpoint_text)
             self.ostream.print_blank()
+            self.ostream.flush()
 
     def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -1450,6 +1461,7 @@ class LinearSolver:
                 f'Time spent in renormalization: {(tm.time() - t0):.2f} sec.')
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
         if self.rank == mpi_master():
             assert_msg_critical(
