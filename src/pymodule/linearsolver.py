@@ -841,6 +841,7 @@ class LinearSolver:
 
                 if profiler is not None:
                     profiler.add_timing_info('FockComm', tm.time() - comm_t0)
+                    profiler.add_timing_info('_FockCount_', 1)
 
                 e2_ger = None
                 e2_ung = None
