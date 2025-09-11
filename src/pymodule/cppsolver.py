@@ -100,6 +100,8 @@ class ComplexResponse(LinearSolver):
 
         self.write_h5 = True
 
+        self.timing_mpi = False
+
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
             'a_components': ('str_lower', 'Cartesian components of A operator'),
@@ -110,6 +112,7 @@ class ComplexResponse(LinearSolver):
             'benchmark': ('bool', 'flag for benchmarking Fock builds'),
             'benchmark_fock_count': ('int', 'number of Fock builds'),
             'write_h5': ('bool', 'write checkpoint and final h5'),
+            'timing_mpi': ('bool', 'print timing from all MPI ranks'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -513,7 +516,12 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
+            h5_t0 = tm.time()
             self._read_checkpoint(rsp_vector_labels)
+            self.ostream.print_info(
+                'Time spent in reading checkpoint: ' +
+                f'{tm.time() - h5_t0:.2f} sec.')
+            self.ostream.print_blank()
 
         # generate initial guess from scratch
         else:
@@ -932,7 +940,23 @@ class ComplexResponse(LinearSolver):
         if self.rank == mpi_master():
             self._print_convergence('Complex response')
 
-        profiler.print_timing(self.ostream, rank_name='master rank')
+        if not self.timing_mpi:
+            profiler.print_timing(self.ostream, rank_name='master rank')
+        else:
+            # collect timing results from individual ranks
+            list_timing_dict = self.comm.gather(profiler.timing_dict)
+            if self.rank == mpi_master():
+                local_profiler = Profiler({
+                    'timing': True,
+                    'profiling': False,
+                    'memory_profiling': False,
+                    'memory_tracing': False,
+                })
+                for rank_idx in range(self.nodes):
+                    local_profiler.timing_dict = list_timing_dict[rank_idx]
+                    local_profiler.print_timing(
+                        self.ostream, rank_name=f'rank {rank_idx}')
+
         profiler.print_profiling_summary(self.ostream)
 
         profiler.check_memory_usage('End of CPP solver')
