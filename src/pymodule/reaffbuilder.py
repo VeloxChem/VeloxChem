@@ -429,7 +429,7 @@ class ReactionForceFieldBuilder():
                     hess_drv.ostream.mute()
                 hess_drv.atom_pairs = list(unknown_pairs)
                 hess_drv.compute(molecule, basis)
-                hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
+                hessian = np.copy(hess_drv.hessian)  # type: ignore
             else:
                 cond = np.shape(hessian) == (molecule.number_of_atoms() * 3,
                                              molecule.number_of_atoms() * 3)
