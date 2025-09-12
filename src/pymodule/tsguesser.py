@@ -697,7 +697,12 @@ class TransitionStateGuesser():
         plt.show()
 
         mol = Molecule.read_xyz_string(xyz_data_i)
-        mol.show(atom_indices=atom_indices, width=640, height=360)
+
+        reactant_bonds = set(self.reactant.bonds.keys())
+        product_bonds = set(self.product.bonds.keys())
+        changing_bonds = list(self.forming_bonds) + list(self.breaking_bonds)
+        mol.show(bonds=reactant_bonds | product_bonds, dashed_bonds=changing_bonds,
+            atom_indices=atom_indices, width=640, height=360,)
 
     def _mm_to_xyz_geom(self, geom, molecule=None):
         if molecule is None:
