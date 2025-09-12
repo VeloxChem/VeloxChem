@@ -89,7 +89,7 @@ class TransitionStateGuesser():
         self.mute_ff_build = True
         self.mm_temperature = 600
         self.mm_steps = 1000
-        self.mm_step_size = 0.001 * mmunit.picoseconds
+        self.mm_step_size = 0.001
         self.save_mm_traj = False
         self.scf_drv = None
         # self.evb_drv: None | EvbDriver = None
@@ -101,7 +101,7 @@ class TransitionStateGuesser():
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
-        
+
         self.ffbuilder = ReactionForceFieldBuilder()
 
     def find_TS(
@@ -188,19 +188,6 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
 
-        self.systems, self.topology, self.initial_positions = sysbuilder.build_systems(
-            self.reactant,
-            self.product,
-            list(self.lambda_vec),
-            conf,
-            constraints,
-        )
-        self.results.update({
-            'broken_bonds': self.breaking_bonds,
-            'formed_bonds': self.forming_bonds,
-            'lambda_vec': self.lambda_vec
-        })
-
         self.ostream.print_info(
             f"Saving reactant and product forcefield as json to {self.folder_name}"
         )
@@ -209,6 +196,21 @@ class TransitionStateGuesser():
             self.reactant, f"{self.folder_name}/reactant.json")
         self.product.save_forcefield_as_json(
             self.product, f"{self.folder_name}/product.json")
+        self.systems, self.topology, self.initial_positions = sysbuilder.build_systems(
+            self.reactant,
+            self.product,
+            list(self.lambda_vec),
+            conf,
+            constraints,
+        )
+        self.ostream.print_info(f"Saving systems as xml to {self.folder_name}")
+        self.ostream.flush()
+        sysbuilder.save_systems_as_xml(self.systems, self.folder_name)
+        self.results.update({
+            'broken_bonds': self.breaking_bonds,
+            'formed_bonds': self.forming_bonds,
+            'lambda_vec': self.lambda_vec
+        })
 
         return
 
@@ -247,8 +249,9 @@ class TransitionStateGuesser():
             self.systems['product'],
             pro_int,
         )
-        pos = self.initial_positions
         bohr_to_nm = 0.0529177249
+        pos = self.initial_positions * 0.1
+
         try:
             if self.force_conformer_search:
                 self.ostream.print_info(
@@ -380,7 +383,8 @@ class TransitionStateGuesser():
         conformer_search,
     ):
         if not conformer_search:
-            integrator = mm.VerletIntegrator(self.mm_step_size)
+            integrator = mm.VerletIntegrator(self.mm_step_size *
+                                             mmunit.picoseconds)
             # TODO add more flexible options if we need them, coordinate with conformergenerator as well
             # platform settings for small molecule
             platform = mm.Platform.getPlatformByName("CPU")
@@ -392,14 +396,14 @@ class TransitionStateGuesser():
                 platform,
             )
             simulation.context.setPositions(init_pos)
-            simulation.context.setVelocitiesToTemperature(300 * mmunit.kelvin)
 
             simulation.minimizeEnergy()
+            simulation.context.setVelocitiesToTemperature(self.mm_temperature *
+                                                          mmunit.kelvin)
             if self.save_mm_traj:
                 mmapp.PDBFile.writeFile(
                     topology,
-                    simulation.context.getState(
-                        getPositions=True).getPositions(),
+                    state_pos,
                     str(self.folder / f'{l}_begin_minim.pdb'),
                 )
                 simulation.reporters.append(
@@ -409,8 +413,7 @@ class TransitionStateGuesser():
             if self.save_mm_traj:
                 mmapp.PDBFile.writeFile(
                     topology,
-                    simulation.context.getState(
-                        getPositions=True).getPositions(),
+                    state_pos,
                     str(self.folder / f'{l}_end_minim.pdb'),
                 )
 
@@ -761,6 +764,13 @@ class TransitionStateGuesser():
     def _print_initial_mm_header(self):
         self.ostream.print_blank()
         self.ostream.print_header("Starting initial MM scan")
+        self.ostream.print_blank()
+        self.ostream.print_header("MM parameters:")
+        self.ostream.print_header(f"mm steps:       {self.mm_steps:>10}")
+        self.ostream.print_header(f"mm temperature: {self.mm_temperature:>8} K")
+        self.ostream.print_header(f"mm step size:   {self.mm_step_size:>7} ps")
+        self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
+        self.ostream.print_header(f"saving mm traj: {self.save_mm_traj:>10}")
         self.ostream.print_blank()
         valstr = '{} | {} | {} | {} | {}'.format(
             'Lambda',

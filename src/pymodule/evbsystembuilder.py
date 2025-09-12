@@ -36,6 +36,7 @@ import networkx as nx
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 import typing
+from pathlib import Path
 import copy
 import math
 import sys
@@ -2297,6 +2298,48 @@ class EvbSystemBuilder():
             return 180.0 * phi_in_radian / math.pi
         else:
             return phi_in_radian
+        
+    def save_systems_as_xml(self, systems: dict, folder: str):
+        """Save the systems as xml files to the given folder.
+
+        Args:
+            systems (dict): The systems to save
+            folder (str): The folder relative to the current working directory to save the systems to.
+        """
+
+        assert_msg_critical('openmm' in sys.modules,
+                            'openmm is required for EvbDriver.')
+
+        path = Path().cwd() / folder
+        self.ostream.print_info(f"Saving systems to {path}")
+        self.ostream.flush()
+        for name, system in systems.items():
+            if isinstance(name, float) or isinstance(name, int):
+                filename = f"{name:.3f}_sys.xml"
+            else:
+                filename = f"{name}_sys.xml"
+            with open(path / filename, mode="w", encoding="utf-8") as output:
+                output.write(mm.XmlSerializer.serialize(system))
+
+    def load_systems_from_xml(self, folder: str):
+        """Load the systems from xml files in the given folder.
+
+        Args:
+            folder (str): The folder relative to the current working directory to load the systems from.
+        Returns:
+            dict: The loaded systems
+        """
+
+        assert_msg_critical('openmm' in sys.modules,
+                            'openmm is required for EvbDriver.')
+
+        systems = {}
+        path = Path().cwd() / folder
+        for lam in self.Lambda:
+            with open(path / f"{lam:.3f}_sys.xml", mode="r",
+                      encoding="utf-8") as input:
+                systems[lam] = mm.XmlSerializer.deserialize(input.read())
+        return systems
 
 
 # The EVB procedure uses two different potentials, one for the integration of the EOMs to explore phase space, and another one for the calculation of the PES

@@ -91,11 +91,12 @@ class ReactionForceFieldBuilder():
         self.reparameterize_bonds: bool = True
         self.reparameterize_angles: bool = False
         self.optimize_ff: bool = True
-        self.mm_opt_constrain_bonds: bool = False
+        self.mm_opt_constrain_bonds: bool = True
         self.water_model: str = 'spce'
         self.reactant_total_multiplicity: int = -1
         self.product_total_multiplicity: int = -1
-        self.breaking_bonds: set[tuple[int, int]] | tuple = set()
+        self.breaking_bonds: set[tuple[int, int]] | tuple = set() # one-indexed
+        self.product_mapping: dict[int, int] | None = None # one-indexed
         self.reactant_partial_charges: list[float] | list[
             list[float]] | None = None
         self.product_partial_charges: list[float] | list[
@@ -158,7 +159,7 @@ class ReactionForceFieldBuilder():
 
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
-        if not self.skip_reaction_matching:
+        if not self.skip_reaction_matching and self.product_mapping is None:
             breaking_bonds_insert = "no breaking bonds"
             if len(self.breaking_bonds) > 0:
                 breaking_bonds_insert = f"breaking bonds: {self.breaking_bonds}"
@@ -169,16 +170,30 @@ class ReactionForceFieldBuilder():
             # adjust for 1-indexed input of breaking bonds
             breaking_bonds = {(bond[0] - 1, bond[1] - 1)
                               for bond in self.breaking_bonds}
-            self.product, product_mapping = self._match_reactant_and_product(
+            self.product, self.product_mapping = self._match_reactant_and_product(
                 self.reactant,
                 self.reactant.molecule.get_element_ids(),
                 self.product,
                 self.product.molecule.get_element_ids(),
                 breaking_bonds,
             )
+        elif self.product_mapping is not None:
+            self.ostream.print_info(f"Skipping reaction matching because the mapping {self.product_mapping} is already provided")
+            self.product_mapping = {k - 1: v - 1 for k, v in self.product_mapping.items()}
         else:
-            product_mapping = None
             self.ostream.print_info("Skipping reaction matching")
+        self.ostream.flush()
+            
+        if self.product_mapping is not None:
+            self.product = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
+                self.product,
+                self.product_mapping,
+            )
+
+            self.product.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
+                self.product.molecule,
+                self.product_mapping,
+            )
 
         forming_bonds, breaking_bonds = self._summarise_reaction(
             self.reactant, self.product)
@@ -195,6 +210,7 @@ class ReactionForceFieldBuilder():
                     self.reactant.molecule.get_element_ids(),
                     self.reactant,
                     forming_bonds,
+                    
                     note='reactant',
                 )
             if len(products) > 1:
@@ -202,10 +218,11 @@ class ReactionForceFieldBuilder():
                     self.product.molecule.get_element_ids(),
                     self.product,
                     breaking_bonds,
+                    
                     note='product',
                 )
 
-        return self.reactant, self.product, forming_bonds, breaking_bonds, reactants, products, product_mapping
+        return self.reactant, self.product, forming_bonds, breaking_bonds, reactants, products, self.product_mapping
 
     def _create_combined_forcefield(
         self,
@@ -266,6 +283,7 @@ class ReactionForceFieldBuilder():
         combined_mol = self._combine_molecule(
             molecules,
             self.reactant_total_multiplicity,
+            name=name,
         )
         self.ostream.print_info(
             f"Combined reactant with total charge {combined_mol.get_charge()} and multiplicity {combined_mol.get_multiplicity()}"
@@ -443,29 +461,33 @@ class ReactionForceFieldBuilder():
         return forcefield
 
     # Guesses how to combine molecular structures without overlapping them
-    def _combine_molecule(self, molecules, total_multiplicity):
+    def _combine_molecule(self, molecules, total_multiplicity,name='MOL'):
 
         combined_molecule = Molecule()
         # pos = []
         charge = 0
         Sm1 = 0
-        for mol in molecules:
+        for i,mol in enumerate(molecules):
             charge += mol.get_charge()
             Sm1 += mol.get_multiplicity() - 1
             if combined_molecule.number_of_atoms() > 0:
-                max_x = max(combined_molecule.get_coordinates_in_angstrom()[:,
-                                                                            0])
-                min_x = min(combined_molecule.get_coordinates_in_angstrom()[:,
-                                                                            0])
+                coords = combined_molecule.get_coordinates_in_angstrom()
+                max_x = max(coords[:, 0])
+                min_x = min(coords[:, 0])
                 shift = max_x - min_x + 2
+                self.ostream.print_info(
+                    f"max_x: {max_x}, min_x: {min_x}, shifting next molecule by {shift} angstrom")
             else:
                 shift = 0
-
+            coords = mol.get_coordinates_in_angstrom()
+            min_x = min(coords[:, 0])
+            coords[:, 0] -= min_x
             for elem, coord in zip(mol.get_element_ids(),
-                                   mol.get_coordinates_in_angstrom()):
+                                   coords):
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
+            combined_molecule.write_xyz_file(f"combined_{name}_{i}")
         combined_molecule.set_charge(charge)
         if total_multiplicity > -1:
             combined_molecule.set_multiplicity(total_multiplicity)
@@ -576,15 +598,6 @@ class ReactionForceFieldBuilder():
         print_mapping = {k + 1: v + 1 for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {print_mapping}")
         self.ostream.flush()
-        product_ff = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
-            product_ff,
-            total_mapping,
-        )
-
-        product_ff.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
-            product_ff.molecule,
-            total_mapping,
-        )
         return product_ff, total_mapping
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
@@ -757,22 +770,26 @@ class ReactionForceFieldBuilder():
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
         os.unlink(f'{name}.xml')
-        os.unlink(f'{name}.pdb')
+        # os.unlink(f'{name}.pdb')
         os.unlink(f'{name}_sys.xml')
         integrator = mm.VerletIntegrator(0.001)
         sim = mmapp.Simulation(top, mmsys, integrator)
         sim.context.setPositions(pos)
         self.ostream.print_info(f"Minimizing {note} molecule.")
         sim.minimizeEnergy()
+        # with open(f'{name}_optimized.pdb', 'w') as pdbfile:
+        mmapp.PDBFile.writeFile(top, sim.context.getState(getPositions=True).getPositions(), f'{name}_initial_optimized.pdb')
         sim.context.setVelocitiesToTemperature(600 * mmunit.kelvin)
         self.ostream.print_info(
             f"Running 1000 NVE steps with initial T at 600 K for {note} molecule."
         )
         self.ostream.flush()
         sim.step(1000)
+        mmapp.PDBFile.writeFile(top, sim.context.getState(getPositions=True).getPositions(), f'{name}_600k_run.pdb')
         self.ostream.print_info(f"Minimizing {note} molecule again.")
         self.ostream.flush()
         sim.minimizeEnergy()
+        mmapp.PDBFile.writeFile(top, sim.context.getState(getPositions=True).getPositions(), f'{name}_final_optimized.pdb')
         state = sim.context.getState(getPositions=True)
         if self.mm_opt_constrain_bonds:
             integrator = mm.VerletIntegrator(0.001)

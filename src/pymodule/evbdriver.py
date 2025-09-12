@@ -272,7 +272,7 @@ class EvbDriver():
 
             self.ostream.print_info(f"Saving files to {data_folder_path}")
             self.ostream.flush()
-            self.save_systems_as_xml(systems, conf["run_folder"])
+            system_builder.save_systems_as_xml(systems, conf["run_folder"])
 
             top_path = cwd / data_folder / "topology.pdb"
 
@@ -336,7 +336,8 @@ class EvbDriver():
             "Lambda": Lambda
         }
         if load_systems:
-            systems = self.load_systems_from_xml(str(Path(data_folder) / "run"))
+            sysbuilder = EvbSystemBuilder()
+            systems = sysbuilder.load_systems_from_xml(str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
@@ -355,48 +356,6 @@ class EvbDriver():
             f"Current configurations: {[conf['name'] for conf in self.system_confs]}"
         )
         self.ostream.flush()
-
-    def save_systems_as_xml(self, systems: dict, folder: str):
-        """Save the systems as xml files to the given folder.
-
-        Args:
-            systems (dict): The systems to save
-            folder (str): The folder relative to the current working directory to save the systems to.
-        """
-
-        assert_msg_critical('openmm' in sys.modules,
-                            'openmm is required for EvbDriver.')
-
-        path = Path().cwd() / folder
-        self.ostream.print_info(f"Saving systems to {path}")
-        self.ostream.flush()
-        for name, system in systems.items():
-            if isinstance(name, float) or isinstance(name, int):
-                filename = f"{name:.3f}_sys.xml"
-            else:
-                filename = f"{name}_sys.xml"
-            with open(path / filename, mode="w", encoding="utf-8") as output:
-                output.write(mm.XmlSerializer.serialize(system))
-
-    def load_systems_from_xml(self, folder: str):
-        """Load the systems from xml files in the given folder.
-
-        Args:
-            folder (str): The folder relative to the current working directory to load the systems from.
-        Returns:
-            dict: The loaded systems
-        """
-
-        assert_msg_critical('openmm' in sys.modules,
-                            'openmm is required for EvbDriver.')
-
-        systems = {}
-        path = Path().cwd() / folder
-        for lam in self.Lambda:
-            with open(path / f"{lam:.3f}_sys.xml", mode="r",
-                      encoding="utf-8") as input:
-                systems[lam] = mm.XmlSerializer.deserialize(input.read())
-        return systems
 
     def run_FEP(
         self,
