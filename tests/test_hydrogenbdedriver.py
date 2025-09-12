@@ -18,10 +18,6 @@ class TestHydrogenBdeDriver:
 
     def run_hydrogen_bde(self, molecules):
         hbde = HydrogenBdeDriver()
-        hbde.basis_sets = ['def2-SVP', 'def2-SVP']
-        hbde.xcfunctionals = ['BLYP', 'BLYP']
-        hbde.mol_scf_drv.ri_coulomb = True
-        hbde.radical_scf_drv.ri_coulomb = True
         hbde.mute_output = True
         hbde.compute(molecules)
         if hbde._rank == mpi_master():

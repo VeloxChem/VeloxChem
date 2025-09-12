@@ -48,11 +48,14 @@ from .optimizationdriver import OptimizationDriver
 
 class HydrogenBdeDriver:
     """
-    This class implements the hydrogen bond dissociation energy (BDE) driver.
+    This class implements bond dissociation energy (BDE) driver.
+    calculate the BDE of hydrogen/target atoms in a molecule.
+    target atoms should only have one connected atom in the molecule.
     Use self.compute to calculate the BDE for each unique hydrogen atom
     Use self.show to show the results in kJ/mol 
     (default is to calculate hydrogens only for sp3 carbon atoms)
-    two sets of basis or exchange correlation functionals are needed for optimization and single point calculation separately
+    two sets of basis or exchange correlation functionals are needed 
+    for optimization and single point calculation separately
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -70,10 +73,8 @@ class HydrogenBdeDriver:
         self._size = comm.Get_size()
         self.ostream = ostream
 
-        #set basis
-        self.basis_sets = [
-            "def2-svp", "def2-tzvp"
-        ]  #two basis sets needed for optimization and final single point energy calculation
+        #two basis sets needed for optimization and final single point energy calculation
+        self.basis_sets = ["def2-svp", "def2-tzvp"]  
         self.xcfunctionals = ["blyp", "b3lyp"]
         self.radical_level_shifting = 0.5
         #whole molecule optimization workflow
@@ -125,8 +126,45 @@ class HydrogenBdeDriver:
         self.only_hartree_fock = False
         self.mute_output = False
         self.energy_unit = "kj"  #kcal, kj, au
+    
+    def _update_drv_input_attributes(self, old_drv, new_drv):
+        #if attribute is in input keywords, then update it but skip _scf_type of old_drv
+        update_keywords = []
+        if hasattr(new_drv, '_input_keywords'):
+            for key in new_drv._input_keywords.keys():# scf driver
+                update_keywords.extend(new_drv._input_keywords[key].keys())
+        if hasattr(new_drv, 'input_keywords'): # optimization driver
+            for key in new_drv.input_keywords.keys():
+                update_keywords.extend(new_drv.input_keywords[key].keys())
 
-    def check_scf_mute(self):
+        for attr in vars(old_drv):
+            # skip attributes of _scf_type
+            if attr == "_scf_type":
+                continue
+            if ((attr in update_keywords) & hasattr(old_drv, attr)):
+                setattr(new_drv, attr, getattr(old_drv, attr))
+        return new_drv
+
+
+    def _check_proper_drv(self,whole_molecule):
+        #reset scf drv for 'molecule', 'radical', 'target_atom' based on multiplicity
+        #default hydrogen is doublet with ScfUnrestrictedDriver
+        if self.target_atom_multiplicity < 2:
+            self.hydrogen_final_scf_drv = self._update_drv_input_attributes(self.hydrogen_final_scf_drv, ScfRestrictedDriver())
+        
+        #default radical is doublet with ScfUnrestrictedDriver
+        if self.mol_rad_multiplicity < 2:
+            self.radical_scf_drv = self._update_drv_input_attributes(self.radical_scf_drv, ScfRestrictedDriver())
+            self.radical_final_scf_drv = self._update_drv_input_attributes(self.radical_final_scf_drv, ScfRestrictedDriver())
+            self.radical_opt_drv = self._update_drv_input_attributes(self.radical_opt_drv, OptimizationDriver(self.radical_scf_drv))
+
+        #default molecule is closed shell
+        if whole_molecule.get_multiplicity() > 2:
+            self.mol_scf_drv = self._update_drv_input_attributes(self.mol_scf_drv, ScfUnrestrictedDriver())
+            self.mol_final_scf_drv = self._update_drv_input_attributes(self.mol_final_scf_drv, ScfUnrestrictedDriver())
+            self.mol_opt_drv = self._update_drv_input_attributes(self.mol_opt_drv, OptimizationDriver(self.mol_scf_drv))
+
+    def _check_scf_mute(self):
         if self.mute_output:
             self.mol_scf_drv.ostream.mute()
             self.mol_final_scf_drv.ostream.mute()
@@ -135,14 +173,22 @@ class HydrogenBdeDriver:
             self.hydrogen_final_scf_drv.ostream.mute()
             self.mol_opt_drv.ostream.mute()
             self.radical_opt_drv.ostream.mute()
+    
 
-    def check_radical_level_shifting(self):
+    def _check_radical_level_shifting(self):
         if self.radical_level_shifting is not None:
-            self.radical_scf_drv.level_shifting = self.radical_level_shifting
-            self.radical_final_scf_drv.level_shifting = self.radical_level_shifting
-            self.radical_opt_drv.level_shifting = self.radical_level_shifting
+            if self.mol_rad_multiplicity <2:
+                self.ostream.print_warning(
+                    "level shifting is only applied to open shell calculations, "
+                    "will skip setting level shifting for radical scf drivers"
+                    )
+                self.ostream.flush()
+                return
+            if hasattr(self.radical_scf_drv, 'level_shifting'):
+                self.radical_scf_drv.level_shifting = self.radical_level_shifting
+                self.radical_final_scf_drv.level_shifting = self.radical_level_shifting
 
-    def check_functionals(self):
+    def _check_functionals(self):
         """
         check if exchange-correlation functionals as list are set, suppose to be [functional1,functional2]
         if not, then check if the user set the only_hartree_fock flag or extract the scf_driver functionals
@@ -257,7 +303,7 @@ class HydrogenBdeDriver:
         including atom types, coordinates, equivalent atom types, and connectivity information.
 
         keys are "atom_type","equiv_group","H_connected_atom","coord"
-        the equiv_group is used to identify equivalent atoms in the molecule and can be used for skip redundant calculations.
+        the equiv_group is used to identify equivalent atoms in the molecule and can be used for skipping redundant calculations.
         the H_connected_atom is used to identify if the atom is connected to a sp3 carbon atom.
         
         :param molecule: The molecule object
@@ -304,7 +350,8 @@ class HydrogenBdeDriver:
         :param atom_idx: The index of the atom to analyze
         :param connectivity_matrix: The connectivity matrix of the molecule
 
-        :return: A string containing the H connected atom information,this string is in the format of "atomlabel_atomindex_atomtype".
+        :return: A string containing the H connected atom information,this string is 
+        in the format of "atomlabel_atomindex_atomtype".
         """
         # if the atom is not H or target_atom_type, then return ''
         if labels[atom_idx] != self.target_atom:
@@ -379,7 +426,8 @@ class HydrogenBdeDriver:
         :param unique_hydrogen_keys: The keys of the unique hydrogen atoms.
         :param hydrogen_atoms_dict: The dictionary containing hydrogen atom information.
 
-        :return: tuple. The updated hydrogen_atoms_dict, a list of tuple, like [(bond dissociation energy, coordinates),(bond dissociation energy, coordinates)].
+        :return: tuple. The updated hydrogen_atoms_dict, a list of tuple, 
+        like [(bond dissociation energy, coordinates),(bond dissociation energy, coordinates)].
         """
         au2kcal = 627.509
         au2kj = 2625.5
@@ -388,8 +436,15 @@ class HydrogenBdeDriver:
         for i in range(len(unique_hydrogen_keys)):
             key = unique_hydrogen_keys[i]
             energy_au = unique_hydrogen_dissociation_energies[i]
-            unique_hydrogen_bdes_kj_coords.append(
-                (energy_au * au2kj, hydrogen_atoms_dict[key]["coord"]))
+            if self.energy_unit == "kj":
+                unique_hydrogen_bdes_kj_coords.append(
+                    (energy_au * au2kj, hydrogen_atoms_dict[key]["coord"]))
+            elif self.energy_unit == "kcal":
+                unique_hydrogen_bdes_kj_coords.append(
+                    (energy_au * au2kcal, hydrogen_atoms_dict[key]["coord"]))
+            elif self.energy_unit == "au":
+                unique_hydrogen_bdes_kj_coords.append(
+                    (energy_au, hydrogen_atoms_dict[key]["coord"]))
             equiv_group = hydrogen_atoms_dict[key]["equiv_group"]
             for j in equiv_group:
                 hydrogen_atoms_dict[
@@ -415,6 +470,9 @@ class HydrogenBdeDriver:
         self.ostream.flush()
         for key in hydrogen_atoms_dict.keys():
             if "dissociation_energy_au" in hydrogen_atoms_dict[key].keys():
+                #skip the SCF not converged ones, whose dissociation_energy_au is set to 0.0
+                if hydrogen_atoms_dict[key]["dissociation_energy_au"] - 0.0 < 1.0e-6: 
+                    continue
                 if unit == "kcal":
                     self.ostream.print_info(
                         f"{key} {round(hydrogen_atoms_dict[key]['dissociation_energy_kcal'], 1)} kcal/mol"
@@ -447,8 +505,7 @@ class HydrogenBdeDriver:
         basis_set1 = MolecularBasis.read(molecule, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(molecule, self.basis_sets[1])
         scf_results = self.mol_scf_drv.compute(molecule, basis_set1)
-        opt_results = self.mol_opt_drv.compute(molecule, basis_set1,
-                                               scf_results)
+        opt_results = self.mol_opt_drv.compute(molecule, basis_set1, scf_results)
 
         opt_molecule = Molecule.read_xyz_string(opt_results["final_geometry"])
         opt_molecule.set_charge(molecule.get_charge())
@@ -456,8 +513,17 @@ class HydrogenBdeDriver:
 
         # final energy
         final_single_point_scf_result = self.mol_final_scf_drv.compute(opt_molecule, basis_set2)
+        if not self.mol_final_scf_drv.is_converged:
+            self.new_method()
+            self.ostream.flush()
         self.whole_mol_single_point_scf_energy = self.mol_final_scf_drv.get_scf_energy()
         return opt_molecule
+
+    def new_method(self):
+        self.ostream.print_warning(
+                "SCF of final single point calculation did not converge for the whole molecule, "
+                "the result is not reliable, please modify the settings if needed"
+            )
 
     def _compute_hydrogen_radical_scf_energy(self):
         """
@@ -470,11 +536,18 @@ class HydrogenBdeDriver:
         hydrogen.set_charge(self.target_atom_charge)
         basis_set2 = MolecularBasis.read(hydrogen, self.basis_sets[1])
         scf_resultsH = self.hydrogen_final_scf_drv.compute(hydrogen, basis_set2)
+        if not self.hydrogen_final_scf_drv.is_converged:
+            self.ostream.print_warning(
+                f"SCF of final single point calculation did not converge for {self.target_atom} radical or ion, "
+                f"the result is not reliable, please modify the settings if needed"
+            )
+            self.ostream.flush()
         self.hydrogen_single_point_scf_energy = self.hydrogen_final_scf_drv.get_scf_energy()
 
     def _remove_atom_by_idx(self, mol, atom_indices_to_remove, carbon_indices):
         """
-        this function is used to remove atoms from a molecule by using their indices and find the exposed carbon for guess
+        this function is used to remove atoms from a molecule by using their indices 
+        and find the exposed carbon for guess
 
         :param mol: The molecule object.
         :param atom_indices_to_remove: The list of atom indices to remove.
@@ -511,33 +584,61 @@ class HydrogenBdeDriver:
 
         :param mol: The molecule object.
         :param radical_carbon_idx: The index of the radical carbon atom for guess.
-        :param run_idx: The index of the current radical molecule among all radical molecules. can be removed because it is only used to save file
+        :param run_idx: The index of the current radical molecule among all radical molecules. Can be removed because it is only used to save file
 
-        :return: The SCF energy of the radical molecule.
+        :return: The SCF energy of the radical molecule. or None if the SCF did not converge
+
         """
+        self.ostream.print_info("-" * 50)
+        if self.show_mol:
+            mol.show(atom_indices=True)
+            
         step_start = time.time()
         mol.set_multiplicity(self.mol_rad_multiplicity)
         mol.set_charge(self.mol_rad_charge)
         basis_set1 = MolecularBasis.read(mol, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(mol, self.basis_sets[1])
         self.radical_scf_drv.filename = f'bde_{run_idx+1}'
+
+        #set guess for radical optimization
         if self.mol_rad_multiplicity != 1:
             self.radical_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
-        scf_resultsmol = self.radical_scf_drv.compute(mol, basis_set1)
-        opt_results_rad = self.radical_opt_drv.compute(mol, basis_set1,
-                                                       scf_resultsmol)
+        
+        try:
+            scf_resultsmol = self.radical_scf_drv.compute(mol, basis_set1)
+            opt_results_rad = self.radical_opt_drv.compute(mol, basis_set1,scf_resultsmol)
+        except Exception as e:
+            if "ScfGradientDriver: SCF did not converge" in str(e):
+                self.ostream.print_warning(
+                    f"SCF did not converge for radical molecule {run_idx+1},will skip this radical, please modify the settings if needed"
+                )
+                self.ostream.flush()
+                return None
         mol = Molecule.read_xyz_string(opt_results_rad["final_geometry"])
         mol.set_multiplicity(self.mol_rad_multiplicity)
+
         if self.mol_rad_multiplicity != 1:
             self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
         mol.set_charge(self.mol_rad_charge)
         scf_results_rad_big = self.radical_final_scf_drv.compute(mol, basis_set2)
-        step_end = time.time()
-        self.ostream.print_info("-" * 50)
-        self.ostream.print_info(
-            f"time cost : {round(step_end - step_start, 2)} seconds")
-        self.ostream.flush()
+ 
+        if not self.radical_final_scf_drv.is_converged:
+            self.ostream.print_warning(
+                f"SCF of final single point calculation did not converge for radical molecule {run_idx+1}, "
+                f"will skip this radical or molecule, please modify the settings if needed"
+            )
+            self.ostream.flush()
+            return None
+
         radical_single_point_scf_energy = self.radical_final_scf_drv.get_scf_energy()
+        step_end = time.time()
+        self.ostream.print_info(
+            f"SCF energy for radical molecule {run_idx+1} is {radical_single_point_scf_energy} au"
+        )
+        self.ostream.print_info(
+            f"time cost : {round(step_end - step_start, 2)} seconds"
+        )
+        self.ostream.flush()
         return radical_single_point_scf_energy
 
     def _show_bde_on_atom(self,
@@ -598,9 +699,14 @@ class HydrogenBdeDriver:
             #add bde based on coords and unique_bde_au
             for i in range(len(bdes_coords)):
                 #bde coords is a list of tuple [(bde, (x, y, z)),(bde, (x, y, z))]
-                bde_kj = round(bdes_coords[i][0],
-                               0)  #only show the integer part
-                bde_kj = int(bde_kj)
+                #default in kJ/mol but changed by self.energy_unit
+                #skip the scf not converged ones, whose bde is set to 0.0
+                if bdes_coords[i][0] - 0.0 < 1.0e-6:
+                    bde_kj = 'Fail'
+                else:
+                    bde_kj = round(bdes_coords[i][0],
+                                0)  #only show the integer part
+                    bde_kj = int(bde_kj)
                 viewer.addLabel(
                     f'{bde_kj}', {
                         'position': {
@@ -622,15 +728,16 @@ class HydrogenBdeDriver:
     def _generate_radical_molecules(self, whole_molecule: object):
         """
         only applied to single molecule
-        Generate radical molecules from the whole molecule by removing hydrogen atoms.
+        Generate radical molecules from the whole molecule by removing hydrogen atoms or target atoms.
 
         :param whole_molecule: The whole molecule object to generate radicals from.
         :return: A tuple, containing the radical molecules, their corresponding carbon indices, and guess messages.
 
         """
-        self.check_scf_mute()
-        self.check_functionals()
-        self.check_radical_level_shifting()
+        self._check_proper_drv(whole_molecule)
+        self._check_scf_mute()
+        self._check_functionals()
+        self._check_radical_level_shifting()
         hydrogen_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_hydrogen_keys, unique_hydrogen_indices = self._fetch_unique_H(
             hydrogen_atoms_dict,
@@ -639,11 +746,14 @@ class HydrogenBdeDriver:
         #self.ostream.print_info(f'unique_hydrogen_indices {unique_hydrogen_indices}')
         carbon_indices = []
         # Generate radical molecules by removing hydrogen atoms
+        # check connectivity matrix to find the connected carbon index for each hydrogen
+        # if connected to more than one atom, then throw error
         conn_mat = whole_molecule.get_connectivity_matrix()
         for x in unique_hydrogen_indices:
             assert list(conn_mat[x]).count(1) == 1
             carbon_indices.append(list(conn_mat[x]).index(1))
         #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
+
         opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule)
         radical_molecules, radical_carbon_indices = self._remove_atom_by_idx(
             opt_whole_molecule, unique_hydrogen_indices, carbon_indices)
@@ -655,11 +765,13 @@ class HydrogenBdeDriver:
 
     def _compute_single_molecule(self, whole_molecule: object):
         """
-        used to compute hydrogen bond dissociation energies (BDEs) for a single molecule.
+        used to compute hydrogen/target atom bond dissociation energies (BDEs) for a single molecule.
         """
-        self.check_scf_mute()
-        self.check_functionals()
-        self.check_radical_level_shifting()
+        self._check_proper_drv(whole_molecule)
+        self._check_scf_mute()
+        self._check_functionals()
+        self._check_radical_level_shifting()
+
         hydrogen_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_hydrogen_keys, unique_hydrogen_indices = self._fetch_unique_H(
             hydrogen_atoms_dict,
@@ -673,12 +785,14 @@ class HydrogenBdeDriver:
             assert list(conn_mat[x]).count(1) == 1
             carbon_indices.append(list(conn_mat[x]).index(1))
         #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
+
         opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule)
         self._compute_hydrogen_radical_scf_energy()
         self.opt_whole_molecule = opt_whole_molecule
         molecules_rads, radical_carbon_indices = self._remove_atom_by_idx(
             opt_whole_molecule, unique_hydrogen_indices, carbon_indices)
 
+        #calculate BDEs for each radical molecule
         unique_BDEs_au = []
         count = 1
         for run_idx, (mol_rad, radical_carbon_idx) in enumerate(
@@ -687,14 +801,23 @@ class HydrogenBdeDriver:
                 f"Computing energy of structure : {count} of {len(molecules_rads)}"
             )
             self.ostream.flush()
+            mol_rad_scf_energy = None #reset to None for each radical molecule
             mol_rad_scf_energy = self._compute_mol_rad_scf_energy(
                 mol_rad, radical_carbon_idx, run_idx)
-            bde_au = mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.hydrogen_single_point_scf_energy
+            if mol_rad_scf_energy is None:
+                bde_au = 0.0
+                self.ostream.print_warning(
+                    f"SCF did not converge for radical molecule {count}, setting BDE to 0.0, please modify the settings if needed"
+                )
+                self.ostream.flush()
+            else:
+                bde_au = mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.hydrogen_single_point_scf_energy
             unique_BDEs_au.append(bde_au)
             count += 1
         self.unique_BDEs_au = unique_BDEs_au
         self.unique_hydrogen_keys = unique_hydrogen_keys
-        # loop the unique_hydrogen_indices to remove the H atoms from the molecule and calulate the dissciation energy but save the energy for all equivalent H atoms
+        # loop the unique_hydrogen_indices to remove the H atoms from the molecule and
+        # calculate the dissociation energy but save the energy for all equivalent H atoms
         # print the dissociation energy for each H atom
         self.hydrogen_atoms_dict, self.bdes_coords, self.unique_hydrogen_bdes_coords = self._update_equiv_hydrogen_dissociation_energy(
             unique_BDEs_au, unique_hydrogen_keys, hydrogen_atoms_dict)
