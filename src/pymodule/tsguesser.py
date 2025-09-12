@@ -401,6 +401,8 @@ class TransitionStateGuesser():
             simulation.context.setVelocitiesToTemperature(self.mm_temperature *
                                                           mmunit.kelvin)
             if self.save_mm_traj:
+                state_pos = simulation.context.getState(
+                    getPositions=True).getPositions(asNumpy=True)
                 mmapp.PDBFile.writeFile(
                     topology,
                     state_pos,
@@ -411,6 +413,8 @@ class TransitionStateGuesser():
             simulation.step(self.mm_steps)
             simulation.minimizeEnergy()
             if self.save_mm_traj:
+                state_pos = simulation.context.getState(
+                    getPositions=True).getPositions(asNumpy=True)
                 mmapp.PDBFile.writeFile(
                     topology,
                     state_pos,
