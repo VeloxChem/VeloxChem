@@ -1205,46 +1205,33 @@ CScreeningData::getNumGpusPerNode() const -> const int64_t
 }
 
 auto
-CScreeningData::setPreLinkTime(const std::string& prelink_elapsed_time) -> void
+CScreeningData::setTimerSummary(const std::string& timer_summary) -> void
 {
-    _prelink_time = prelink_elapsed_time;
+    _timer_summary = timer_summary;
 }
 
 auto
-CScreeningData::getPreLinkTime() const -> const std::string
+CScreeningData::getTimerSummary() const -> const std::string
 {
-    return _prelink_time;
+    return _timer_summary;
 }
 
 auto
-CScreeningData::initTimers(const int64_t num_gpus_per_node) -> void
+CScreeningData::initGpuTimers(const int64_t num_gpus_per_node) -> void
 {
-    _coulomb_time  = std::vector<std::string>(num_gpus_per_node);
-    _exchange_time = std::vector<std::string>(num_gpus_per_node);
+    _gpu_timer_summary = std::vector<std::string>(num_gpus_per_node);
 }
 
 auto
-CScreeningData::setCoulombTime(const int64_t gpu_id, const std::string& coulomb_elapsed_time) -> void
+CScreeningData::setGpuTimerSummary(const int64_t gpu_id, const std::string& timer_summary) -> void
 {
-    _coulomb_time[gpu_id] = coulomb_elapsed_time;
+    _gpu_timer_summary[gpu_id] = timer_summary;
 }
 
 auto
-CScreeningData::getCoulombTime() const -> const std::vector<std::string>
+CScreeningData::getGpuTimerSummary() const -> const std::vector<std::string>
 {
-    return _coulomb_time;
-}
-
-auto
-CScreeningData::setExchangeTime(const int64_t gpu_id, const std::string& exchange_elapsed_time) -> void
-{
-    _exchange_time[gpu_id] = exchange_elapsed_time;
-}
-
-auto
-CScreeningData::getExchangeTime() const -> const std::vector<std::string>
-{
-    return _exchange_time;
+    return _gpu_timer_summary;
 }
 
 auto

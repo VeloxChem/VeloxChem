@@ -57,9 +57,8 @@ class CScreeningData
 
     double _density_threshold{0.0};
 
-    std::string _prelink_time;
-    std::vector<std::string> _coulomb_time;
-    std::vector<std::string> _exchange_time;
+    std::string _timer_summary;
+    std::vector<std::string> _gpu_timer_summary;
 
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
@@ -220,16 +219,13 @@ class CScreeningData
 
     auto getNumGpusPerNode() const -> const int64_t;
 
-    auto setPreLinkTime(const std::string& prelink_elapsed_time) -> void;
-    auto getPreLinkTime() const -> const std::string;
+    auto setTimerSummary(const std::string& timer_summary) -> void;
+    auto getTimerSummary() const -> const std::string;
 
-    auto initTimers(const int64_t num_gpus_per_node) -> void;
+    auto initGpuTimers(const int64_t num_gpus_per_node) -> void;
 
-    auto setCoulombTime(const int64_t gpu_id, const std::string& coulomb_elapsed_time) -> void;
-    auto getCoulombTime() const -> const std::vector<std::string>;
-
-    auto setExchangeTime(const int64_t gpu_id, const std::string& exchange_elapsed_time) -> void;
-    auto getExchangeTime() const -> const std::vector<std::string>;
+    auto setGpuTimerSummary(const int64_t gpu_id, const std::string& timer_summary) -> void;
+    auto getGpuTimerSummary() const -> const std::vector<std::string>;
 
     auto getQMatrixSS() const -> const CDenseMatrix&;
     auto getQMatrixSP() const -> const CDenseMatrix&;

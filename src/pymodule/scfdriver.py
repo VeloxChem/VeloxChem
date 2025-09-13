@@ -222,6 +222,9 @@ class ScfDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # TODO: add timing_mpi
+        self.timing_gpu = False
+
         # verbosity of output (1-3)
         self.print_level = 2
 
@@ -252,6 +255,7 @@ class ScfDriver:
                 'checkpoint_file': ('str', 'name of checkpoint file'),
                 'write_h5': ('bool', 'write checkpoint and final h5'),
                 'timing': ('bool', 'print timing information'),
+                'timing_gpu': ('bool', 'print GPU timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
@@ -1567,6 +1571,9 @@ class ScfDriver:
         coulomb_timing = 0.0
         exchange_timing = 0.0
 
+        timer_summary = {}
+        gpu_timer_summary = [{} for idx in range(screener.get_num_gpus_per_node())]
+
         if self._dft and not self._first_step:
 
             if self.xcfun.is_hybrid():
@@ -1585,15 +1592,22 @@ class ScfDriver:
                                                        screener, self.rank,
                                                        self.nodes)
 
-                    coulomb_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in screener.get_coulomb_time()
-                    ])
+                    for line in screener.get_timer_summary().splitlines():
+                        key, val = line.split(':')
+                        key = key.strip()
+                        val = float(val.replace('sec', '').strip())
+                        if key not in timer_summary:
+                            timer_summary[key] = 0.0
+                        timer_summary[key] += val
 
-                    exchange_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in screener.get_exchange_time()
-                    ])
+                    for idx, gpu_timer_lines in enumerate(screener.get_gpu_timer_summary()):
+                        for line in gpu_timer_lines.splitlines():
+                            key, val = line.split(':')
+                            key = key.strip()
+                            val = float(val.replace('sec', '').strip())
+                            if key not in gpu_timer_summary[idx]:
+                                gpu_timer_summary[idx][key] = 0.0
+                            gpu_timer_summary[idx][key] += val
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dmat,
                                                       0.0, erf_k_coef, omega,
@@ -1602,15 +1616,22 @@ class ScfDriver:
                                                       screener, self.rank,
                                                       self.nodes)
 
-                    coulomb_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in screener.get_coulomb_time()
-                    ])
+                    for line in screener.get_timer_summary().splitlines():
+                        key, val = line.split(':')
+                        key = key.strip()
+                        val = float(val.replace('sec', '').strip())
+                        if key not in timer_summary:
+                            timer_summary[key] = 0.0
+                        timer_summary[key] += val
 
-                    exchange_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in screener.get_exchange_time()
-                    ])
+                    for idx, gpu_timer_lines in enumerate(screener.get_gpu_timer_summary()):
+                        for line in gpu_timer_lines.splitlines():
+                            key, val = line.split(':')
+                            key = key.strip()
+                            val = float(val.replace('sec', '').strip())
+                            if key not in gpu_timer_summary[idx]:
+                                gpu_timer_summary[idx][key] = 0.0
+                            gpu_timer_summary[idx][key] += val
 
                     fock_mat_local = (fock_mat_full_k.to_numpy() +
                                       fock_mat_erf_k.to_numpy())
@@ -1624,15 +1645,22 @@ class ScfDriver:
                         self.rank, self.nodes)
                     fock_mat_local = fock_mat.to_numpy()
 
-                    coulomb_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in screener.get_coulomb_time()
-                    ])
+                    for line in screener.get_timer_summary().splitlines():
+                        key, val = line.split(':')
+                        key = key.strip()
+                        val = float(val.replace('sec', '').strip())
+                        if key not in timer_summary:
+                            timer_summary[key] = 0.0
+                        timer_summary[key] += val
 
-                    exchange_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in screener.get_exchange_time()
-                    ])
+                    for idx, gpu_timer_lines in enumerate(screener.get_gpu_timer_summary()):
+                        for line in gpu_timer_lines.splitlines():
+                            key, val = line.split(':')
+                            key = key.strip()
+                            val = float(val.replace('sec', '').strip())
+                            if key not in gpu_timer_summary[idx]:
+                                gpu_timer_summary[idx][key] = 0.0
+                            gpu_timer_summary[idx][key] += val
 
             else:
                 # pure DFT
@@ -1642,13 +1670,22 @@ class ScfDriver:
                                             self.rank, self.nodes)
                 fock_mat_local = fock_mat.to_numpy()
 
-                coulomb_timing += np.array([
-                    float(dt.split()[0]) for dt in screener.get_coulomb_time()
-                ])
+                for line in screener.get_timer_summary().splitlines():
+                    key, val = line.split(':')
+                    key = key.strip()
+                    val = float(val.replace('sec', '').strip())
+                    if key not in timer_summary:
+                        timer_summary[key] = 0.0
+                    timer_summary[key] += val
 
-                exchange_timing += np.array([
-                    float(dt.split()[0]) for dt in screener.get_exchange_time()
-                ])
+                for idx, gpu_timer_lines in enumerate(screener.get_gpu_timer_summary()):
+                    for line in gpu_timer_lines.splitlines():
+                        key, val = line.split(':')
+                        key = key.strip()
+                        val = float(val.replace('sec', '').strip())
+                        if key not in gpu_timer_summary[idx]:
+                            gpu_timer_summary[idx][key] = 0.0
+                        gpu_timer_summary[idx][key] += val
 
         else:
             # Hartree-Fock
@@ -1658,11 +1695,22 @@ class ScfDriver:
                                         self.rank, self.nodes)
             fock_mat_local = fock_mat.to_numpy()
 
-            coulomb_timing += np.array(
-                [float(dt.split()[0]) for dt in screener.get_coulomb_time()])
+            for line in screener.get_timer_summary().splitlines():
+                key, val = line.split(':')
+                key = key.strip()
+                val = float(val.replace('sec', '').strip())
+                if key not in timer_summary:
+                    timer_summary[key] = 0.0
+                timer_summary[key] += val
 
-            exchange_timing += np.array(
-                [float(dt.split()[0]) for dt in screener.get_exchange_time()])
+            for idx, gpu_timer_lines in enumerate(screener.get_gpu_timer_summary()):
+                for line in gpu_timer_lines.splitlines():
+                    key, val = line.split(':')
+                    key = key.strip()
+                    val = float(val.replace('sec', '').strip())
+                    if key not in gpu_timer_summary[idx]:
+                        gpu_timer_summary[idx][key] = 0.0
+                    gpu_timer_summary[idx][key] += val
 
         if self.rank == mpi_master():
             fock_mat = np.zeros(fock_mat_local.shape)
@@ -1677,18 +1725,36 @@ class ScfDriver:
         # TODO: add beta density
 
         if self.timing:
-            #all_eri_timing = self.comm.gather(coulomb_timing + exchange_timing)
+            all_timer_summary = self.comm.gather(timer_summary)
+            all_gpu_timer_summary = self.comm.gather(gpu_timer_summary)
 
             if self.rank == mpi_master():
-                #all_eri_timing = np.array(all_eri_timing).reshape(-1)
-                #max_eri_timing = np.max(all_eri_timing)
-                #if max_eri_timing > 0.0:
-                #    eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
-                #        all_eri_timing.size * max_eri_timing)
-                #else:
-                #    eri_load_imb = 0.0
+                fock_time_list = [s['Total timing'] for s in all_timer_summary]
+
+                fock_time_max = max(fock_time_list)
+                fock_time_ave = sum(fock_time_list) / len(fock_time_list)
+                fock_load_imb = 1.0 - fock_time_ave / fock_time_max
 
                 profiler.add_timing_info('FockERI', tm.time() - eri_t0)
+                profiler.add_timing_info('(loadimb)', fock_load_imb)
+
+                if self.timing_gpu:
+                    self.ostream.print_blank()
+
+                    for idx in range(len(all_timer_summary)):
+                        for key, val in all_timer_summary[idx].items():
+                            valstr = f'rank {idx:<5d} {key:<22s} : {val:.2f} sec'
+                            self.ostream.print_info('Timer : ' + valstr)
+                        self.ostream.print_blank()
+
+                    for idx in range(len(all_gpu_timer_summary)):
+                        for gpu_idx in range(len(all_gpu_timer_summary[idx])):
+                            for key, val in all_gpu_timer_summary[idx][gpu_idx].items():
+                                valstr = f'rank {idx:<5d} gpu {gpu_idx:<5d} {key:<22s} : {val:.2f} sec'
+                                self.ostream.print_info('GPU Timer : ' + valstr)
+                            self.ostream.print_blank()
+
+                    self.ostream.flush()
 
         vxc_t0 = tm.time()
 

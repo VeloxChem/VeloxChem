@@ -1014,6 +1014,7 @@ class LinearSolver:
                                                 self.prelink_thresh, local_screening,
                                                 self.rank, self.nodes)
 
+                    """
                     coulomb_timing += np.array([
                         float(dt.split()[0])
                         for dt in local_screening.get_coulomb_time()
@@ -1023,6 +1024,7 @@ class LinearSolver:
                         float(dt.split()[0])
                         for dt in local_screening.get_exchange_time()
                     ])
+                    """
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
@@ -1032,6 +1034,7 @@ class LinearSolver:
                                                       local_screening,
                                                       self.rank, self.nodes)
 
+                    """
                     coulomb_timing += np.array([
                         float(dt.split()[0])
                         for dt in local_screening.get_coulomb_time()
@@ -1041,6 +1044,7 @@ class LinearSolver:
                         float(dt.split()[0])
                         for dt in local_screening.get_exchange_time()
                     ])
+                    """
 
                 else:
                     # global hybrid
@@ -1050,6 +1054,7 @@ class LinearSolver:
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
                         local_screening, self.rank, self.nodes)
 
+                    """
                     coulomb_timing += np.array([
                         float(dt.split()[0])
                         for dt in local_screening.get_coulomb_time()
@@ -1059,6 +1064,7 @@ class LinearSolver:
                         float(dt.split()[0])
                         for dt in local_screening.get_exchange_time()
                     ])
+                    """
 
             else:
                 # pure DFT
@@ -1068,6 +1074,7 @@ class LinearSolver:
                                             self.prelink_thresh, local_screening,
                                             self.rank, self.nodes)
 
+                """
                 coulomb_timing += np.array([
                     float(dt.split()[0]) for dt in local_screening.get_coulomb_time()
                 ])
@@ -1076,6 +1083,7 @@ class LinearSolver:
                     float(dt.split()[0])
                     for dt in local_screening.get_exchange_time()
                 ])
+                """
 
         else:
             # Hartree-Fock
@@ -1084,11 +1092,13 @@ class LinearSolver:
                                         self.eri_thresh, self.prelink_thresh,
                                         local_screening, self.rank, self.nodes)
 
+            """
             coulomb_timing += np.array(
                 [float(dt.split()[0]) for dt in local_screening.get_coulomb_time()])
 
             exchange_timing += np.array(
                 [float(dt.split()[0]) for dt in local_screening.get_exchange_time()])
+            """
 
         #all_eri_timing = local_comm.allgather(coulomb_timing + exchange_timing)
         #all_eri_timing = np.array(all_eri_timing).reshape(-1)
