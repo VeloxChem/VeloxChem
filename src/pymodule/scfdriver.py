@@ -222,8 +222,8 @@ class ScfDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
-        # TODO: add timing_mpi
         self.timing_gpu = False
+        self.timing_mpi = False
 
         # verbosity of output (1-3)
         self.print_level = 2
@@ -256,6 +256,7 @@ class ScfDriver:
                 'write_h5': ('bool', 'write checkpoint and final h5'),
                 'timing': ('bool', 'print timing information'),
                 'timing_gpu': ('bool', 'print GPU timing information'),
+                'timing_mpi': ('bool', 'print MPI timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
@@ -709,7 +710,26 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, den_mat, profiler)
 
-        profiler.end(self.ostream, scf_flag=True)
+        if not self.timing_mpi:
+            profiler.print_timing(self.ostream, scf_flag=True, rank_name='master rank')
+        else:
+            # collect timing results from individual ranks
+            list_timing_dict = self.comm.gather(profiler.timing_dict)
+            if self.rank == mpi_master():
+                local_profiler = Profiler({
+                    'timing': True,
+                    'profiling': False,
+                    'memory_profiling': False,
+                    'memory_tracing': False,
+                })
+                for rank_idx in range(self.nodes):
+                    local_profiler.timing_dict = list_timing_dict[rank_idx]
+                    local_profiler.print_timing(
+                        self.ostream, scf_flag=True, rank_name=f'rank {rank_idx}')
+
+        profiler.print_profiling_summary(self.ostream)
+        profiler.print_memory_usage(self.ostream, scf_flag=True)
+        profiler.print_memory_tracing(self.ostream)
 
         if not self.is_converged:
             self.ostream.print_header(
