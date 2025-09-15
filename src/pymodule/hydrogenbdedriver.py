@@ -35,7 +35,7 @@ import time
 import numpy as np
 import sys
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master,hartree_in_kcalpermol, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .atomtypeidentifier import AtomTypeIdentifier
@@ -48,16 +48,57 @@ from .optimizationdriver import OptimizationDriver
 
 class HydrogenBdeDriver:
     """
-    This class implements bond dissociation energy (BDE) driver.
-    calculate the BDE of hydrogen/target atoms in a molecule.
-    target atoms should only have one connected atom in the molecule.
-    Use self.compute to calculate the BDE for each unique hydrogen atom
-    Use self.show to show the results in kJ/mol 
-    (default is to calculate hydrogens only for sp3 carbon atoms)
-    two sets of basis or exchange correlation functionals are needed 
-    for optimization and single point calculation separately
-    """
+    This class implements a driver for calculating bond dissociation energies (BDEs) of hydrogen or other target atoms in molecules.
 
+    Overview:
+    ---------
+    - Calculates the BDE for each unique hydrogen (or target) atom in a molecule.
+    - Target atoms must be singly connected (i.e., bonded to only one other atom).
+    - Use `self.compute()` to calculate BDEs for each unique hydrogen atom.
+    - Use `self.show()` to visualize the results in kJ/mol (default: only hydrogens bonded to sp3 carbons).
+    - Requires two sets of basis sets and exchange-correlation functionals: one for geometry optimization, one for single-point energy calculation.
+
+    Workflow:
+    ---------
+    1. Optimize the whole molecule geometry using `basis_set1` and `functional1`.
+    2. Perform a single-point energy calculation with `basis_set2` and `functional2`.
+    3. Analyze the molecule to:
+        a. Determine atom types, equivalent atom groups, and connectivity.
+        b. Filter unique hydrogen/target atoms based on equivalence and bonding.
+    4. For each unique hydrogen/target atom:
+        a. Remove it from the optimized molecule to generate the corresponding radical.
+        b. Optimize the radical geometry and perform a single-point energy calculation.
+    5. Compute the single-point energy of the isolated hydrogen/target atom.
+    6. Calculate the BDE:
+        BDE = (radical/leftover molecule energy) + (hydrogen/target atom energy) - (whole molecule energy)
+
+    Defaults:
+    ---------
+    - Hydrogen radical: doublet, neutral, bonded to sp3 carbon.
+    - Optimization: def2-svp/blyp/RI/grid_level2, SCF convergence 1e-3.
+    - Single-point: def2-tzvp/b3lyp, SCF convergence 1e-3.
+    - Level shifting of 0.5 applied to radical SCF drivers.
+    - If SCF for a radical does not converge, BDE is set to 0.0 and displayed as "fail".
+
+    Usage:
+    ------
+    - Use `_generate_radical_molecules()` to generate radical candidates from a molecule.
+    - Use `compute(molecules)` to calculate BDEs for a single molecule or a list of molecules.
+    - Use `show()` to visualize results.
+    - Input to `compute()` should be a `Molecule` object (or a list thereof) with correct charge and multiplicity set.
+    - Set the target atom type, multiplicity, and charge via:
+        `self.target_atom = "H"`
+        `self.target_atom_multiplicity = 2` #hydrogen radical
+        `self.target_atom_charge = 0` #neutral hydrogen radical
+    - Set radical/leftover molecule multiplicity and charge via:
+        `self.mol_rad_multiplicity = 2` #radical molecule when removing H radical
+        `self.mol_rad_charge = 0` #neutral radical molecule when removing H radical
+    - Mute SCF and optimization output by setting `self.mute_output = True`.
+    - Set energy units via `self.energy_unit = "kcal"`, `"kj"`, or `"au"`.
+    - Customize basis sets and functionals via:
+        `self.basis_sets = ["def2-svp", "def2-tzvp"]`
+        `self.xcfunctionals = ["blyp", "b3lyp"]`
+    """
     def __init__(self, comm=None, ostream=None):
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -114,6 +155,7 @@ class HydrogenBdeDriver:
         self.mol_rad_multiplicity = 2
         self.mol_rad_charge = 0
         self.show_mol = False
+        
         #attributes for atom analysis
         self.atom_idx = None
         self.labels = None
@@ -149,21 +191,31 @@ class HydrogenBdeDriver:
     def _check_proper_drv(self,whole_molecule):
         #reset scf drv for 'molecule', 'radical', 'target_atom' based on multiplicity
         #default hydrogen is doublet with ScfUnrestrictedDriver
-        if self.target_atom_multiplicity < 2:
+        if self.target_atom_multiplicity == 1: #singlet
             self.hydrogen_final_scf_drv = self._update_drv_input_attributes(self.hydrogen_final_scf_drv, ScfRestrictedDriver())
+        elif self.target_atom_multiplicity > 1: #multiplet
+            self.hydrogen_final_scf_drv = self._update_drv_input_attributes(self.hydrogen_final_scf_drv, ScfUnrestrictedDriver())
         
         #default radical is doublet with ScfUnrestrictedDriver
-        if self.mol_rad_multiplicity < 2:
+        if self.mol_rad_multiplicity == 1: #singlet
             self.radical_scf_drv = self._update_drv_input_attributes(self.radical_scf_drv, ScfRestrictedDriver())
             self.radical_final_scf_drv = self._update_drv_input_attributes(self.radical_final_scf_drv, ScfRestrictedDriver())
             self.radical_opt_drv = self._update_drv_input_attributes(self.radical_opt_drv, OptimizationDriver(self.radical_scf_drv))
+        elif self.mol_rad_multiplicity > 1: #multiplet
+            self.radical_scf_drv = self._update_drv_input_attributes(self.radical_scf_drv, ScfUnrestrictedDriver())
+            self.radical_final_scf_drv = self._update_drv_input_attributes(self.radical_final_scf_drv, ScfUnrestrictedDriver())
+            self.radical_opt_drv = self._update_drv_input_attributes(self.radical_opt_drv, OptimizationDriver(self.radical_scf_drv))
 
         #default molecule is closed shell
-        if whole_molecule.get_multiplicity() > 2:
+        if whole_molecule.get_multiplicity() > 1: #multiplet
             self.mol_scf_drv = self._update_drv_input_attributes(self.mol_scf_drv, ScfUnrestrictedDriver())
             self.mol_final_scf_drv = self._update_drv_input_attributes(self.mol_final_scf_drv, ScfUnrestrictedDriver())
             self.mol_opt_drv = self._update_drv_input_attributes(self.mol_opt_drv, OptimizationDriver(self.mol_scf_drv))
-
+        elif whole_molecule.get_multiplicity() == 1: #singlet
+            self.mol_scf_drv = self._update_drv_input_attributes(self.mol_scf_drv, ScfRestrictedDriver())
+            self.mol_final_scf_drv = self._update_drv_input_attributes(self.mol_final_scf_drv, ScfRestrictedDriver())
+            self.mol_opt_drv = self._update_drv_input_attributes(self.mol_opt_drv, OptimizationDriver(self.mol_scf_drv))
+    
     def _check_scf_mute(self):
         if self.mute_output:
             self.mol_scf_drv.ostream.mute()
@@ -193,36 +245,37 @@ class HydrogenBdeDriver:
         check if exchange-correlation functionals as list are set, suppose to be [functional1,functional2]
         if not, then check if the user set the only_hartree_fock flag or extract the scf_driver functionals
         """
-        #if no functionals then all HF
-        if len(self.xcfunctionals) == 0:
-            if self.only_hartree_fock:
-                #warning
-                self.ostream.print_info(
-                    "No functionals provided, using HF for all calculations")
-                self.ostream.flush()
-                return
-            else:
-                self.ostream.print_warning(
-                    "No functionals provided, checking scf drv functionals")
-                self.ostream.flush()
-                if self.mol_scf_drv.xcfun is not None:
-                    self.xcfunctionals.append(self.mol_scf_drv.xcfun)
-                    if self.mol_final_scf_drv.xcfun is not None:
-                        self.xcfunctionals.append(self.mol_final_scf_drv.xcfun)
-                    else:
-                        self.xcfunctionals.append(self.mol_scf_drv.xcfun)
-                elif self.radical_scf_drv.xcfun is not None:
-                    self.xcfunctionals.append(self.radical_scf_drv.xcfun)
-                    if self.radical_final_scf_drv.xcfun is not None:
-                        self.xcfunctionals.append(
-                            self.radical_final_scf_drv.xcfun)
-                    else:
-                        self.xcfunctionals.append(self.radical_scf_drv.xcfun)
+        #if only hartree fock, then set functionals to None
+        if self.only_hartree_fock:
+            self.xcfunctionals = [] #reset xcfunctionals to an empty list
+            self.ostream.print_info(
+                "Using HF for all calculations")
+            self.ostream.flush()
+            return
+
+        #if not setting HF only, then check if functionals are provided in the scf drivers
+        if len(self.xcfunctionals) == 0 and not self.only_hartree_fock:
+            self.ostream.print_warning(
+                "No functionals provided, checking scf drv functionals")
+            self.ostream.flush()
+            if self.mol_scf_drv.xcfun is not None:
+                self.xcfunctionals.append(self.mol_scf_drv.xcfun)
+                if self.mol_final_scf_drv.xcfun is not None:
+                    self.xcfunctionals.append(self.mol_final_scf_drv.xcfun)
                 else:
-                    assert_msg_critical(
-                        "No exchange-correlation functionals provided and no functional found in scf drivers, "
-                        "please provide functionals or set only_hartree_fock=True"
-                    )
+                    self.xcfunctionals.append(self.mol_scf_drv.xcfun)
+            elif self.radical_scf_drv.xcfun is not None:
+                self.xcfunctionals.append(self.radical_scf_drv.xcfun)
+                if self.radical_final_scf_drv.xcfun is not None:
+                    self.xcfunctionals.append(
+                        self.radical_final_scf_drv.xcfun)
+                else:
+                    self.xcfunctionals.append(self.radical_scf_drv.xcfun)
+            else:
+                assert_msg_critical(
+                    "No exchange-correlation functionals provided and no functional found in scf drivers, "
+                    "please provide functionals or set only_hartree_fock=True"
+                )
         elif len(self.xcfunctionals) == 1:
             self.xcfunctionals.append(self.xcfunctionals[0])
 
@@ -429,8 +482,8 @@ class HydrogenBdeDriver:
         :return: tuple. The updated hydrogen_atoms_dict, a list of tuple, 
         like [(bond dissociation energy, coordinates),(bond dissociation energy, coordinates)].
         """
-        au2kcal = 627.509
-        au2kj = 2625.5
+        au2kcal = hartree_in_kcalpermol()
+        au2kj = hartree_in_kjpermol()
         hydrogen_bdes_kj_coords = []
         unique_hydrogen_bdes_kj_coords = []
         for i in range(len(unique_hydrogen_keys)):
