@@ -201,7 +201,7 @@ from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
 from .smddriver import SmdDriver
-from .hydrogenbdedriver import HydrogenBdeDriver
+from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 

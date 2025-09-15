@@ -46,7 +46,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
 
 
-class HydrogenBdeDriver:
+class AtomBdeDriver:
     """
     This class implements a driver for calculating bond dissociation energies (BDEs) of hydrogen or other target atoms in molecules.
 
@@ -74,7 +74,7 @@ class HydrogenBdeDriver:
 
     Defaults:
     ---------
-    - Hydrogen radical: doublet, neutral, bonded to sp3 carbon.
+    - Atom(default hydrogen) radical: doublet, neutral, bonded to sp3 carbon.
     - Optimization: def2-svp/blyp/RI/grid_level2, SCF convergence 1e-3.
     - Single-point: def2-tzvp/b3lyp, SCF convergence 1e-3.
     - Level shifting of 0.5 applied to radical SCF drivers.
@@ -94,7 +94,7 @@ class HydrogenBdeDriver:
         `self.mol_rad_multiplicity = 2` #radical molecule when removing H radical
         `self.mol_rad_charge = 0` #neutral radical molecule when removing H radical
     - Mute SCF and optimization output by setting `self.mute_output = True`.
-    - Set energy units via `self.energy_unit = "kcal"`, `"kj"`, or `"au"`.
+    - Set energy units via `self.energy_unit = "kcal"`, `"kJ"`, or `"hartree"` or  `"au"`.
     - Customize basis sets and functionals via:
         `self.basis_sets = ["def2-svp", "def2-tzvp"]`
         `self.xcfunctionals = ["blyp", "b3lyp"]`
@@ -144,9 +144,9 @@ class HydrogenBdeDriver:
         self.radical_opt_drv.conv_gmax = 8e-03
         self.radical_final_scf_drv = ScfUnrestrictedDriver()
         self.radical_final_scf_drv.conv_thresh = 1e-3
-        #hydrogen radical scf driver
-        self.hydrogen_final_scf_drv = ScfUnrestrictedDriver()
-        self.hydrogen_final_scf_drv.conv_thresh = 1e-3
+        #Target atom radical scf driver
+        self.target_atom_final_scf_drv = ScfUnrestrictedDriver()
+        self.target_atom_final_scf_drv.conv_thresh = 1e-3
         #analyze all atoms in the molecule, setting for _atom_analyzer
         self.analyze_allatoms = False
         self.target_atom = "H"
@@ -164,11 +164,11 @@ class HydrogenBdeDriver:
         self.atom_info_dict = {}
         self.target_atom_info_dict = {}
         self.use_equiv = True
-        self.only_sp3_carbon_hydrogen = True
+        self.only_sp3_carbon_connections = True
         self.only_hartree_fock = False
         self.mute_output = False
-        self.energy_unit = "kj"  #kcal, kj, au
-    
+        self.energy_unit = "kJ"  #kcal, kJ, hartree
+
     def _update_drv_input_attributes(self, old_drv, new_drv):
         #if attribute is in input keywords, then update it but skip _scf_type of old_drv
         update_keywords = []
@@ -190,12 +190,12 @@ class HydrogenBdeDriver:
 
     def _check_proper_drv(self,whole_molecule):
         #reset scf drv for 'molecule', 'radical', 'target_atom' based on multiplicity
-        #default hydrogen is doublet with ScfUnrestrictedDriver
+        #default target atom (hydrogen) is doublet with ScfUnrestrictedDriver
         if self.target_atom_multiplicity == 1: #singlet
-            self.hydrogen_final_scf_drv = self._update_drv_input_attributes(self.hydrogen_final_scf_drv, ScfRestrictedDriver())
+            self.target_atom_final_scf_drv = self._update_drv_input_attributes(self.target_atom_final_scf_drv, ScfRestrictedDriver())
         elif self.target_atom_multiplicity > 1: #multiplet
-            self.hydrogen_final_scf_drv = self._update_drv_input_attributes(self.hydrogen_final_scf_drv, ScfUnrestrictedDriver())
-        
+            self.target_atom_final_scf_drv = self._update_drv_input_attributes(self.target_atom_final_scf_drv, ScfUnrestrictedDriver())
+
         #default radical is doublet with ScfUnrestrictedDriver
         if self.mol_rad_multiplicity == 1: #singlet
             self.radical_scf_drv = self._update_drv_input_attributes(self.radical_scf_drv, ScfRestrictedDriver())
@@ -222,7 +222,7 @@ class HydrogenBdeDriver:
             self.mol_final_scf_drv.ostream.mute()
             self.radical_scf_drv.ostream.mute()
             self.radical_final_scf_drv.ostream.mute()
-            self.hydrogen_final_scf_drv.ostream.mute()
+            self.target_atom_final_scf_drv.ostream.mute()
             self.mol_opt_drv.ostream.mute()
             self.radical_opt_drv.ostream.mute()
     
@@ -288,7 +288,7 @@ class HydrogenBdeDriver:
         self.mol_final_scf_drv.xcfun = self.xcfunctionals[1]
         self.radical_scf_drv.xcfun = self.xcfunctionals[0]
         self.radical_final_scf_drv.xcfun = self.xcfunctionals[1]
-        self.hydrogen_final_scf_drv.xcfun = self.xcfunctionals[1]
+        self.target_atom_final_scf_drv.xcfun = self.xcfunctionals[1]
 
     def _get_equiv(self, mol):
         """
@@ -425,13 +425,13 @@ class HydrogenBdeDriver:
             return h_connected_atom_info
 
     def _fetch_unique_H(self,
-                        hydrogen_atoms_dict,
+                        target_atoms_dict,
                         use_equiv=False,
-                        only_sp3_carbon_hydrogen=False):
+                        only_sp3_carbon_connections=False):
         """
-        this function is used as filter for unique hydrogen atoms or only hydrogen connected to sp3 carbon
+        this function is used as filter for unique (hydrogen) atoms or only hydrogen connected to sp3 carbon
 
-        :param hydrogen_atoms_dict: The dictionary containing hydrogen atom information.
+        :param target_atoms_dict: The dictionary containing target atom information.
         :param use_equiv: Whether to use equivalent hydrogen atoms.
         :param only_sp3_carbon_hydrogen: Whether to only include hydrogen connected to sp3 carbon.
 
@@ -439,106 +439,106 @@ class HydrogenBdeDriver:
 
         """
         if not use_equiv:
-            for key in hydrogen_atoms_dict.keys():
-                hydrogen_atoms_dict[key]["equiv_group"] = []
+            for key in target_atoms_dict.keys():
+                target_atoms_dict[key]["equiv_group"] = []
 
-        hydrogen_record = []
-        unique_hydrogen_keys = []
-        for key in hydrogen_atoms_dict.keys():
+        target_atoms_record = []
+        unique_target_atom_keys = []
+        for key in target_atoms_dict.keys():
             if key.split("_")[0] == self.target_atom and int(
-                    key.split("_")[1]) not in hydrogen_record:
-                hydrogen_record.extend(hydrogen_atoms_dict[key]["equiv_group"])
-                unique_hydrogen_keys.append(key)
-        unique_hydrogen_indices = [
-            int(x.split("_")[1]) for x in unique_hydrogen_keys
+                    key.split("_")[1]) not in target_atoms_record:
+                target_atoms_record.extend(target_atoms_dict[key]["equiv_group"])
+                unique_target_atom_keys.append(key)
+        unique_target_atom_indices = [
+            int(x.split("_")[1]) for x in unique_target_atom_keys
         ]
-        if not only_sp3_carbon_hydrogen:
-            return unique_hydrogen_keys, unique_hydrogen_indices
+        if not only_sp3_carbon_connections:
+            return unique_target_atom_keys, unique_target_atom_indices
         else:
-            sp3_carbon_unique_hydrogen_indices = []
-            sp3_carbon_unique_hydrogen_keys = []
-            for key in unique_hydrogen_keys:
-                if hydrogen_atoms_dict[key]["H_connected_atom"] != "":
-                    connected_atom = hydrogen_atoms_dict[key][
+            sp3_carbon_unique_target_atoms_indices = []
+            sp3_carbon_unique_target_atoms_keys = []
+            for key in unique_target_atom_keys:
+                if target_atoms_dict[key]["H_connected_atom"] != "":
+                    connected_atom = target_atoms_dict[key][
                         "H_connected_atom"].split("_")[0]
-                    connected_atom_type = hydrogen_atoms_dict[key][
+                    connected_atom_type = target_atoms_dict[key][
                         "H_connected_atom"].split("_")[2]
                     if connected_atom == "C" and connected_atom_type == "c3":
-                        sp3_carbon_unique_hydrogen_indices.append(
+                        sp3_carbon_unique_target_atoms_indices.append(
                             int(key.split("_")[1]))
-                        sp3_carbon_unique_hydrogen_keys.append(key)
-            return sp3_carbon_unique_hydrogen_keys, sp3_carbon_unique_hydrogen_indices
+                        sp3_carbon_unique_target_atoms_keys.append(key)
+            return sp3_carbon_unique_target_atoms_keys, sp3_carbon_unique_target_atoms_indices
 
-    def _update_equiv_hydrogen_dissociation_energy(
-            self, unique_hydrogen_dissociation_energies, unique_hydrogen_keys,
-            hydrogen_atoms_dict):
+    def _update_equiv_target_atoms_dissociation_energy(
+            self, unique_target_atoms_dissociation_energies, unique_target_atoms_keys,
+            target_atoms_dict):
         """
-        this function is used to add the dissociation energy of equivalent hydrogen atoms in the hydrogen_atoms_dict
+        this function is used to add the dissociation energy of equivalent target atoms in the target_atoms_dict
 
-        :param unique_hydrogen_dissociation_energies: The bond dissociation energies of the unique hydrogen atoms.
-        :param unique_hydrogen_keys: The keys of the unique hydrogen atoms.
-        :param hydrogen_atoms_dict: The dictionary containing hydrogen atom information.
+        :param unique_target_atoms_dissociation_energies: The bond dissociation energies of the unique target atoms.
+        :param unique_target_atoms_keys: The keys of the unique target atoms.
+        :param target_atoms_dict: The dictionary containing target atom information.
 
-        :return: tuple. The updated hydrogen_atoms_dict, a list of tuple, 
+        :return: tuple. The updated target_atoms_dict, a list of tuple, 
         like [(bond dissociation energy, coordinates),(bond dissociation energy, coordinates)].
         """
-        au2kcal = hartree_in_kcalpermol()
-        au2kj = hartree_in_kjpermol()
-        hydrogen_bdes_kj_coords = []
-        unique_hydrogen_bdes_kj_coords = []
-        for i in range(len(unique_hydrogen_keys)):
-            key = unique_hydrogen_keys[i]
-            energy_au = unique_hydrogen_dissociation_energies[i]
-            if self.energy_unit == "kj":
-                unique_hydrogen_bdes_kj_coords.append(
-                    (energy_au * au2kj, hydrogen_atoms_dict[key]["coord"]))
-            elif self.energy_unit == "kcal":
-                unique_hydrogen_bdes_kj_coords.append(
-                    (energy_au * au2kcal, hydrogen_atoms_dict[key]["coord"]))
-            elif self.energy_unit == "au":
-                unique_hydrogen_bdes_kj_coords.append(
-                    (energy_au, hydrogen_atoms_dict[key]["coord"]))
-            equiv_group = hydrogen_atoms_dict[key]["equiv_group"]
+        hartree2kcal = hartree_in_kcalpermol()
+        hartree2kj = hartree_in_kjpermol()
+        target_atoms_bdes_kj_coords = []
+        unique_target_atoms_bdes_kj_coords = []
+        for i in range(len(unique_target_atoms_keys)):
+            key = unique_target_atoms_keys[i]
+            energy_hartree = unique_target_atoms_dissociation_energies[i]
+            if "kj" in self.energy_unit.lower():
+                unique_target_atoms_bdes_kj_coords.append(
+                    (energy_hartree * hartree2kj, target_atoms_dict[key]["coord"]))
+            elif "kcal" in self.energy_unit.lower():
+                unique_target_atoms_bdes_kj_coords.append(
+                    (energy_hartree * hartree2kcal, target_atoms_dict[key]["coord"]))
+            elif ("hartree" in self.energy_unit.lower() or "au" in self.energy_unit.lower()):
+                unique_target_atoms_bdes_kj_coords.append(
+                    (energy_hartree, target_atoms_dict[key]["coord"]))
+            equiv_group = target_atoms_dict[key]["equiv_group"]
             for j in equiv_group:
-                hydrogen_atoms_dict[
-                    str(self.target_atom)+"_" + str(j)]["dissociation_energy_au"] = energy_au
-                hydrogen_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kcal"] = (
-                    energy_au * au2kcal)
-                hydrogen_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kj"] = (
-                    energy_au * au2kj)
-                hydrogen_bdes_kj_coords.append(
-                    (energy_au * au2kj,
-                     hydrogen_atoms_dict[str(self.target_atom)+"_" + str(j)]["coord"]))
-        return (hydrogen_atoms_dict, hydrogen_bdes_kj_coords,
-                unique_hydrogen_bdes_kj_coords)
+                target_atoms_dict[
+                    str(self.target_atom)+"_" + str(j)]["dissociation_energy_hartree"] = energy_hartree
+                target_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kcal"] = (
+                    energy_hartree * hartree2kcal)
+                target_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kj"] = (
+                    energy_hartree * hartree2kj)
+                target_atoms_bdes_kj_coords.append(
+                    (energy_hartree * hartree2kj,
+                     target_atoms_dict[str(self.target_atom)+"_" + str(j)]["coord"]))
+        return (target_atoms_dict, target_atoms_bdes_kj_coords,
+                unique_target_atoms_bdes_kj_coords)
 
-    def _print_hydrogen_bond_dissociation_energy(self,
-                                                 hydrogen_atoms_dict,
+    def _print_target_atoms_bond_dissociation_energy(self,
+                                                 target_atoms_dict,
                                                  unit="kcal"):
         """
-        this function is used to print the bond dissociation energy of hydrogen atoms, with targeting energy units
+        this function is used to print the bond dissociation energy of target atoms, with targeting energy units
         """
         self.ostream.print_info("-" * 50)
         self.ostream.print_info(f"bond dissociation energy of {self.target_atom} atoms:")
         self.ostream.flush()
-        for key in hydrogen_atoms_dict.keys():
-            if "dissociation_energy_au" in hydrogen_atoms_dict[key].keys():
-                #skip the SCF not converged ones, whose dissociation_energy_au is set to 0.0
-                if hydrogen_atoms_dict[key]["dissociation_energy_au"] - 0.0 < 1.0e-6: 
+        for key in target_atoms_dict.keys():
+            if "dissociation_energy_hartree" in target_atoms_dict[key].keys():
+                #skip the SCF not converged ones, whose dissociation_energy_hartree is set to 0.0
+                if target_atoms_dict[key]["dissociation_energy_hartree"] - 0.0 < 1.0e-6:
                     continue
-                if unit == "kcal":
+                if "kcal" in unit.lower():
                     self.ostream.print_info(
-                        f"{key} {round(hydrogen_atoms_dict[key]['dissociation_energy_kcal'], 1)} kcal/mol"
+                        f"{key} {round(target_atoms_dict[key]['dissociation_energy_kcal'], 1)} kcal/mol"
                     )
                     self.ostream.flush()
-                elif unit == "kj":
+                elif "kj" in unit.lower():
                     self.ostream.print_info(
-                        f"{key} {round(hydrogen_atoms_dict[key]['dissociation_energy_kj'], 1)} kj/mol"
+                        f"{key} {round(target_atoms_dict[key]['dissociation_energy_kj'], 1)} kJ/mol"
                     )
                     self.ostream.flush()
-                elif unit == "au":
+                elif ("hartree" in unit.lower() or "au" in unit.lower()):
                     self.ostream.print_info(
-                        f"{key} {hydrogen_atoms_dict[key]['dissociation_energy_au']} au"
+                        f"{key} {target_atoms_dict[key]['dissociation_energy_hartree']} hartree"
                     )
                     self.ostream.flush()
 
@@ -553,7 +553,7 @@ class HydrogenBdeDriver:
 
         """
         self.ostream.print_info(
-            "Optimizing geometry of the molecule before removing hydrogens")
+            "Optimizing geometry of the molecule before removing target atoms...")
         self.ostream.flush()
         basis_set1 = MolecularBasis.read(molecule, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(molecule, self.basis_sets[1])
@@ -578,24 +578,24 @@ class HydrogenBdeDriver:
                 "the result is not reliable, please modify the settings if needed"
             )
 
-    def _compute_hydrogen_radical_scf_energy(self):
+    def _compute_target_atoms_radical_scf_energy(self):
         """
-        this function is used to compute the hydrogen radical SCF energy
+        this function is used to compute the target atoms radical SCF energy
         open shell with ScfUnrestrictedDriver
         """
 
-        hydrogen = Molecule.read_str(f"{self.target_atom} 0.0 0.0 0.0")
-        hydrogen.set_multiplicity(self.target_atom_multiplicity)
-        hydrogen.set_charge(self.target_atom_charge)
-        basis_set2 = MolecularBasis.read(hydrogen, self.basis_sets[1])
-        scf_resultsH = self.hydrogen_final_scf_drv.compute(hydrogen, basis_set2)
-        if not self.hydrogen_final_scf_drv.is_converged:
+        target_atom = Molecule.read_str(f"{self.target_atom} 0.0 0.0 0.0")
+        target_atom.set_multiplicity(self.target_atom_multiplicity)
+        target_atom.set_charge(self.target_atom_charge)
+        basis_set2 = MolecularBasis.read(target_atom, self.basis_sets[1])
+        scf_resultsH = self.target_atom_final_scf_drv.compute(target_atom, basis_set2)
+        if not self.target_atom_final_scf_drv.is_converged:
             self.ostream.print_warning(
                 f"SCF of final single point calculation did not converge for {self.target_atom} radical or ion, "
                 f"the result is not reliable, please modify the settings if needed"
             )
             self.ostream.flush()
-        self.hydrogen_single_point_scf_energy = self.hydrogen_final_scf_drv.get_scf_energy()
+        self.target_atom_single_point_scf_energy = self.target_atom_final_scf_drv.get_scf_energy()
 
     def _remove_atom_by_idx(self, mol, atom_indices_to_remove, carbon_indices):
         """
@@ -686,7 +686,7 @@ class HydrogenBdeDriver:
         radical_single_point_scf_energy = self.radical_final_scf_drv.get_scf_energy()
         step_end = time.time()
         self.ostream.print_info(
-            f"SCF energy for radical molecule {run_idx+1} is {radical_single_point_scf_energy} au"
+            f"SCF energy for radical molecule {run_idx+1} is {radical_single_point_scf_energy} hartree"
         )
         self.ostream.print_info(
             f"time cost : {round(step_end - step_start, 2)} seconds"
@@ -716,7 +716,7 @@ class HydrogenBdeDriver:
         :param one_indexed:
             The flag for using one-based indexing. Supposed to be True.
         :param bdes_coords:
-            The list of tuples of (bde, coordinates) of hydrogen atoms.
+            The list of tuples of (bde, coordinates) of target atoms.
         """
 
         try:
@@ -749,7 +749,7 @@ class HydrogenBdeDriver:
                             'backgroundColor': 0xffffff,
                             'backgroundOpacity': 0.0,
                         })
-            #add bde based on coords and unique_bde_au
+            #add bde based on coords and unique_bde_hartree
             for i in range(len(bdes_coords)):
                 #bde coords is a list of tuple [(bde, (x, y, z)),(bde, (x, y, z))]
                 #default in kJ/mol but changed by self.energy_unit
@@ -791,25 +791,25 @@ class HydrogenBdeDriver:
         self._check_scf_mute()
         self._check_functionals()
         self._check_radical_level_shifting()
-        hydrogen_atoms_dict = self._atoms_analyzer(whole_molecule)
-        unique_hydrogen_keys, unique_hydrogen_indices = self._fetch_unique_H(
-            hydrogen_atoms_dict,
+        target_atoms_dict = self._atoms_analyzer(whole_molecule)
+        unique_target_atoms_keys, unique_target_atoms_indices = self._fetch_unique_H(
+            target_atoms_dict,
             use_equiv=self.use_equiv,
-            only_sp3_carbon_hydrogen=self.only_sp3_carbon_hydrogen)
-        #self.ostream.print_info(f'unique_hydrogen_indices {unique_hydrogen_indices}')
+            only_sp3_carbon_connections=self.only_sp3_carbon_connections)
+        #self.ostream.print_info(f'unique_target_atoms_indices {unique_target_atoms_indices}')
         carbon_indices = []
-        # Generate radical molecules by removing hydrogen atoms
-        # check connectivity matrix to find the connected carbon index for each hydrogen
+        # Generate radical molecules by removing target atoms
+        # check connectivity matrix to find the connected carbon index for each target atom
         # if connected to more than one atom, then throw error
         conn_mat = whole_molecule.get_connectivity_matrix()
-        for x in unique_hydrogen_indices:
+        for x in unique_target_atoms_indices:
             assert list(conn_mat[x]).count(1) == 1
             carbon_indices.append(list(conn_mat[x]).index(1))
         #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
 
         opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule)
         radical_molecules, radical_carbon_indices = self._remove_atom_by_idx(
-            opt_whole_molecule, unique_hydrogen_indices, carbon_indices)
+            opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
         guess_msg = []
         for i in range(len(radical_molecules)):
             guess = f"guess_unpaired_electrons = {radical_carbon_indices[i]+1}(1.0)"
@@ -825,28 +825,28 @@ class HydrogenBdeDriver:
         self._check_functionals()
         self._check_radical_level_shifting()
 
-        hydrogen_atoms_dict = self._atoms_analyzer(whole_molecule)
-        unique_hydrogen_keys, unique_hydrogen_indices = self._fetch_unique_H(
-            hydrogen_atoms_dict,
+        target_atoms_dict = self._atoms_analyzer(whole_molecule)
+        unique_target_atoms_keys, unique_target_atoms_indices = self._fetch_unique_H(
+            target_atoms_dict,
             use_equiv=self.use_equiv,
-            only_sp3_carbon_hydrogen=self.only_sp3_carbon_hydrogen)
+            only_sp3_carbon_connections=self.only_sp3_carbon_connections)
 
-        #self.ostream.print_info(f'unique_hydrogen_indices {unique_hydrogen_indices}')
+        #self.ostream.print_info(f'unique_target_atoms_indices {unique_target_atoms_indices}')
         carbon_indices = []
         conn_mat = whole_molecule.get_connectivity_matrix()
-        for x in unique_hydrogen_indices:
+        for x in unique_target_atoms_indices:
             assert list(conn_mat[x]).count(1) == 1
             carbon_indices.append(list(conn_mat[x]).index(1))
         #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
 
         opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule)
-        self._compute_hydrogen_radical_scf_energy()
+        self._compute_target_atoms_radical_scf_energy()
         self.opt_whole_molecule = opt_whole_molecule
         molecules_rads, radical_carbon_indices = self._remove_atom_by_idx(
-            opt_whole_molecule, unique_hydrogen_indices, carbon_indices)
+            opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
 
         #calculate BDEs for each radical molecule
-        unique_BDEs_au = []
+        unique_BDEs_hartree = []
         count = 1
         for run_idx, (mol_rad, radical_carbon_idx) in enumerate(
                 zip(molecules_rads, radical_carbon_indices)):
@@ -858,28 +858,28 @@ class HydrogenBdeDriver:
             mol_rad_scf_energy = self._compute_mol_rad_scf_energy(
                 mol_rad, radical_carbon_idx, run_idx)
             if mol_rad_scf_energy is None:
-                bde_au = 0.0
+                bde_hartree = 0.0
                 self.ostream.print_warning(
                     f"SCF did not converge for radical molecule {count}, setting BDE to 0.0, please modify the settings if needed"
                 )
                 self.ostream.flush()
             else:
-                bde_au = mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.hydrogen_single_point_scf_energy
-            unique_BDEs_au.append(bde_au)
+                bde_hartree = mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.target_atom_single_point_scf_energy
+            unique_BDEs_hartree.append(bde_hartree)
             count += 1
-        self.unique_BDEs_au = unique_BDEs_au
-        self.unique_hydrogen_keys = unique_hydrogen_keys
-        # loop the unique_hydrogen_indices to remove the H atoms from the molecule and
+        self.unique_BDEs_hartree = unique_BDEs_hartree
+        self.unique_target_atoms_keys = unique_target_atoms_keys
+        # loop the unique_target_atoms_indices to remove the H atoms from the molecule and
         # calculate the dissociation energy but save the energy for all equivalent H atoms
         # print the dissociation energy for each H atom
-        self.hydrogen_atoms_dict, self.bdes_coords, self.unique_hydrogen_bdes_coords = self._update_equiv_hydrogen_dissociation_energy(
-            unique_BDEs_au, unique_hydrogen_keys, hydrogen_atoms_dict)
-        self._print_hydrogen_bond_dissociation_energy(self.hydrogen_atoms_dict,
+        self.target_atoms_dict, self.bdes_coords, self.unique_target_atoms_bdes_coords = self._update_equiv_target_atoms_dissociation_energy(
+            unique_BDEs_hartree, unique_target_atoms_keys, target_atoms_dict)
+        self._print_target_atoms_bond_dissociation_energy(self.target_atoms_dict,
                                                       unit=self.energy_unit)
 
     def compute(self, mol_list: list):
         """
-        for computing hydrogen bond dissociation energies (BDEs) for a list of molecules.
+        for computing bond dissociation energies (BDEs) for a list of molecules.
         can accept one molecule object as well.
         will save self.mols_bdes_list
         """
@@ -888,13 +888,13 @@ class HydrogenBdeDriver:
             mol_list = [mol_list]
         for mol in mol_list:
             self._compute_single_molecule(mol)
-            #use a dictionary to store all bde and hydrogen atom information
+            #use a dictionary to store all bde and target atom information
             mol_bde_dict = {
-                'hydrogen_atoms_dict': self.hydrogen_atoms_dict,
+                'target_atoms_dict': self.target_atoms_dict,
                 'bdes_coords': self.bdes_coords,
-                'unique_hydrogen_keys': self.unique_hydrogen_keys,
-                'unique_BDEs_au': self.unique_BDEs_au,
-                'unique_hydrogen_bdes_coords': self.unique_hydrogen_bdes_coords,
+                'unique_target_atoms_keys': self.unique_target_atoms_keys,
+                'unique_BDEs_hartree': self.unique_BDEs_hartree,
+                'unique_target_atoms_bdes_coords': self.unique_target_atoms_bdes_coords,
                 'opt_whole_molecule': self.opt_whole_molecule,
             }
             self.mols_bdes_list.append(mol_bde_dict)
@@ -904,16 +904,16 @@ class HydrogenBdeDriver:
              atom_labels=False,
              width=400,
              height=300,
-             unique_hydrogen=True):
+             unique_target_atoms=True):
         """
-        this function is to visualize the hydrogen bond dissociation energies (BDEs) on the hydrogen atoms in the molecule.
+        this function is to visualize the bond dissociation energies (BDEs) on the target atoms in the molecule.
         allow atom indices and labels to be shown.
         """
         for item in self.mols_bdes_list:
             mol = item['opt_whole_molecule']
 
-            if unique_hydrogen:
-                bdes_coords = item['unique_hydrogen_bdes_coords']
+            if unique_target_atoms:
+                bdes_coords = item['unique_target_atoms_bdes_coords']
             else:
                 bdes_coords = item['bdes_coords']
 
