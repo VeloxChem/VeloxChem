@@ -3726,6 +3726,7 @@ integrateVxcGradientForLDA(const CMolecule&        molecule,
 
     gpuSafe(gpuFree(d_gto_info));
     gpuSafe(gpuFree(d_ao_inds));
+    gpuSafe(gpuFree(d_ao_to_atom_ids));
 
     gpuSafe(gpuFree(d_mol_grad));
 
@@ -4245,6 +4246,8 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     gpuSafe(gpuFree(d_ao_inds));
     gpuSafe(gpuFree(d_ao_to_atom_ids));
 
+    gpuSafe(gpuFree(d_mol_grad));
+
     gpuSafe(gpuFree(d_gto_values));
     gpuSafe(gpuFree(d_gto_values_x));
     gpuSafe(gpuFree(d_gto_values_y));
@@ -4256,6 +4259,22 @@ integrateVxcGradientForGGA(const CMolecule&        molecule,
     gpuSafe(gpuFree(d_gto_values_yy));
     gpuSafe(gpuFree(d_gto_values_yz));
     gpuSafe(gpuFree(d_gto_values_zz));
+
+    gpuSafe(gpuFree(d_dengrad_x));
+    gpuSafe(gpuFree(d_dengrad_y));
+    gpuSafe(gpuFree(d_dengrad_z));
+
+    gpuSafe(gpuFree(d_dengrad_xx));
+    gpuSafe(gpuFree(d_dengrad_xy));
+    gpuSafe(gpuFree(d_dengrad_xz));
+
+    gpuSafe(gpuFree(d_dengrad_yx));
+    gpuSafe(gpuFree(d_dengrad_yy));
+    gpuSafe(gpuFree(d_dengrad_yz));
+
+    gpuSafe(gpuFree(d_dengrad_zx));
+    gpuSafe(gpuFree(d_dengrad_zy));
+    gpuSafe(gpuFree(d_dengrad_zz));
 
     gpuSafe(gpuFree(d_mat_F));
     gpuSafe(gpuFree(d_mat_F_x));
