@@ -92,10 +92,45 @@ target_sources(vlxobjs
     ElectronRepulsionGeom2000ContrRecDPXX.cpp
     ElectronRepulsionGeom2000ContrRecDSXX.cpp
     ElectronRepulsionGeom2000ContrRecPDXX.cpp
-    ElectronRepulsionGeom2000ContrRecPFXX.cpp
     ElectronRepulsionGeom2000ContrRecPPXX.cpp
     ElectronRepulsionGeom2000ContrRecPSXX.cpp
     ElectronRepulsionGeom2000ContrRecSXXX.cpp
+    ElectronRepulsionGeom2000ContrRecDFXX.cpp
+    ElectronRepulsionGeom2000ContrRecFDXX.cpp
+    ElectronRepulsionGeom2000ContrRecFFXX.cpp
+    ElectronRepulsionGeom2000ContrRecFPXX.cpp
+    ElectronRepulsionGeom2000ContrRecFSXX.cpp
+    ElectronRepulsionGeom2000ContrRecPFXX.cpp
+    ElectronRepulsionGeom2000ContrRecDGXX.cpp
+    ElectronRepulsionGeom2000ContrRecFGXX.cpp
+    ElectronRepulsionGeom2000ContrRecGDXX.cpp
+    ElectronRepulsionGeom2000ContrRecGFXX.cpp
+    ElectronRepulsionGeom2000ContrRecGGXX.cpp
+    ElectronRepulsionGeom2000ContrRecGPXX.cpp
+    ElectronRepulsionGeom2000ContrRecGSXX.cpp
+    ElectronRepulsionGeom2000ContrRecPGXX.cpp
+    ElectronRepulsionGeom2000ContrRecDHXX.cpp
+    ElectronRepulsionGeom2000ContrRecFHXX.cpp
+    ElectronRepulsionGeom2000ContrRecGHXX.cpp
+    ElectronRepulsionGeom2000ContrRecHDXX.cpp
+    ElectronRepulsionGeom2000ContrRecHFXX.cpp
+    ElectronRepulsionGeom2000ContrRecHGXX.cpp
+    ElectronRepulsionGeom2000ContrRecHHXX.cpp
+    ElectronRepulsionGeom2000ContrRecHPXX.cpp
+    ElectronRepulsionGeom2000ContrRecHSXX.cpp
+    ElectronRepulsionGeom2000ContrRecPHXX.cpp
+    ElectronRepulsionGeom2000ContrRecDIXX.cpp
+    ElectronRepulsionGeom2000ContrRecFIXX.cpp
+    ElectronRepulsionGeom2000ContrRecGIXX.cpp
+    ElectronRepulsionGeom2000ContrRecHIXX.cpp
+    ElectronRepulsionGeom2000ContrRecIDXX.cpp
+    ElectronRepulsionGeom2000ContrRecIFXX.cpp
+    ElectronRepulsionGeom2000ContrRecIGXX.cpp
+    ElectronRepulsionGeom2000ContrRecIHXX.cpp
+    ElectronRepulsionGeom2000ContrRecIIXX.cpp
+    ElectronRepulsionGeom2000ContrRecIPXX.cpp
+    ElectronRepulsionGeom2000ContrRecISXX.cpp
+    ElectronRepulsionGeom2000ContrRecPIXX.cpp
   )
 
 target_include_directories(vlxobjs

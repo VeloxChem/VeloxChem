@@ -133,6 +133,12 @@ comp_electron_repulsion_geom1000_sssf(T& distributor,
     const CBoysFunc<4> bf_table;
 
     CSimdArray<double> bf_data(6, ket_npgtos);
+    
+    // set up range seperation factor
+
+    const auto use_rs = distributor.need_omega();
+
+    const auto omega = distributor.get_omega();
 
     // set up ket partitioning
 
@@ -231,10 +237,19 @@ comp_electron_repulsion_geom1000_sssf(T& distributor,
                 t4cfunc::comp_distances_wq(pfactors, 23, 17, 10);
 
                 t4cfunc::comp_distances_wp(pfactors, 26, 17, r_p);
-
-                t4cfunc::comp_boys_args(bf_data, 5, pfactors, 13, a_exp, b_exp);
-
-                bf_table.compute(bf_data, 0, 5);
+                
+                if (use_rs)
+                {
+                    t4cfunc::comp_boys_args(bf_data, 5, pfactors, 13, a_exp, b_exp, omega);
+                    
+                    bf_table.compute(bf_data, 0, 5, pfactors, a_exp, b_exp, omega);
+                }
+                else
+                {
+                    t4cfunc::comp_boys_args(bf_data, 5, pfactors, 13, a_exp, b_exp);
+                    
+                    bf_table.compute(bf_data, 0, 5);
+                }
 
                 t4cfunc::comp_ovl_factors(pfactors, 16, 2, 3, ab_ovl, ab_norm, a_exp, b_exp);
 
