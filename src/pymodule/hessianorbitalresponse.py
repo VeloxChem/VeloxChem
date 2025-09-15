@@ -30,10 +30,10 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from collections import Counter
 import numpy as np
 import time as tm
 import math
-from collections import Counter
 
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCMolecularHessian
@@ -196,9 +196,7 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.start_timer('dOvlp')
 
         ovlp_deriv_ao_dict = {
-            (iatom, x): None
-            for iatom in range(natm)
-            for x in range(3)
+            (iatom, x): None for iatom in range(natm) for x in range(3)
         }
 
         ovlp_grad_drv = OverlapGeom100Driver()
@@ -233,9 +231,7 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.start_timer('dFock')
 
         fock_deriv_ao_dict = {
-            (iatom, x): None
-            for iatom in range(natm)
-            for x in range(3)
+            (iatom, x): None for iatom in range(natm) for x in range(3)
         }
 
         for iatom in local_atoms:
@@ -276,6 +272,7 @@ class HessianOrbitalResponse(CphfSolver):
 
             if atom_pairs is None:
                 naos = basis.get_dimensions_of_basis()
+
                 batch_size = get_batch_size(None, natm * 3, naos, self.comm)
                 batch_size = batch_size // 3
 
@@ -299,6 +296,7 @@ class HessianOrbitalResponse(CphfSolver):
                     num_batches += 1
 
             for batch_ind in range(num_batches):
+
                 if atom_pairs is None:
                     batch_start = batch_ind * batch_size
                     batch_end = min(batch_start + batch_size, natm)
@@ -368,9 +366,11 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
+
                     if atom_pairs is not None:
-                        if (iatom, jatom) not in atom_pairs and \
-                                (jatom, iatom) not in atom_pairs and iatom!=jatom:
+                        if ((iatom, jatom) not in atom_pairs and
+                            (jatom, iatom) not in atom_pairs and
+                                iatom != jatom):
                             continue
 
                     for y in range(3):
@@ -450,10 +450,13 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
+
                     if atom_pairs is not None:
-                        if (iatom, jatom) not in atom_pairs and \
-                                (jatom, iatom) not in atom_pairs and iatom!=jatom:
+                        if ((iatom, jatom) not in atom_pairs and
+                            (jatom, iatom) not in atom_pairs and
+                                iatom != jatom):
                             continue
+
                     for y in range(3):
                         key_jy = (jatom, y)
 
@@ -562,8 +565,7 @@ class HessianOrbitalResponse(CphfSolver):
             # 'ovlp_deriv_oo': ovlp_deriv_oo,
             # 'fock_deriv_ao': fock_deriv_ao,
             # 'fock_uij': fock_uij,
-            'hessian_first_integral_derivatives':
-            hessian_first_integral_derivatives,
+            'hessian_first_integral_derivatives': hessian_first_integral_derivatives,
             'hessian_eri_overlap': hessian_eri_overlap,
         }
 
