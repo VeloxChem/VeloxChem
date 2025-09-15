@@ -689,7 +689,7 @@ class AtomBdeDriver:
             f"SCF energy for radical molecule {run_idx+1} is {radical_single_point_scf_energy} hartree"
         )
         self.ostream.print_info(
-            f"time cost : {round(step_end - step_start, 2)} seconds"
+            f"Time cost : {round(step_end - step_start, 2)} seconds"
         )
         self.ostream.flush()
         return radical_single_point_scf_energy
@@ -850,6 +850,7 @@ class AtomBdeDriver:
         count = 1
         for run_idx, (mol_rad, radical_carbon_idx) in enumerate(
                 zip(molecules_rads, radical_carbon_indices)):
+            self.ostream.print_info("-" * 50)
             self.ostream.print_info(
                 f"Computing energy of structure : {count} of {len(molecules_rads)}"
             )
