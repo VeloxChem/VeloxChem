@@ -1,7 +1,8 @@
-import pytest
-import numpy as np
 from pathlib import Path
+import numpy as np
+import pytest
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -10,8 +11,9 @@ from veloxchem.scfhessiandriver import ScfHessianDriver
 
 class TestHessianAtomPair:
 
-    @pytest.mark.timeconsuming
+    @pytest.mark.solvers
     def test_hessian_atom_pair(self):
+
         mol = Molecule.read_xyz_string("""15
 
         O       99.814000000   100.835000000   101.232000000
@@ -31,18 +33,24 @@ class TestHessianAtomPair:
         H      102.224000000    97.640900000    97.837700000""")
 
         basis = MolecularBasis.read(mol, 'sto-3g')
+
         atom_pairs = [(0, 3), (6, 9)]
+
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
         scf_drv.compute(mol, basis)
+
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.atom_pairs = atom_pairs
         hess_drv.compute(mol, basis)
+
         pair_hess = hess_drv.hessian
 
-        cwd = Path(__file__).parent
-        path = str(cwd / 'data/water_hessian_pair_1-4_7-10.txt')
-        reference_hess = np.loadtxt(path)
-        np.testing.assert_allclose(pair_hess,
-                                   reference_hess,
-                                   rtol=1e-8,
-                                   atol=1e-10)
+        if scf_drv.rank == mpi_master():
+            cwd = Path(__file__).parent
+            path = str(cwd / 'data' / 'water_hessian_pair_1-4_7-10.txt')
+            reference_hess = np.loadtxt(path)
+            np.testing.assert_allclose(pair_hess,
+                                       reference_hess,
+                                       rtol=1e-8,
+                                       atol=1e-10)
