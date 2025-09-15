@@ -262,8 +262,8 @@ class ExcitedStateAnalysisDriver:
             density matrices in MO and AO basis.
         """
 
-        if (any(key.startswith('eigenvector') for key in rsp_results)
-                and 'formatted' not in rsp_results):
+        if (any(key.startswith('eigenvector') for key in rsp_results) and
+                'formatted' not in rsp_results):
             rsp_results = self.format_rsp_results(rsp_results)
 
         mo = scf_results["C_alpha"]
