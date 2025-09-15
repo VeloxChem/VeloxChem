@@ -3466,7 +3466,33 @@ class MMForceFieldGenerator:
         return atom_names
 
     @staticmethod
-    def load_forcefield_from_json(path: str):
+    def load_forcefield_from_json_string(json_string: str):
+        """
+        Load forcefield data from a JSON string.
+
+        Args:
+            json_string (str): The JSON string containing the forcefield data.
+        
+        Returns:
+            MMForceFieldGenerator: The updated forcefield object with the loaded data.
+        """
+        forcefield = MMForceFieldGenerator()
+        ff_data = json.loads(json_string)
+
+        forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["atoms"])
+        forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["bonds"])
+        forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["angles"])
+        forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["dihedrals"])
+        forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
+            ff_data["impropers"])
+        return forcefield
+
+    @staticmethod
+    def load_forcefield_from_json_file(path: str):
         """
         Load forcefield data from a JSON file.
 
@@ -3477,19 +3503,9 @@ class MMForceFieldGenerator:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
         with open(path, "r", encoding="utf-8") as file:
-            forcefield = MMForceFieldGenerator()
-            ff_data = json.load(file)
-
-            forcefield.atoms = MMForceFieldGenerator._str_to_tuple_key(
-                ff_data["atoms"])
-            forcefield.bonds = MMForceFieldGenerator._str_to_tuple_key(
-                ff_data["bonds"])
-            forcefield.angles = MMForceFieldGenerator._str_to_tuple_key(
-                ff_data["angles"])
-            forcefield.dihedrals = MMForceFieldGenerator._str_to_tuple_key(
-                ff_data["dihedrals"])
-            forcefield.impropers = MMForceFieldGenerator._str_to_tuple_key(
-                ff_data["impropers"])
+            json_str = file.read()
+        forcefield = MMForceFieldGenerator.load_forcefield_from_json_string(
+            json_str)
         return forcefield
 
     def print_bonds(self):
@@ -3541,16 +3557,15 @@ class MMForceFieldGenerator:
         return s
 
     @staticmethod
-    def save_forcefield_as_json(forcefield, path: str):
+    def get_forcefield_as_json(forcefield) -> str:
         """
-        Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
+        Get the forcefield data of the forcefieldgenerator as a JSON string, converting all tuples to strings
 
         Args:
-            forcefield (MMForceFieldGenerator): The forcefield object containing the data to be saved.
-            filename (str): The name of the file to save the forcefield data to.
+            forcefield (MMForceFieldGenerator): The forcefield object containing the data to be converted.
 
         Returns:
-            None
+            str: The JSON string representation of the forcefield data.
         """
         ff_data = {
             "atoms":
@@ -3564,11 +3579,26 @@ class MMForceFieldGenerator:
             "impropers":
             MMForceFieldGenerator._tuple_to_str_key(forcefield.impropers),
         }
+        return json.dumps(ff_data, indent=4)
+
+    @staticmethod
+    def save_forcefield_as_json(forcefield, path: str):
+        """
+        Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
+
+        Args:
+            forcefield (MMForceFieldGenerator): The forcefield object containing the data to be saved.
+            filename (str): The name of the file to save the forcefield data to.
+
+        Returns:
+            None
+        """
+        json = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
         folder = str(Path(path).parent)
         if not Path(folder).exists():
             Path(folder).mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as file:
-            json.dump(ff_data, file, indent=4)
+            file.write(json)
 
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:

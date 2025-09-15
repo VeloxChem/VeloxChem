@@ -82,6 +82,10 @@ class TransitionStateGuesser():
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
+        self.molecule = None
+        self.results = {}
+
         self.lambda_vec = list(np.round(np.linspace(0, 1, 21), 3))
         self.scf_xcfun = "b3lyp"
         self.scf_basis = 'def2-svp'
@@ -92,9 +96,6 @@ class TransitionStateGuesser():
         self.mm_step_size = 0.001
         self.save_mm_traj = False
         self.scf_drv = None
-        # self.evb_drv: None | EvbDriver = None
-        self.molecule = None
-        self.results = {}
         self.folder_name = 'ts_data'
         self.force_conformer_search = False
         self.skip_conformer_search = False
@@ -207,8 +208,8 @@ class TransitionStateGuesser():
         self.ostream.flush()
         sysbuilder.save_systems_as_xml(self.systems, self.folder_name)
         self.results.update({
-            'broken_bonds': self.breaking_bonds,
-            'formed_bonds': self.forming_bonds,
+            'breaking_bonds': self.breaking_bonds,
+            'forming_bonds': self.forming_bonds,
             'lambda_vec': self.lambda_vec
         })
 
@@ -560,15 +561,13 @@ class TransitionStateGuesser():
             raise ImportError('ipywidgets is required for this functionality.')
 
         if ts_results is None:
-            if self.results is not None:
+            if self.results is not None and self.results != {}:
                 self.ostream.print_info("Loading self.results")
                 ts_results = self.results
             else:
                 try:
                     if filename is not None:
                         self.results_file = filename
-                    self.ostream.print_info(
-                        f"Loading results from {self.results_file}")
                     ts_results = self.load_results(self.results_file)
                 except Exception as e:
                     raise e
@@ -698,11 +697,19 @@ class TransitionStateGuesser():
 
         mol = Molecule.read_xyz_string(xyz_data_i)
 
-        reactant_bonds = set(self.reactant.bonds.keys())
-        product_bonds = set(self.product.bonds.keys())
-        changing_bonds = list(self.forming_bonds) + list(self.breaking_bonds)
-        mol.show(bonds=reactant_bonds | product_bonds, dashed_bonds=changing_bonds,
-            atom_indices=atom_indices, width=640, height=360,)
+        if self.reactant.bonds is not None and self.product.bonds is not None:
+            reactant_bonds = set(self.reactant.bonds.keys())
+            product_bonds = set(self.product.bonds.keys())
+            changing_bonds = list(self.forming_bonds) + list(self.breaking_bonds)
+            mol.show(
+                bonds=reactant_bonds | product_bonds,
+                dashed_bonds=changing_bonds,
+                atom_indices=atom_indices,
+                width=640,
+                height=360,
+            )
+        else:
+            mol.show(atom_indices=atom_indices, width=640, height=360)
 
     def _mm_to_xyz_geom(self, geom, molecule=None):
         if molecule is None:
@@ -734,19 +741,40 @@ class TransitionStateGuesser():
         scf_energies = results.get('scf_energies', None)
         max_scf_geometry = results.get('max_scf_geometry', None)
         max_scf_lambda = results.get('max_scf_lambda', None)
+        
+        reactant = self.reactant.get_forcefield_as_json(self.reactant)
+        product = self.product.get_forcefield_as_json(self.product)
+        rea_xyz = self.reactant.molecule.get_xyz_string()
+        pro_xyz = self.product.molecule.get_xyz_string()
+        
+        forming_bonds = results.get('forming_bonds', None)
+        breaking_bonds = results.get('breaking_bonds', None)
+        
+        hf.create_dataset('reactant_ff', data=reactant)
+        hf.create_dataset('product_ff', data=product)
+        hf.create_dataset('reactant_xyz', data=rea_xyz)
+        hf.create_dataset('product_xyz', data=pro_xyz)
 
         hf.create_dataset('mm_energies', data=mm_energies, dtype='f')
         hf.create_dataset('xyz_geometries', data=geometries)
         hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
         hf.create_dataset('max_mm_geometry', data=[max_mm_geometry])
         hf.create_dataset('max_mm_lambda', data=max_mm_lambda, dtype='f')
+        
+        hf.create_dataset('forming_bonds', data=np.array(np.array(list(forming_bonds)), dtype='i'))
+        hf.create_dataset('breaking_bonds', data=np.array(np.array(list(breaking_bonds)), dtype='i'))
+        
         if scf_energies is not None:
             hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
             hf.create_dataset('max_scf_geometry', data=[max_scf_geometry])
             hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
 
-    @staticmethod
-    def _load_results(fname):
+    
+
+    def load_results(self, fname):
+        self.ostream.print_info(f"Loading results from {fname}")
+        self.ostream.flush()
+        
         hf = h5py.File(fname, 'r')
         results = {}
         results['mm_energies'] = hf['mm_energies'][:]
@@ -756,18 +784,28 @@ class TransitionStateGuesser():
         results['lambda_vec'] = hf['lambda_vec'][:]
         results['max_mm_geometry'] = hf['max_mm_geometry'][0].decode('utf-8')
         results['max_mm_lambda'] = hf['max_mm_lambda'][()]
+        
+        reactant_ff = hf['reactant_ff'][()]
+        product_ff = hf['product_ff'][()]
+        reactant_xyz = hf['reactant_xyz'][()].decode('utf-8')
+        product_xyz = hf['product_xyz'][()].decode('utf-8')
+        
+        forming_bonds = hf['forming_bonds'][()]
+        breaking_bonds = hf['breaking_bonds'][()]
+        
+        self.reactant = MMForceFieldGenerator.load_forcefield_from_json_string(reactant_ff)
+        self.reactant.molecule = Molecule.read_xyz_string(reactant_xyz)
+        self.product = MMForceFieldGenerator.load_forcefield_from_json_string(product_ff)
+        self.product.molecule = Molecule.read_xyz_string(product_xyz)
+        
+        self.forming_bonds = set([tuple(bond) for bond in forming_bonds])
+        self.breaking_bonds = set([tuple(bond) for bond in breaking_bonds])
+        
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]
             results['max_scf_geometry'] = hf['max_scf_geometry'][0].decode(
                 'utf-8')
             results['max_scf_lambda'] = hf['max_scf_lambda'][()]
-        return results
-
-    def load_results(self, fname):
-        self.ostream.print_info(f"Loading results from {fname}")
-        self.ostream.flush()
-        results = self._load_results(fname)
-        self.results = results
         return results
 
     def _print_initial_mm_header(self):

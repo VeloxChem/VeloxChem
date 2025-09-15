@@ -93,10 +93,16 @@ class ReactionForceFieldBuilder():
         self.optimize_ff: bool = True
         self.mm_opt_constrain_bonds: bool = True
         self.water_model: str = 'spce'
-        self.reactant_total_multiplicity: int = -1
-        self.product_total_multiplicity: int = -1
-        self.breaking_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
         self.product_mapping: dict[int, int] | None = None  # one-indexed
+        self.mute_scf: bool = True
+        self.skip_reaction_matching: bool = False
+        #Todo get a better functional and basis set from here https://pubs.acs.org/doi/10.1021/acs.jctc.3c00558
+        self.hessian_xc_fun: str = 'B3LYP'
+        #Todo get better basis set once we have f-functionals
+        # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
+        self.hessian_basis = 'def2-SV_P_'
+        
+        # argument inputs
         self.reactant_partial_charges: list[float] | list[
             list[float]] | None = None
         self.product_partial_charges: list[float] | list[
@@ -105,14 +111,9 @@ class ReactionForceFieldBuilder():
                                                   | None] | None = None
         self.product_hessians: np.ndarray | list[np.ndarray
                                                  | None] | None = None
-
-        self.mute_scf: bool = True
-        self.skip_reaction_matching: bool = False
-        #Todo get a better functional and basis set from here https://pubs.acs.org/doi/10.1021/acs.jctc.3c00558
-        self.hessian_xc_fun: str = 'B3LYP'
-        #Todo get better basis set once we have f-functionals
-        # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
-        self.hessian_basis = 'def2-SV_P_'
+        self.breaking_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
+        self.reactant_total_multiplicity: int = -1
+        self.product_total_multiplicity: int = -1
 
         self.keywords = {
             "reactant_partial_charges": list | None,
