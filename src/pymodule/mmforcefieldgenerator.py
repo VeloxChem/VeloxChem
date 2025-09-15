@@ -503,8 +503,8 @@ class MMForceFieldGenerator:
                         # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
                         # Extract the dihedral indices
                         scanned_dih = [
-                            int(i) for i in line.split('Dihedral')[1].split()
-                            [0].split('-')
+                            int(i) for i in (
+                                line.split('Dihedral')[1].split()[0].split('-'))
                         ]
                         assert_msg_critical(
                             sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
@@ -1145,7 +1145,7 @@ class MMForceFieldGenerator:
         atomtypeidentifier.identify_equivalences()
 
         self.atom_info_dict = atomtypeidentifier.atom_info_dict
-        ## TODO: change this to skip when water is used
+        # TODO: change this to skip when water is used
         if not resp:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
@@ -1365,7 +1365,7 @@ class MMForceFieldGenerator:
 
                 elif element in self.tm_parameters:
                     tmmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
-                    tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.'  ##TODO: rephrase
+                    tmmsg += ' Taking transition metal parameters from literature.'
                     self.ostream.print_info(tmmsg)
                     sigma = self.tm_parameters[element]['sigma']
                     epsilon = self.tm_parameters[element]['epsilon']
@@ -1415,9 +1415,9 @@ class MMForceFieldGenerator:
             self.ostream.flush()
 
         if use_tm:
-            self.ostream.print_info('Using TM parameters.')
+            self.ostream.print_info('Using transition metal parameters.')
             tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
-            tm_ref += 'J. Chem. Theory Comput. 2016 12 (8), 3681-3688.'
+            tm_ref += ' J. Chem. Theory Comput. 2016, 12, 3681-3688.'
             self.ostream.print_reference('Reference: ' + tm_ref)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1939,11 +1939,10 @@ class MMForceFieldGenerator:
                                                    dihedral_data['class2'],
                                                    dihedral_data['class3'],
                                                    dihedral_data['class4']):
-                                periodicity = int(
-                                    dihedral_data[f'periodicity1'])
-                                barrier = float(dihedral_data[f'k1'])
+                                periodicity = int(dihedral_data['periodicity1'])
+                                barrier = float(dihedral_data['k1'])
                                 phase = float(
-                                    dihedral_data[f'phase1']) / np.pi * 180.0
+                                    dihedral_data['phase1']) / np.pi * 180.0
                                 comment = self.get_dihedral_type_string(
                                     target_dihedral)
                                 improper_ordering = ordering
@@ -1999,10 +1998,10 @@ class MMForceFieldGenerator:
                                                        dihedral_data['class3'],
                                                        dihedral_data['class4']):
                                     periodicity = int(
-                                        dihedral_data[f'periodicity1'])
-                                    barrier = float(dihedral_data[f'k1'])
-                                    phase = float(dihedral_data[f'phase1']
-                                                 ) / np.pi * 180.0
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(
                                         target_dihedral)
                                     improper_ordering = ordering
@@ -2049,10 +2048,10 @@ class MMForceFieldGenerator:
                                                        dihedral_data['class3'],
                                                        dihedral_data['class4']):
                                     periodicity = int(
-                                        dihedral_data[f'periodicity1'])
-                                    barrier = float(dihedral_data[f'k1'])
-                                    phase = float(dihedral_data[f'phase1']
-                                                 ) / np.pi * 180.0
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(
                                         target_dihedral)
                                     improper_ordering = ordering
@@ -2403,8 +2402,8 @@ class MMForceFieldGenerator:
                 continue
 
             # Check if any side atom of the bond is involved in a triple bond
-            if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+            if (bond[0] in ['c1', 'n1', 'cg', 'ch'] or
+                    bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -2436,11 +2435,11 @@ class MMForceFieldGenerator:
         """
         Determines if the bond between atom_i and atom_j is part of a ring.
 
-        :param atom_i: 
+        :param atom_i:
             Index of the first atom in the bond.
-        :param atom_j: 
+        :param atom_j:
             Index of the second atom in the bond.
-        :return: 
+        :return:
             True if the bond is part of a ring, False otherwise.
         """
 
@@ -2709,7 +2708,8 @@ class MMForceFieldGenerator:
 
             f_top.write('\n#include "' + Path(itp_fname).name + '"\n')
 
-            ##TODO: change this to fit with the self.water_parameters -- e.g., if water_model in self.water_parameters
+            # TODO: change this to fit with the self.water_parameters
+            # e.g., if water_model in self.water_parameters
             if water_model is not None:
                 # very rudimentary check for water model names
                 assert_msg_critical(
