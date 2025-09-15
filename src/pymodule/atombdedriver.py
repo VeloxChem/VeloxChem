@@ -156,6 +156,9 @@ class AtomBdeDriver:
         self.mol_rad_charge = 0
         self.show_mol = False
         
+        #save files
+        self.save_files = True
+
         #attributes for atom analysis
         self.atom_idx = None
         self.labels = None
@@ -542,7 +545,7 @@ class AtomBdeDriver:
                     )
                     self.ostream.flush()
 
-    def _compute_whole_mol_scf_energy(self, molecule):
+    def _compute_whole_mol_scf_energy(self, molecule, mol_idx):
         """
         this function is used to compute the whole molecule SCF energy with optimization and single-point energy calculation
         close shell with ScfRestrictedDriver
@@ -555,6 +558,15 @@ class AtomBdeDriver:
         self.ostream.print_info(
             "Optimizing geometry of the molecule before removing target atoms...")
         self.ostream.flush()
+        if self.save_files:
+            self.mol_scf_drv.filename = f'bde_mol_{mol_idx+1}'
+            self.mol_opt_drv.filename = f'bde_mol_{mol_idx+1}_opt'
+            self.mol_final_scf_drv.filename = f'bde_mol_{mol_idx+1}_final'
+        else:
+            self.mol_scf_drv.filename = None
+            self.mol_opt_drv.filename = None
+            self.mol_final_scf_drv.filename = None
+
         basis_set1 = MolecularBasis.read(molecule, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(molecule, self.basis_sets[1])
         scf_results = self.mol_scf_drv.compute(molecule, basis_set1)
@@ -578,7 +590,7 @@ class AtomBdeDriver:
                 "the result is not reliable, please modify the settings if needed"
             )
 
-    def _compute_target_atoms_radical_scf_energy(self):
+    def _compute_target_atoms_radical_scf_energy(self, mol_idx):
         """
         this function is used to compute the target atoms radical SCF energy
         open shell with ScfUnrestrictedDriver
@@ -588,6 +600,10 @@ class AtomBdeDriver:
         target_atom.set_multiplicity(self.target_atom_multiplicity)
         target_atom.set_charge(self.target_atom_charge)
         basis_set2 = MolecularBasis.read(target_atom, self.basis_sets[1])
+        if self.save_files:
+            self.target_atom_final_scf_drv.filename = f'bde_mol_{mol_idx+1}_target_{self.target_atom}_final'
+        else:
+            self.target_atom_final_scf_drv.filename = None
         scf_resultsH = self.target_atom_final_scf_drv.compute(target_atom, basis_set2)
         if not self.target_atom_final_scf_drv.is_converged:
             self.ostream.print_warning(
@@ -629,7 +645,7 @@ class AtomBdeDriver:
                 radical_carbon_indices.append(carbon_idx - 1)
         return allmolecules, radical_carbon_indices
 
-    def _compute_mol_rad_scf_energy(self, mol, radical_carbon_idx, run_idx):
+    def _compute_mol_rad_scf_energy(self, mol, radical_carbon_idx, run_idx, mol_idx):
         """
         this function is used to compute the SCF energy for the given radical molecule 
         optimization and single point energy calculation.
@@ -651,7 +667,14 @@ class AtomBdeDriver:
         mol.set_charge(self.mol_rad_charge)
         basis_set1 = MolecularBasis.read(mol, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(mol, self.basis_sets[1])
-        self.radical_scf_drv.filename = f'bde_{run_idx+1}'
+        if self.save_files:
+            self.radical_scf_drv.filename = f'bde_mol_{mol_idx+1}_{run_idx+1}'
+            self.radical_opt_drv.filename = f'bde_mol_{mol_idx+1}_{run_idx+1}_opt'
+            self.radical_final_scf_drv.filename = f'bde_mol_{mol_idx+1}_{run_idx+1}_final'
+        else:
+            self.radical_scf_drv.filename = None
+            self.radical_opt_drv.filename = None
+            self.radical_final_scf_drv.filename = None
 
         #set guess for radical optimization
         if self.mol_rad_multiplicity != 1:
@@ -659,7 +682,7 @@ class AtomBdeDriver:
         
         try:
             scf_resultsmol = self.radical_scf_drv.compute(mol, basis_set1)
-            opt_results_rad = self.radical_opt_drv.compute(mol, basis_set1,scf_resultsmol)
+            opt_results_rad = self.radical_opt_drv.compute(mol, basis_set1, scf_resultsmol)
         except Exception as e:
             if "ScfGradientDriver: SCF did not converge" in str(e):
                 self.ostream.print_warning(
@@ -816,7 +839,7 @@ class AtomBdeDriver:
             guess_msg.append(guess)
         return radical_molecules, radical_carbon_indices, guess_msg
 
-    def _compute_single_molecule(self, whole_molecule: object):
+    def _compute_single_molecule(self, whole_molecule: object, mol_idx: int):
         """
         used to compute hydrogen/target atom bond dissociation energies (BDEs) for a single molecule.
         """
@@ -839,8 +862,8 @@ class AtomBdeDriver:
             carbon_indices.append(list(conn_mat[x]).index(1))
         #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
 
-        opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule)
-        self._compute_target_atoms_radical_scf_energy()
+        opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule,mol_idx)
+        self._compute_target_atoms_radical_scf_energy(mol_idx)
         self.opt_whole_molecule = opt_whole_molecule
         molecules_rads, radical_carbon_indices = self._remove_atom_by_idx(
             opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
@@ -857,7 +880,7 @@ class AtomBdeDriver:
             self.ostream.flush()
             mol_rad_scf_energy = None #reset to None for each radical molecule
             mol_rad_scf_energy = self._compute_mol_rad_scf_energy(
-                mol_rad, radical_carbon_idx, run_idx)
+                mol_rad, radical_carbon_idx, run_idx, mol_idx)
             if mol_rad_scf_energy is None:
                 bde_hartree = 0.0
                 self.ostream.print_warning(
@@ -887,8 +910,8 @@ class AtomBdeDriver:
         self.mols_bdes_list = []
         if not isinstance(mol_list, list):
             mol_list = [mol_list]
-        for mol in mol_list:
-            self._compute_single_molecule(mol)
+        for mol_idx, mol in enumerate(mol_list):
+            self._compute_single_molecule(mol,mol_idx)
             #use a dictionary to store all bde and target atom information
             mol_bde_dict = {
                 'target_atoms_dict': self.target_atoms_dict,
