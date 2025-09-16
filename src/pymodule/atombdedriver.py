@@ -232,13 +232,9 @@ class AtomBdeDriver:
 
     def _check_radical_level_shifting(self):
         if self.radical_level_shifting is not None:
-            if self.mol_rad_multiplicity <2:
-                self.ostream.print_warning(
-                    "level shifting is only applied to open shell calculations, "
-                    "will skip setting level shifting for radical scf drivers"
-                    )
+            if self.mol_rad_multiplicity == 1:
+                self.ostream.print_info("level shifting is used")
                 self.ostream.flush()
-                return
             if hasattr(self.radical_scf_drv, 'level_shifting'):
                 self.radical_scf_drv.level_shifting = self.radical_level_shifting
                 self.radical_final_scf_drv.level_shifting = self.radical_level_shifting
