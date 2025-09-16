@@ -168,7 +168,15 @@ class TransitionStateGuesser():
 
         self.molecule = Molecule.read_xyz_string(
             self.reactant.molecule.get_xyz_string())
-
+        self.molecule.set_charge(self.reactant.molecule.get_charge())
+        self.molecule.set_multiplicity(self.reactant.molecule.get_multiplicity())
+        
+        if self.mute_ff_build:
+            self.ostream.print_blank()
+            self.ostream.flush()
+            self.ffbuilder.ostream.unmute()
+            self.ffbuilder._summarise_reaction(self.reactant,self.product)
+            self.ffbuilder.ostream.mute()
         self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
@@ -185,7 +193,7 @@ class TransitionStateGuesser():
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
             self.ostream.print_info(
-                "Building MM systems for the transition state guess. Disable mute_sys_builder to see detailed output."
+                "Building MM systems for the transition state guess. Disable mute_ff_build to see detailed output."
             )
             self.ostream.flush()
 
@@ -481,7 +489,7 @@ class TransitionStateGuesser():
             results = self.results
         assert_msg_critical(
             'mm_geometries' in results.keys(),
-            'Could not find "mm_geometries" in results.',
+            'Could not find "mm_geometries" in results. Total keys: {results.keys()}',
         )
         structures = results['mm_geometries']
         self._print_scf_header()
@@ -519,7 +527,7 @@ class TransitionStateGuesser():
         self.molecule.set_multiplicity(mult)
         self.molecule.set_charge(charge)
         self._save_results(self.results_file, self.results)
-        return self.molecule, self.results
+        return self.results
 
     def _get_scf_energy(self, positions):
         self.molecule = self._set_molecule_positions(self.molecule, positions)
@@ -568,19 +576,20 @@ class TransitionStateGuesser():
                 try:
                     if filename is not None:
                         self.results_file = filename
+                    self.ostream.print_info(
+                        f"Loading results from {self.results_file}")
                     ts_results = self.load_results(self.results_file)
                 except Exception as e:
                     raise e
-        self.ostream.flush()
 
-        mm_energies = ts_results['mm_energies']
-        geometries = ts_results['xyz_geometries']
-        lambda_vec = ts_results['lambda_vec']
+        mm_energies = ts_results.get('mm_energies', None)
+        geometries = ts_results.get('xyz_geometries', None)
+        lambda_vec = ts_results.get('lambda_vec', None)
         scf_energies = ts_results.get('scf_energies', None)
         if scf_energies is not None:
-            final_lambda = ts_results['max_scf_lambda']
+            final_lambda = ts_results.get('max_scf_lambda', None)
         else:
-            final_lambda = ts_results['max_mm_lambda']
+            final_lambda = ts_results.get('max_mm_lambda', None)
         ipywidgets.interact(
             self._show_iteration,
             mm_energies=ipywidgets.fixed(mm_energies),
@@ -819,12 +828,11 @@ class TransitionStateGuesser():
         self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
         self.ostream.print_header(f"saving mm traj: {self.save_mm_traj:>10}")
         self.ostream.print_blank()
-        valstr = '{} | {} | {} | {} | {}'.format(
+        valstr = '{} | {} | {} | {}'.format(
             'Lambda',
-            ' E_int',
             '    E1',
             '    E2',
-            '    Em',
+            '     V',
         )
         self.ostream.print_header(valstr)
         self.ostream.print_header(45 * '-')
@@ -850,18 +858,25 @@ class TransitionStateGuesser():
 
     def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
         if n_conf is None:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
-                l, md_e, e1, e2, em)
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
+                l, e1, e2, em)
         else:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
-                l, md_e, e1, e2, em, n_conf)
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
+                l,e1, e2, em, n_conf)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
     def _print_scf_header(self):
+        if self.mute_scf:
+            self.ostream.print_info("Disable mute_scf to see detailed output.")
         self.ostream.print_blank()
         self.ostream.print_header(f"Starting SCF scan")
         self.ostream.print_blank()
+        self.ostream.print_header("SCF parameters:")
+        self.ostream.print_header(f"basis:       {self.scf_basis:>10}")
+        self.ostream.print_header(f"DFT xc fun:  {self.scf_xcfun:>10}")
+        self.ostream.print_blank()
+        self.ostream.flush()
         valsltr = '{} | {} | {}'.format(
             'Lambda',
             'SCF Energy',
