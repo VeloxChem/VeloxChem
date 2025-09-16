@@ -40,7 +40,7 @@ from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
 from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
-                             get_conformer_data, get_pubchem_reference)
+                             get_conformer_data, get_pubchem_sketcher_reference)
 
 
 @staticmethod
@@ -1324,7 +1324,7 @@ def _Molecule_builder():
               "https://pubchem.ncbi.nlm.nih.gov/edit/ \n")
         print("Documentation for the PubChem Sketcher: " +
               "https://pubchem.ncbi.nlm.nih.gov/docs/sketcher-help \n")
-        print("Reference: " + get_pubchem_reference() + "\n")
+        print("Reference: " + get_pubchem_sketcher_reference() + "\n")
 
         display(
             IFrame('https://pubchem.ncbi.nlm.nih.gov/edit/',

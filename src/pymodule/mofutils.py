@@ -984,8 +984,29 @@ def check_two_points_center(lG, centers):
             return False
 
 
+def in_same_cycle(G, nodes):
+    for cycle in nx.cycle_basis(G):
+        if set(nodes).issubset(cycle):
+            return cycle
+    return None
+
+def find_centers(lG):
+    #center atom should be close to both X atoms and the distances are close
+    barycenter = nx.barycenter(lG)
+    normalcenter = nx.center(lG)
+    #check if normalcenter are in same cycle include barycenter, check cycles in lG
+    if set(barycenter).intersection(set(normalcenter)):
+        #check if normal center is in a cycle
+        if in_same_cycle(lG, normalcenter) is not None:
+            centers = normalcenter
+        else:
+            centers = barycenter
+    else:
+        centers = barycenter
+    return centers
+
 def distinguish_G_centers(lG):
-    centers = nx.barycenter(lG)
+    centers = find_centers(lG)
     # centers = nx.center(lG)
     if len(centers) == 1:
         print("center is a point")
@@ -1072,17 +1093,15 @@ def get_pairX_outer_frag(connected_pairXs, outer_frag_nodes):
 def cleave_outer_frag_subgraph(lG, pairXs, outer_frag_nodes):
     subgraph_outer_frag = lG.subgraph(outer_frag_nodes)
     kick_nodes = []
-    for i in list(outer_frag_nodes):
-        if nx.shortest_path_length(subgraph_outer_frag, pairXs[0],
-                                   i) > nx.shortest_path_length(
-                                       subgraph_outer_frag, pairXs[0],
-                                       pairXs[1]):
-            kick_nodes.append(i)
-        elif nx.shortest_path_length(subgraph_outer_frag, pairXs[1],
-                                     i) > nx.shortest_path_length(
-                                         subgraph_outer_frag, pairXs[0],
-                                         pairXs[1]):
-            kick_nodes.append(i)
+    #test to remove nodeX and kick the small frag
+    for i in pairXs:
+        lG_temp = lG.copy()
+        lG_temp.remove_node(i)
+        frags = list(nx.connected_components(lG_temp))
+        #sort frags by size
+        frags.sort(key=len)
+        small_frag_nodes = list(frags[0])
+        kick_nodes.extend(small_frag_nodes)
 
     subgraph_single_frag = lG.subgraph(outer_frag_nodes - set(kick_nodes))
     return subgraph_single_frag
@@ -1293,6 +1312,30 @@ def process_linker_molecule(molecule,
                                 adj_nonH_num += 1
                         if adj_nonH_num > 2:
                             Xs_indices.append(n)
+                #double check Xs_indices
+                if len(Xs_indices) > linker_topic:
+                    #cut bond connected to Xs_indices and if there is a fragment include H then should exclude this Xs
+                    #use lG fragment
+                    for x in Xs_indices:
+                        lG_temp = lG.copy()
+                        lG_temp.remove_node(x)
+                        if nx.number_connected_components(lG_temp) == linker_topic:
+                            frags = list(nx.connected_components(lG_temp))
+                            #sort frags by size
+                            frags.sort(key=len)
+                            small_frag_nodes = list(frags[0])
+                            #labels of small frag
+                            small_frag_labels = [
+                                lG_temp.nodes[n]["label"]
+                                for n in small_frag_nodes
+                            ]
+                            if not any(label == "H"
+                                       for label in small_frag_labels):
+                                continue
+                            else:
+                                Xs_indices.remove(x)
+                        else:
+                            Xs_indices.remove(x)
 
     else:
         raise ValueError(

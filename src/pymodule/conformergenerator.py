@@ -256,6 +256,8 @@ class ConformerGenerator:
                 dih_angle = [0, 90, 180, 270]
             elif max_periodicity == 5:
                 dih_angle = [36, 54, 84, 144, 324]
+            elif max_periodicity == 6:
+                dih_angle = [0, 60, 120, 180, 240, 300]
             else:
                 continue
 

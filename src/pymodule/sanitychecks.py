@@ -268,7 +268,8 @@ def polorbrsp_sanity_check_2(obj, method_flag, lr_results):
         # check that frequencies agree with LR
         response_results = lr_results.get('solutions', None)
         for frequency in obj.frequencies:
-            if (obj.vector_components[0], frequency) not in response_results.keys():
+            if (obj.vector_components[0],
+                    frequency) not in response_results.keys():
                 error_msg = f'Frequency {frequency:2.3f} in '
                 error_msg += method_flag + ' not found in linear response results '
                 error_msg += 'for vector compontent ' + obj.vector_components[0]
@@ -594,14 +595,16 @@ def solvation_model_sanity_check(obj):
             'point charges')
 
         assert_msg_critical(
-            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm', 'smd'],
             type(obj).__name__ +
-            ': Only the C-PCM solvation model is implemented.')
+            ': Only the C-PCM and SMD solvation models are implemented.')
 
         obj._cpcm = True
+        obj._smd = (obj.solvation_model.lower() == 'smd')
 
     else:
         obj._cpcm = False
+        obj._smd = False
 
 
 def write_pe_jsonfile(molecule, potfile):

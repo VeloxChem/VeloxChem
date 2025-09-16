@@ -129,19 +129,6 @@ def ff_gen_xyz(
     return str(Path("Residues", f"{gromacs_file}.itp"))
 
 
-# 1.ff_gen to generate ff for user_linker
-# 2. parse ff
-# 3. mapping and replace new mof_edge ff
-
-###ff_name = ff_gen_xyz(linker_file,charge=-3)
-##ff_name='/Users/chenxili/GitHub/MOFbuilder/tests/Residues/triph.itp'
-##mapping = get_mapping_between_nometal_linker_xyz(linker_topic,center_frag_nodes_num,center_Xs,single_frag_nodes_num,frag_Xs,linker_file, new_xyz='Residues/EDGE.xyz')
-##map_name = 'linker_ff_mapping'
-##parsed_path=parseff(ff_name)
-##map_path = write_mapping_file(parsed_path,mapping,map_name)
-##map_forcefield_by_xyz(parsed_path,map_path,linker_file, new_xyz='EDGE.xyz')
-
-
 def get_residues_forcefield(
     arr,
     node_split_dict,

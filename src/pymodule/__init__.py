@@ -201,7 +201,7 @@ from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
-
+from .smddriver import SmdDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 

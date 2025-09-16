@@ -34,9 +34,13 @@
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 
+#include <iostream>
+
 CRIFockDriver::CRIFockDriver()
 
     : _j_metric(nullptr)
+
+    , _k_metric(nullptr)
 
     , _eri_buffer(CT3FlatBuffer<double>())
 {
@@ -46,6 +50,20 @@ CRIFockDriver::CRIFockDriver()
 CRIFockDriver::CRIFockDriver(const CSubMatrix& j_metric)
 
     : _j_metric(new CSubMatrix(j_metric))
+
+    , _k_metric(nullptr)
+
+    , _eri_buffer(CT3FlatBuffer<double>())
+{
+    
+}
+
+CRIFockDriver::CRIFockDriver(const CSubMatrix& j_metric,
+                             const CSubMatrix& k_metric)
+
+    : _j_metric(new CSubMatrix(j_metric))
+
+    , _k_metric(new CSubMatrix(k_metric))
 
     , _eri_buffer(CT3FlatBuffer<double>())
 {
@@ -57,6 +75,11 @@ CRIFockDriver::~CRIFockDriver()
     if (_j_metric != nullptr)
     {
         delete _j_metric;
+    }
+    
+    if (_k_metric != nullptr)
+    {
+        delete _k_metric;
     }
 }
 
@@ -158,6 +181,19 @@ auto
 CRIFockDriver::compute_local_bq_vector(const CMatrix &density) const -> std::vector<double>
 {
     return _trafo_local_gamma_vector(_comp_gamma_vector(density));
+}
+
+auto
+CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> std::vector<double>
+{
+    const auto mask = _eri_buffer.mask_indices();
+    
+    if (!mask.empty())
+    {
+        std::cout << "mask size:" << std::endl;
+    }
+    
+    return std::vector<double>();
 }
 
 auto
