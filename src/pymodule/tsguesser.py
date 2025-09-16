@@ -169,13 +169,14 @@ class TransitionStateGuesser():
         self.molecule = Molecule.read_xyz_string(
             self.reactant.molecule.get_xyz_string())
         self.molecule.set_charge(self.reactant.molecule.get_charge())
-        self.molecule.set_multiplicity(self.reactant.molecule.get_multiplicity())
-        
+        self.molecule.set_multiplicity(
+            self.reactant.molecule.get_multiplicity())
+
         if self.mute_ff_build:
             self.ostream.print_blank()
             self.ostream.flush()
             self.ffbuilder.ostream.unmute()
-            self.ffbuilder._summarise_reaction(self.reactant,self.product)
+            self.ffbuilder._summarise_reaction(self.reactant, self.product)
             self.ffbuilder.ostream.mute()
         self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
@@ -709,7 +710,8 @@ class TransitionStateGuesser():
         if self.reactant.bonds is not None and self.product.bonds is not None:
             reactant_bonds = set(self.reactant.bonds.keys())
             product_bonds = set(self.product.bonds.keys())
-            changing_bonds = list(self.forming_bonds) + list(self.breaking_bonds)
+            changing_bonds = list(self.forming_bonds) + list(
+                self.breaking_bonds)
             mol.show(
                 bonds=reactant_bonds | product_bonds,
                 dashed_bonds=changing_bonds,
@@ -750,15 +752,15 @@ class TransitionStateGuesser():
         scf_energies = results.get('scf_energies', None)
         max_scf_geometry = results.get('max_scf_geometry', None)
         max_scf_lambda = results.get('max_scf_lambda', None)
-        
+
         reactant = self.reactant.get_forcefield_as_json(self.reactant)
         product = self.product.get_forcefield_as_json(self.product)
         rea_xyz = self.reactant.molecule.get_xyz_string()
         pro_xyz = self.product.molecule.get_xyz_string()
-        
+
         forming_bonds = results.get('forming_bonds', None)
         breaking_bonds = results.get('breaking_bonds', None)
-        
+
         hf.create_dataset('reactant_ff', data=reactant)
         hf.create_dataset('product_ff', data=product)
         hf.create_dataset('reactant_xyz', data=rea_xyz)
@@ -769,21 +771,23 @@ class TransitionStateGuesser():
         hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
         hf.create_dataset('max_mm_geometry', data=[max_mm_geometry])
         hf.create_dataset('max_mm_lambda', data=max_mm_lambda, dtype='f')
-        
-        hf.create_dataset('forming_bonds', data=np.array(np.array(list(forming_bonds)), dtype='i'))
-        hf.create_dataset('breaking_bonds', data=np.array(np.array(list(breaking_bonds)), dtype='i'))
-        
+
+        hf.create_dataset('forming_bonds',
+                          data=np.array(np.array(list(forming_bonds)),
+                                        dtype='i'))
+        hf.create_dataset('breaking_bonds',
+                          data=np.array(np.array(list(breaking_bonds)),
+                                        dtype='i'))
+
         if scf_energies is not None:
             hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
             hf.create_dataset('max_scf_geometry', data=[max_scf_geometry])
             hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
 
-    
-
     def load_results(self, fname):
         self.ostream.print_info(f"Loading results from {fname}")
         self.ostream.flush()
-        
+
         hf = h5py.File(fname, 'r')
         results = {}
         results['mm_energies'] = hf['mm_energies'][:]
@@ -793,23 +797,25 @@ class TransitionStateGuesser():
         results['lambda_vec'] = hf['lambda_vec'][:]
         results['max_mm_geometry'] = hf['max_mm_geometry'][0].decode('utf-8')
         results['max_mm_lambda'] = hf['max_mm_lambda'][()]
-        
+
         reactant_ff = hf['reactant_ff'][()]
         product_ff = hf['product_ff'][()]
         reactant_xyz = hf['reactant_xyz'][()].decode('utf-8')
         product_xyz = hf['product_xyz'][()].decode('utf-8')
-        
+
         forming_bonds = hf['forming_bonds'][()]
         breaking_bonds = hf['breaking_bonds'][()]
-        
-        self.reactant = MMForceFieldGenerator.load_forcefield_from_json_string(reactant_ff)
+
+        self.reactant = MMForceFieldGenerator.load_forcefield_from_json_string(
+            reactant_ff)
         self.reactant.molecule = Molecule.read_xyz_string(reactant_xyz)
-        self.product = MMForceFieldGenerator.load_forcefield_from_json_string(product_ff)
+        self.product = MMForceFieldGenerator.load_forcefield_from_json_string(
+            product_ff)
         self.product.molecule = Molecule.read_xyz_string(product_xyz)
-        
+
         self.forming_bonds = set([tuple(bond) for bond in forming_bonds])
         self.breaking_bonds = set([tuple(bond) for bond in breaking_bonds])
-        
+
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]
             results['max_scf_geometry'] = hf['max_scf_geometry'][0].decode(
@@ -858,11 +864,10 @@ class TransitionStateGuesser():
 
     def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
         if n_conf is None:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
-                l, e1, e2, em)
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}".format(l, e1, e2, em)
         else:
             valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
-                l,e1, e2, em, n_conf)
+                l, e1, e2, em, n_conf)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
