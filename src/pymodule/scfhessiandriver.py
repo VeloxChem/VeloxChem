@@ -33,6 +33,7 @@
 import numpy as np
 import time as tm
 import math
+import copy
 
 from .veloxchemlib import OverlapGeom200Driver
 from .veloxchemlib import OverlapGeom101Driver
@@ -99,6 +100,8 @@ class ScfHessianDriver(HessianDriver):
         # flag for printing the Hessian
         self.do_print_hessian = False
 
+        self.atom_pairs = None
+
         # TODO: determine _block_size_factor for SCF Hessian driver
         # self._block_size_factor = 4
 
@@ -113,9 +116,9 @@ class ScfHessianDriver(HessianDriver):
 
         self._input_keywords['hessian'].update({
             'orbrsp_only':
-                ('bool', 'whether to only run CPHF orbital response'),
+            ('bool', 'whether to only run CPHF orbital response'),
             'use_subcomms':
-                ('bool', 'whether to use subcommunicators in orbital response'),
+            ('bool', 'whether to use subcommunicators in orbital response'),
         })
 
     def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):
@@ -161,6 +164,7 @@ class ScfHessianDriver(HessianDriver):
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
+        self.profiler = profiler
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
@@ -178,7 +182,8 @@ class ScfHessianDriver(HessianDriver):
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
         else:
-            self.compute_analytical(molecule, ao_basis, profiler)
+            self.compute_analytical(molecule, ao_basis, profiler,
+                                    self.atom_pairs)
 
         if self.rank == mpi_master():
             # print Hessian
@@ -289,7 +294,7 @@ class ScfHessianDriver(HessianDriver):
                             'ScfHessianDriver: SCF did not converge')
         self.ostream.unmute()
 
-    def compute_analytical(self, molecule, ao_basis, profiler):
+    def compute_analytical(self, molecule, ao_basis, profiler, atom_pairs=None):
         """
         Computes the analytical nuclear Hessian.
 
@@ -299,7 +304,11 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         :param profiler:
             The profiler.
+        :param atom_pairs:
+            The atom pairs to compute the Hessian for.
         """
+
+        profiler.timing = True
 
         assert_msg_critical(
             self.scf_driver.scf_type == 'restricted',
@@ -383,7 +392,9 @@ class ScfHessianDriver(HessianDriver):
         for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
 
-        cphf_solver.compute(molecule, ao_basis, scf_tensors)
+        # todo add atom pair option to cphf solver
+
+        cphf_solver.compute(molecule, ao_basis, scf_tensors, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
@@ -394,22 +405,39 @@ class ScfHessianDriver(HessianDriver):
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
 
         # First-order contributions
-
         t1 = tm.time()
 
         # RHS contracted with CPHF coefficients (ov)
         hessian_cphf_coeff_rhs = np.zeros((natm, 3, natm, 3))
 
-        for i in range(natm):
+        atoms = []
+        if atom_pairs is not None:
+            for i, j in atom_pairs:
+                if i not in atoms:
+                    atoms.append(i)
+                if j not in atoms:
+                    atoms.append(j)
+        else:
+            atoms = range(natm)
+        atoms = sorted(atoms)
+
+        # TODO: use alternative way to partition atoms
+        local_atoms = atoms[self.rank::self.nodes]
+
+        for i in atoms:
             for x in range(3):
                 dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
-
-                for j in range(i, natm):
+                for j in atoms:
+                    if j < i:
+                        continue
+                    if atom_pairs is not None:
+                        if i != j and (i, j) not in atom_pairs and (
+                                j, i) not in atom_pairs:
+                            continue
                     for y in range(3):
                         hess_ijxy = 4.0 * (np.dot(
                             dist_cphf_ov_ix_data,
                             dist_cphf_rhs[j * 3 + y].data))
-
                         hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
                         if i != j:
                             hessian_cphf_coeff_rhs[j, y, i, x] += hess_ijxy
@@ -431,7 +459,6 @@ class ScfHessianDriver(HessianDriver):
         self.ostream.flush()
 
         # Second-order contributions
-
         t2 = tm.time()
 
         ovlp_hess_200_drv = OverlapGeom200Driver()
@@ -498,9 +525,6 @@ class ScfHessianDriver(HessianDriver):
 
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
-
-        # TODO: use alternative way to partition atoms
-        local_atoms = list(range(natm))[self.rank::self.nodes]
 
         for i in local_atoms:
 
@@ -570,20 +594,23 @@ class ScfHessianDriver(HessianDriver):
                 thresh_int)
 
             # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
-            xy_pairs_upper_triang = [
-                (x, y) for x in range(3) for y in range(x, 3)
-            ]
+            xy_pairs_upper_triang = [(x, y) for x in range(3)
+                                     for y in range(x, 3)]
 
             for idx, (x, y) in enumerate(xy_pairs_upper_triang):
                 hess_val = fock_factor * fock_hess_2000[idx]
                 hessian_2nd_order_derivatives[i, i, x, y] += hess_val
                 if x != y:
                     hessian_2nd_order_derivatives[i, i, y, x] += hess_val
-
         # do only upper triangular matrix
-        all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
-
         # TODO: use alternative way to partition atom pairs
+        if atom_pairs is None:
+            all_atom_pairs = [(i, j) for i in range(natm)
+                              for j in range(i, natm)]
+        else:
+            all_atom_pairs = copy.copy(atom_pairs)
+            for i in atoms:
+                all_atom_pairs.append((i, i))
         local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
 
         for i, j in local_atom_pairs:
@@ -686,7 +713,6 @@ class ScfHessianDriver(HessianDriver):
 
         hessian_2nd_order_derivatives = self.comm.reduce(
             hessian_2nd_order_derivatives, root=mpi_master())
-
         # DFT:
         if self._dft:
             grid_drv = GridDriver(self.comm)
@@ -716,6 +742,10 @@ class ScfHessianDriver(HessianDriver):
             nuclear_charges = molecule.get_element_ids()
 
             for i in range(self.rank, natm, self.nodes):
+                if atom_pairs is not None:
+                    if i not in atoms:
+                        continue
+
                 q_i = nuclear_charges[i]
                 xyz_i = qm_coords[i]
 
@@ -734,6 +764,10 @@ class ScfHessianDriver(HessianDriver):
             if self.scf_driver.qm_vdw_params is not None:
 
                 for i in range(self.rank, natm, self.nodes):
+                    if atom_pairs is not None:
+                        if i not in atoms:
+                            continue
+
                     xyz_i = qm_coords[i]
                     sigma_i = self.scf_driver.qm_vdw_params[i, 0]
                     epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
@@ -778,11 +812,19 @@ class ScfHessianDriver(HessianDriver):
                                                      root=mpi_master())
 
         if self.rank == mpi_master():
-
-            # Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
-            # Sum up the terms and reshape for final Hessian
+            # Doing this post-hoc is much easier to implement, and the cost of the nuclear nuclear contribution is neglible
+            if atom_pairs is not None:
+                for i in range(natm):
+                    for j in range(natm):
+                        if (i, j) not in all_atom_pairs and (
+                                j, i) not in all_atom_pairs:
+                            hessian_nuclear_nuclear[i, j, :, :] = 0.0
+                            if self._dft:
+                                hessian_dft_xc[i * 3:i * 3 + 3,
+                                               j * 3:j * 3 + 3] = 0.0
+
             self.hessian = (
                 hessian_first_order_derivatives +
                 hessian_2nd_order_derivatives.transpose(0, 2, 1, 3) +
