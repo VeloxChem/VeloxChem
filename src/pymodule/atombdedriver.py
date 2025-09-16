@@ -826,7 +826,7 @@ class AtomBdeDriver:
             carbon_indices.append(list(conn_mat[x]).index(1))
         #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
 
-        opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule)
+        opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule,1) #mol_idx=1 because of single molecule, so no other molecules
         radical_molecules, radical_carbon_indices = self._remove_atom_by_idx(
             opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
         guess_msg = []
