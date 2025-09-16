@@ -559,7 +559,7 @@ class AtomBdeDriver:
             "Optimizing geometry of the molecule before removing target atoms...")
         self.ostream.flush()
         if self.save_files:
-            self.mol_scf_drv.filename = f'bde_mol_{mol_idx+1}'
+            self.mol_scf_drv.filename = f'bde_mol_{mol_idx+1}_opt'
             self.mol_opt_drv.filename = f'bde_mol_{mol_idx+1}_opt'
             self.mol_final_scf_drv.filename = f'bde_mol_{mol_idx+1}_final'
         else:
@@ -668,7 +668,7 @@ class AtomBdeDriver:
         basis_set1 = MolecularBasis.read(mol, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(mol, self.basis_sets[1])
         if self.save_files:
-            self.radical_scf_drv.filename = f'bde_mol_{mol_idx+1}_{run_idx+1}'
+            self.radical_scf_drv.filename = f'bde_mol_{mol_idx+1}_{run_idx+1}_opt'
             self.radical_opt_drv.filename = f'bde_mol_{mol_idx+1}_{run_idx+1}_opt'
             self.radical_final_scf_drv.filename = f'bde_mol_{mol_idx+1}_{run_idx+1}_final'
         else:
