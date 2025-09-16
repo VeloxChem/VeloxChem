@@ -98,7 +98,9 @@ class TransitionStateGuesser():
         self.scf_drv = None
         self.folder_name = 'ts_data'
         self.force_conformer_search = False
-        self.skip_conformer_search = False
+        self.skip_discont_conformer_search = False
+        self.peak_conformer_search = True
+        self.peak_conformer_search_range = 0
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
@@ -225,14 +227,7 @@ class TransitionStateGuesser():
         return
 
     def scan_mm(self):
-
-        energies = []
-        E1 = []
-        E2 = []
-        energies_int = []
-        N_conf = []
-
-        positions = []
+        # Setup
         if not os.path.exists(self.folder_name):
             os.makedirs(self.folder_name)
         else:
@@ -265,97 +260,117 @@ class TransitionStateGuesser():
         try:
             if self.force_conformer_search:
                 self.ostream.print_info(
-                    "Force conformer search is enabled, scanning conformers for all Lambda values."
+                    "force_conformer_search true. Doing conformer search at every lambda."
                 )
                 self.ostream.flush()
-                self._print_rescan_mm_header()
-            else:
-                self._print_initial_mm_header()
-            for l in self.lambda_vec:
-                em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
-                    self.topology,
-                    self.systems[l],
-                    l,
-                    pos,
+                positions, Em, E1, E2, E_int, N_conf = self._run_mm_scan(
+                    self.lambda_vec,
                     rea_sim,
                     pro_sim,
-                    self.force_conformer_search,
+                    conformer_search=True,
+                    init_pos=pos,
                 )
-                if self.force_conformer_search:
-                    self._print_mm_iter(l, e1, e2, em, e_int, n_conf)
-                else:
-                    self._print_mm_iter(l, e1, e2, em, e_int)
+            else:
+                positions, Em, E1, E2, E_int, N_conf = self._run_mm_scan(
+                    self.lambda_vec,
+                    rea_sim,
+                    pro_sim,
+                    conformer_search=False,
+                    init_pos=pos,
+                )
 
-                positions.append(pos)
-                pos = pos * bohr_to_nm
-                E1.append(e1)
-                E2.append(e2)
-                energies.append(em)
-                energies_int.append(e_int)
-                N_conf.append(n_conf)
-            self.ostream.print_blank()
-            #make sure E1 is monotonically increasing
-            #make sure E2 is monotonically decreasing
-            if not self.skip_conformer_search and not self.force_conformer_search:
-                printed_header = False
-                for i, l in enumerate(self.lambda_vec):
-                    rescan = False
-                    if i < len(self.lambda_vec) - 1:
-                        rescan = E1[i] >= E1[i + 1]
-                    if i > 0:
-                        rescan = rescan or E2[i - 1] <= E2[i]
-                    if rescan:
-                        if not printed_header:
-                            self._print_rescan_mm_header()
-                            printed_header = True
-                        em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
-                            self.topology,
-                            self.systems[l],
-                            l,
-                            pos,
+                # Find peak
+                searched_conformers_indices = []
+                if self.peak_conformer_search:
+                    peak_index = np.argmax(Em)
+                    self.ostream.print_info(
+                        f"Found peak MM E: {Em[peak_index]:.3f} at Lambda: {self.lambda_vec[peak_index]}."
+                    )
+                    max_index = min(
+                        len(self.lambda_vec),
+                        peak_index + self.peak_conformer_search_range,
+                    )
+                    min_index = max(
+                        0,
+                        peak_index - self.peak_conformer_search_range,
+                    )
+                    self.ostream.print_info(
+                        f"Doing conformer search from Lambda: {self.lambda_vec[min_index]} to Lambda: {self.lambda_vec[max_index]}."
+                    )
+                    self.ostream.flush()
+                    searched_conformers_indices.extend(range(min_index, max_index + 1))
+                    positions_cs, Em_cs, E1_cs, E2_cs, E_int_cs, N_conf_cs = self._run_mm_scan(
+                        self.lambda_vec[min_index:max_index + 1],
+                        rea_sim,
+                        pro_sim,
+                        conformer_search=True,
+                        init_pos=positions[min_index],
+                    )
+                    
+                    for i, l in enumerate(self.lambda_vec[min_index:max_index + 1]):
+                        if Em_cs[i] < Em[min_index + i]:
+                            positions[min_index + i] = positions_cs[i]
+                            Em[min_index + i] = Em_cs[i]
+                            E1[min_index + i] = E1_cs[i]
+                            E2[min_index + i] = E2_cs[i]
+                            E_int[min_index + i] = E_int_cs[i]
+                            N_conf[min_index + i] = N_conf_cs[i]
+                            
+                if not self.skip_conformer_search:
+                    discont_indices = self._check_discontinuities(E1, E2)
+                    
+                    while len(discont_indices) > 0 and len(searched_conformers_indices) < len(self.lambda_vec):
+                        self.ostream.flush()
+                        self.ostream.print_info(f"Found discontinuities at indices: {discont_indices}.")
+                        to_search_indices = sorted([i for i in discont_indices if i not in searched_conformers_indices])
+                        searched_conformers_indices.extend(to_search_indices)
+                        searched_conformers_indices = sorted(list(set(searched_conformers_indices)))
+                        to_search_lambda = [self.lambda_vec[i] for i in to_search_indices]
+                        self.ostream.print_info(f"Performing conformer search at lambda values: {to_search_lambda}.")
+                        self.ostream.flush()
+                        positions_cs, Em_cs, E1_cs, E2_cs, E_int_cs, N_conf_cs = self._run_mm_scan(
+                            to_search_lambda,
                             rea_sim,
                             pro_sim,
-                            True,
+                            conformer_search=True,
+                            init_pos=positions[to_search_indices[0]], # TODO improve initial guess when searching multiple regions
                         )
-                        if n_conf == -1:
-                            n_conf = 'N/A'
-                        if e_int < energies_int[i]:
-                            positions[i] = pos
-                            energies[i] = em
-                            E1[i] = e1
-                            E2[i] = e2
-                            energies_int[i] = e_int
-                            N_conf[i] = n_conf
-                        self._print_mm_iter(
-                            l,
-                            E1[i],
-                            E2[i],
-                            energies[i],
-                            energies_int[i],
-                            N_conf[i],
-                        )
+                        
+                        for i, i_l in enumerate(to_search_indices):
+                            if Em_cs[i] < Em[i_l]:
+                                positions[i_l] = positions_cs[i]
+                                Em[i_l] = Em_cs[i]
+                                E1[i_l] = E1_cs[i]
+                                E2[i_l] = E2_cs[i]
+                                E_int[i_l] = E_int_cs[i]
+                                N_conf[i_l] = N_conf_cs[i]
+                        
+                        discont_indices = self._check_discontinuities(E1, E2)
 
+            pass
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
             exception = e
+
+        # Save the results and return them or raise the exception
 
         xyz_geometries = []
         for mm_geom in positions:
             xyz_geom = self._mm_to_xyz_geom(mm_geom, self.molecule)
             xyz_geometries.append(xyz_geom)
         results = {
-            'mm_energies': energies,
+            'mm_energies': Em,
             'mm_energies_reactant': E1,
             'mm_energies_product': E2,
-            'int_energies': energies_int,
+            'int_energies': E_int,
             'mm_geometries': positions,
             'xyz_geometries': xyz_geometries,
         }
 
         if exception is None:
-            max_mm_index = np.argmax(energies)
+            max_mm_index = np.argmax(Em)
             max_xyz_geom = xyz_geometries[max_mm_index]
-            max_mm_energy = energies[max_mm_index]
+            max_mm_energy = Em[max_mm_index]
             max_mm_lambda = self.lambda_vec[max_mm_index]
             self.ostream.print_info(
                 f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
@@ -381,6 +396,54 @@ class TransitionStateGuesser():
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
             raise exception
+        
+    def _check_discontinuities(self, E1, E2):
+        discont_indices = []
+        for i,e1 in enumerate(E1[:-1]):
+            if e1 > E1[i+1]:
+                discont_indices.append(i)
+                discont_indices.append(i+1)
+
+        for i,e2 in enumerate(E2[:-1]):
+            if e2 < E2[i+1]:
+                discont_indices.append(i)
+                discont_indices.append(i+1)
+        discont_indices = set(sorted(discont_indices))
+        return discont_indices
+
+    def _run_mm_scan(self, lambda_vals, rea_sim, pro_sim, conformer_search,
+                     init_pos):
+        pos = copy.copy(init_pos)
+        positions = []
+        Em = []
+        E1 = []
+        E2 = []
+        E_int = []
+        N_conf = []
+        self._print_mm_header(conformer_search=conformer_search,
+                              lambda_vals=lambda_vals)
+        for l in lambda_vals:
+            em, e1, e2, e_int, return_pos, n_conf = self._get_mm_energy(
+                self.topology,
+                self.systems[l],
+                l,
+                pos,
+                rea_sim,
+                pro_sim,
+                conformer_search,
+            )
+            positions.append(return_pos)
+            Em.append(em)
+            E1.append(e1)
+            E2.append(e2)
+            E_int.append(e_int)
+            N_conf.append(n_conf)
+            if conformer_search:
+                self._print_mm_iter(l, e1, e2, em, e_int, n_conf)
+            else:
+                self._print_mm_iter(l, e1, e2, em, e_int)
+            pos = return_pos
+        return positions, Em, E1, E2, E_int, N_conf
 
     def _get_mm_energy(
         self,
@@ -823,43 +886,46 @@ class TransitionStateGuesser():
             results['max_scf_lambda'] = hf['max_scf_lambda'][()]
         return results
 
-    def _print_initial_mm_header(self):
+    def _print_mm_header(self, conformer_search=False, lambda_vals=None):
         self.ostream.print_blank()
-        self.ostream.print_header("Starting initial MM scan")
+        if lambda_vals is None:
+            self.ostream.print_header("Starting MM scan")
+        else:
+            self.ostream.print_header(
+                f"Starting MM scan for lambda values {lambda_vals}")
         self.ostream.print_blank()
         self.ostream.print_header("MM parameters:")
-        self.ostream.print_header(f"mm steps:       {self.mm_steps:>10}")
-        self.ostream.print_header(f"mm temperature: {self.mm_temperature:>8} K")
-        self.ostream.print_header(f"mm step size:   {self.mm_step_size:>7} ps")
+        self.ostream.print_header(f"MD steps:       {self.mm_steps:>10}")
+        self.ostream.print_header(f"MD temperature: {self.mm_temperature:>8} K")
+        self.ostream.print_header(f"MD step size:   {self.mm_step_size:>7} ps")
         self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
-        self.ostream.print_header(f"saving mm traj: {self.save_mm_traj:>10}")
+        self.ostream.print_header(
+            f"saving MD traj: {str(self.save_mm_traj):>10}")
+        self.ostream.print_header(
+            f"conf. search:   {str(conformer_search):>10}")
+        if conformer_search:
+            self.ostream.print_header(
+                f"conf. steps:    {self.conformer_steps:>10}")
+            self.ostream.print_header(
+                f"conf. snapshots:{self.conformer_snapshots:>10}")
         self.ostream.print_blank()
-        valstr = '{} | {} | {} | {}'.format(
-            'Lambda',
-            '    E1',
-            '    E2',
-            '     V',
-        )
+        if not conformer_search:
+            valstr = '{} | {} | {} | {}'.format(
+                'Lambda',
+                '    E1',
+                '    E2',
+                '     V',
+            )
+        else:
+            valstr = '{} | {} | {} | {} | {}'.format(
+                'Lambda',
+                '    E1',
+                '    E2',
+                '     V',
+                'n_conf',
+            )
         self.ostream.print_header(valstr)
         self.ostream.print_header(45 * '-')
-        self.ostream.flush()
-
-    def _print_rescan_mm_header(self):
-        self.ostream.print_blank()
-        self.ostream.print_header(
-            f"Scanning MM conformers with {self.conformer_snapshots} snapshots and {self.conformer_steps} steps"
-        )
-        self.ostream.print_blank()
-        valstr = '{} | {} | {} | {} | {} | {}'.format(
-            'Lambda',
-            ' E_int',
-            '    E1',
-            '    E2',
-            '    Em',
-            'n_conf',
-        )
-        self.ostream.print_header(valstr)
-        self.ostream.print_header(50 * '-')
         self.ostream.flush()
 
     def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
