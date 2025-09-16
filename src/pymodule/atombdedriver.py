@@ -907,12 +907,18 @@ class AtomBdeDriver:
         self._check_scf_mute()
         self._check_functionals()
         self._check_radical_level_shifting()
+
         target_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_target_atoms_keys, unique_target_atoms_indices = self._fetch_unique_target_atom(
             target_atoms_dict,
             use_equiv=self.use_equiv,
             only_sp3_carbon_connections=self.only_sp3_carbon_connections)
-        #self.ostream.print_info(f'unique_target_atoms_indices {unique_target_atoms_indices}')
+
+        
+        if self._debug:
+            self.ostream.print_info(f'unique_target_atoms_indices {unique_target_atoms_indices}')
+        
+
         carbon_indices = []
         # Generate radical molecules by removing target atoms
         # check connectivity matrix to find the connected carbon index for each target atom
@@ -921,11 +927,13 @@ class AtomBdeDriver:
         for x in unique_target_atoms_indices:
             assert list(conn_mat[x]).count(1) == 1
             carbon_indices.append(list(conn_mat[x]).index(1))
-        #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
+        if self._debug:
+            self.ostream.print_info(f'connected atom_indices {carbon_indices}')
 
-        opt_whole_molecule = self._compute_whole_mol_scf_energy(whole_molecule,1) #mol_idx=1 because of single molecule, so no other molecules
+        self._compute_whole_mol_scf_energy(whole_molecule,1) #mol_idx=1 because of single molecule, so no other molecules
         radical_molecules, radical_carbon_indices = self._remove_atom_by_idx(
-            opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
+            self.opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
+            
         guess_msg = []
         for i in range(len(radical_molecules)):
             guess = f"guess_unpaired_electrons = {radical_carbon_indices[i]+1}(1.0)"
