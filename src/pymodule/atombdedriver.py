@@ -992,7 +992,7 @@ class AtomBdeDriver:
                     bde_hartree = self.mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.target_atom_single_point_scf_energy         
                 unique_BDEs_hartree.append(bde_hartree)
 
-        self._comm.bcast(unique_BDEs_hartree, root=mpi_master())
+        unique_BDEs_hartree = self._comm.bcast(unique_BDEs_hartree, root=mpi_master())
 
 
         if self._rank == mpi_master():
