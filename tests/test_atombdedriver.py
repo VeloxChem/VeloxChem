@@ -20,9 +20,9 @@ class TestAtomBdeDriver:
         bde.mute_output = True
         bde.save_files = False
         bde.compute(molecules)
-        if bde._rank == mpi_master():
-            assert abs(bde.mols_bdes_list[0]["unique_BDEs_hartree"][0] -
+        assert abs(bde.mols_bdes_list[0]["unique_BDEs_hartree"][0] -
                        0.17657796026960781) < 1.0e-4
+
 
     @pytest.mark.skipif("rdkit" not in sys.modules,
                         reason="rdkit not available")

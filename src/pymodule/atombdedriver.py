@@ -35,7 +35,7 @@ import time
 import numpy as np
 import sys
 
-from .veloxchemlib import mpi_master,hartree_in_kcalpermol, hartree_in_kjpermol
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .atomtypeidentifier import AtomTypeIdentifier
@@ -44,7 +44,6 @@ from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
-
 
 
 class AtomBdeDriver:
@@ -79,7 +78,7 @@ class AtomBdeDriver:
     - Optimization: def2-svp/blyp/RI/grid_level2, SCF convergence 1e-3.
     - Single-point: def2-tzvp/b3lyp, SCF convergence 1e-3.
     - Level shifting of 0.5 applied to radical SCF drivers.
-    - If SCF for a radical does not converge, BDE is set to 0.0 and displayed as "fail".
+    - If SCF for a radical does not converge, BDE is set to 0.0 and displayed as "Fail".
 
     Usage:
     ------
@@ -100,6 +99,7 @@ class AtomBdeDriver:
         `self.basis_sets = ["def2-svp", "def2-tzvp"]`
         `self.xcfunctionals = ["blyp", "b3lyp"]`
     """
+
     def __init__(self, comm=None, ostream=None):
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -116,7 +116,7 @@ class AtomBdeDriver:
         self.ostream = ostream
 
         #two basis sets needed for optimization and final single point energy calculation
-        self.basis_sets = ["def2-svp", "def2-tzvp"]  
+        self.basis_sets = ["def2-svp", "def2-tzvp"]
         self.xcfunctionals = ["blyp", "b3lyp"]
         self.radical_level_shifting = 0.5
         #whole molecule optimization workflow
@@ -156,7 +156,11 @@ class AtomBdeDriver:
         self.mol_rad_multiplicity = 2
         self.mol_rad_charge = 0
         self.show_mol = False
-        
+
+        #attributes for filtering target atoms based on connected atoms
+        self.connected_atoms = []  #connected atoms to the target atom
+        self.connected_atom_types = []  #connected atom types to the target atom
+
         #save files
         self.save_files = True
 
@@ -167,7 +171,7 @@ class AtomBdeDriver:
         self.atoms_types = None
         self.atom_info_dict = {}
         self.target_atom_info_dict = {}
-        self.use_equiv = True
+        self.use_equivalence = True
         self.only_sp3_carbon_connections = True
         self.only_hartree_fock = False
         self.mute_output = False
@@ -175,21 +179,14 @@ class AtomBdeDriver:
 
         self._debug = False  #debug mode
 
-    def _check_mpi_results(self,v):
-        """
-        check the mpi results, if any of the results is None, then return None
-        """
-        #print in rank x the variable is y
-        if self._rank:
-            self.ostream.print_info(f'in rank {self._rank} the variable is {v}')
 
     def _update_drv_input_attributes(self, old_drv, new_drv):
         #if attribute is in input keywords, then update it but skip _scf_type of old_drv
         update_keywords = []
         if hasattr(new_drv, '_input_keywords'):
-            for key in new_drv._input_keywords.keys():# scf driver
+            for key in new_drv._input_keywords.keys():  # scf driver
                 update_keywords.extend(new_drv._input_keywords[key].keys())
-        if hasattr(new_drv, 'input_keywords'): # optimization driver
+        if hasattr(new_drv, 'input_keywords'):  # optimization driver
             for key in new_drv.input_keywords.keys():
                 update_keywords.extend(new_drv.input_keywords[key].keys())
 
@@ -201,35 +198,49 @@ class AtomBdeDriver:
                 setattr(new_drv, attr, getattr(old_drv, attr))
         return new_drv
 
-
-    def _check_proper_drv(self,whole_molecule):
+    def _check_proper_drv(self, whole_molecule):
         #reset scf drv for 'molecule', 'radical', 'target_atom' based on multiplicity
         #default target atom (hydrogen) is doublet with ScfUnrestrictedDriver
-        if self.target_atom_multiplicity == 1: #singlet
-            self.target_atom_final_scf_drv = self._update_drv_input_attributes(self.target_atom_final_scf_drv, ScfRestrictedDriver(self._comm))
-        elif self.target_atom_multiplicity > 1: #multiplet
-            self.target_atom_final_scf_drv = self._update_drv_input_attributes(self.target_atom_final_scf_drv, ScfUnrestrictedDriver(self._comm))
+        if self.target_atom_multiplicity == 1:  #singlet
+            self.target_atom_final_scf_drv = self._update_drv_input_attributes(
+                self.target_atom_final_scf_drv, ScfRestrictedDriver(self._comm))
+        elif self.target_atom_multiplicity > 1:  #multiplet
+            self.target_atom_final_scf_drv = self._update_drv_input_attributes(
+                self.target_atom_final_scf_drv,
+                ScfUnrestrictedDriver(self._comm))
 
         #default radical is doublet with ScfUnrestrictedDriver
-        if self.mol_rad_multiplicity == 1: #singlet
-            self.radical_scf_drv = self._update_drv_input_attributes(self.radical_scf_drv, ScfRestrictedDriver(self._comm))
-            self.radical_final_scf_drv = self._update_drv_input_attributes(self.radical_final_scf_drv, ScfRestrictedDriver(self._comm))
-            self.radical_opt_drv = self._update_drv_input_attributes(self.radical_opt_drv, OptimizationDriver(self.radical_scf_drv))
-        elif self.mol_rad_multiplicity > 1: #multiplet
-            self.radical_scf_drv = self._update_drv_input_attributes(self.radical_scf_drv, ScfUnrestrictedDriver(self._comm))
-            self.radical_final_scf_drv = self._update_drv_input_attributes(self.radical_final_scf_drv, ScfUnrestrictedDriver(self._comm))
-            self.radical_opt_drv = self._update_drv_input_attributes(self.radical_opt_drv, OptimizationDriver(self.radical_scf_drv))
+        if self.mol_rad_multiplicity == 1:  #singlet
+            self.radical_scf_drv = self._update_drv_input_attributes(
+                self.radical_scf_drv, ScfRestrictedDriver(self._comm))
+            self.radical_final_scf_drv = self._update_drv_input_attributes(
+                self.radical_final_scf_drv, ScfRestrictedDriver(self._comm))
+            self.radical_opt_drv = self._update_drv_input_attributes(
+                self.radical_opt_drv, OptimizationDriver(self.radical_scf_drv))
+        elif self.mol_rad_multiplicity > 1:  #multiplet
+            self.radical_scf_drv = self._update_drv_input_attributes(
+                self.radical_scf_drv, ScfUnrestrictedDriver(self._comm))
+            self.radical_final_scf_drv = self._update_drv_input_attributes(
+                self.radical_final_scf_drv, ScfUnrestrictedDriver(self._comm))
+            self.radical_opt_drv = self._update_drv_input_attributes(
+                self.radical_opt_drv, OptimizationDriver(self.radical_scf_drv))
 
         #default molecule is closed shell
-        if whole_molecule.get_multiplicity() > 1: #multiplet
-            self.mol_scf_drv = self._update_drv_input_attributes(self.mol_scf_drv, ScfUnrestrictedDriver(self._comm))
-            self.mol_final_scf_drv = self._update_drv_input_attributes(self.mol_final_scf_drv, ScfUnrestrictedDriver(self._comm))
-            self.mol_opt_drv = self._update_drv_input_attributes(self.mol_opt_drv, OptimizationDriver(self.mol_scf_drv))
-        elif whole_molecule.get_multiplicity() == 1: #singlet
-            self.mol_scf_drv = self._update_drv_input_attributes(self.mol_scf_drv, ScfRestrictedDriver(self._comm))
-            self.mol_final_scf_drv = self._update_drv_input_attributes(self.mol_final_scf_drv, ScfRestrictedDriver(self._comm))
-            self.mol_opt_drv = self._update_drv_input_attributes(self.mol_opt_drv, OptimizationDriver(self.mol_scf_drv))
-    
+        if whole_molecule.get_multiplicity() > 1:  #multiplet
+            self.mol_scf_drv = self._update_drv_input_attributes(
+                self.mol_scf_drv, ScfUnrestrictedDriver(self._comm))
+            self.mol_final_scf_drv = self._update_drv_input_attributes(
+                self.mol_final_scf_drv, ScfUnrestrictedDriver(self._comm))
+            self.mol_opt_drv = self._update_drv_input_attributes(
+                self.mol_opt_drv, OptimizationDriver(self.mol_scf_drv))
+        elif whole_molecule.get_multiplicity() == 1:  #singlet
+            self.mol_scf_drv = self._update_drv_input_attributes(
+                self.mol_scf_drv, ScfRestrictedDriver(self._comm))
+            self.mol_final_scf_drv = self._update_drv_input_attributes(
+                self.mol_final_scf_drv, ScfRestrictedDriver(self._comm))
+            self.mol_opt_drv = self._update_drv_input_attributes(
+                self.mol_opt_drv, OptimizationDriver(self.mol_scf_drv))
+
     def _check_scf_mute(self):
         if self.mute_output:
             self.mol_scf_drv.ostream.mute()
@@ -239,7 +250,6 @@ class AtomBdeDriver:
             self.target_atom_final_scf_drv.ostream.mute()
             self.mol_opt_drv.ostream.mute()
             self.radical_opt_drv.ostream.mute()
-    
 
     def _check_radical_level_shifting(self):
         if self.radical_level_shifting is not None:
@@ -257,9 +267,8 @@ class AtomBdeDriver:
         """
         #if only hartree fock, then set functionals to None
         if self.only_hartree_fock:
-            self.xcfunctionals = [] #reset xcfunctionals to an empty list
-            self.ostream.print_info(
-                "Using HF for all calculations")
+            self.xcfunctionals = []  #reset xcfunctionals to an empty list
+            self.ostream.print_info("Using HF for all calculations")
             self.ostream.flush()
             return
 
@@ -277,15 +286,13 @@ class AtomBdeDriver:
             elif self.radical_scf_drv.xcfun is not None:
                 self.xcfunctionals.append(self.radical_scf_drv.xcfun)
                 if self.radical_final_scf_drv.xcfun is not None:
-                    self.xcfunctionals.append(
-                        self.radical_final_scf_drv.xcfun)
+                    self.xcfunctionals.append(self.radical_final_scf_drv.xcfun)
                 else:
                     self.xcfunctionals.append(self.radical_scf_drv.xcfun)
             else:
                 assert_msg_critical(
                     "No exchange-correlation functionals provided and no functional found in scf drivers, "
-                    "please provide functionals or set only_hartree_fock=True"
-                )
+                    "please provide functionals or set only_hartree_fock=True")
         elif len(self.xcfunctionals) == 1:
             self.xcfunctionals.append(self.xcfunctionals[0])
 
@@ -388,8 +395,9 @@ class AtomBdeDriver:
                 "atom_type": atom_type[i],
                 "equiv_group": self._search_in_equiv_atoms_groups(
                     equiv_atoms_groups, i),
-                f"{self.target_atom}_connected_atom": self._add_target_atom_connected_atom_info(
-                    labels, atom_type, i, con_matrix),
+                f"{self.target_atom}_connected_atom":
+                    self._add_target_atom_connected_atom_info(
+                        labels, atom_type, i, con_matrix),
                 "coord": coords[i]
             }
         if self._debug:
@@ -407,8 +415,8 @@ class AtomBdeDriver:
             self.target_atom_info = target_atom_info_dict
             return target_atom_info_dict
 
-    def _add_target_atom_connected_atom_info(self, labels, atoms_types, atom_idx,
-                                   connectivity_matrix):
+    def _add_target_atom_connected_atom_info(self, labels, atoms_types,
+                                             atom_idx, connectivity_matrix):
         """
         this function is to use connectivity matrix to find the H connected atom information
 
@@ -430,18 +438,19 @@ class AtomBdeDriver:
             connected_atom_idx = np.where(con_info == 1)[0]
             if len(connected_atom_idx) != 1:
                 assert_msg_critical(
-                    f"{self.target_atom} atom should have only one connected atom")
+                    f"{self.target_atom} atom should have only one connected atom"
+                )
             connected_atom = labels[connected_atom_idx[0]]
             connected_atom_type = atoms_types[connected_atom_idx[0]]
             target_atom_connected_atom_info = (str(connected_atom) + "_" +
-                                     str(connected_atom_idx[0]) + "_" +
-                                     str(connected_atom_type))
+                                               str(connected_atom_idx[0]) +
+                                               "_" + str(connected_atom_type))
             return target_atom_connected_atom_info
 
     def _fetch_unique_target_atom(self,
-                        target_atoms_dict,
-                        use_equiv=False,
-                        only_sp3_carbon_connections=False):
+                                  target_atoms_dict,
+                                  use_equiv=False,
+                                  only_sp3_carbon_connections=False):
         """
         this function is used as filter for unique (hydrogen) atoms or only hydrogen connected to sp3 carbon
 
@@ -454,25 +463,27 @@ class AtomBdeDriver:
         """
         if not use_equiv:
             for key in target_atoms_dict.keys():
-                target_atoms_dict[key]["equiv_group"] = [key.split("_")[1]] #set equiv_group to itself
+                target_atoms_dict[key]["equiv_group"] = [
+                    key.split("_")[1]
+                ]  #set equiv_group to itself
 
         target_atoms_record = []
         unique_target_atom_keys = []
         for key in target_atoms_dict.keys():
             if key.split("_")[0] == self.target_atom and int(
                     key.split("_")[1]) not in target_atoms_record:
-                target_atoms_record.extend(target_atoms_dict[key]["equiv_group"])
+                target_atoms_record.extend(
+                    target_atoms_dict[key]["equiv_group"])
                 unique_target_atom_keys.append(key)
         unique_target_atom_indices = [
             int(x.split("_")[1]) for x in unique_target_atom_keys
         ]
-        if not only_sp3_carbon_connections:
-            return unique_target_atom_keys, unique_target_atom_indices
-        else:
+        if only_sp3_carbon_connections:
             sp3_carbon_unique_target_atoms_indices = []
             sp3_carbon_unique_target_atoms_keys = []
             for key in unique_target_atom_keys:
-                if target_atoms_dict[key][f"{self.target_atom}_connected_atom"] != "":
+                if target_atoms_dict[key][
+                        f"{self.target_atom}_connected_atom"] != "":
                     connected_atom = target_atoms_dict[key][
                         f"{self.target_atom}_connected_atom"].split("_")[0]
                     connected_atom_type = target_atoms_dict[key][
@@ -482,10 +493,39 @@ class AtomBdeDriver:
                             int(key.split("_")[1]))
                         sp3_carbon_unique_target_atoms_keys.append(key)
             return sp3_carbon_unique_target_atoms_keys, sp3_carbon_unique_target_atoms_indices
+        else:
+            #no filtering on connected atoms
+            if (len(self.connected_atoms) == 0):  #no filtering on connected atoms
+                return unique_target_atom_keys, unique_target_atom_indices
+            #filtering on connected atoms
+            else:
+                connected_unique_target_atoms_indices = []
+                connected_unique_target_atoms_keys = []
+                for key in unique_target_atom_keys:
+                    if target_atoms_dict[key][
+                            f"{self.target_atom}_connected_atom"] != "":
+                        connected_atom = target_atoms_dict[key][
+                            f"{self.target_atom}_connected_atom"].split("_")[0]
+                        connected_atom_type = target_atoms_dict[key][
+                            f"{self.target_atom}_connected_atom"].split("_")[2]
+                        #check if connected_atom is in the list of connected_atoms
+                        if connected_atom in self.connected_atoms:
+                            #if setting connected_atom_types, then check if connected_atom_type is in the list
+                            if len(self.connected_atom_types) > 0:
+                                if connected_atom_type in self.connected_atom_types:
+                                    connected_unique_target_atoms_indices.append(
+                                        int(key.split("_")[1]))
+                                    connected_unique_target_atoms_keys.append(
+                                        key)
+                            else:  #if not setting connected_atom_types, then only check connected_atom
+                                connected_unique_target_atoms_indices.append(
+                                    int(key.split("_")[1]))
+                                connected_unique_target_atoms_keys.append(key)
+                return connected_unique_target_atoms_keys, connected_unique_target_atoms_indices
 
     def _update_equiv_target_atoms_dissociation_energy(
-            self, unique_target_atoms_dissociation_energies, unique_target_atoms_keys,
-            target_atoms_dict):
+            self, unique_target_atoms_dissociation_energies,
+            unique_target_atoms_keys, target_atoms_dict):
         """
         this function is used to add the dissociation energy of equivalent target atoms in the target_atoms_dict
 
@@ -505,56 +545,68 @@ class AtomBdeDriver:
             energy_hartree = unique_target_atoms_dissociation_energies[i]
             if "kj" in self.energy_unit.lower():
                 unique_target_atoms_bdes_kj_coords.append(
-                    (energy_hartree * hartree2kj, target_atoms_dict[key]["coord"]))
+                    (energy_hartree * hartree2kj,
+                     target_atoms_dict[key]["coord"]))
             elif "kcal" in self.energy_unit.lower():
                 unique_target_atoms_bdes_kj_coords.append(
-                    (energy_hartree * hartree2kcal, target_atoms_dict[key]["coord"]))
-            elif ("hartree" in self.energy_unit.lower() or "au" in self.energy_unit.lower()):
+                    (energy_hartree * hartree2kcal,
+                     target_atoms_dict[key]["coord"]))
+            elif ("hartree" in self.energy_unit.lower() or
+                  "au" in self.energy_unit.lower()):
                 unique_target_atoms_bdes_kj_coords.append(
                     (energy_hartree, target_atoms_dict[key]["coord"]))
             equiv_group = target_atoms_dict[key]["equiv_group"]
             for j in equiv_group:
                 target_atoms_dict[
-                    str(self.target_atom)+"_" + str(j)]["dissociation_energy_hartree"] = energy_hartree
-                target_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kcal"] = (
-                    energy_hartree * hartree2kcal)
-                target_atoms_dict[str(self.target_atom)+"_" + str(j)]["dissociation_energy_kj"] = (
-                    energy_hartree * hartree2kj)
+                    str(self.target_atom) + "_" +
+                    str(j)]["dissociation_energy_hartree"] = energy_hartree
+                target_atoms_dict[str(self.target_atom) + "_" +
+                                  str(j)]["dissociation_energy_kcal"] = (
+                                      energy_hartree * hartree2kcal)
+                target_atoms_dict[str(self.target_atom) + "_" +
+                                  str(j)]["dissociation_energy_kj"] = (
+                                      energy_hartree * hartree2kj)
                 target_atoms_bdes_kj_coords.append(
                     (energy_hartree * hartree2kj,
-                     target_atoms_dict[str(self.target_atom)+"_" + str(j)]["coord"]))
+                     target_atoms_dict[str(self.target_atom) + "_" +
+                                       str(j)]["coord"]))
         return (target_atoms_dict, target_atoms_bdes_kj_coords,
                 unique_target_atoms_bdes_kj_coords)
 
     def _print_target_atoms_bond_dissociation_energy(self,
-                                                 target_atoms_dict,
-                                                 unit="kcal"):
+                                                     target_atoms_dict,
+                                                     unit="kcal"):
         """
         this function is used to print the bond dissociation energy of target atoms, with targeting energy units
         """
         #self._comm.barrier()
         self.ostream.print_info("-" * 50)
-        self.ostream.print_info(f"bond dissociation energy of {self.target_atom} atoms:")
-        self.ostream.flush() 
+        self.ostream.print_info(
+            f"Bond Dissociation Energy of {self.target_atom} atoms:")
+        self.ostream.flush()
+        def adjust_index2_onebased(key):
+            return key.split("_")[0] + "_" + str(int(key.split("_")[1]) + 1)
         for key in target_atoms_dict.keys():
             if "dissociation_energy_hartree" in target_atoms_dict[key].keys():
                 #skip the SCF not converged ones, whose dissociation_energy_hartree is set to 0.0
-                if target_atoms_dict[key]["dissociation_energy_hartree"] - 0.0 < 1.0e-6:
-                    self.ostream.print_info(f"{key} fail")
+                if target_atoms_dict[key][
+                        "dissociation_energy_hartree"] - 0.0 < 1.0e-6:
+                    self.ostream.print_info(f"{adjust_index2_onebased(key)} fail")
+                    self.ostream.flush()
                     continue
                 if "kcal" in unit.lower():
                     self.ostream.print_info(
-                        f"{key} {round(target_atoms_dict[key]['dissociation_energy_kcal'], 1)} kcal/mol"
+                        f"{adjust_index2_onebased(key)} {round(target_atoms_dict[key]['dissociation_energy_kcal'], 1)} kcal/mol"
                     )
                     self.ostream.flush()
                 elif "kj" in unit.lower():
                     self.ostream.print_info(
-                        f"{key} {round(target_atoms_dict[key]['dissociation_energy_kj'], 1)} kJ/mol"
+                        f"{adjust_index2_onebased(key)} {round(target_atoms_dict[key]['dissociation_energy_kj'], 1)} kJ/mol"
                     )
                     self.ostream.flush()
                 elif ("hartree" in unit.lower() or "au" in unit.lower()):
                     self.ostream.print_info(
-                        f"{key} {target_atoms_dict[key]['dissociation_energy_hartree']} hartree"
+                        f"{adjust_index2_onebased(key)} {target_atoms_dict[key]['dissociation_energy_hartree']} hartree"
                     )
                     self.ostream.flush()
             #self._comm.barrier()
@@ -570,19 +622,21 @@ class AtomBdeDriver:
 
         """
         self.ostream.print_info(
-            "Optimizing geometry of the molecule before removing target atoms...")
+            "Optimizing geometry of the molecule before removing target atoms..."
+        )
         if self.save_files:
             self.mol_scf_drv.filename = f'bde_mol_{mol_idx+1}_opt'
             self.mol_opt_drv.filename = f'bde_mol_{mol_idx+1}_opt'
             self.mol_final_scf_drv.filename = f'bde_mol_{mol_idx+1}_final'
 
-
         basis_set1 = MolecularBasis.read(molecule, self.basis_sets[0])
         basis_set2 = MolecularBasis.read(molecule, self.basis_sets[1])
         scf_results = self.mol_scf_drv.compute(molecule, basis_set1)
-        opt_results = self.mol_opt_drv.compute(molecule, basis_set1, scf_results)
+        opt_results = self.mol_opt_drv.compute(molecule, basis_set1,
+                                               scf_results)
         if self._rank == mpi_master():
-            opt_molecule = Molecule.read_xyz_string(opt_results["final_geometry"])
+            opt_molecule = Molecule.read_xyz_string(
+                opt_results["final_geometry"])
             opt_molecule.set_charge(molecule.get_charge())
             opt_molecule.set_multiplicity(molecule.get_multiplicity())
         else:
@@ -603,12 +657,9 @@ class AtomBdeDriver:
 
         else:
             self.whole_mol_single_point_scf_energy = None
-        
+
         self.whole_mol_single_point_scf_energy = self._comm.bcast(
             self.whole_mol_single_point_scf_energy, root=mpi_master())
-
-
-
 
     def _compute_target_atoms_radical_scf_energy(self, mol_idx):
         """
@@ -624,7 +675,9 @@ class AtomBdeDriver:
             self.target_atom_final_scf_drv.filename = f'bde_mol_{mol_idx+1}_target_{self.target_atom}_final'
         else:
             self.target_atom_final_scf_drv.filename = None
-        scf_resultsH = self.target_atom_final_scf_drv.compute(target_atom, basis_set2)
+        scf_results_target_atom = self.target_atom_final_scf_drv.compute(target_atom, basis_set2)
+
+        #if master rank does not get converged, then print warning
         if self._rank == mpi_master():
             if not self.target_atom_final_scf_drv.is_converged:
                 self.ostream.print_warning(
@@ -635,6 +688,7 @@ class AtomBdeDriver:
             self.target_atom_single_point_scf_energy = self.target_atom_final_scf_drv.get_scf_energy()
         else:
             self.target_atom_single_point_scf_energy = None
+
         self.target_atom_single_point_scf_energy = self._comm.bcast(
             self.target_atom_single_point_scf_energy, root=mpi_master())
 
@@ -656,6 +710,7 @@ class AtomBdeDriver:
         # Identify the lines that start with atom and save the positions
         allmolecules = []
         radical_carbon_indices = []
+
         for idx, carbon_idx in zip(atom_indices_to_remove, carbon_indices):
             new_mol = mol_stringlist.copy()
             # remove the index+2 line, the first line is the number of atoms, the second line is the comment
@@ -669,8 +724,9 @@ class AtomBdeDriver:
             else:
                 radical_carbon_indices.append(carbon_idx - 1)
         return allmolecules, radical_carbon_indices
-    
-    def _compute_mol_rad_scf_energy(self, mol, radical_carbon_idx, run_idx, mol_idx):
+
+    def _compute_mol_rad_scf_energy(self, mol, radical_carbon_idx, run_idx,
+                                    mol_idx):
         """
         this function is used to compute the SCF energy for the given radical molecule 
         optimization and single point energy calculation.
@@ -684,7 +740,6 @@ class AtomBdeDriver:
 
         """
 
-
         self.ostream.print_info("-" * 50)
         if self._rank == mpi_master():
             step_start = time.time()
@@ -692,7 +747,7 @@ class AtomBdeDriver:
             if self._rank == mpi_master():
                 mol.show(atom_indices=True)
 
-        skip_flag = False
+
         mol.set_multiplicity(self.mol_rad_multiplicity)
         mol.set_charge(self.mol_rad_charge)
         basis_set1 = MolecularBasis.read(mol, self.basis_sets[0])
@@ -706,62 +761,61 @@ class AtomBdeDriver:
             self.radical_opt_drv.filename = None
             self.radical_final_scf_drv.filename = None
 
-        #set guess for radical optimization
+        #Set guess for radical optimization
         if self.mol_rad_multiplicity != 1:
             self.radical_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
-        
-        opt_results_rad = None
 
+        #SCF step, also for further optimization
+        scf_skip_flag = None
         try:
             scf_resultsmol = self.radical_scf_drv.compute(mol, basis_set1)
             # Check SCF convergence on all ranks
-            skip_flag_local = not self.radical_scf_drv.is_converged
-            skip_flag = self._comm.allreduce(skip_flag_local, op=MPI.LOR)
-            if self._rank == mpi_master():
-                if skip_flag:
-                    self.ostream.print_warning(
-                        f"SCF of radical molecule {run_idx+1} did not converge on at least one rank, skipping."
-                    )
-                    self.ostream.flush()
-        
-        except Exception as e:
-            skip_flag_local = True
-            skip_flag = self._comm.allreduce(skip_flag_local, op=MPI.LOR)
-            if skip_flag:
-                self.ostream.print_warning(
-                    f"Exception occurred during radical SCF for molecule {run_idx+1}: {e}"
-                )
+            scf_skip_flag_local = not self.radical_scf_drv.is_converged
+            scf_err_msg = "SCF did not converge! "
 
-        if skip_flag:
+        except Exception as e:
+            scf_skip_flag_local = True
+            scf_err_msg = f"Exception occurred during radical SCF for molecule {run_idx+1}: {e}"
+
+        # If any rank has scf_skip_flag_local as True, then scf_skip_flag on all ranks is True
+        scf_skip_flag = self._comm.allreduce(scf_skip_flag_local, op=MPI.LOR)
+
+        if scf_skip_flag:
             self.ostream.print_warning(
-                    f"Skipping radical molecule {run_idx+1} due to previous errors."
-                )
+                f"{scf_err_msg} Skipping radical molecule {run_idx+1}."
+            )
             self.ostream.flush()
             return
 
-
+        # Optimization step
+        opt_skip_flag = None
+        opt_results_rad = None
         try:
             opt_results_rad = self.radical_opt_drv.compute(mol, basis_set1, scf_resultsmol)
-            if self._rank == mpi_master():
-                if opt_results_rad is None:
-                    skip_flag = True
+            # only care optimization results on master rank which will be broadcasted to all ranks later
+            opt_skip_flag_local = opt_results_rad is None
+            opt_err_msg = ""
         except Exception as e:
-            skip_flag_local = True
-            skip_flag = self._comm.allreduce(skip_flag_local, op=MPI.LOR)
-            if skip_flag:
-                self.ostream.print_warning(
-                    f"Exception occurred during radical optimization for molecule {run_idx+1}: {e}"
-                )
+            opt_skip_flag_local = True
+            opt_err_msg = f"Exception occurred during radical optimization for molecule {run_idx+1}: {e}"
 
-        if skip_flag:
+        # Broadcast the opt_skip_flag_local to all ranks from master rank cause only master rank should have opt_results_rad
+        opt_skip_flag = self._comm.bcast(opt_skip_flag_local, root=mpi_master())
+
+        # All ranks should have the same opt_skip_flag
+        # If opt_skip_flag is true, then skip this radical molecule, all ranks should skip and return
+        if opt_skip_flag:
             self.ostream.print_warning(
-                    f"Skipping radical molecule {run_idx+1} due to previous errors."
-                )
+                f"{opt_err_msg} Skipping radical molecule {run_idx+1} of molecule {mol_idx+1} due to failed optimization"
+            )
             self.ostream.flush()
             return
+        
+        #Here, should pass the scf and optimization
+        #since only master rank has the opt_results_rad and other ranks have None, so create molecule on master rank
+        #then broadcast the molecule to all ranks
 
-
-        if self._rank == mpi_master(): #only build the mol on master rank and broadcast
+        if self._rank == mpi_master():  
             mol = Molecule.read_xyz_string(opt_results_rad["final_geometry"])
         #self._comm.barrier()
         mol = self._comm.bcast(mol, root=mpi_master())
@@ -770,45 +824,30 @@ class AtomBdeDriver:
         if self.mol_rad_multiplicity != 1:
             self.radical_final_scf_drv.guess_unpaired_electrons = f'{radical_carbon_idx+1}({self.mol_rad_multiplicity-1}.0)'
         mol.set_charge(self.mol_rad_charge)
-        skip_flag_local = False
-        try:
-            scf_results_rad_big = self.radical_final_scf_drv.compute(mol, basis_set2)
-            skip_flag_local = not self.radical_final_scf_drv.is_converged
-            skip_flag = self._comm.allreduce(skip_flag_local, op=MPI.LOR)
-            if self._rank == mpi_master():
-                if skip_flag:
-                    self.ostream.print_warning(
-                        f"SCF of final single point calculation did not converge for radical molecule {run_idx+1} on at least one rank, skipping."
-                    )
-                    self.ostream.flush()
-        except Exception as e:
-            skip_flag_local = True
-            skip_flag = self._comm.allreduce(skip_flag_local, op=MPI.LOR)
-            if skip_flag:
-                self.ostream.print_warning(
-                    f"Exception occurred during final SCF for radical molecule {run_idx+1}: {e}"
-                )
-        if skip_flag:
-            self.ostream.print_warning(
-                    f"Skipping radical molecule {run_idx+1} due to previous errors."
-                )
-            self.ostream.flush()
-            return
+
+
+        # Final single point energy calculation
+        scf_results_rad_big = self.radical_final_scf_drv.compute(mol, basis_set2)
 
         if self._rank == mpi_master():
+            if not self.radical_final_scf_drv.is_converged:
+                self.ostream.print_warning(
+                    f"SCF of final single point calculation did not converge for radical molecule {run_idx+1}, "
+                    f"the result is not reliable, please modify the settings if needed"
+                )
+                self.ostream.flush()
+                
             self.mol_rad_scf_energy = self.radical_final_scf_drv.get_scf_energy()
             step_end = time.time()
             self.ostream.print_info(
                 f"SCF energy for radical molecule {run_idx+1} is {self.mol_rad_scf_energy} hartree"
             )
-            self.ostream.print_info(
-                f"Time cost : {round(step_end - step_start, 2)} seconds"
-            )
+            self.ostream.print_info(f"Time cost : {round(step_end - step_start, 2)} seconds")
             self.ostream.flush()
-        #self._comm.barrier()
-        self._comm.bcast(self.mol_rad_scf_energy, root=mpi_master())
-        #self._comm.barrier()
+        else:
+            self.mol_rad_scf_energy = None
 
+        self.mol_rad_scf_energy = self._comm.bcast(self.mol_rad_scf_energy, root=mpi_master())
 
     def _show_bde_on_atom(self,
                           molecule,
@@ -868,13 +907,13 @@ class AtomBdeDriver:
             #add bde based on coords and unique_bde_hartree
             for i in range(len(bdes_coords)):
                 #bde coords is a list of tuple [(bde, (x, y, z)),(bde, (x, y, z))]
-                #default in kJ/mol but changed by self.energy_unit
-                #skip the scf not converged ones, whose bde is set to 0.0
+                #Default in kJ/mol but can be changed by self.energy_unit
+                #Skip the scf not converged ones and show 'Fail', whose bde is set to 0.0
                 if bdes_coords[i][0] - 0.0 < 1.0e-6:
                     bde_kj = 'Fail'
                 else:
                     bde_kj = round(bdes_coords[i][0],
-                                0)  #only show the integer part
+                                   0)  #only show the integer part
                     bde_kj = int(bde_kj)
                 viewer.addLabel(
                     f'{bde_kj}', {
@@ -911,13 +950,12 @@ class AtomBdeDriver:
         target_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_target_atoms_keys, unique_target_atoms_indices = self._fetch_unique_target_atom(
             target_atoms_dict,
-            use_equiv=self.use_equiv,
+            use_equiv=self.use_equivalent,
             only_sp3_carbon_connections=self.only_sp3_carbon_connections)
 
-        
         if self._debug:
-            self.ostream.print_info(f'unique_target_atoms_indices {unique_target_atoms_indices}')
-        
+            self.ostream.print_info(
+                f'unique_target_atoms_indices {unique_target_atoms_indices}')
 
         carbon_indices = []
         # Generate radical molecules by removing target atoms
@@ -930,10 +968,12 @@ class AtomBdeDriver:
         if self._debug:
             self.ostream.print_info(f'connected atom_indices {carbon_indices}')
 
-        self._compute_whole_mol_scf_energy(whole_molecule,1) #mol_idx=1 because of single molecule, so no other molecules
+        self._compute_whole_mol_scf_energy(
+            whole_molecule,
+            1)  #mol_idx=1 because of single molecule, so no other molecules
         radical_molecules, radical_carbon_indices = self._remove_atom_by_idx(
             self.opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
-            
+
         guess_msg = []
         for i in range(len(radical_molecules)):
             guess = f"guess_unpaired_electrons = {radical_carbon_indices[i]+1}(1.0)"
@@ -948,18 +988,17 @@ class AtomBdeDriver:
         self._check_scf_mute()
         self._check_functionals()
         self._check_radical_level_shifting()
+        self.skip_mol_flag = False  #reset to False for each molecule
 
         target_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_target_atoms_keys, unique_target_atoms_indices = self._fetch_unique_target_atom(
             target_atoms_dict,
-            use_equiv=self.use_equiv,
+            use_equiv=self.use_equivalence,
             only_sp3_carbon_connections=self.only_sp3_carbon_connections)
 
-        
         if self._debug:
             self.ostream.print_info(f'unique_target_atoms_indices {unique_target_atoms_indices}')
 
-        
         carbon_indices = []
         conn_mat = whole_molecule.get_connectivity_matrix()
         for x in unique_target_atoms_indices:
@@ -967,33 +1006,39 @@ class AtomBdeDriver:
             carbon_indices.append(list(conn_mat[x]).index(1))
         #self.ostream.print_info(f'connected carbon_indices {carbon_indices}')
 
-        self._compute_whole_mol_scf_energy(whole_molecule,mol_idx)
+        self._compute_whole_mol_scf_energy(whole_molecule, mol_idx)
         #compute target atom radical scf energy
         self._compute_target_atoms_radical_scf_energy(mol_idx)
         molecules_rads, radical_carbon_indices = self._remove_atom_by_idx(
             self.opt_whole_molecule, unique_target_atoms_indices, carbon_indices)
+        if len(molecules_rads) == 0:
+            self.skip_mol_flag = True
+            self.ostream.print_warning(
+                "No radical molecules generated, please check the input molecule and settings. "
+                "Skipping this molecule."
+            )
+            self.ostream.flush()
+            return
 
         #calculate BDEs for each radical molecule
         unique_BDEs_hartree = []
 
-        for run_idx, (mol_rad, radical_carbon_idx) in enumerate(
-                zip(molecules_rads, radical_carbon_indices)):
-            self.mol_rad_scf_energy = None #reset to None for each radical molecule
-            self._compute_mol_rad_scf_energy(
-                mol_rad, radical_carbon_idx, run_idx, mol_idx)
+        for run_idx, (mol_rad, radical_carbon_idx) in enumerate(zip(molecules_rads, radical_carbon_indices)):
+            self.mol_rad_scf_energy = None  #reset to None for each radical molecule
+            self._compute_mol_rad_scf_energy(mol_rad, radical_carbon_idx, run_idx, mol_idx)
             if self._rank == mpi_master():
                 if self.mol_rad_scf_energy is None:
                     bde_hartree = 0.0
-                    self.ostream.print_warning(
-                        f"SCF did not converge for radical molecule {run_idx+1}, setting BDE to 0.0, please modify the settings if needed"
-                    )
-                    self.ostream.flush()
+                    #commenting out the warning message to only show one warning 
+                    #self.ostream.print_warning(
+                    #    f"SCF is not converged for radical molecule {run_idx+1}, setting BDE to 0.0, please modify the settings if needed"
+                    #)
+                    #self.ostream.flush()
                 else:
-                    bde_hartree = self.mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.target_atom_single_point_scf_energy         
+                    bde_hartree = self.mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.target_atom_single_point_scf_energy
                 unique_BDEs_hartree.append(bde_hartree)
 
         unique_BDEs_hartree = self._comm.bcast(unique_BDEs_hartree, root=mpi_master())
-
 
         if self._rank == mpi_master():
             # loop the unique_target_atoms_indices to remove the H atoms from the molecule and
@@ -1001,10 +1046,7 @@ class AtomBdeDriver:
             # print the dissociation energy for each H atom
             self.target_atoms_dict, self.bdes_coords, self.unique_target_atoms_bdes_coords = self._update_equiv_target_atoms_dissociation_energy(
                 unique_BDEs_hartree, unique_target_atoms_keys, target_atoms_dict)
-            self._print_target_atoms_bond_dissociation_energy(self.target_atoms_dict,
-                                                        unit=self.energy_unit)
-
-            
+            self._print_target_atoms_bond_dissociation_energy(self.target_atoms_dict, unit=self.energy_unit)
             self.unique_target_atoms_keys = unique_target_atoms_keys
             self.unique_BDEs_hartree = unique_BDEs_hartree
             self.opt_whole_molecule = self.opt_whole_molecule
@@ -1016,15 +1058,12 @@ class AtomBdeDriver:
             self.unique_BDEs_hartree = None
             self.opt_whole_molecule = None
 
-        self._comm.bcast(self.target_atoms_dict, root=mpi_master())
-        self._comm.bcast(self.bdes_coords, root=mpi_master())
-        self._comm.bcast(self.unique_target_atoms_bdes_coords, root=mpi_master())
-        self._comm.bcast(self.unique_target_atoms_keys, root=mpi_master())
-        self._comm.bcast(self.unique_BDEs_hartree, root=mpi_master())
-        self._comm.bcast(self.opt_whole_molecule, root=mpi_master())
-        
-        
-
+        self.target_atoms_dict = self._comm.bcast(self.target_atoms_dict, root=mpi_master())
+        self.bdes_coords = self._comm.bcast(self.bdes_coords, root=mpi_master())
+        self.unique_target_atoms_bdes_coords = self._comm.bcast(self.unique_target_atoms_bdes_coords, root=mpi_master())
+        self.unique_target_atoms_keys = self._comm.bcast(self.unique_target_atoms_keys, root=mpi_master())
+        self.unique_BDEs_hartree = self._comm.bcast(self.unique_BDEs_hartree, root=mpi_master())
+        self.opt_whole_molecule = self._comm.bcast(self.opt_whole_molecule, root=mpi_master())
 
     def compute(self, mol_list: list):
         """
@@ -1032,16 +1071,18 @@ class AtomBdeDriver:
         can accept one molecule object as well.
         will save self.mols_bdes_list
         """
-  
+
         self.ostream.print_info("=" * 50)
         self.ostream.print_info("Starting BDE calculations...")
         self.ostream.flush()
-        
+
         self.mols_bdes_list = []
         if not isinstance(mol_list, list):
             mol_list = [mol_list]
         for mol_idx, mol in enumerate(mol_list):
-            self._compute_single_molecule(mol,mol_idx)
+            self._compute_single_molecule(mol, mol_idx)
+            if self.skip_mol_flag:
+                continue
             #use a dictionary to store all bde and target atom information
             if self._rank == mpi_master():
                 mol_bde_dict = {
@@ -1049,7 +1090,8 @@ class AtomBdeDriver:
                     'bdes_coords': self.bdes_coords,
                     'unique_target_atoms_keys': self.unique_target_atoms_keys,
                     'unique_BDEs_hartree': self.unique_BDEs_hartree,
-                    'unique_target_atoms_bdes_coords': self.unique_target_atoms_bdes_coords,
+                    'unique_target_atoms_bdes_coords':
+                        self.unique_target_atoms_bdes_coords,
                     'opt_whole_molecule': self.opt_whole_molecule,
                 }
                 #reset for next molecule
@@ -1060,9 +1102,9 @@ class AtomBdeDriver:
                 self.unique_target_atoms_bdes_coords = None
                 self.opt_whole_molecule = None
                 self.mols_bdes_list.append(mol_bde_dict)
-        
-        self._comm.bcast(self.mols_bdes_list, root=mpi_master())
 
+        self.mols_bdes_list = self._comm.bcast(self.mols_bdes_list,
+                                               root=mpi_master())
 
     def show(self,
              atom_indices=False,
@@ -1074,7 +1116,7 @@ class AtomBdeDriver:
         this function is to visualize the bond dissociation energies (BDEs) on the target atoms in the molecule.
         allow atom indices and labels to be shown.
         """
-        if self._rank==mpi_master():
+        if self._rank == mpi_master():
 
             for item in self.mols_bdes_list:
                 mol = item['opt_whole_molecule']
@@ -1085,9 +1127,9 @@ class AtomBdeDriver:
                     bdes_coords = item['bdes_coords']
 
                 self._show_bde_on_atom(mol,
-                                    width=width,
-                                    height=height,
-                                    atom_indices=atom_indices,
-                                    atom_labels=atom_labels,
-                                    one_indexed=True,
-                                    bdes_coords=bdes_coords)
+                                       width=width,
+                                       height=height,
+                                       atom_indices=atom_indices,
+                                       atom_labels=atom_labels,
+                                       one_indexed=True,
+                                       bdes_coords=bdes_coords)
