@@ -1,4 +1,5 @@
 import pytest
+from mpi4py import MPI
 from pathlib import Path
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import Molecule
@@ -28,10 +29,12 @@ class TestAtomBdeDriver:
         'bde_mol_1_opt.h5',
         'bde_mol_1_target_H_final_scf.h5',
         'bde_mol_1_target_H_final.h5']
-        for f in files:
-            p=Path(f)
-            if p.is_file():
-                p.unlink()
+        #unlink files on master rank
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            for f in files:
+                p=Path(f)
+                if p.is_file():
+                    p.unlink()
 
     def test_atom_bde_driver(self):
         #use a methane molecule as test case
