@@ -368,12 +368,15 @@ class MMDriver:
             The Ryckaert-Bellemans coefficients.
         """
 
-        sum_coefs = np.zeros(7)
+        sum_coefs = None
 
         for barrier, phase, periodicity in zip(barriers, phases, periodicities):
             RB_coefs = self.get_RB_coefficients_single_term(
                 barrier, phase, periodicity)
-            sum_coefs += np.array(RB_coefs)
+            if sum_coefs is None:
+                sum_coefs = np.array(RB_coefs)
+            else:
+                sum_coefs += np.array(RB_coefs)
 
         return sum_coefs
 
