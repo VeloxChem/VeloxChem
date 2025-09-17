@@ -36,10 +36,12 @@ import numpy as np
 import os
 import math
 import copy
+import h5py
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .outputstream import OutputStream
+from .openmmdynamics import OpenMMDynamics
 from .errorhandler import assert_msg_critical
 from .sanitychecks import molecule_sanity_check
 from .mmforcefieldgenerator import MMForceFieldGenerator
@@ -47,6 +49,8 @@ from .evbdriver import EvbDriver
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
+from .reaffbuilder import ReactionForceFieldBuilder
+from .evbsystembuilder import EvbSystemBuilder
 
 try:
     import openmm as mm
@@ -78,137 +82,761 @@ class TransitionStateGuesser():
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-        self.lambda_vec = np.round(np.linspace(0, 1, 21), 3)
+        self.lambda_vec = list(np.round(np.linspace(0, 1, 21), 3))
         self.scf_xcfun = "b3lyp"
         self.scf_basis = 'def2-svp'
         self.mute_scf = True
-        self.mute_evb = True
+        self.mute_ff_build = True
         self.mm_temperature = 600
         self.mm_steps = 1000
-        self.mm_step_size = 0.001 * mmunit.picoseconds
+        self.mm_step_size = 0.001
         self.save_mm_traj = False
         self.scf_drv = None
-        self.evb_drv: None | EvbDriver = None
+        # self.evb_drv: None | EvbDriver = None
         self.molecule = None
+        self.results = {}
+        self.folder_name = 'ts_data'
+        self.force_conformer_search = False
+        self.skip_conformer_search = False
+        self.conformer_steps = 10000
+        self.conformer_snapshots = 10
+        self.results_file = 'ts_results.h5'
+
+        self.ffbuilder = ReactionForceFieldBuilder()
 
     def find_TS(
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
-        reactant_partial_charges: list[float] | list[list[float]] = None,
-        product_partial_charges: list[float] | list[list[float]] = None,
-        reactant_total_multiplicity=-1,
-        product_total_multiplicity=-1,
-        breaking_bonds: list[tuple[int, int]] = [],
         scf=True,
-        scf_drv=None,
-        constraints=None,
+        **ff_kwargs,
     ):
         """Find a guess for the transition state using a force field scan.
 
         Args:
-            evb (evbDriver): An EVB driver object with built forcefields
-            scf (bool, optional): If an scf energy scan should be performed. Defaults to True.
-            scf_drv (scfDriver, optional): The scf driver to be used for the scf scan.
-            constraints (dict, optional): Dictionary of constraints, see the EVB documentation for details. Defaults to None.
-            charge (int, optional): The charge of the total system. If None (default), the charge of the evb reactant molecule will be used.
-            multiplicity (int, optional): The multiplicity of the total system. If None (default), the multiplicity of the evb reactant molecule will be used.
-
+            reactant (Molecule | list[Molecule]): The reactant molecule or a list of reactant molecules.
+            product (Molecule | list[Molecule]): The product molecule or a list of product molecules.
+            scf (bool, optional): If True, performs an SCF scan after the MM scan. Defaults to True.
+            reactant_partial_charges (list[float], list[list[float]]): Partial charges for the reactant. Will be calculated if not provided. Defaults to None.
+            product_partial_charges (list[float], list[list[float]]): Partial charges for the product. Will be calculated if not provided. Defaults to None.
+            reparameterize (bool): If True, reparameterizes unknown force constants with the Seminario method. Defaults to True
+            reactant_hessians (np.ndarray, list[np.ndarray]): Hessians for the reactant for the Seminario method. Will be calculated if not provided. Defaults to None.
+            product_hessians (np.ndarray, list[np.ndarray]): Hessians for the product for the Seminario method. Will be calculated if not provided. Defaults to None.
+            mm_opt_constrain_bonds (list[tuple[int, int]]): Bonds to constrain during MM optimization.
+            reactant_total_multiplicity (int): Total multiplicity for the reactant to override calculated value. Defaults to -1.
+            product_total_multiplicity (int): Total multiplicity for the product to override calculated value. Defaults to -1.
+            breaking_bonds (list[tuple[int, int]]): (List of) Bond(s) that is forced to break and is not allowed to recombine over the reaction. Defaults to None.
+            mute_ff_scf (bool): If True, mutes SCF output from RESP calculations. Has no effect if mute_ff_build is True. Defaults to True.
+            optimize_mol (bool): If True, does an xtb optimization of every provided molecule object before reparameterisation. Defaults to False.
+            optimize_ff (bool): If True, does an mm optimization of the combined reactant and product after reparameterisation. Defaults to True.
+            water_model (str): The water model used by the ffbuilder. Only has effect if there is a water molecule involved in the reaction. Defaults to "spce".
+            
         Raises:
             ff_exception: If for whatever reason the force field scan crashes, an exception is raised.
 
         Returns:
             molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
         """
-        evb_drv = EvbDriver()
-        evb_drv.build_ff_from_molecules(
-            reactant,
-            product,
-            reactant_partial_charges=reactant_partial_charges,
-            product_partial_charges=product_partial_charges,
-            reactant_total_multiplicity=reactant_total_multiplicity,
-            product_total_multiplicity=product_total_multiplicity,
-            breaking_bonds=breaking_bonds,
-        )
-        if self.mute_evb:
-            evb_drv.ostream.mute()
-        self.evb_drv = evb_drv
-        self.scf_drv = scf_drv
-        if scf:
-            molecule_sanity_check(self.evb_drv.reactant.molecule)
 
-        self.molecule = self.evb_drv.reactant.molecule
-        print(
+        # Build forcefields and systems
+        self.build_forcefields(reactant, product, **ff_kwargs)
+
+        # Scan MM
+        self.scan_mm()
+
+        # Scan SCF
+        if scf:
+            # assert False, 'Not implemented yet'
+            self.scan_scf(self.results)
+
+        return self.molecule, self.results
+
+    def build_forcefields(self, reactant, product, constraints=[], **ts_kwargs):
+        if self.mute_ff_build:
+            self.ffbuilder.ostream.mute()
+            self.ostream.print_info(
+                "Building forcefields. Disable mute_ff_builder to see detailed output."
+            )
+            self.ostream.flush()
+        self.ffbuilder.read_keywords(**ts_kwargs)
+
+        self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
+            reactant=reactant,
+            product=product,
+        )
+
+        self.molecule = Molecule.read_xyz_string(
+            self.reactant.molecule.get_xyz_string())
+
+        self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
 
-        self.evb_drv.temperature = self.mm_temperature
-        self.evb_drv.build_systems(
-            ['ts_guesser'],
-            self.lambda_vec,
-            constraints=constraints,
-        )
-        self.ostream.print_blank()
-        self.ostream.print_header("Starting MM scan")
-        self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
-        self.ostream.flush()
-        mm_energies, mm_geometries, ff_exception = self._scan_ff(self.evb_drv)
-        xyz_geometries = []
-        for mm_geom in mm_geometries:
-            xyz_geom = self._mm_to_xyz_geom(mm_geom,
-                                            self.evb_drv.reactant.molecule)
-            xyz_geometries.append(xyz_geom)
-        self.results = {
-            'mm_energies': mm_energies,
-            'mm_geometries': mm_geometries,
-            'xyz_geometries': xyz_geometries,
-            'lambda_vec': self.lambda_vec,
-            'broken_bonds': self.evb_drv.broken_bonds,
-            'formed_bonds': self.evb_drv.formed_bonds,
+        conf = {
+            "name": "vacuum",
+            "bonded_integration": True,
+            "soft_core_coulomb_pes": True,
+            "soft_core_lj_pes": True,
+            "soft_core_coulomb_int": False,
+            "soft_core_lj_int": False,
         }
-        # for i, (E, P) in enumerate(zip(mm_energies, mm_geometries)):
-        #     self.results[self.lambda_vec[i]] = {
-        #         'mm_energy': E,
-        #         'mm_geometry': P,
-        #     }
-        self.results['broken_bonds'] = self.evb_drv.broken_bonds
-        self.results['formed_bonds'] = self.evb_drv.formed_bonds
-        if ff_exception:
+        sysbuilder = EvbSystemBuilder()
+        if self.mute_ff_build:
+            sysbuilder.ostream.mute()
+            self.ostream.print_info(
+                "Building MM systems for the transition state guess. Disable mute_sys_builder to see detailed output."
+            )
+            self.ostream.flush()
+
+        self.ostream.print_info(
+            f"Saving reactant and product forcefield as json to {self.folder_name}"
+        )
+        self.ostream.flush()
+        self.reactant.save_forcefield_as_json(
+            self.reactant, f"{self.folder_name}/reactant.json")
+        self.product.save_forcefield_as_json(
+            self.product, f"{self.folder_name}/product.json")
+        self.systems, self.topology, self.initial_positions = sysbuilder.build_systems(
+            self.reactant,
+            self.product,
+            list(self.lambda_vec),
+            conf,
+            constraints,
+        )
+        self.ostream.print_info(f"Saving systems as xml to {self.folder_name}")
+        self.ostream.flush()
+        sysbuilder.save_systems_as_xml(self.systems, self.folder_name)
+        self.results.update({
+            'broken_bonds': self.breaking_bonds,
+            'formed_bonds': self.forming_bonds,
+            'lambda_vec': self.lambda_vec
+        })
+
+        return
+
+    def scan_mm(self):
+
+        energies = []
+        E1 = []
+        E2 = []
+        energies_int = []
+        N_conf = []
+
+        positions = []
+        if not os.path.exists(self.folder_name):
+            os.makedirs(self.folder_name)
+        else:
+            for file in os.listdir(self.folder_name):
+                file_path = os.path.join(self.folder_name, file)
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+        self.folder = Path().cwd() / self.folder_name
+
+        if self.save_mm_traj:
+            mmapp.PDBFile.writeFile(self.topology, self.initial_positions,
+                                    str(self.folder / 'topology.pdb'))
+        exception = None
+
+        rea_int = mm.VerletIntegrator(1)
+        rea_sim = mmapp.Simulation(
+            self.topology,
+            self.systems['reactant'],
+            rea_int,
+        )
+        pro_int = mm.VerletIntegrator(1)
+        pro_sim = mmapp.Simulation(
+            self.topology,
+            self.systems['product'],
+            pro_int,
+        )
+        bohr_to_nm = 0.0529177249
+        pos = self.initial_positions * 0.1
+
+        try:
+            if self.force_conformer_search:
+                self.ostream.print_info(
+                    "Force conformer search is enabled, scanning conformers for all Lambda values."
+                )
+                self.ostream.flush()
+                self._print_rescan_mm_header()
+            else:
+                self._print_initial_mm_header()
+            for l in self.lambda_vec:
+                em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
+                    self.topology,
+                    self.systems[l],
+                    l,
+                    pos,
+                    rea_sim,
+                    pro_sim,
+                    self.force_conformer_search,
+                )
+                if self.force_conformer_search:
+                    self._print_mm_iter(l, e1, e2, em, e_int, n_conf)
+                else:
+                    self._print_mm_iter(l, e1, e2, em, e_int)
+
+                positions.append(pos)
+                pos = pos * bohr_to_nm
+                E1.append(e1)
+                E2.append(e2)
+                energies.append(em)
+                energies_int.append(e_int)
+                N_conf.append(n_conf)
+            self.ostream.print_blank()
+            #make sure E1 is monotonically increasing
+            #make sure E2 is monotonically decreasing
+            if not self.skip_conformer_search and not self.force_conformer_search:
+                printed_header = False
+                for i, l in enumerate(self.lambda_vec):
+                    rescan = False
+                    if i < len(self.lambda_vec) - 1:
+                        rescan = E1[i] >= E1[i + 1]
+                    if i > 0:
+                        rescan = rescan or E2[i - 1] <= E2[i]
+                    if rescan:
+                        if not printed_header:
+                            self._print_rescan_mm_header()
+                            printed_header = True
+                        em, e1, e2, e_int, pos, n_conf = self._get_mm_energy(
+                            self.topology,
+                            self.systems[l],
+                            l,
+                            pos,
+                            rea_sim,
+                            pro_sim,
+                            True,
+                        )
+                        if n_conf == -1:
+                            n_conf = 'N/A'
+                        if e_int < energies_int[i]:
+                            positions[i] = pos
+                            energies[i] = em
+                            E1[i] = e1
+                            E2[i] = e2
+                            energies_int[i] = e_int
+                            N_conf[i] = n_conf
+                        self._print_mm_iter(
+                            l,
+                            E1[i],
+                            E2[i],
+                            energies[i],
+                            energies_int[i],
+                            N_conf[i],
+                        )
+
+        except Exception as e:
+            self.ostream.print_warning(f"Error in the ff scan: {e}")
+            exception = e
+
+        xyz_geometries = []
+        for mm_geom in positions:
+            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.molecule)
+            xyz_geometries.append(xyz_geom)
+        results = {
+            'mm_energies': energies,
+            'mm_energies_reactant': E1,
+            'mm_energies_product': E2,
+            'int_energies': energies_int,
+            'mm_geometries': positions,
+            'xyz_geometries': xyz_geometries,
+        }
+
+        if exception is None:
+            max_mm_index = np.argmax(energies)
+            max_xyz_geom = xyz_geometries[max_mm_index]
+            max_mm_energy = energies[max_mm_index]
+            max_mm_lambda = self.lambda_vec[max_mm_index]
+            self.ostream.print_info(
+                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
+            )
+            self.ostream.print_blank()
+            results.update({
+                'max_mm_geometry': max_xyz_geom,
+                'max_mm_lambda': max_mm_lambda,
+            })
+            self.results.update(results)
+            mult = self.molecule.get_multiplicity()
+            charge = self.molecule.get_charge()
+            self.molecule = Molecule.read_xyz_string(max_xyz_geom)
+            self.molecule.set_multiplicity(mult)
+            self.molecule.set_charge(charge)
+            self._save_results(self.results_file, self.results)
+            return self.results
+        else:
+            self.ostream.flush()
+            self.results.update(results)
+            # self._save_results(self.results_file, self.results)
             self.ostream.print_warning(
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
-            raise ff_exception
+            raise exception
 
-        max_mm_index = np.argmax(mm_energies)
-        max_xyz_geom = xyz_geometries[max_mm_index]
-        max_mm_energy = mm_energies[max_mm_index]
-        max_mm_lambda = self.lambda_vec[max_mm_index]
-        self.ostream.print_info(
-            f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
-        )
-        self.ostream.print_blank()
-        if not scf:
-            self.results.update({'final_geometry': max_xyz_geom})
-            self.results.update({'final_lambda': max_mm_lambda})
+    def _get_mm_energy(
+        self,
+        topology,
+        system,
+        l,
+        init_pos,
+        reasim,
+        prosim,
+        conformer_search,
+    ):
+        if not conformer_search:
+            integrator = mm.VerletIntegrator(self.mm_step_size *
+                                             mmunit.picoseconds)
+            # TODO add more flexible options if we need them, coordinate with conformergenerator as well
+            # platform settings for small molecule
+            platform = mm.Platform.getPlatformByName("CPU")
+            platform.setPropertyDefaultValue("Threads", "1")
+            simulation = mmapp.Simulation(
+                topology,
+                system,
+                integrator,
+                platform,
+            )
+            simulation.context.setPositions(init_pos)
+
+            simulation.minimizeEnergy()
+            simulation.context.setVelocitiesToTemperature(self.mm_temperature *
+                                                          mmunit.kelvin)
+            if self.save_mm_traj:
+                state_pos = simulation.context.getState(
+                    getPositions=True).getPositions(asNumpy=True)
+                mmapp.PDBFile.writeFile(
+                    topology,
+                    state_pos,
+                    str(self.folder / f'{l}_begin_minim.pdb'),
+                )
+                simulation.reporters.append(
+                    mmapp.XTCReporter(str(self.folder / f'{l}_traj.xtc'), 1))
+            simulation.step(self.mm_steps)
+            simulation.minimizeEnergy()
+            if self.save_mm_traj:
+                state_pos = simulation.context.getState(
+                    getPositions=True).getPositions(asNumpy=True)
+                mmapp.PDBFile.writeFile(
+                    topology,
+                    state_pos,
+                    str(self.folder / f'{l}_end_minim.pdb'),
+                )
+
+            state = simulation.context.getState(getEnergy=True,
+                                                getPositions=True)
+            e_int = state.getPotentialEnergy().value_in_unit(
+                mmunit.kilojoules_per_mole)
+            pos_nm = state.getPositions(asNumpy=True).value_in_unit(
+                mmunit.nanometers)
+            pos_bohr = state.getPositions(asNumpy=True).value_in_unit(
+                mmunit.bohr)
+            n_conf = -1
         else:
-            # assert False, 'Not implemented yet'
+            opm_dyn = OpenMMDynamics()
+            opm_dyn.ostream.mute()
+            # opm_dyn.create_system_from_molecule(mol, ff_gen)
+            pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
 
-            self.ostream.print_header(f"Starting SCF scan")
-            self.ostream.flush()
-            scf_energies = self._scan_scf()
-            max_scf_index = np.argmax(scf_energies)
-            max_scf_geom = self.results['xyz_geometries'][max_scf_index]
-            max_scf_energy = scf_energies[max_scf_index]
-            max_scf_lambda = self.lambda_vec[max_scf_index]
-            self.results.update({'final_geometry': max_scf_geom})
-            self.results.update({'final_lambda': max_scf_lambda})
-            self.ostream.print_info(
-                f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
+            pdb = mmapp.PDBFile.writeFile(topology, init_pos, pdb_name)
+            opm_dyn.pdb = mmapp.PDBFile(pdb_name)
+            opm_dyn.system = system
+            conformers_dict = opm_dyn.conformational_sampling(
+                ensemble='NVT',
+                nsteps=self.conformer_steps,
+                snapshots=self.conformer_snapshots,
+            )
+            n_conf = len(conformers_dict['energies'])
+            arg = np.argmin(conformers_dict['energies'])
+            e_int = conformers_dict['energies'][arg]
+            temp_mol = conformers_dict['molecules'][arg]
+            pos_nm = temp_mol.get_coordinates_in_angstrom() * 0.1
+            pos_bohr = temp_mol.get_coordinates_in_bohr()
+            # self.ostream.print_info(
+            #     f"Found {len(conformers_dict['energies'])} conformers for lambda {l}. Energies: {conformers_dict['energies']}, index of minimum: {arg}"
+            # )
+            # self.ostream.flush()
+
+        em, e1, e2 = self._recalc_mm_energy(pos_nm, l, reasim, prosim)
+        avg_x = np.mean(pos_bohr[:, 0])
+        avg_y = np.mean(pos_bohr[:, 1])
+        avg_z = np.mean(pos_bohr[:, 2])
+        pos_bohr -= [avg_x, avg_y, avg_z]
+        return em, e1, e2, e_int, pos_bohr, n_conf
+
+    def _recalc_mm_energy(self, pos, l, rea_sim, pro_sim):
+        rea_sim.context.setPositions(pos)
+        pro_sim.context.setPositions(pos)
+        e1 = rea_sim.context.getState(
+            getEnergy=True).getPotentialEnergy().value_in_unit(
+                mmunit.kilojoules_per_mole)
+        e2 = pro_sim.context.getState(
+            getEnergy=True).getPotentialEnergy().value_in_unit(
+                mmunit.kilojoules_per_mole)
+        em = e1 * (1 - l) + e2 * l
+
+        return em, e1, e2
+
+    def scan_scf(self, results=None):
+        if results is None:
+            results = self.results
+        assert_msg_critical(
+            'mm_geometries' in results.keys(),
+            'Could not find "mm_geometries" in results.',
+        )
+        structures = results['mm_geometries']
+        self._print_scf_header()
+        scf_energies = []
+        ref = 0
+        for i, l in enumerate(self.lambda_vec):
+            geom = structures[i]
+            scf_E = self._get_scf_energy(geom)
+            if i == 0:
+                ref = scf_E
+                dif = 0
+            else:
+                dif = scf_E - ref
+            scf_energies.append(scf_E)
+            self._print_scf_iter(l, scf_E, dif)
+        self.ostream.print_blank()
+
+        max_scf_index = np.argmax(scf_energies)
+        max_scf_geom = self._mm_to_xyz_geom(structures[max_scf_index])
+        max_scf_energy = scf_energies[max_scf_index]
+        max_scf_lambda = self.lambda_vec[max_scf_index]
+        results = {
+            'scf_energies': scf_energies,
+            'max_scf_geometry': max_scf_geom,
+            'max_scf_lambda': max_scf_lambda
+        }
+        self.ostream.print_info(
+            f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
+        )
+        self.ostream.flush()
+        self.results.update(results)
+        mult = self.molecule.get_multiplicity()
+        charge = self.molecule.get_charge()
+        self.molecule = Molecule.read_xyz_string(max_scf_geom)
+        self.molecule.set_multiplicity(mult)
+        self.molecule.set_charge(charge)
+        self._save_results(self.results_file, self.results)
+        return self.molecule, self.results
+
+    def _get_scf_energy(self, positions):
+        self.molecule = self._set_molecule_positions(self.molecule, positions)
+        if self.scf_drv is None:
+            scf_drv = ScfRestrictedDriver()
+            scf_drv.xcfun = self.scf_xcfun
+            self.scf_drv = scf_drv
+
+        if self.mute_scf:
+            self.scf_drv.ostream.mute()
+        basis = MolecularBasis.read(self.molecule, self.scf_basis)
+        scf_results = self.scf_drv.compute(self.molecule, basis)
+
+        if not self.scf_drv.is_converged:
+            self.ostream.print_warning(
+                "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
             )
             self.ostream.flush()
+            self.scf_drv.conv_thresh = 1.0e-4
+            self.scf_drv.max_iter = 200
+            scf_results = self.scf_drv.compute(self.molecule, basis)
+        return scf_results['scf_energy'] * hartree_in_kjpermol()
 
-        self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
-        return self.molecule, self.results
+    def show_results(self, ts_results=None, atom_indices=False, filename=None):
+        """Show the results of the transition state guesser.
+        This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
+
+        Args:
+            ts_results (dict, optional): The results of the transition state guesser. If none (default), uses the current results.
+            atom_indices (bool, optional): If true, shows the atom-indices of the molecule. Defaults to False.
+
+        Raises:
+            ImportError: If ipywidgets is not installed, an ImportError is raised.
+        """
+
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+
+        if ts_results is None:
+            if self.results is not None:
+                self.ostream.print_info("Loading self.results")
+                ts_results = self.results
+            else:
+                try:
+                    if filename is not None:
+                        self.results_file = filename
+                    self.ostream.print_info(
+                        f"Loading results from {self.results_file}")
+                    ts_results = self.load_results(self.results_file)
+                except Exception as e:
+                    raise e
+        self.ostream.flush()
+
+        mm_energies = ts_results['mm_energies']
+        geometries = ts_results['xyz_geometries']
+        lambda_vec = ts_results['lambda_vec']
+        scf_energies = ts_results.get('scf_energies', None)
+        if scf_energies is not None:
+            final_lambda = ts_results['max_scf_lambda']
+        else:
+            final_lambda = ts_results['max_mm_lambda']
+        ipywidgets.interact(
+            self._show_iteration,
+            mm_energies=ipywidgets.fixed(mm_energies),
+            scf_energies=ipywidgets.fixed(scf_energies),
+            geometries=ipywidgets.fixed(geometries),
+            lambda_vec=ipywidgets.fixed(lambda_vec),
+            step=ipywidgets.SelectionSlider(
+                options=lambda_vec,
+                description='Lambda',
+                value=final_lambda,
+            ),
+            atom_indices=ipywidgets.fixed(atom_indices),
+        )
+
+    def _show_iteration(
+        self,
+        mm_energies,
+        geometries,
+        lambda_vec,
+        step,
+        scf_energies=None,
+        atom_indices=False,
+    ):
+        """
+        Show the geometry at a specific iteration.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('matplotlib is required for this functionality.')
+
+        rel_mm_energies = mm_energies - np.min(mm_energies)
+
+        lam_index = np.where(lambda_vec == np.array(step))[0][0]
+        xyz_data_i = geometries[lam_index]
+        total_steps = len(rel_mm_energies) - 1
+        x = np.linspace(0, lambda_vec[-1], 100)
+        y = np.interp(x, lambda_vec, rel_mm_energies)
+        fig, ax1 = plt.subplots(figsize=(6.5, 4))
+        ax1.plot(
+            x,
+            y,
+            color='black',
+            alpha=0.9,
+            linewidth=2.5,
+            linestyle='-',
+            zorder=0,
+            label='MM energy',
+        )
+        ax1.scatter(
+            lambda_vec,
+            rel_mm_energies,
+            color='black',
+            alpha=0.7,
+            s=120 / math.log(total_steps, 10),
+            facecolors="none",
+            edgecolor="darkcyan",
+            zorder=1,
+        )
+        ax1.scatter(
+            lambda_vec[lam_index],
+            rel_mm_energies[lam_index],
+            marker='o',
+            color='darkcyan',
+            alpha=1.0,
+            s=120 / math.log(total_steps, 10),
+            zorder=2,
+        )
+        ax1.set_xlabel(r'$\lambda$')
+        ax1.set_ylabel('Relative MM energy [kJ/mol]')
+
+        if scf_energies is not None:
+            ax2 = ax1.twinx()
+            rel_scf_energies = scf_energies - np.min(scf_energies)
+            ax2.plot(
+                x,
+                np.interp(x, lambda_vec, rel_scf_energies),
+                color='darkred',
+                alpha=0.9,
+                linewidth=2.5,
+                linestyle='--',
+                zorder=0,
+                label='SCF energy',
+            )
+            ax2.scatter(
+                lambda_vec,
+                rel_scf_energies,
+                alpha=0.7,
+                s=120 / math.log(total_steps, 10),
+                facecolors="none",
+                edgecolor="darkorange",
+                zorder=1,
+            )
+            ax2.scatter(
+                lambda_vec[lam_index],
+                rel_scf_energies[lam_index],
+                marker='o',
+                color='darkorange',
+                alpha=1.0,
+                s=120 / math.log(total_steps, 10),
+                zorder=2,
+            )
+            ax2.set_ylabel('Relative SCF energy [kJ/mol]')
+
+        fig.legend(loc='upper right',
+                   bbox_to_anchor=(1, 1),
+                   bbox_transform=ax1.transAxes)
+        ax1.set_title("Transition state finder")
+        # Ensure x-axis displays as integers
+        ax1.set_xticks(lambda_vec[::2])
+        fig.tight_layout()
+        plt.show()
+
+        mol = Molecule.read_xyz_string(xyz_data_i)
+
+        reactant_bonds = set(self.reactant.bonds.keys())
+        product_bonds = set(self.product.bonds.keys())
+        changing_bonds = list(self.forming_bonds) + list(self.breaking_bonds)
+        mol.show(bonds=reactant_bonds | product_bonds, dashed_bonds=changing_bonds,
+            atom_indices=atom_indices, width=640, height=360,)
+
+    def _mm_to_xyz_geom(self, geom, molecule=None):
+        if molecule is None:
+            molecule = self.molecule
+        new_mol = TransitionStateGuesser._set_molecule_positions(molecule, geom)
+        return new_mol.get_xyz_string()
+
+    @staticmethod
+    def _set_molecule_positions(molecule, positions):
+        assert molecule.number_of_atoms() == len(positions)
+        for i in range(molecule.number_of_atoms()):
+            molecule.set_atom_coordinates(i, positions[i])
+        return molecule
+
+    def _save_results(self, fname, results):
+        self.ostream.print_info(f"Saving results to {self.results_file}")
+        self.ostream.flush()
+        if os.path.exists(fname):
+            self.ostream.print_warning(
+                f"File {fname} already exists. Overwriting it.")
+            self.ostream.flush()
+            os.remove(fname)
+        hf = h5py.File(fname, 'w')
+        lambda_vec = results.get('lambda_vec', None)
+        geometries = results.get('xyz_geometries', None)
+        mm_energies = results.get('mm_energies', None)
+        max_mm_geometry = results.get('max_mm_geometry', None)
+        max_mm_lambda = results.get('max_mm_lambda', None)
+        scf_energies = results.get('scf_energies', None)
+        max_scf_geometry = results.get('max_scf_geometry', None)
+        max_scf_lambda = results.get('max_scf_lambda', None)
+
+        hf.create_dataset('mm_energies', data=mm_energies, dtype='f')
+        hf.create_dataset('xyz_geometries', data=geometries)
+        hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
+        hf.create_dataset('max_mm_geometry', data=[max_mm_geometry])
+        hf.create_dataset('max_mm_lambda', data=max_mm_lambda, dtype='f')
+        if scf_energies is not None:
+            hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
+            hf.create_dataset('max_scf_geometry', data=[max_scf_geometry])
+            hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
+
+    @staticmethod
+    def _load_results(fname):
+        hf = h5py.File(fname, 'r')
+        results = {}
+        results['mm_energies'] = hf['mm_energies'][:]
+        results['xyz_geometries'] = [
+            s.decode('utf-8') for s in hf['xyz_geometries'][:]
+        ]
+        results['lambda_vec'] = hf['lambda_vec'][:]
+        results['max_mm_geometry'] = hf['max_mm_geometry'][0].decode('utf-8')
+        results['max_mm_lambda'] = hf['max_mm_lambda'][()]
+        if 'scf_energies' in hf:
+            results['scf_energies'] = hf['scf_energies'][:]
+            results['max_scf_geometry'] = hf['max_scf_geometry'][0].decode(
+                'utf-8')
+            results['max_scf_lambda'] = hf['max_scf_lambda'][()]
+        return results
+
+    def load_results(self, fname):
+        self.ostream.print_info(f"Loading results from {fname}")
+        self.ostream.flush()
+        results = self._load_results(fname)
+        self.results = results
+        return results
+
+    def _print_initial_mm_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header("Starting initial MM scan")
+        self.ostream.print_blank()
+        self.ostream.print_header("MM parameters:")
+        self.ostream.print_header(f"mm steps:       {self.mm_steps:>10}")
+        self.ostream.print_header(f"mm temperature: {self.mm_temperature:>8} K")
+        self.ostream.print_header(f"mm step size:   {self.mm_step_size:>7} ps")
+        self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
+        self.ostream.print_header(f"saving mm traj: {self.save_mm_traj:>10}")
+        self.ostream.print_blank()
+        valstr = '{} | {} | {} | {} | {}'.format(
+            'Lambda',
+            ' E_int',
+            '    E1',
+            '    E2',
+            '    Em',
+        )
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(45 * '-')
+        self.ostream.flush()
+
+    def _print_rescan_mm_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header(
+            f"Scanning MM conformers with {self.conformer_snapshots} snapshots and {self.conformer_steps} steps"
+        )
+        self.ostream.print_blank()
+        valstr = '{} | {} | {} | {} | {} | {}'.format(
+            'Lambda',
+            ' E_int',
+            '    E1',
+            '    E2',
+            '    Em',
+            'n_conf',
+        )
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(50 * '-')
+        self.ostream.flush()
+
+    def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
+        if n_conf is None:
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(
+                l, md_e, e1, e2, em)
+        else:
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
+                l, md_e, e1, e2, em, n_conf)
+        self.ostream.print_header(valstr)
+        self.ostream.flush()
+
+    def _print_scf_header(self):
+        self.ostream.print_blank()
+        self.ostream.print_header(f"Starting SCF scan")
+        self.ostream.print_blank()
+        valsltr = '{} | {} | {}'.format(
+            'Lambda',
+            'SCF Energy',
+            'Difference',
+        )
+        self.ostream.print_header(valsltr)
+        self.ostream.print_header(40 * '-')
+        self.ostream.flush()
+
+    def _print_scf_iter(self, l, scf_E, dif):
+        valstr = "{:8.2f}  {:15.5f}  {:8.3f}".format(l, scf_E, dif)
+        self.ostream.print_header(valstr)
+        self.ostream.flush()
 
     #todo add option for reading geometry (bond distances, angles, etc.) from transition state instead of averaging them
     #todo add option for recalculating charges from ts_mol
@@ -219,9 +847,9 @@ class TransitionStateGuesser():
                      ts_mol=None,
                      recalculate=True):
         if reaffgen is None:
-            reaffgen = self.evb_drv.reactant
+            reaffgen = self.reactant
         if proffgen is None:
-            proffgen = self.evb_drv.product
+            proffgen = self.product
         if ts_mol is None:
             ts_mol = self.molecule
 
@@ -350,255 +978,3 @@ class TransitionStateGuesser():
                 atom.update({'equivalent_atom': equi_atom})
             atoms.update({i: atom})
         return atoms
-
-    def _scan_ff(self, EVB):
-        energies = []
-        positions = []
-        initial_positions = EVB.system_confs[0]['initial_positions']  #in nm
-
-        topology = EVB.system_confs[0]['topology']
-        if self.save_mm_traj:
-            if not os.path.exists('ts_data'):
-                os.makedirs('ts_data')
-            else:
-                for file in os.listdir('ts_data'):
-                    file_path = os.path.join('ts_data', file)
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-            ts_folder = Path().cwd() / 'ts_data'
-
-            mmapp.PDBFile.writeFile(topology, initial_positions,
-                                    str(ts_folder / 'topology.pdb'))
-        exception = None
-        mm_P = initial_positions
-        try:
-            for l in self.lambda_vec:
-                integrator = mm.VerletIntegrator(self.mm_step_size)
-                simulation = mmapp.Simulation(topology,
-                                              EVB.system_confs[0]['systems'][l],
-                                              integrator)
-                simulation.context.setPositions(mm_P)
-
-                simulation.minimizeEnergy()
-                if self.save_mm_traj:
-                    mmapp.PDBFile.writeFile(
-                        topology,
-                        simulation.context.getState(
-                            getPositions=True).getPositions(),
-                        str(ts_folder / f'{l}_begin_minim.pdb'),
-                    )
-                    simulation.reporters.append(
-                        mmapp.XTCReporter(str(ts_folder / f'{l}_traj.xtc'), 1))
-                simulation.step(self.mm_steps)
-                simulation.minimizeEnergy()
-                if self.save_mm_traj:
-                    mmapp.PDBFile.writeFile(
-                        topology,
-                        simulation.context.getState(
-                            getPositions=True).getPositions(),
-                        str(ts_folder / f'{l}_end_minim.pdb'),
-                    )
-
-                state = simulation.context.getState(getEnergy=True,
-                                                    getPositions=True)
-                mm_E = state.getPotentialEnergy().value_in_unit(
-                    mmunit.kilojoules_per_mole)
-                mm_P = state.getPositions(asNumpy=True).value_in_unit(
-                    mmunit.bohr)
-                avg_x = np.mean(mm_P[:, 0])
-                avg_y = np.mean(mm_P[:, 1])
-                avg_z = np.mean(mm_P[:, 2])
-                mm_P -= [avg_x, avg_y, avg_z]
-
-                self.ostream.print_info(
-                    f"Lambda: {l}, MM Energy: {mm_E:.3f} kJ/mol")
-                self.ostream.flush()
-                energies.append(mm_E)
-                positions.append(mm_P)
-                bohr_to_nm = 0.0529177249
-                mm_P = mm_P * bohr_to_nm
-        except Exception as e:
-            self.ostream.print_warning(f"Error in the ff scan: {e}")
-            exception = e
-        return energies, positions, exception
-
-    def _scan_scf(self):
-        scf_energies = []
-        for i, l in enumerate(self.lambda_vec):
-            geom = self.results['mm_geometries'][i]
-            scf_E = self._get_scf_energy(geom)
-            scf_energies.append(scf_E)
-            self.ostream.print_info(
-                f"Lambda: {l}, SCF Energy: {scf_E:.3f} kJ/mol")
-            self.ostream.flush()
-
-        self.results['scf_energies'] = scf_energies
-
-        return scf_energies
-
-    def _get_scf_energy(self, positions):
-        self.molecule = self._set_molecule_positions(self.molecule, positions)
-        if self.scf_drv is None:
-            scf_drv = ScfRestrictedDriver()
-            scf_drv.xcfun = self.scf_xcfun
-            self.scf_drv = scf_drv
-
-        if self.mute_scf:
-            self.scf_drv.ostream.mute()
-        basis = MolecularBasis.read(self.molecule, self.scf_basis)
-        scf_results = self.scf_drv.compute(self.molecule, basis)
-        return scf_results['scf_energy'] * hartree_in_kjpermol()
-
-    def show_results(self, ts_results=None, atom_indices=False):
-        """Show the results of the transition state guesser.
-        This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
-
-        Args:
-            ts_results (dict, optional): The results of the transition state guesser. If none (default), uses the current results.
-            atom_indices (bool, optional): If true, shows the atom-indices of the molecule. Defaults to False.
-
-        Raises:
-            ImportError: If ipywidgets is not installed, an ImportError is raised.
-        """
-
-        try:
-            import ipywidgets
-        except ImportError:
-            raise ImportError('ipywidgets is required for this functionality.')
-
-        if ts_results is None:
-            ts_results = self.results
-
-        mm_energies = ts_results['mm_energies']
-        geometries = ts_results['xyz_geometries']
-        lambda_vec = ts_results['lambda_vec']
-        scf_energies = ts_results.get('scf_energies', None)
-        final_lambda = ts_results['final_lambda']
-        ipywidgets.interact(
-            self._show_iteration,
-            mm_energies=ipywidgets.fixed(mm_energies),
-            scf_energies=ipywidgets.fixed(scf_energies),
-            geometries=ipywidgets.fixed(geometries),
-            lambda_vec=ipywidgets.fixed(lambda_vec),
-            step=ipywidgets.SelectionSlider(
-                options=lambda_vec,
-                description='Lambda',
-                value=final_lambda,
-            ),
-            atom_indices=ipywidgets.fixed(atom_indices),
-        )
-
-    def _show_iteration(
-        self,
-        mm_energies,
-        geometries,
-        lambda_vec,
-        step,
-        scf_energies=None,
-        atom_indices=False,
-    ):
-        """
-        Show the geometry at a specific iteration.
-        """
-
-        try:
-            import matplotlib.pyplot as plt
-        except ImportError:
-            raise ImportError('matplotlib is required for this functionality.')
-
-        rel_mm_energies = mm_energies - np.min(mm_energies)
-
-        lam_index = np.where(lambda_vec == step)[0][0]
-        xyz_data_i = geometries[lam_index]
-        total_steps = len(rel_mm_energies) - 1
-        x = np.linspace(0, lambda_vec[-1], 100)
-        y = np.interp(x, lambda_vec, rel_mm_energies)
-        fig, ax1 = plt.subplots(figsize=(6.5, 4))
-        ax1.plot(
-            x,
-            y,
-            color='black',
-            alpha=0.9,
-            linewidth=2.5,
-            linestyle='-',
-            zorder=0,
-            label='MM energy',
-        )
-        ax1.scatter(
-            lambda_vec,
-            rel_mm_energies,
-            color='black',
-            alpha=0.7,
-            s=120 / math.log(total_steps, 10),
-            facecolors="none",
-            edgecolor="darkcyan",
-            zorder=1,
-        )
-        ax1.scatter(
-            lambda_vec[lam_index],
-            rel_mm_energies[lam_index],
-            marker='o',
-            color='darkcyan',
-            alpha=1.0,
-            s=120 / math.log(total_steps, 10),
-            zorder=2,
-        )
-        ax1.set_xlabel(r'$\lambda$')
-        ax1.set_ylabel('Relative MM energy [kJ/mol]')
-
-        if scf_energies is not None:
-            ax2 = ax1.twinx()
-            rel_scf_energies = scf_energies - np.min(scf_energies)
-            ax2.plot(
-                x,
-                np.interp(x, lambda_vec, rel_scf_energies),
-                color='darkred',
-                alpha=0.9,
-                linewidth=2.5,
-                linestyle='--',
-                zorder=0,
-                label='SCF energy',
-            )
-            ax2.scatter(
-                lambda_vec,
-                rel_scf_energies,
-                alpha=0.7,
-                s=120 / math.log(total_steps, 10),
-                facecolors="none",
-                edgecolor="darkorange",
-                zorder=1,
-            )
-            ax2.scatter(
-                lambda_vec[lam_index],
-                rel_scf_energies[lam_index],
-                marker='o',
-                color='darkorange',
-                alpha=1.0,
-                s=120 / math.log(total_steps, 10),
-                zorder=2,
-            )
-            ax2.set_ylabel('Relative SCF energy [kJ/mol]')
-
-        fig.legend(loc='upper right',
-                   bbox_to_anchor=(1, 1),
-                   bbox_transform=ax1.transAxes)
-        ax1.set_title("Transition state finder")
-        # Ensure x-axis displays as integers
-        ax1.set_xticks(lambda_vec[::2])
-        fig.tight_layout()
-        plt.show()
-
-        mol = Molecule.read_xyz_string(xyz_data_i)
-        mol.show(atom_indices=atom_indices, width=640, height=360)
-
-    @staticmethod
-    def _mm_to_xyz_geom(geom, molecule):
-        new_mol = TransitionStateGuesser._set_molecule_positions(molecule, geom)
-        return new_mol.get_xyz_string()
-
-    @staticmethod
-    def _set_molecule_positions(molecule, positions):
-        assert molecule.number_of_atoms() == len(positions)
-        for i in range(molecule.number_of_atoms()):
-            molecule.set_atom_coordinates(i, positions[i])
-        return molecule

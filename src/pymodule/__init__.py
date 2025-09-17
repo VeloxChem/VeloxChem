@@ -188,7 +188,7 @@ from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
-from .evbffbuilder import EvbForceFieldBuilder
+from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
 from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
@@ -201,6 +201,7 @@ from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
+from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver

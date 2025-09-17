@@ -313,12 +313,15 @@ class ScfGradientDriver(GradientDriver):
             fock_type = '2jk'
             exchange_scaling_factor = 1.0
 
-        # TODO: range-separated Fock
+        # further determine exchange_scaling_factor, erf_k_coef and omega
         need_omega = (use_dft and xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(
-                False, 'ScfGradientDriver: Not implemented for' +
-                ' range-separated functional')
+            exchange_scaling_factor = (xcfun.get_rs_alpha() +
+                                       xcfun.get_rs_beta())
+            erf_k_coef = -xcfun.get_rs_beta()
+            omega = xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(D)
@@ -394,11 +397,20 @@ class ScfGradientDriver(GradientDriver):
                                                  exchange_scaling_factor, 0.0,
                                                  thresh_int)
 
-                grad_timing['Fock_grad'] += time.time() - t0
-
                 factor = 2.0 if fock_type == 'j' else 1.0
 
                 self.gradient[iatom, :] += np.array(atomgrad) * factor
+
+                if need_omega:
+                    # for range-separated functional
+                    atomgrad_rs = fock_grad_drv.compute(
+                        basis, screener_atom, screener, den_mat_for_fock,
+                        den_mat_for_fock2, iatom, 'kx_rs', erf_k_coef, omega,
+                        thresh_int)
+
+                    self.gradient[iatom, :] -= np.array(atomgrad_rs)
+
+                grad_timing['Fock_grad'] += time.time() - t0
 
         # XC contribution to gradient
 
@@ -689,12 +701,15 @@ class ScfGradientDriver(GradientDriver):
             fock_type = '2jk'
             exchange_scaling_factor = 1.0
 
-        # TODO: range-separated Fock
+        # further determine exchange_scaling_factor, erf_k_coef and omega
         need_omega = (use_dft and xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(
-                False, 'ScfGradientDriver: Not implemented for' +
-                ' range-separated functional')
+            exchange_scaling_factor = (xcfun.get_rs_alpha() +
+                                       xcfun.get_rs_beta())
+            erf_k_coef = -xcfun.get_rs_beta()
+            omega = xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
         Da_for_fock = make_matrix(basis, mat_t.symmetric)
         Da_for_fock.set_values(Da)
@@ -779,6 +794,22 @@ class ScfGradientDriver(GradientDriver):
 
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
+
+                    if need_omega:
+                        # for range-separated functional
+                        atomgrad_Ka_rs = fock_grad_drv.compute(
+                            basis, screener_atom, screener, Da_for_fock,
+                            Da_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                            thresh_int)
+                        atomgrad_Kb_rs = fock_grad_drv.compute(
+                            basis, screener_atom, screener, Db_for_fock,
+                            Db_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                            thresh_int)
+
+                        self.gradient[
+                            iatom, :] -= 0.5 * np.array(atomgrad_Ka_rs)
+                        self.gradient[
+                            iatom, :] -= 0.5 * np.array(atomgrad_Kb_rs)
 
         # XC contribution to gradient
 
