@@ -4,14 +4,51 @@ target_sources(vlxobjs
     ElectronRepulsionGeom0010ContrRecXXDP.cpp
     ElectronRepulsionGeom0010ContrRecXXDS.cpp
     ElectronRepulsionGeom0010ContrRecXXPD.cpp
-    ElectronRepulsionGeom0010ContrRecXXPF.cpp
     ElectronRepulsionGeom0010ContrRecXXPP.cpp
     ElectronRepulsionGeom0010ContrRecXXPS.cpp
     ElectronRepulsionGeom0010ContrRecXXSD.cpp
-    ElectronRepulsionGeom0010ContrRecXXSF.cpp
-    ElectronRepulsionGeom0010ContrRecXXSG.cpp
     ElectronRepulsionGeom0010ContrRecXXSP.cpp
     ElectronRepulsionGeom0010ContrRecXXSS.cpp
+    ElectronRepulsionGeom0010ContrRecXXDF.cpp
+    ElectronRepulsionGeom0010ContrRecXXFD.cpp
+    ElectronRepulsionGeom0010ContrRecXXFF.cpp
+    ElectronRepulsionGeom0010ContrRecXXFP.cpp
+    ElectronRepulsionGeom0010ContrRecXXFS.cpp
+    ElectronRepulsionGeom0010ContrRecXXPF.cpp
+    ElectronRepulsionGeom0010ContrRecXXSF.cpp
+    ElectronRepulsionGeom0010ContrRecXXDG.cpp
+    ElectronRepulsionGeom0010ContrRecXXFG.cpp
+    ElectronRepulsionGeom0010ContrRecXXGD.cpp
+    ElectronRepulsionGeom0010ContrRecXXGF.cpp
+    ElectronRepulsionGeom0010ContrRecXXGG.cpp
+    ElectronRepulsionGeom0010ContrRecXXGP.cpp
+    ElectronRepulsionGeom0010ContrRecXXGS.cpp
+    ElectronRepulsionGeom0010ContrRecXXPG.cpp
+    ElectronRepulsionGeom0010ContrRecXXSG.cpp
+    ElectronRepulsionGeom0010ContrRecXXDH.cpp
+    ElectronRepulsionGeom0010ContrRecXXFH.cpp
+    ElectronRepulsionGeom0010ContrRecXXGH.cpp
+    ElectronRepulsionGeom0010ContrRecXXHD.cpp
+    ElectronRepulsionGeom0010ContrRecXXHF.cpp
+    ElectronRepulsionGeom0010ContrRecXXHG.cpp
+    ElectronRepulsionGeom0010ContrRecXXHH.cpp
+    ElectronRepulsionGeom0010ContrRecXXHP.cpp
+    ElectronRepulsionGeom0010ContrRecXXHS.cpp
+    ElectronRepulsionGeom0010ContrRecXXPH.cpp
+    ElectronRepulsionGeom0010ContrRecXXSH.cpp
+    ElectronRepulsionGeom0010ContrRecXXDI.cpp
+    ElectronRepulsionGeom0010ContrRecXXFI.cpp
+    ElectronRepulsionGeom0010ContrRecXXGI.cpp
+    ElectronRepulsionGeom0010ContrRecXXHI.cpp
+    ElectronRepulsionGeom0010ContrRecXXID.cpp
+    ElectronRepulsionGeom0010ContrRecXXIF.cpp
+    ElectronRepulsionGeom0010ContrRecXXIG.cpp
+    ElectronRepulsionGeom0010ContrRecXXIH.cpp
+    ElectronRepulsionGeom0010ContrRecXXII.cpp
+    ElectronRepulsionGeom0010ContrRecXXIP.cpp
+    ElectronRepulsionGeom0010ContrRecXXIS.cpp
+    ElectronRepulsionGeom0010ContrRecXXPI.cpp
+    ElectronRepulsionGeom0010ContrRecXXSI.cpp
     ElectronRepulsionGeom1000ContrRecDDXX.cpp
     ElectronRepulsionGeom1000ContrRecDFXX.cpp
     ElectronRepulsionGeom1000ContrRecDGXX.cpp
@@ -58,14 +95,51 @@ target_sources(vlxobjs
     ElectronRepulsionGeom1010ContrRecDPXX.cpp
     ElectronRepulsionGeom1010ContrRecDSXX.cpp
     ElectronRepulsionGeom1010ContrRecPDXX.cpp
-    ElectronRepulsionGeom1010ContrRecPFXX.cpp
     ElectronRepulsionGeom1010ContrRecPPXX.cpp
     ElectronRepulsionGeom1010ContrRecPSXX.cpp
     ElectronRepulsionGeom1010ContrRecSDXX.cpp
-    ElectronRepulsionGeom1010ContrRecSFXX.cpp
-    ElectronRepulsionGeom1010ContrRecSGXX.cpp
     ElectronRepulsionGeom1010ContrRecSPXX.cpp
     ElectronRepulsionGeom1010ContrRecSSXX.cpp
+    ElectronRepulsionGeom1010ContrRecDFXX.cpp
+    ElectronRepulsionGeom1010ContrRecFDXX.cpp
+    ElectronRepulsionGeom1010ContrRecFFXX.cpp
+    ElectronRepulsionGeom1010ContrRecFPXX.cpp
+    ElectronRepulsionGeom1010ContrRecFSXX.cpp
+    ElectronRepulsionGeom1010ContrRecDGXX.cpp
+    ElectronRepulsionGeom1010ContrRecFGXX.cpp
+    ElectronRepulsionGeom1010ContrRecGDXX.cpp
+    ElectronRepulsionGeom1010ContrRecGFXX.cpp
+    ElectronRepulsionGeom1010ContrRecGGXX.cpp
+    ElectronRepulsionGeom1010ContrRecGPXX.cpp
+    ElectronRepulsionGeom1010ContrRecGSXX.cpp
+    ElectronRepulsionGeom1010ContrRecPGXX.cpp
+    ElectronRepulsionGeom1010ContrRecDIXX.cpp
+    ElectronRepulsionGeom1010ContrRecFIXX.cpp
+    ElectronRepulsionGeom1010ContrRecGIXX.cpp
+    ElectronRepulsionGeom1010ContrRecIDXX.cpp
+    ElectronRepulsionGeom1010ContrRecIFXX.cpp
+    ElectronRepulsionGeom1010ContrRecIGXX.cpp
+    ElectronRepulsionGeom1010ContrRecIIXX.cpp
+    ElectronRepulsionGeom1010ContrRecIPXX.cpp
+    ElectronRepulsionGeom1010ContrRecISXX.cpp
+    ElectronRepulsionGeom1010ContrRecPIXX.cpp
+    ElectronRepulsionGeom1010ContrRecSIXX.cpp
+    ElectronRepulsionGeom1010ContrRecDHXX.cpp
+    ElectronRepulsionGeom1010ContrRecFHXX.cpp
+    ElectronRepulsionGeom1010ContrRecGHXX.cpp
+    ElectronRepulsionGeom1010ContrRecHDXX.cpp
+    ElectronRepulsionGeom1010ContrRecHFXX.cpp
+    ElectronRepulsionGeom1010ContrRecHGXX.cpp
+    ElectronRepulsionGeom1010ContrRecHHXX.cpp
+    ElectronRepulsionGeom1010ContrRecHIXX.cpp
+    ElectronRepulsionGeom1010ContrRecHPXX.cpp
+    ElectronRepulsionGeom1010ContrRecHSXX.cpp
+    ElectronRepulsionGeom1010ContrRecIHXX.cpp
+    ElectronRepulsionGeom1010ContrRecPHXX.cpp
+    ElectronRepulsionGeom1010ContrRecSHXX.cpp
+    ElectronRepulsionGeom1010ContrRecPFXX.cpp
+    ElectronRepulsionGeom1010ContrRecSFXX.cpp
+    ElectronRepulsionGeom1010ContrRecSGXX.cpp
     ElectronRepulsionGeom2000ContrRecDDXX.cpp
     ElectronRepulsionGeom2000ContrRecDPXX.cpp
     ElectronRepulsionGeom2000ContrRecDSXX.cpp
