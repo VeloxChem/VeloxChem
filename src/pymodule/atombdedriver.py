@@ -846,8 +846,9 @@ class AtomBdeDriver:
             self.ostream.flush()
         else:
             self.mol_rad_scf_energy = None
-
+            
         self.mol_rad_scf_energy = self._comm.bcast(self.mol_rad_scf_energy, root=mpi_master())
+        return self.mol_rad_scf_energy, mol
 
     def _show_bde_on_atom(self,
                           molecule,
@@ -1022,10 +1023,12 @@ class AtomBdeDriver:
 
         #calculate BDEs for each radical molecule
         unique_BDEs_hartree = []
+        #results for each radical molecule
+        radical_molecules_results = []
 
         for run_idx, (mol_rad, radical_carbon_idx) in enumerate(zip(molecules_rads, radical_carbon_indices)):
             self.mol_rad_scf_energy = None  #reset to None for each radical molecule
-            self._compute_mol_rad_scf_energy(mol_rad, radical_carbon_idx, run_idx, mol_idx)
+            self.mol_rad_scf_energy, opt_mol_rad = self._compute_mol_rad_scf_energy(mol_rad, radical_carbon_idx, run_idx, mol_idx)
             if self._rank == mpi_master():
                 if self.mol_rad_scf_energy is None:
                     bde_hartree = 0.0
@@ -1037,8 +1040,11 @@ class AtomBdeDriver:
                 else:
                     bde_hartree = self.mol_rad_scf_energy - self.whole_mol_single_point_scf_energy + self.target_atom_single_point_scf_energy
                 unique_BDEs_hartree.append(bde_hartree)
+                radical_molecules_results.append((self.mol_rad_scf_energy, opt_mol_rad))
+
 
         unique_BDEs_hartree = self._comm.bcast(unique_BDEs_hartree, root=mpi_master())
+        radical_molecules_results = self._comm.bcast(radical_molecules_results, root=mpi_master())
 
         if self._rank == mpi_master():
             # loop the unique_target_atoms_indices to remove the H atoms from the molecule and
@@ -1050,6 +1056,7 @@ class AtomBdeDriver:
             self.unique_target_atoms_keys = unique_target_atoms_keys
             self.unique_BDEs_hartree = unique_BDEs_hartree
             self.opt_whole_molecule = self.opt_whole_molecule
+            self.radical_molecules_results = radical_molecules_results
         else:
             self.target_atoms_dict = None
             self.bdes_coords = None
@@ -1057,6 +1064,7 @@ class AtomBdeDriver:
             self.unique_target_atoms_keys = None
             self.unique_BDEs_hartree = None
             self.opt_whole_molecule = None
+            self.radical_molecules_results = None
 
         self.target_atoms_dict = self._comm.bcast(self.target_atoms_dict, root=mpi_master())
         self.bdes_coords = self._comm.bcast(self.bdes_coords, root=mpi_master())
@@ -1064,6 +1072,7 @@ class AtomBdeDriver:
         self.unique_target_atoms_keys = self._comm.bcast(self.unique_target_atoms_keys, root=mpi_master())
         self.unique_BDEs_hartree = self._comm.bcast(self.unique_BDEs_hartree, root=mpi_master())
         self.opt_whole_molecule = self._comm.bcast(self.opt_whole_molecule, root=mpi_master())
+        self.radical_molecules_results = self._comm.bcast(self.radical_molecules_results, root=mpi_master())
 
     def compute(self, mol_list: list):
         """
@@ -1093,6 +1102,7 @@ class AtomBdeDriver:
                     'unique_target_atoms_bdes_coords':
                         self.unique_target_atoms_bdes_coords,
                     'opt_whole_molecule': self.opt_whole_molecule,
+                    'radical_molecules_results': self.radical_molecules_results
                 }
                 #reset for next molecule
                 self.target_atoms_dict = None
@@ -1101,6 +1111,7 @@ class AtomBdeDriver:
                 self.unique_BDEs_hartree = None
                 self.unique_target_atoms_bdes_coords = None
                 self.opt_whole_molecule = None
+                self.radical_molecules_results = None
                 self.mols_bdes_list.append(mol_bde_dict)
 
         self.mols_bdes_list = self._comm.bcast(self.mols_bdes_list,
