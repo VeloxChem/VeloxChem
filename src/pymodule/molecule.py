@@ -977,17 +977,16 @@ def _Molecule_show(self,
                 lines = sdf.split('\n')
                 last_line = lines[-2]
                 lines = lines[:-2]
-                for key in dashed_bonds:
-                    line = f" {key[0] + 1:<2} {key[1] + 1:<2} 0.5  0"
+                for key in sorted(dashed_bonds):
+                    line = f" {key[0]+1:<2} {key[1]+1:<2} 0.5  0"
                     lines.append(line)
                 lines.append(last_line)
 
                 splitline = re.split(r'(\s+)', lines[3])
-
                 splitline[4] = str(int(splitline[4]) + len(dashed_bonds))
+                splitline[3] = " " * (2 - len(splitline[4]))
                 lines[3] = ''.join(splitline)
                 sdf = '\n'.join(lines)
-
             viewer.addModel(sdf, 'sdf')
 
         if atom_indices or atom_labels:
