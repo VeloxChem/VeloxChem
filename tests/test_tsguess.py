@@ -1,5 +1,4 @@
 from pathlib import Path
-import numpy as np
 import pytest
 import sys
 
@@ -18,9 +17,6 @@ except ImportError:
 @pytest.mark.timeconsuming
 class TestTransitionStateGuesser:
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_ts_guesser(self):
         rea = Molecule.read_smiles("C1CCC=C1")
         pro = Molecule.read_smiles("C=CC1CC1")

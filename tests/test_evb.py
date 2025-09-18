@@ -23,9 +23,6 @@ except ImportError:
 @pytest.mark.timeconsuming
 class TestEvb:
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_forcefield_builder(self):
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
 
@@ -127,9 +124,6 @@ class TestEvb:
             else:
                 assert val1 == val2
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_system_builder(self):
         data_path = Path(__file__).parent / 'data'
         # load forcefields
@@ -237,9 +231,6 @@ class TestEvb:
                 pass
         return '"'.join(line)
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_data_processing(self):
         # Load simulation data
         input_results = {}
