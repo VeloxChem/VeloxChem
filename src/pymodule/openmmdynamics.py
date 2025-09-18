@@ -824,8 +824,7 @@ class OpenMMDynamics:
         self.ostream.flush()
         self._get_centroid_bond_force()
 
-        self.simulation = app.Simulation(topology, self.system, self.integrator, self._create_platform())
-
+        self.simulation = app.Simulation(topology, self.system, self.integrator, platform=self._create_platform())
         self.simulation.context.setPositions(self.positions)
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
         self.simulation.minimizeEnergy()
@@ -851,8 +850,7 @@ class OpenMMDynamics:
         # Recalculate energies
         self.ostream.print_info("Recalculating energies for the conformations...")
         self.ostream.flush()
-
-        simulation = app.Simulation(topology, real_system, self._create_integrator(), self._create_platform())
+        simulation = app.Simulation(topology, real_system, self._create_integrator(), platform=self._create_platform())
 
         for idx, conformation in enumerate(conformations):    
             simulation.context.setPositions(conformation)
@@ -953,8 +951,7 @@ class OpenMMDynamics:
         topology = self.pdb.topology
         self.positions = self.pdb.positions
 
-        self.simulation = app.Simulation(topology, self.system, self.integrator, self._create_platform())
-
+        self.simulation = app.Simulation(topology, self.system, self.integrator, platform=self._create_platform())
         self.simulation.context.setPositions(self.positions)
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
 
@@ -977,8 +974,7 @@ class OpenMMDynamics:
         for i in range(snapshots):
             self.simulation.step(save_freq)
         
-            minimized_system = app.Simulation(topology, self.system, self._create_integrator(), self._create_platform())
-
+            minimized_system = app.Simulation(topology, self.system, self._create_integrator(), platform=self._create_platform())
             minimized_system.context.setPositions(self.simulation.context.getState(getPositions=True).getPositions())
             
             minimized_system.minimizeEnergy()
@@ -1224,7 +1220,7 @@ class OpenMMDynamics:
         
         self.positions = self.pdb.positions
         
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator, self._create_platform())
+        self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
 
         self.simulation.context.setPositions(self.positions)
         
@@ -1432,7 +1428,7 @@ class OpenMMDynamics:
 
         self.positions = self.pdb.positions
         
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator, self._create_platform())
+        self.simulation = app.Simulation(self.topology, self.system, new_integrator, platform=self._create_platform())
 
         # Load the state if a restart file is provided
         if restart_file is not None:
