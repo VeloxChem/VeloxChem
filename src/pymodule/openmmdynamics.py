@@ -75,7 +75,7 @@ class OpenMMDynamics:
         The output stream.
 
     Instance variables:
-        - platform: The platform for OpenMM. Default is 'reference'
+        - openmm_platform: The platform for OpenMM.
                     Options are 'CPU', 'CUDA' and 'OpenCL'.
         - ensemble: The thermodynamic ensemble used in the simulation.
                     Options are: 'NVE', 'NVT' and 'NPT'.
@@ -138,9 +138,11 @@ class OpenMMDynamics:
         # output stream
         self.ostream = ostream
 
+        # openmm platform
+        self.openmm_platform = None
+
         # Instance variables
         # Simulation parameters
-        self.platform = 'reference'
         self.ensemble = 'NVE'
         self.temperature = 298.15 
         self.friction = 1.0 
@@ -822,7 +824,8 @@ class OpenMMDynamics:
         self.ostream.flush()
         self._get_centroid_bond_force()
 
-        self.simulation = app.Simulation(topology, self.system, self.integrator)
+        self.simulation = app.Simulation(topology, self.system, self.integrator, self._create_platform())
+
         self.simulation.context.setPositions(self.positions)
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
         self.simulation.minimizeEnergy()
@@ -848,7 +851,8 @@ class OpenMMDynamics:
         # Recalculate energies
         self.ostream.print_info("Recalculating energies for the conformations...")
         self.ostream.flush()
-        simulation = app.Simulation(topology, real_system, self._create_integrator())
+
+        simulation = app.Simulation(topology, real_system, self._create_integrator(), self._create_platform())
 
         for idx, conformation in enumerate(conformations):    
             simulation.context.setPositions(conformation)
@@ -949,7 +953,8 @@ class OpenMMDynamics:
         topology = self.pdb.topology
         self.positions = self.pdb.positions
 
-        self.simulation = app.Simulation(topology, self.system, self.integrator)
+        self.simulation = app.Simulation(topology, self.system, self.integrator, self._create_platform())
+
         self.simulation.context.setPositions(self.positions)
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
 
@@ -972,7 +977,8 @@ class OpenMMDynamics:
         for i in range(snapshots):
             self.simulation.step(save_freq)
         
-            minimized_system = app.Simulation(topology, self.system, self._create_integrator())
+            minimized_system = app.Simulation(topology, self.system, self._create_integrator(), self._create_platform())
+
             minimized_system.context.setPositions(self.simulation.context.getState(getPositions=True).getPositions())
             
             minimized_system.minimizeEnergy()
@@ -1218,7 +1224,7 @@ class OpenMMDynamics:
         
         self.positions = self.pdb.positions
         
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator)
+        self.simulation = app.Simulation(self.topology, self.system, new_integrator, self._create_platform())
 
         self.simulation.context.setPositions(self.positions)
         
@@ -1426,7 +1432,7 @@ class OpenMMDynamics:
 
         self.positions = self.pdb.positions
         
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator)
+        self.simulation = app.Simulation(self.topology, self.system, new_integrator, self._create_platform())
 
         # Load the state if a restart file is provided
         if restart_file is not None:
@@ -1820,6 +1826,22 @@ class OpenMMDynamics:
        
             print('The CONECT records were not found in the PDB file.')
             print('The connectivity matrix was used to determine the bonds.')
+
+    def _create_platform(self):
+        """
+        Creates an OpenMM platform.
+
+        Returns:
+            OpenMM Platform.
+        """
+
+        if self.openmm_platform is None:
+            return None
+        else:
+            platform = mm.Platform.getPlatformByName(self.openmm_platform)
+            if self.openmm_platform == "CPU":
+                platform.setPropertyDefaultValue("Threads", "1")
+            return platform
 
     def _create_integrator(self):
         """
