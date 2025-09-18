@@ -45,6 +45,8 @@ class TestAtomBdeDriver:
 
     def test_atom_bde_driver(self):
 
+        self.cleanup_h5files()
+
         # use a methane molecule as test case
         xyz_str = """5
 
@@ -55,4 +57,5 @@ class TestAtomBdeDriver:
         H              1.480064000000         0.189072000000        -2.064585000000
         """
         self.run_atom_bde(Molecule.read_xyz_string(xyz_str))
+
         self.cleanup_h5files()
