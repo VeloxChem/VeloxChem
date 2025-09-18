@@ -132,7 +132,7 @@ class OptimizationDriver:
                 'tmax': ('float', 'maximum value of trust radius'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
-                'irc': ('bool', 'intrinsic reaction coordinate search'),
+                'irc': ('bool', 'flag for intrinsic reaction coordinate'),
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
@@ -188,7 +188,7 @@ class OptimizationDriver:
             self.filename = opt_dict['filename']
 
         # update hessian option for transition state search
-        if ('hessian' not in opt_dict) and (self.transition | self.irc):
+        if ('hessian' not in opt_dict) and (self.transition or self.irc):
             self.hessian = 'first'
 
     def _pick_driver(self, drv):
@@ -240,10 +240,10 @@ class OptimizationDriver:
         """
 
         # update hessian option for transition state search
-        if self.hessian == 'never' and (self.transition | self.irc):
+        if self.hessian == 'never' and (self.transition or self.irc):
             self.hessian = 'first'
 
-        if self.hessian or (self.transition | self.irc):
+        if self.hessian or (self.transition or self.irc):
             err_msg = (
                 'The installed geometric package does not support\n' +
                 '  Hessian or transition state search. Please install\n' +
@@ -364,13 +364,13 @@ class OptimizationDriver:
 
         if self.trust is None:
             # from geomeTRIC params.py
-            default_trust = 0.01 if (self.transition | self.irc) else 0.1
+            default_trust = 0.01 if self.transition else 0.1
         else:
             default_trust = self.trust
 
         if self.tmax is None:
             # from geomeTRIC params.py
-            default_tmax = 0.03 if (self.transition | self.irc) else 0.3
+            default_tmax = 0.03 if self.transition else default_trust if self.irc else 0.3
         else:
             default_tmax = self.tmax
 
@@ -836,7 +836,7 @@ class OptimizationDriver:
         lines.append('Max. Number of Steps    :    ' + str(self.max_iter))
         lines.append('Transition State        :    ' +
                      ('Yes' if self.transition else 'No'))
-        lines.append('IRC Search              :    ' +
+        lines.append('IRC                     :    ' +
                      ('Yes' if self.irc else 'No'))
         lines.append('Hessian                 :    ' + self.hessian)
 
