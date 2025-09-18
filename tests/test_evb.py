@@ -208,6 +208,11 @@ class TestEvb:
             min_len = min(len(sys_lines), len(ref_lines))
             for i, (sys_line, ref_line) in enumerate(
                     zip(sys_lines[:min_len], ref_lines[:min_len])):
+
+                # skip the line with openmm version
+                if 'openmmVersion' in sys_line:
+                    continue
+
                 cond = TestEvb._round_numbers_in_line(
                     sys_line) == TestEvb._round_numbers_in_line(ref_line)
 
