@@ -152,7 +152,7 @@ class TransitionStateGuesser():
             # assert False, 'Not implemented yet'
             self.scan_scf(self.results)
 
-        return self.molecule, self.results
+        return self.results
 
     def build_forcefields(self, reactant, product, constraints=[], **ts_kwargs):
         if self.mute_ff_build:
@@ -316,7 +316,7 @@ class TransitionStateGuesser():
                             E_int[min_index + i] = E_int_cs[i]
                             N_conf[min_index + i] = N_conf_cs[i]
                             
-                if not self.skip_conformer_search:
+                if not self.skip_discont_conformer_search:
                     discont_indices = self._check_discontinuities(E1, E2)
                     
                     while len(discont_indices) > 0 and len(searched_conformers_indices) < len(self.lambda_vec):
