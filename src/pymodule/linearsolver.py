@@ -666,6 +666,11 @@ class LinearSolver:
 
                     n_subcomms = self.nodes // subcomm_size
 
+                    # make sure that number of subcomms does not exceed number
+                    # of trial vectors
+                    if n_subcomms > n_total:
+                        continue
+
                     ave, res = divmod(n_total, n_subcomms)
                     counts = [ave + 1 if p < res else ave for p in range(n_subcomms)]
 
