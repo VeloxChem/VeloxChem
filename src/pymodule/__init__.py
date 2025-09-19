@@ -174,6 +174,7 @@ from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 from .mmforcefieldgenerator import MMForceFieldGenerator
+from .trajectorydriver import TrajectoryDriver
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
