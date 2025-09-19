@@ -4861,7 +4861,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             const uint32_t offsetD = 1 * max_prim_pair_count;
 
-            gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block>>>(
+            gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block,0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
                                static_cast<uint32_t>(s_prim_count),
