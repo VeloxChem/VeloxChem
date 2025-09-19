@@ -198,7 +198,6 @@ CT4CMatricesDistributor::distribute(const CSimdArray<double>&        buffer,
 auto
 CT4CMatricesDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
-#pragma omp critical
     {
         const auto bra_ang_moms = bra_gto_pair_block.angular_momentums();
 

@@ -608,10 +608,12 @@ accumulate(CSubMatrix*                glob_matrix,
 
                     if (ang_order)
                     {
+		        #pragma omp atomic update 
                         glob_matrix->operator[]({kg, lg}) += loc_matrix->at({bra_loff + k, ket_loff + l});
                     }
                     else
                     {
+		      #pragma omp atomic update
                         glob_matrix->operator[]({lg, kg}) += loc_matrix->at({bra_loff + k, ket_loff + l});
                     }
                 }
