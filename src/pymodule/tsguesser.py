@@ -888,28 +888,22 @@ class TransitionStateGuesser():
 
     def _print_mm_header(self, conformer_search=False, lambda_vals=None):
         self.ostream.print_blank()
-        if lambda_vals is None:
-            self.ostream.print_header("Starting MM scan")
-        else:
+        if conformer_search is False:
+            if lambda_vals is None:
+                self.ostream.print_header("Starting MM scan")
+            else:
+                self.ostream.print_header(
+                    f"Starting MM scan for lambda values {lambda_vals}")
+            self.ostream.print_blank()
+            self.ostream.print_header("MM parameters:")
+            self.ostream.print_header(f"MD steps:       {self.mm_steps:>10}")
+            self.ostream.print_header(f"MD temperature: {self.mm_temperature:>8} K")
+            self.ostream.print_header(f"MD step size:   {self.mm_step_size:>7} ps")
+            self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
             self.ostream.print_header(
-                f"Starting MM scan for lambda values {lambda_vals}")
-        self.ostream.print_blank()
-        self.ostream.print_header("MM parameters:")
-        self.ostream.print_header(f"MD steps:       {self.mm_steps:>10}")
-        self.ostream.print_header(f"MD temperature: {self.mm_temperature:>8} K")
-        self.ostream.print_header(f"MD step size:   {self.mm_step_size:>7} ps")
-        self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
-        self.ostream.print_header(
-            f"saving MD traj: {str(self.save_mm_traj):>10}")
-        self.ostream.print_header(
-            f"conf. search:   {str(conformer_search):>10}")
-        if conformer_search:
-            self.ostream.print_header(
-                f"conf. steps:    {self.conformer_steps:>10}")
-            self.ostream.print_header(
-                f"conf. snapshots:{self.conformer_snapshots:>10}")
-        self.ostream.print_blank()
-        if not conformer_search:
+                f"saving MD traj: {str(self.save_mm_traj):>10}")
+            # self.ostream.print_header(
+            #     f"conf. search:   {str(conformer_search):>10}")
             valstr = '{} | {} | {} | {}'.format(
                 'Lambda',
                 '    E1',
@@ -917,6 +911,21 @@ class TransitionStateGuesser():
                 '     V',
             )
         else:
+            if lambda_vals is None:
+                self.ostream.print_header("Starting MM scan with conformer search")
+            else:
+                self.ostream.print_header(
+                    f"Starting MM scan with conformer search for lambda values {lambda_vals}"
+                )
+            self.ostream.print_header(
+                f"conf. steps:    {self.conformer_steps:>10}")
+            self.ostream.print_header(
+                f"conf. snapshots:{self.conformer_snapshots:>10}")
+            self.ostream.print_header(f"MD temperature: {self.mm_temperature:>8} K")
+            self.ostream.print_header(f"MD step size:   {self.mm_step_size:>7} ps")
+            self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
+            self.ostream.print_header(
+                f"saving MD traj: {str(self.save_mm_traj):>10}")
             valstr = '{} | {} | {} | {} | {}'.format(
                 'Lambda',
                 '    E1',

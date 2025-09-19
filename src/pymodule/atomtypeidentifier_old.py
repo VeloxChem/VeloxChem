@@ -42,7 +42,7 @@ from .outputstream import OutputStream
 from .errorhandler import safe_arccos
 
 
-class AtomTypeIdentifier:
+class AtomTypeIdentifier_old:
     """
     A class to identify atom types in a molecule using GAFF (General Amber
     Force Field) atom types based on a VeloxChem molecule object.
@@ -427,7 +427,7 @@ class AtomTypeIdentifier:
                                   and int(gaff_version_minor) >= 2)
 
         for atom_number, info in self.atom_info_dict.items():
-            atom_found = False
+
             # Chemical environment information
             connected_symbols = set(info['ConnectedAtoms'])
 
@@ -891,7 +891,6 @@ class AtomTypeIdentifier:
                             f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
 
                 self.atom_types_dict[f"C{info['AtomNumber']}"] = carbon_type
-                
 
             # Oxygen type decision
 
@@ -1509,8 +1508,13 @@ class AtomTypeIdentifier:
                             'opls': f'opls_x{info["AtomNumber"]}',
                             'gaff': f'nx{info["AtomNumber"]}'
                         }
-    
-                
+
+                else:
+
+                    nitrogen_type = {
+                        'opls': f'opls_x{info["AtomNumber"]}',
+                        'gaff': f'nx{info["AtomNumber"]}'
+                    }
 
                 self.atom_types_dict[f"N{info['AtomNumber']}"] = nitrogen_type
 
@@ -1567,12 +1571,12 @@ class AtomTypeIdentifier:
                     elif info['NumConnectedAtoms'] == 2:
                         phosphorus_type = {'opls': 'opls_900P', 'gaff': 'p2'}
 
-                    # # Undefined phosphorus #todo px is already in use, use p_uff instead
-                    # else:
-                    #     phosphorus_type = {
-                    #         'opls': f'opls_x{info["AtomNumber"]}',
-                    #         'gaff': f'px{info["AtomNumber"]}'
-                    #     }
+                    # Undefined phosphorus #todo px is already in use, use p_uff instead
+                    else:
+                        phosphorus_type = {
+                            'opls': f'opls_x{info["AtomNumber"]}',
+                            'gaff': f'px{info["AtomNumber"]}'
+                        }
 
                     self.atom_types_dict[
                         f"P{info['AtomNumber']}"] = phosphorus_type
@@ -1586,44 +1590,47 @@ class AtomTypeIdentifier:
                         if (connected_atom_info['AtomicSymbol'] == 'H' and
                                 connected_atom_info['NumConnectedAtoms'] == 1):
 
-                            # if phosphorus_type == {
-                            #         'opls': f'opls_x{info["AtomNumber"]}',
-                            #         'gaff': f'px{info["AtomNumber"]}'
-                            # }:
+                            if phosphorus_type == {
+                                    'opls': f'opls_x{info["AtomNumber"]}',
+                                    'gaff': f'px{info["AtomNumber"]}'
+                            }:
 
-                            #     # Undefined hydrogen
-                            #     hydrogen_type = {
-                            #         'opls': f'opls_{info["AtomNumber"]}',
-                            #         'gaff': f'hx{info["AtomNumber"]}'
-                            #     }
-                            # else:
-                            hydrogen_type = {'opls': 'opls_XXX', 'gaff': 'hp'}
+                                # Undefined hydrogen
+                                hydrogen_type = {
+                                    'opls': f'opls_{info["AtomNumber"]}',
+                                    'gaff': f'hx{info["AtomNumber"]}'
+                                }
+                            else:
+                                hydrogen_type = {
+                                    'opls': 'opls_XXX',
+                                    'gaff': 'hp'
+                                }
 
                             self.atom_types_dict[
                                 f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
 
-                # # Other cases
-                # else:
-                #     phosphorus_type = {
-                #         'opls': f'opls_x{info["AtomNumber"]}',
-                #         'gaff': f'px{info["AtomNumber"]}'
-                #     }
+                # Other cases
+                else:
+                    phosphorus_type = {
+                        'opls': f'opls_x{info["AtomNumber"]}',
+                        'gaff': f'px{info["AtomNumber"]}'
+                    }
 
-                #     self.atom_types_dict[
-                #         f"P{info['AtomNumber']}"] = phosphorus_type
+                    self.atom_types_dict[
+                        f"P{info['AtomNumber']}"] = phosphorus_type
 
-                #     # Assign hydrogen types if necessary
-                #     for connected_atom_number in info['ConnectedAtomsNumbers']:
-                #         connected_atom_info = self.atom_info_dict[
-                #             connected_atom_number]
+                    # Assign hydrogen types if necessary
+                    for connected_atom_number in info['ConnectedAtomsNumbers']:
+                        connected_atom_info = self.atom_info_dict[
+                            connected_atom_number]
 
-                #         if (connected_atom_info['AtomicSymbol'] == 'H' and
-                #                 connected_atom_info['NumConnectedAtoms'] == 1):
+                        if (connected_atom_info['AtomicSymbol'] == 'H' and
+                                connected_atom_info['NumConnectedAtoms'] == 1):
 
-                #             hydrogen_type = {'opls': 'opls_XXX', 'gaff': 'hx'}
+                            hydrogen_type = {'opls': 'opls_XXX', 'gaff': 'hx'}
 
-                #             self.atom_types_dict[
-                #                 f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
+                            self.atom_types_dict[
+                                f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
 
             # Sulfur type decision
 
@@ -1686,13 +1693,13 @@ class AtomTypeIdentifier:
 
                     # TODO: Sp3 S connected with hydrogen
 
-                # else:
+                else:
 
-                #     sulfur_type = {
-                #         'opls': f'opls_x{info["AtomNumber"]}',
-                #         'gaff':
-                #         f'sx{info["AtomNumber"]}'  #todo atomtype sx is already in use
-                #     }
+                    sulfur_type = {
+                        'opls': f'opls_x{info["AtomNumber"]}',
+                        'gaff':
+                        f'sx{info["AtomNumber"]}'  #todo atomtype sx is already in use
+                    }
 
                 self.atom_types_dict[f"S{info['AtomNumber']}"] = sulfur_type
 
@@ -1706,15 +1713,16 @@ class AtomTypeIdentifier:
 
                         if sulfur_type == {'opls': 'opls_924S', 'gaff': 'sh'}:
                             hydrogen_type = {'opls': 'opls_926H', 'gaff': 'hs'}
-                            self.atom_types_dict[
-                                f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
 
-                        # else:
-                        #     hydrogen_type = {
-                        #         'opls': f'opls_x{info["AtomNumber"]}',
-                        #         'gaff':
-                        #         f'hsx{info["AtomNumber"]}'  #todo hsx is not a valid gaff atom type
-                        #     }
+                        else:
+                            hydrogen_type = {
+                                'opls': f'opls_x{info["AtomNumber"]}',
+                                'gaff':
+                                f'hsx{info["AtomNumber"]}'  #todo hsx is not a valid gaff atom type
+                            }
+
+                        self.atom_types_dict[
+                            f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
 
             # Decision for halogens
 
@@ -1735,72 +1743,54 @@ class AtomTypeIdentifier:
                 self.atom_types_dict[
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = halogen_type
 
-                # if 'H' in info['ConnectedAtoms']:
-                #     self.bad_hydrogen = True
-                #     hydrogen_type = {
-                #         'opls': 'opls_h_x',
-                #         'gaff': 'h_x'
-                #     }  #todo change this to h_uff
-                #     atom_num = info['ConnectedAtomsNumbers'][
-                #         info['ConnectedAtoms'].index('H')]
-                #     self.atom_types_dict[f'H{atom_num}'] = hydrogen_type
+                if 'H' in info['ConnectedAtoms']:
+                    hydrogen_type = {
+                        'opls': 'opls_h_x',
+                        'gaff': 'h_x'
+                    }  #todo change this to h_uff
+                    atom_num = info['ConnectedAtomsNumbers'][
+                        info['ConnectedAtoms'].index('H')]
+                    self.atom_types_dict[f'H{atom_num}'] = hydrogen_type
+                    self.bad_hydrogen = True
 
+            # Decision for Transition Metals
 
-            # elif info['AtomicSymbol'] not in [
-            #         'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'
-            # ]:
+            elif info['AtomicSymbol'] not in [
+                    'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'
+            ]:
+
                 # Assign atom types based on AtomicSymbol and AtomNumber
-                # atom_type = {
-                #     'opls': f'opls_{info["AtomicSymbol"]}{info["AtomNumber"]}',
-                #     'gaff':
-                #     f'{info["AtomicSymbol"]}{info["AtomNumber"]}'  #todo change this to metal_uff
-                # }
+                atom_type = {
+                    'opls': f'opls_{info["AtomicSymbol"]}{info["AtomNumber"]}',
+                    'gaff':
+                    f'{info["AtomicSymbol"]}{info["AtomNumber"]}'  #todo change this to metal_uff
+                }
 
-                # self.atom_types_dict[
-                #     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = atom_type
+                self.atom_types_dict[
+                    f"{info['AtomicSymbol']}{info['AtomNumber']}"] = atom_type
 
-                # if 'H' in info['ConnectedAtoms']:
-                #     self.bad_hydrogen = True
-                #     hydrogen_type = {
-                #         'opls': 'opls_h_x',
-                #         'gaff': 'h_x'
-                #     }  #todo change this to h_uff
-                #     atom_num = info['ConnectedAtomsNumbers'][
-                #         info['ConnectedAtoms'].index('H')]
-                #     self.atom_types_dict[f'H{atom_num}'] = hydrogen_type
+                if 'H' in info['ConnectedAtoms']:
+                    hydrogen_type = {
+                        'opls': 'opls_h_x',
+                        'gaff': 'h_x'
+                    }  #todo change this to h_uff
+                    atom_num = info['ConnectedAtomsNumbers'][
+                        info['ConnectedAtoms'].index('H')]
+                    self.atom_types_dict[f'H{atom_num}'] = hydrogen_type
+                    self.bad_hydrogen = True
 
-            # else:
-            #     # Else for the cases falling off the decision tree
-            #     # The Hydrogen are assigned outside the main branches of the
-            #     # decision tree
-            #     # Therefore, they need to be out of the else case.
-
-            #     #todo can we not just assign a default uff fallback for everything?
-
-            #     if info['AtomicSymbol'] != 'H':
-            #         self.ostream.print_warning(
-            #             f"{info['AtomicSymbol']}{info['AtomNumber']}" +
-            #             'Has not been found in the decision tree, check it carefully'
-            #         )
-            #         self.ostream.flush()
-
-        pass
-        for atom_info in self.atom_info_dict.values():
-            name = f"{atom_info['AtomicSymbol']}{atom_info['AtomNumber']}"
-            uff_type = {'uff': atom_info['AtomicSymbol']}
-            if name not in self.atom_types_dict:
-                self.atom_types_dict[name] = {'uff': atom_info['AtomicSymbol']}
             else:
-                self.atom_types_dict[name].update(uff_type)
+                # Else for the cases falling off the decision tree
+                # The Hydrogen are assigned outside the main branches of the
+                # decision tree
+                # Therefore, they need to be out of the else case.
 
-        pass
-                
-        # # Assign UFF atom types, which are just the atomic symbols
-        # for key, atom_info in zip(self.atom_types_dict.keys(),
-        #                           self.atom_info_dict.values()):
-        #     self.atom_types_dict[key].update({'uff': atom_info['AtomicSymbol']})
-        # self.ostream.print_info(str(self.atom_types_dict))
-        # self.ostream.flush()
+                if info['AtomicSymbol'] != 'H':
+                    self.ostream.print_warning(
+                        f"{info['AtomicSymbol']}{info['AtomNumber']}" +
+                        'Has not been found in the decision tree, check it carefully'
+                    )
+                    self.ostream.flush()
 
     def extract_gaff_atom_types(self):
         """
@@ -1818,11 +1808,8 @@ class AtomTypeIdentifier:
         for atom_type in sorted_atom_types:
             if isinstance(self.atom_types_dict[atom_type], dict):
                 gaff_type = self.atom_types_dict[atom_type].get('gaff', None)
-                uff_type = self.atom_types_dict[atom_type].get('uff', None)
                 if gaff_type:
                     self.gaff_atom_types.append(gaff_type)
-                else:
-                    self.gaff_atom_types.append(f'unknown_{uff_type}')
 
     def check_alternating_atom_types(self):
         """

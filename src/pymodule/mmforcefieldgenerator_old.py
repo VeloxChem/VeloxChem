@@ -34,7 +34,6 @@ from mpi4py import MPI
 from pathlib import Path, PurePath
 import numpy as np
 import tempfile
-import time
 import sys
 import re
 import json
@@ -43,7 +42,7 @@ from xml.dom import minidom
 from collections import defaultdict
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kjpermol
-from .atomtypeidentifier import AtomTypeIdentifier
+from .atomtypeidentifier_old import AtomTypeIdentifier_old
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
@@ -63,7 +62,7 @@ from .waterparameters import get_water_parameters
 from .environment import get_data_path
 
 
-class MMForceFieldGenerator:
+class MMForceFieldGenerator_old:
     """
     Parameterizes general Amber force field and creates Gromacs topologies.
 
@@ -121,7 +120,7 @@ class MMForceFieldGenerator:
         # molecule
         self.molecule_name = 'MOL'
         self.scan_xyz_files = None
-        self.gaff_atom_types = None
+        self.atom_types = None
         self.rotatable_bonds = []
 
         # topology settings
@@ -249,11 +248,11 @@ class MMForceFieldGenerator:
             'MMForceFieldGenerator.compute: scan_xyz_files not defined ')
 
         assert_msg_critical(
-            self.gaff_atom_types is not None,
+            self.atom_types is not None,
             'MMForceFieldGenerator.compute: atom_types not defined ')
 
         assert_msg_critical(
-            len(self.gaff_atom_types) == molecule.number_of_atoms(),
+            len(self.atom_types) == molecule.number_of_atoms(),
             'MMForceFieldGenerator.compute: inconsistent number of atom_types')
 
         # read QM scan
@@ -1084,8 +1083,6 @@ class MMForceFieldGenerator:
             If False partial charges will be set to zero.
         """
 
-        t = time.time()
-
         ff_data_dict = None
         ff_data_lines = None
 
@@ -1122,8 +1119,6 @@ class MMForceFieldGenerator:
                 if version_major.isdigit() and version_minor.isdigit():
                     gaff_version = f'{version_major}.{version_minor}'
 
-        dt1 = time.time() - t
-        t = time.time()
         # Molecular information
 
         self.molecule = molecule
@@ -1131,30 +1126,25 @@ class MMForceFieldGenerator:
         coords = self.molecule.get_coordinates_in_angstrom()
         n_atoms = self.molecule.number_of_atoms()
 
-        atomtypeidentifier = AtomTypeIdentifier(self.comm)
+        atomtypeidentifier = AtomTypeIdentifier_old(self.comm)
         atomtypeidentifier.ostream.mute()
         # set GAFF version
         atomtypeidentifier.gaff_version = gaff_version
 
         if self.topology_update_flag:
-            self.atom_types_dict = atomtypeidentifier.generate_gaff_atomtypes(
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
                 self.molecule, self.connectivity_matrix)
             # The partial charges have to be recalculated
             self.partial_charges = None
         else:
-            self.atom_types_dict = atomtypeidentifier.generate_gaff_atomtypes(
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
                 self.molecule)
             self.connectivity_matrix = np.copy(
                 atomtypeidentifier.connectivity_matrix)
-            
-        self.gaff_atom_types = atomtypeidentifier.gaff_atom_types
-        self.atom_info_dict = atomtypeidentifier.atom_info_dict
-        
-
-        dt2 = time.time() - t
-        t = time.time()
+        self.atom_types = [t['gaff'] for t in self.atom_types.values()]
         atomtypeidentifier.identify_equivalences()
 
+        self.atom_info_dict = atomtypeidentifier.atom_info_dict
         ## TODO: change this to skip when water is used
         if not resp:
             # skip RESP charges calculation
@@ -1238,17 +1228,71 @@ class MMForceFieldGenerator:
         # preparing atomtypes and atoms
 
         assert_msg_critical(
-            len(self.gaff_atom_types) == n_atoms,
+            len(self.atom_types) == n_atoms,
             'MMForceFieldGenerator: inconsistent atom_types')
 
         for i in range(n_atoms):
-            self.gaff_atom_types[i] = f'{self.gaff_atom_types[i].strip():<2s}'
-        self.unique_atom_types = sorted(list(set(self.gaff_atom_types)))
+            self.atom_types[i] = f'{self.atom_types[i].strip():<2s}'
+        self.unique_atom_types = sorted(list(set(self.atom_types)))
 
         # Bonds
-        dt3 = time.time() - t
 
-        bond_indices, angle_indices, dihedral_indices, pairs_14 = self.generate_topology_indices(n_atoms)
+        bond_indices = set()
+        for i in range(n_atoms):
+            for j in range(i + 1, n_atoms):
+                if self.connectivity_matrix[i, j] == 1:
+                    bond_indices.add((i, j))
+        bond_indices = sorted(list(bond_indices))
+
+        # Angles
+
+        angle_indices = set()
+
+        for i, j in bond_indices:
+            for k in range(n_atoms):
+                if k in [i, j]:
+                    continue
+                if self.connectivity_matrix[j, k] == 1:
+                    inds = (i, j, k) if i < k else (k, j, i)
+                    angle_indices.add(inds)
+                if self.connectivity_matrix[k, i] == 1:
+                    inds = (k, i, j) if k < j else (j, i, k)
+                    angle_indices.add(inds)
+        angle_indices = sorted(list(angle_indices))
+
+        # Dihedrals
+
+        dihedral_indices = set()
+
+        for i, j, k in angle_indices:
+            for l in range(n_atoms):
+                if l in [i, j, k]:
+                    continue
+                if self.connectivity_matrix[k, l] == 1:
+                    inds = (i, j, k, l) if i < l else (l, k, j, i)
+                    dihedral_indices.add(inds)
+                if self.connectivity_matrix[l, i] == 1:
+                    inds = (l, i, j, k) if l < k else (k, j, i, l)
+                    dihedral_indices.add(inds)
+        dihedral_indices = sorted(list(dihedral_indices))
+
+        # Exclusions
+
+        exclusion_indices = []
+        if self.nrexcl >= 2:
+            for i, j in bond_indices:
+                exclusion_indices.append((i, j))
+        if self.nrexcl >= 3:
+            for i, j, k in angle_indices:
+                exclusion_indices.append((i, k))
+
+        # 1-4 pairs
+
+        pairs_14 = set()
+        for i, j, k, l in dihedral_indices:
+            if (i, l) not in exclusion_indices:
+                pairs_14.add((i, l))
+        pairs_14 = sorted(list(pairs_14))
 
         # Read the force field and include the data in the topology dictionary.
 
@@ -1260,39 +1304,43 @@ class MMForceFieldGenerator:
         use_uff = False
         use_tm = False
         use_water_model = False
-        sigmas = []
-        epsilons = []
 
-        for i, atom_type in enumerate(self.atom_types_dict.values()):
+        for at in self.unique_atom_types:
             atom_type_found = False
-            if 'gaff' in atom_type:
-                gafftype = atom_type['gaff'].strip()
-                if use_xml:
-                    for atom_type_data in ff_data_dict['atom_types']:
-                        # Note: need strip() for converting e.g. 'c ' to 'c'
-                        if atom_type_data['class'] == gafftype:
-                            sigma = float(atom_type_data['sigma'])
-                            epsilon = float(atom_type_data['epsilon'])
-                            comment = 'GAFF'
-                            atom_type_found = True
-                            use_gaff = True
-                            break
 
-                else:
-                    for line in ff_data_lines:
-                        if line.startswith(f'  {gafftype}     '):
-                            atom_ff = line[5:].strip().split()
-                            sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
-                            epsilon = float(atom_ff[1]) * 4.184
-                            comment = 'GAFF'
-                            atom_type_found = True
-                            use_gaff = True
-                            break
+            if use_xml:
+                for atom_type_data in ff_data_dict['atom_types']:
+                    # Note: need strip() for converting e.g. 'c ' to 'c'
+                    if atom_type_data['class'] == at.strip():
+                        sigma = float(atom_type_data['sigma'])
+                        epsilon = float(atom_type_data['epsilon'])
+                        comment = 'GAFF'
+                        atom_type_found = True
+                        use_gaff = True
+                        break
+
+            else:
+                for line in ff_data_lines:
+                    if line.startswith(f'  {at}     '):
+                        atom_ff = line[5:].strip().split()
+                        sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
+                        epsilon = float(atom_ff[1]) * 4.184
+                        comment = 'GAFF'
+                        atom_type_found = True
+                        use_gaff = True
+                        break
 
             if not atom_type_found:
-                element = atom_type['uff'].strip()
-                gafftype = atom_type.get('gaff', '').strip()
-                if gafftype in ['ow', 'hw']:
+                # Auxilary variable for finding parameters in UFF
+                element = ''
+                for i, c in enumerate(at):
+                    if c.isalpha() and not (c == 'x' and i > 0):
+                        element += c
+                    else:
+                        break
+                element = element.capitalize()
+
+                if at in ['ow', 'hw']:
                     assert_msg_critical(
                         water_model is not None,
                         'MMForceFieldGenerator: water model not specified.')
@@ -1301,16 +1349,14 @@ class MMForceFieldGenerator:
                         f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}"
                     )
 
-                    sigma = self.water_parameters[water_model][atom_type][
-                        'sigma']
-                    epsilon = self.water_parameters[water_model][atom_type][
-                        'epsilon']
+                    sigma = self.water_parameters[water_model][at]['sigma']
+                    epsilon = self.water_parameters[water_model][at]['epsilon']
 
                     water_bonds = self.water_parameters[water_model]['bonds']
                     water_angles = self.water_parameters[water_model]['angles']
                     self.partial_charges = [
                         self.water_parameters[water_model][a]['charge']
-                        for a in self.gaff_atom_types
+                        for a in self.atom_types
                     ]
                     atom_type_found = True
                     use_water_model = True
@@ -1318,7 +1364,7 @@ class MMForceFieldGenerator:
                     comment = water_model
 
                 elif element in self.tm_parameters:
-                    tmmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
+                    tmmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
                     tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.'  ##TODO: rephrase
                     self.ostream.print_info(tmmsg)
                     sigma = self.tm_parameters[element]['sigma']
@@ -1328,7 +1374,7 @@ class MMForceFieldGenerator:
 
                 # Case for atoms in UFF but not in GAFF
                 elif element in self.uff_parameters:
-                    uffmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
+                    uffmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
                     uffmsg += ' Taking sigma and epsilon from UFF.'
                     self.ostream.print_info(uffmsg)
                     sigma = self.uff_parameters[element]['sigma']
@@ -1339,10 +1385,14 @@ class MMForceFieldGenerator:
                 else:
                     assert_msg_critical(
                         False,
-                        f'MMForceFieldGenerator: atom type {atom_type} not found in GAFF or UFF.'
+                        f'MMForceFieldGenerator: atom type {at} not found in GAFF or UFF.'
                     )
-            sigmas.append(sigma)
-            epsilons.append(epsilon)
+
+            atom_type_params[at] = {
+                'sigma': sigma,
+                'epsilon': epsilon,
+                'comment': comment
+            }
 
         if use_gaff:
             if gaff_version is not None:
@@ -1389,27 +1439,18 @@ class MMForceFieldGenerator:
         atom_masses = self.molecule.get_masses()
         equivalent_atoms = list(atomtypeidentifier.equivalent_atoms)
 
-        for i, atom_type in enumerate(self.atom_types_dict.values()):
-
-            if 'gaff' in atom_type:
-                atom_type = atom_type['gaff'].strip()
-                forcefield = 'gaff'
-            else:
-                atom_type = atom_type['uff'].strip()
-                forcefield = 'uff'
-
+        for i in range(n_atoms):
+            at = self.atom_types[i]
             self.atoms[i] = {
-                'type': atom_type,
-                'forcefield': forcefield,
+                'type': at,
                 'name': atom_names[i],
                 'mass': atom_masses[i],
                 'charge': self.partial_charges[i],
-                'sigma': sigmas[i],
-                'epsilon': epsilons[i],
+                'sigma': atom_type_params[at]['sigma'],
+                'epsilon': atom_type_params[at]['epsilon'],
                 'equivalent_atom': equivalent_atoms[i],
             }
 
-        t = time.time()
         # Bonds analysis
 
         self.bonds = {}
@@ -1418,8 +1459,8 @@ class MMForceFieldGenerator:
 
             r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
 
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
             patterns = [
                 re.compile(r'\A' + f'{at_1}-{at_2}  '),
                 re.compile(r'\A' + f'{at_2}-{at_1}  '),
@@ -1500,9 +1541,9 @@ class MMForceFieldGenerator:
                 np.dot(a, b) / np.linalg.norm(a) /
                 np.linalg.norm(b)) * 180 / np.pi
 
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            at_3 = self.gaff_atom_types[k]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
             patterns = [
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
                 re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
@@ -1570,10 +1611,10 @@ class MMForceFieldGenerator:
 
         for i, j, k, l in dihedral_indices:
 
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            at_3 = self.gaff_atom_types[k]
-            at_4 = self.gaff_atom_types[l]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
+            at_4 = self.atom_types[l]
 
             patterns = [
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3}-{at_4} '),
@@ -1819,8 +1860,8 @@ class MMForceFieldGenerator:
         for i, j, k, l in self.dihedrals:
             # Ensure consistent ordering of bond indices
             bond_indices = (min(j, k), max(j, k))
-            bond_types = (self.gaff_atom_types[bond_indices[0]],
-                          self.gaff_atom_types[bond_indices[1]])
+            bond_types = (self.atom_types[bond_indices[0]],
+                          self.atom_types[bond_indices[1]])
             rotatable_bonds_types[bond_indices] = bond_types
 
         # Check if the rotatable bonds are indeed rotatable or not
@@ -1844,9 +1885,9 @@ class MMForceFieldGenerator:
         improper_atom_inds = []
 
         for i, j, k in angle_indices:
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            at_3 = self.gaff_atom_types[k]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
 
             if at_2 not in sp2_atom_types:
                 continue
@@ -1859,7 +1900,7 @@ class MMForceFieldGenerator:
             for l in range(n_atoms):
                 if (l in [i, j, k]) or (self.connectivity_matrix[l, j] != 1):
                     continue
-                at_4 = self.gaff_atom_types[l]
+                at_4 = self.atom_types[l]
 
                 patterns = [
                     re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
@@ -2066,72 +2107,8 @@ class MMForceFieldGenerator:
                     'periodicity': periodicity,
                     'comment': comment
                 }
-        self.ostream.unmute()
-        self.ostream.print_info(
-            f"dt1 {dt1:.2f} s, dt2 {dt2:.2f} s, dt3 {dt3:.2f} s")
-        self.ostream.flush()
-        self.ostream.mute()
 
         self.ostream.flush()
-
-    def generate_topology_indices(self, n_atoms):
-        bond_indices = set()
-        for i in range(n_atoms):
-            for j in range(i + 1, n_atoms):
-                if self.connectivity_matrix[i, j] == 1:
-                    bond_indices.add((i, j))
-        bond_indices = sorted(list(bond_indices))
-
-        # Angles
-
-        angle_indices = set()
-
-        for i, j in bond_indices:
-            for k in range(n_atoms):
-                if k in [i, j]:
-                    continue
-                if self.connectivity_matrix[j, k] == 1:
-                    inds = (i, j, k) if i < k else (k, j, i)
-                    angle_indices.add(inds)
-                if self.connectivity_matrix[k, i] == 1:
-                    inds = (k, i, j) if k < j else (j, i, k)
-                    angle_indices.add(inds)
-        angle_indices = sorted(list(angle_indices))
-
-        # Dihedrals
-
-        dihedral_indices = set()
-
-        for i, j, k in angle_indices:
-            for l in range(n_atoms):
-                if l in [i, j, k]:
-                    continue
-                if self.connectivity_matrix[k, l] == 1:
-                    inds = (i, j, k, l) if i < l else (l, k, j, i)
-                    dihedral_indices.add(inds)
-                if self.connectivity_matrix[l, i] == 1:
-                    inds = (l, i, j, k) if l < k else (k, j, i, l)
-                    dihedral_indices.add(inds)
-        dihedral_indices = sorted(list(dihedral_indices))
-
-        # Exclusions
-
-        exclusion_indices = []
-        if self.nrexcl >= 2:
-            for i, j in bond_indices:
-                exclusion_indices.append((i, j))
-        if self.nrexcl >= 3:
-            for i, j, k in angle_indices:
-                exclusion_indices.append((i, k))
-
-        # 1-4 pairs
-
-        pairs_14 = set()
-        for i, j, k, l in dihedral_indices:
-            if (i, l) not in exclusion_indices:
-                pairs_14.add((i, l))
-        pairs_14 = sorted(list(pairs_14))
-        return bond_indices,angle_indices,dihedral_indices,pairs_14
 
     @staticmethod
     def get_dihedral_type_string(target_dihedral):
