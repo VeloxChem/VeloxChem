@@ -1238,11 +1238,22 @@ class VibrationalAnalysis:
 
         freqs = vib_results['vib_frequencies']
         raman_results = vib_results['raman_activities']
-        # TODO: make the read of raman results consistent
-        if isinstance(raman_results, dict):
-            raman_act = raman_results["0"]
-        else:
-            raman_act = raman_results[0]
+
+        # two scenarios of getting raman_activities
+        # 1. vib_results from vis_drv.compute: use freq key 0
+        # 2. vib_results from reading final h5: use freq key '0'
+
+        assert_msg_critical(
+            '0' in raman_results or 0 in raman_results,
+            'plot_raman: Could not find frequency 0 in raman_activities')
+
+        assert_msg_critical(
+            not ('0' in raman_results and 0 in raman_results),
+            'plot_raman: Duplicate entry of frequency 0 and "0" in raman_activities')
+
+        raman_act_key = '0' if '0' in raman_results else 0
+        raman_act = raman_results[raman_act_key]
+
         if broadening_type.lower() == 'lorentzian':
             x, y = self.lorentzian_broadening(freqs, raman_act, 0, 4000, 1,
                                               broadening_value)
