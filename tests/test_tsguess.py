@@ -52,12 +52,14 @@ class TestTransitionStateGuesser:
             'ts_results.h5',
         ]
 
+        fpaths = [Path(f) for f in fnames]
+
         dir_path = Path('ts_data')
-        fnames += sorted([str(x) for x in dir_path.iterdir() if x.is_file()])
+        if dir_path.is_dir():
+            fpaths += [x for x in dir_path.iterdir() if x.is_file()]
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            for f in fnames:
-                p = Path(f)
+            for p in fpaths:
                 if p.is_file():
                     p.unlink()
         MPI.COMM_WORLD.barrier()
