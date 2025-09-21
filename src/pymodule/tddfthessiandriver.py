@@ -22,11 +22,9 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .molecule import Molecule
 from .hessiandriver import HessianDriver
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
@@ -202,8 +200,8 @@ class TddftHessianDriver(HessianDriver):
         # for the current molecular geometry.
         self.tddft_gradient_driver._scf_drv = self.scf_driver
         self.tddft_gradient_driver._rsp_results = None
-        self.tddft_gradient_driver.compute_analytical(molecule,
-                                                      basis, rsp_results)
+        self.tddft_gradient_driver.compute_analytical(molecule, basis,
+                                                      rsp_results)
         if self.rank == mpi_master():
             # Multiple excited states can be computed simultaneously.
             # For the numerical Hessian, take the first excited state in the list

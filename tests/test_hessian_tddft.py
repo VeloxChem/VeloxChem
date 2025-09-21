@@ -12,7 +12,7 @@ from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tddftgradientdriver import TddftGradientDriver
 from veloxchem.tddfthessiandriver import TddftHessianDriver
-from veloxchem.vibrationalanalysis import VibrationalAnalysis
+
 
 class TestTddftHessianDriver:
 
@@ -20,7 +20,7 @@ class TestTddftHessianDriver:
 
         molecule_xyz_string = """
             3
-            
+
             O       0.0000000000     0.0000000000     0.1240508479
             H      -0.7695699584     0.0000000000    -0.4962033916
             H       0.7695699584    -0.0000000000    -0.4962033916
@@ -50,26 +50,28 @@ class TestTddftHessianDriver:
         grad_dict = {'state_deriv_index': [1], 'do_first_order_prop': 'yes'}
         cphf_dict = {'conv_thresh': 1e-8, 'use_subspace_solver': 'yes'}
         grad_drv.update_settings(grad_dict=grad_dict,
-                                 rsp_dict={'conv_thresh':1e-8},
+                                 rsp_dict={'conv_thresh': 1e-8},
                                  orbrsp_dict=cphf_dict)
 
         grad_drv.compute(molecule, basis, scf_drv, rsp_drv, rsp_results)
 
-        hessian_drv = TddftHessianDriver(scf_drv, rsp_drv=rsp_drv,
-                                             tddft_grad_drv=grad_drv)
+        hessian_drv = TddftHessianDriver(scf_drv,
+                                         rsp_drv=rsp_drv,
+                                         tddft_grad_drv=grad_drv)
         hessian_drv.do_dipole_gradient = True
         hessian_drv.compute(molecule, basis)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
 
             hf = h5py.File(h5file)
-            ref_hessian = np.array(hf.get('hessian_'+ref_label))
-            ref_dipole_gradient = np.array(hf.get('dipole_gradient_'+ref_label)) 
+            ref_hessian = np.array(hf.get('hessian_' + ref_label))
+            ref_dipole_gradient = np.array(
+                hf.get('dipole_gradient_' + ref_label))
             hf.close()
 
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
-            diff_dipole_grad = np.max(np.abs(hessian_drv.dipole_gradient -
-                                             ref_dipole_gradient))
+            diff_dipole_grad = np.max(
+                np.abs(hessian_drv.dipole_gradient - ref_dipole_gradient))
 
             assert diff_hessian < 1.0e-5
             assert diff_dipole_grad < 1.0e-5

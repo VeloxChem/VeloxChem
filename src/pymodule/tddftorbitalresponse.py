@@ -45,6 +45,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
                            rsp_results_solvation_sanity_check)
+from .errorhandler import assert_msg_critical
 
 # Temporary for comp_lr_fock
 from .veloxchemlib import make_matrix, mat_t

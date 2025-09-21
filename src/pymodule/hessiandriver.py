@@ -41,6 +41,7 @@ from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check
 from .molecule import Molecule
 
+
 class HessianDriver:
     """
     Implements the Hessian driver.
@@ -112,21 +113,23 @@ class HessianDriver:
         self._input_keywords = {
             'hessian': {
                 'numerical': ('bool', 'do numerical hessian'),
-                'do_four_point': ('bool', 'do four-point numerical integration'),
+                'do_four_point':
+                    ('bool', 'do four-point numerical integration'),
                 'delta_h': ('float', 'step size for numerical integration'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
-                'do_dipole_gradient': ('bool', 'whether to compute the dipole gradient'),
+                'do_dipole_gradient':
+                    ('bool', 'whether to compute the dipole gradient'),
                 'timing': ('bool', 'whether timing is needed'),
                 'profiling': ('bool', 'whether profiling is needed'),
                 'memory_profiling': ('bool', 'whether to profile memory'),
                 'memory_tracing': ('bool', 'whether to trace memory'),
-                },
+            },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
-                }
             }
+        }
 
     def update_settings(self, method_dict=None, hess_dict=None):
         """
@@ -144,8 +147,7 @@ class HessianDriver:
             hess_dict = {}
 
         hess_keywords = {
-            key: val[0] for key, val in
-            self._input_keywords['hessian'].items()
+            key: val[0] for key, val in self._input_keywords['hessian'].items()
         }
 
         parse_input(self, hess_keywords, hess_dict)
@@ -397,8 +399,8 @@ class HessianDriver:
                 grad_plus = self.compute_gradient(new_mol, *args)
 
                 if self.do_dipole_gradient:
-                    dipmom_plus = (
-                         self.compute_electric_dipole_moment(new_mol, *args))
+                    dipmom_plus = (self.compute_electric_dipole_moment(
+                        new_mol, *args))
 
                 coords[i, d] -= 2.0 * self.delta_h
                 new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
@@ -408,9 +410,8 @@ class HessianDriver:
                 grad_minus = self.compute_gradient(new_mol, *args)
 
                 if self.do_dipole_gradient:
-                    dipmom_minus = (
-                         self.compute_electric_dipole_moment(new_mol, *args))
-
+                    dipmom_minus = (self.compute_electric_dipole_moment(
+                        new_mol, *args))
 
                 if self.do_four_point:
                     coords[i, d] -= self.delta_h
@@ -421,8 +422,8 @@ class HessianDriver:
                     grad_minus2 = self.compute_gradient(new_mol, *args)
 
                     if self.do_dipole_gradient:
-                        dipmom_minus2 = (
-                           self.compute_electric_dipole_moment(new_mol, *args))
+                        dipmom_minus2 = (self.compute_electric_dipole_moment(
+                            new_mol, *args))
 
                     coords[i, d] += 4.0 * self.delta_h
                     new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
@@ -432,8 +433,8 @@ class HessianDriver:
                     grad_plus2 = self.compute_gradient(new_mol, *args)
 
                     if self.do_dipole_gradient:
-                        dipmom_plus2 = (
-                           self.compute_electric_dipole_moment(new_mol, *args))
+                        dipmom_plus2 = (self.compute_electric_dipole_moment(
+                            new_mol, *args))
 
                     coords[i, d] -= 2.0 * self.delta_h
                     hessian[i, d] = ((grad_minus2 - 8 * grad_minus +
@@ -467,7 +468,6 @@ class HessianDriver:
         # unmute ostream
         # TODO: how should the ostream be handled properly?
         self.ostream.unmute()
-
 
     def compute_energy(self, molecule, *args):
         """
@@ -513,4 +513,3 @@ class HessianDriver:
         """
 
         return
-
