@@ -464,6 +464,10 @@ class HessianDriver:
             self.dipole_gradient = dipole_gradient.transpose(2, 0, 1).reshape(
                 3, natm * 3)
 
+        # unmute ostream
+        # TODO: how should the ostream be handled properly?
+        self.ostream.unmute()
+
 
     def compute_energy(self, molecule, *args):
         """
