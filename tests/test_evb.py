@@ -23,9 +23,6 @@ except ImportError:
 @pytest.mark.timeconsuming
 class TestEvb:
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_forcefield_builder(self):
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
 
@@ -78,8 +75,10 @@ class TestEvb:
         here = Path(__file__).parent
         reapath = str(here / 'data' / 'evb_ethanol_ff_data.json')
         propath = str(here / 'data' / 'evb_ethene_H2O_ff_data.json')
-        reactant_ref = MMForceFieldGenerator.load_forcefield_from_json(reapath)
-        product_ref = MMForceFieldGenerator.load_forcefield_from_json(propath)
+        reactant_ref = MMForceFieldGenerator.load_forcefield_from_json_file(
+            reapath)
+        product_ref = MMForceFieldGenerator.load_forcefield_from_json_file(
+            propath)
 
         self._compare_dict(reactant.bonds, reactant_ref.bonds)
         self._compare_dict(reactant.angles, reactant_ref.angles)
@@ -125,9 +124,6 @@ class TestEvb:
             else:
                 assert val1 == val2
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_system_builder(self):
         data_path = Path(__file__).parent / 'data'
         # load forcefields
@@ -139,9 +135,9 @@ class TestEvb:
 
         reactant_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethanol.xyz'), )
-        reactant = MMForceFieldGenerator.load_forcefield_from_json(reapath)
+        reactant = MMForceFieldGenerator.load_forcefield_from_json_file(reapath)
         reactant.molecule = reactant_mol
-        product = MMForceFieldGenerator.load_forcefield_from_json(propath)
+        product = MMForceFieldGenerator.load_forcefield_from_json_file(propath)
         product_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethene_H2O.xyz'), )
         product.molecule = product_mol
@@ -206,6 +202,11 @@ class TestEvb:
             min_len = min(len(sys_lines), len(ref_lines))
             for i, (sys_line, ref_line) in enumerate(
                     zip(sys_lines[:min_len], ref_lines[:min_len])):
+
+                # skip the line with openmm version
+                if 'openmmVersion' in sys_line:
+                    continue
+
                 cond = TestEvb._round_numbers_in_line(
                     sys_line) == TestEvb._round_numbers_in_line(ref_line)
 
@@ -230,9 +231,6 @@ class TestEvb:
                 pass
         return '"'.join(line)
 
-    @pytest.mark.skipif('openmm' not in sys.modules,
-                        reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_data_processing(self):
         # Load simulation data
         input_results = {}
