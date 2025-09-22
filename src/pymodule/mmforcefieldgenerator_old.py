@@ -1141,7 +1141,7 @@ class MMForceFieldGenerator_old:
                 self.molecule)
             self.connectivity_matrix = np.copy(
                 atomtypeidentifier.connectivity_matrix)
-        self.atom_types = [t['gaff'] for t in self.atom_types.values()]
+        self.atom_types = atomtypeidentifier.gaff_atom_types
         atomtypeidentifier.identify_equivalences()
 
         self.atom_info_dict = atomtypeidentifier.atom_info_dict
