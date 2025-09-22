@@ -40,7 +40,7 @@ import h5py
 import time
 from pathlib import Path
 
-from .veloxchemlib import mpi_master, hartree_in_kjpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .openmmdynamics import OpenMMDynamics
 from .errorhandler import assert_msg_critical
@@ -209,6 +209,8 @@ class TransitionStateGuesser():
             self.reactant, f"{self.folder_name}/reactant.json")
         self.product.save_forcefield_as_json(
             self.product, f"{self.folder_name}/product.json")
+
+        # self.initial_positions in angstrom
         self.systems, self.topology, self.initial_positions = sysbuilder.build_systems(
             self.reactant,
             self.product,
@@ -216,9 +218,11 @@ class TransitionStateGuesser():
             conf,
             constraints,
         )
-        self.ostream.print_info(f"Saving systems as xml to {self.folder_name}/systems")
+        self.ostream.print_info(
+            f"Saving systems as xml to {self.folder_name}/systems")
         self.ostream.flush()
-        sysbuilder.save_systems_as_xml(self.systems, self.folder_name + "/systems")
+        sysbuilder.save_systems_as_xml(self.systems,
+                                       self.folder_name + "/systems")
         self.results.update({
             'breaking_bonds': self.breaking_bonds,
             'forming_bonds': self.forming_bonds,
@@ -228,9 +232,10 @@ class TransitionStateGuesser():
         return
 
     def scan_mm(self):
-        
+
         self.folder = Path().cwd() / self.folder_name
 
+        # pdbs are saved in angstrom
         if self.save_mm_traj:
             mmapp.PDBFile.writeFile(self.topology, self.initial_positions,
                                     str(self.folder / 'topology.pdb'))
@@ -248,8 +253,9 @@ class TransitionStateGuesser():
             self.systems['product'],
             pro_int,
         )
-        bohr_to_nm = 0.0529177249
-        pos = self.initial_positions * 0.1
+
+        # pos in angstrom
+        pos = self.initial_positions
 
         try:
             if self.force_conformer_search:
@@ -362,22 +368,21 @@ class TransitionStateGuesser():
 
         # Save the results and return them or raise the exception
 
-        xyz_geometries = []
-        for mm_geom in positions:
-            xyz_geom = self._mm_to_xyz_geom(mm_geom, self.molecule)
-            xyz_geometries.append(xyz_geom)
+        structures = []
+        for mm_pos in positions:
+            xyz = self._mm_to_xyz_str(mm_pos, self.molecule)
+            structures.append(xyz)
         results = {
             'mm_energies': V,
             'mm_energies_reactant': E1,
             'mm_energies_product': E2,
             'int_energies': E_int,
-            'mm_geometries': positions,
-            'xyz_geometries': xyz_geometries,
+            'structures': structures,
         }
 
         if exception is None:
             max_mm_index = np.argmax(V)
-            max_xyz_geom = xyz_geometries[max_mm_index]
+            max_mm_structure = structures[max_mm_index]
             max_mm_energy = V[max_mm_index]
             max_mm_lambda = self.lambda_vec[max_mm_index]
             self.ostream.print_info(
@@ -385,13 +390,13 @@ class TransitionStateGuesser():
             )
             self.ostream.print_blank()
             results.update({
-                'max_mm_geometry': max_xyz_geom,
+                'max_mm_structure': max_mm_structure,
                 'max_mm_lambda': max_mm_lambda,
             })
             self.results.update(results)
             mult = self.molecule.get_multiplicity()
             charge = self.molecule.get_charge()
-            self.molecule = Molecule.read_xyz_string(max_xyz_geom)
+            self.molecule = Molecule.read_xyz_string(max_mm_structure)
             self.molecule.set_multiplicity(mult)
             self.molecule.set_charge(charge)
             self._save_results(self.results_file, self.results)
@@ -421,6 +426,7 @@ class TransitionStateGuesser():
 
     def _run_mm_scan(self, lambda_vals, rea_sim, pro_sim, conformer_search,
                      init_pos):
+
         pos = copy.copy(init_pos)
         positions = []
         V = []
@@ -431,6 +437,7 @@ class TransitionStateGuesser():
         self._print_mm_header(conformer_search=conformer_search,
                               lambda_vals=lambda_vals)
         for l in lambda_vals:
+
             v, e1, e2, e_int, return_pos, n_conf = self._get_mm_energy(
                 self.topology,
                 self.systems[l],
@@ -451,6 +458,7 @@ class TransitionStateGuesser():
             else:
                 self._print_mm_iter(l, e1, e2, v, e_int)
             pos = return_pos
+
         return positions, V, E1, E2, E_int, N_conf
 
     def _get_mm_energy(
@@ -476,7 +484,10 @@ class TransitionStateGuesser():
                 integrator,
                 platform,
             )
-            simulation.context.setPositions(init_pos)
+
+            # units converted from angstrom to nm
+            init_pos_nm = init_pos * 0.1
+            simulation.context.setPositions(init_pos_nm)
 
             simulation.minimizeEnergy()
             simulation.context.setVelocitiesToTemperature(self.mm_temperature *
@@ -506,10 +517,9 @@ class TransitionStateGuesser():
                                                 getPositions=True)
             e_int = state.getPotentialEnergy().value_in_unit(
                 mmunit.kilojoules_per_mole)
-            pos_nm = state.getPositions(asNumpy=True).value_in_unit(
-                mmunit.nanometers)
-            pos_bohr = state.getPositions(asNumpy=True).value_in_unit(
-                mmunit.bohr)
+            pos = state.getPositions(asNumpy=True).value_in_unit(
+                mmunit.angstrom)
+
             n_conf = -1
         else:
             opm_dyn = OpenMMDynamics()
@@ -517,7 +527,11 @@ class TransitionStateGuesser():
             # opm_dyn.create_system_from_molecule(mol, ff_gen)
             pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
 
-            pdb = mmapp.PDBFile.writeFile(topology, init_pos, pdb_name)
+            pdb = mmapp.PDBFile.writeFile(
+                topology,
+                init_pos * mmunit.angstrom,
+                pdb_name,
+            )
             opm_dyn.pdb = mmapp.PDBFile(pdb_name)
             opm_dyn.system = system
             conformers_dict = opm_dyn.conformational_sampling(
@@ -529,23 +543,21 @@ class TransitionStateGuesser():
             arg = np.argmin(conformers_dict['energies'])
             e_int = conformers_dict['energies'][arg]
             temp_mol = conformers_dict['molecules'][arg]
-            pos_nm = temp_mol.get_coordinates_in_angstrom() * 0.1
-            pos_bohr = temp_mol.get_coordinates_in_bohr()
-            # self.ostream.print_info(
-            #     f"Found {len(conformers_dict['energies'])} conformers for lambda {l}. Energies: {conformers_dict['energies']}, index of minimum: {arg}"
-            # )
-            # self.ostream.flush()
+            pos = temp_mol.get_coordinates_in_angstrom()
 
-        v, e1, e2 = self._recalc_mm_energy(pos_nm, l, reasim, prosim)
-        avg_x = np.mean(pos_bohr[:, 0])
-        avg_y = np.mean(pos_bohr[:, 1])
-        avg_z = np.mean(pos_bohr[:, 2])
-        pos_bohr -= [avg_x, avg_y, avg_z]
-        return v, e1, e2, e_int, pos_bohr, n_conf
+        v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
+        avg_x = np.mean(pos[:, 0])
+        avg_y = np.mean(pos[:, 1])
+        avg_z = np.mean(pos[:, 2])
+        pos -= [avg_x, avg_y, avg_z]
+
+        return v, e1, e2, e_int, pos, n_conf
 
     def _recalc_mm_energy(self, pos, l, rea_sim, pro_sim):
-        rea_sim.context.setPositions(pos)
-        pro_sim.context.setPositions(pos)
+        # unit conversion from angstrom to nm
+        pos_nm = pos * 0.1
+        rea_sim.context.setPositions(pos_nm)
+        pro_sim.context.setPositions(pos_nm)
         e1 = rea_sim.context.getState(
             getEnergy=True).getPotentialEnergy().value_in_unit(
                 mmunit.kilojoules_per_mole)
@@ -560,16 +572,15 @@ class TransitionStateGuesser():
         if results is None:
             results = self.results
         assert_msg_critical(
-            'mm_geometries' in results.keys(),
-            'Could not find "mm_geometries" in results. Total keys: {results.keys()}',
+            'structures' in results.keys(),
+            'Could not find "structures" in results. Total keys: {results.keys()}',
         )
-        structures = results['mm_geometries']
+        structures = results['structures']
         self._print_scf_header()
         scf_energies = []
         ref = 0
         for i, l in enumerate(self.lambda_vec):
-            geom = structures[i]
-            scf_E = self._get_scf_energy(geom)
+            scf_E = self._get_scf_energy(structures[i])
             if i == 0:
                 ref = scf_E
                 dif = 0
@@ -580,29 +591,29 @@ class TransitionStateGuesser():
         self.ostream.print_blank()
 
         max_scf_index = np.argmax(scf_energies)
-        max_scf_geom = self._mm_to_xyz_geom(structures[max_scf_index])
+        max_scf_structure = structures[max_scf_index]
         max_scf_energy = scf_energies[max_scf_index]
         max_scf_lambda = self.lambda_vec[max_scf_index]
         results = {
             'scf_energies': scf_energies,
-            'max_scf_geometry': max_scf_geom,
+            'max_scf_structure': max_scf_structure,
             'max_scf_lambda': max_scf_lambda
         }
         self.ostream.print_info(
-            f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
+            f"Found highest SCF E: {max_scf_energy:.3f} at Lambda: {max_scf_lambda}."
         )
         self.ostream.flush()
         self.results.update(results)
         mult = self.molecule.get_multiplicity()
         charge = self.molecule.get_charge()
-        self.molecule = Molecule.read_xyz_string(max_scf_geom)
+        self.molecule = Molecule.read_xyz_string(max_scf_structure)
         self.molecule.set_multiplicity(mult)
         self.molecule.set_charge(charge)
         self._save_results(self.results_file, self.results)
         return self.results
 
-    def _get_scf_energy(self, positions):
-        self.molecule = self._set_molecule_positions(self.molecule, positions)
+    def _get_scf_energy(self, structure):
+        self.molecule = Molecule.read_xyz_string(structure)
         if self.scf_drv is None:
             scf_drv = ScfRestrictedDriver()
             scf_drv.xcfun = self.scf_xcfun
@@ -655,7 +666,7 @@ class TransitionStateGuesser():
                     raise e
 
         mm_energies = ts_results.get('mm_energies', None)
-        geometries = ts_results.get('xyz_geometries', None)
+        structures = ts_results.get('structures', None)
         lambda_vec = ts_results.get('lambda_vec', None)
         scf_energies = ts_results.get('scf_energies', None)
         if scf_energies is not None:
@@ -666,7 +677,7 @@ class TransitionStateGuesser():
             self._show_iteration,
             mm_energies=ipywidgets.fixed(mm_energies),
             scf_energies=ipywidgets.fixed(scf_energies),
-            geometries=ipywidgets.fixed(geometries),
+            structures=ipywidgets.fixed(structures),
             lambda_vec=ipywidgets.fixed(lambda_vec),
             step=ipywidgets.SelectionSlider(
                 options=lambda_vec,
@@ -679,7 +690,7 @@ class TransitionStateGuesser():
     def _show_iteration(
         self,
         mm_energies,
-        geometries,
+        structures,
         lambda_vec,
         step,
         scf_energies=None,
@@ -697,7 +708,7 @@ class TransitionStateGuesser():
         rel_mm_energies = mm_energies - np.min(mm_energies)
 
         lam_index = np.where(lambda_vec == np.array(step))[0][0]
-        xyz_data_i = geometries[lam_index]
+        structure_i = structures[lam_index]
         total_steps = len(rel_mm_energies) - 1
         x = np.linspace(0, lambda_vec[-1], 100)
         y = np.interp(x, lambda_vec, rel_mm_energies)
@@ -776,7 +787,7 @@ class TransitionStateGuesser():
         fig.tight_layout()
         plt.show()
 
-        mol = Molecule.read_xyz_string(xyz_data_i)
+        mol = Molecule.read_xyz_string(structure_i)
 
         if self.reactant.bonds is not None and self.product.bonds is not None:
             reactant_bonds = set(self.reactant.bonds.keys())
@@ -793,17 +804,19 @@ class TransitionStateGuesser():
         else:
             mol.show(atom_indices=atom_indices, width=640, height=360)
 
-    def _mm_to_xyz_geom(self, geom, molecule=None):
+    def _mm_to_xyz_str(self, positions, molecule=None):
         if molecule is None:
             molecule = self.molecule
-        new_mol = TransitionStateGuesser._set_molecule_positions(molecule, geom)
+        new_mol = TransitionStateGuesser._set_molecule_positions(
+            molecule, positions)
         return new_mol.get_xyz_string()
 
     @staticmethod
     def _set_molecule_positions(molecule, positions):
-        assert molecule.number_of_atoms() == len(positions)
+        positions_au = positions / bohr_in_angstrom()
+        assert molecule.number_of_atoms() == len(positions_au)
         for i in range(molecule.number_of_atoms()):
-            molecule.set_atom_coordinates(i, positions[i])
+            molecule.set_atom_coordinates(i, positions_au[i])
         return molecule
 
     def _save_results(self, fname, results):
@@ -816,13 +829,14 @@ class TransitionStateGuesser():
             os.remove(fname)
         hf = h5py.File(fname, 'w')
         lambda_vec = results.get('lambda_vec', None)
-        geometries = results.get('xyz_geometries', None)
         mm_energies = results.get('mm_energies', None)
-        max_mm_geometry = results.get('max_mm_geometry', None)
+        max_mm_structure = results.get('max_mm_structure', None)
         max_mm_lambda = results.get('max_mm_lambda', None)
         scf_energies = results.get('scf_energies', None)
-        max_scf_geometry = results.get('max_scf_geometry', None)
+        max_scf_structure = results.get('max_scf_structure', None)
         max_scf_lambda = results.get('max_scf_lambda', None)
+        
+        structures = results.get('structures', None)
 
         reactant = self.reactant.get_forcefield_as_json(self.reactant)
         product = self.product.get_forcefield_as_json(self.product)
@@ -838,9 +852,8 @@ class TransitionStateGuesser():
         hf.create_dataset('product_xyz', data=pro_xyz)
 
         hf.create_dataset('mm_energies', data=mm_energies, dtype='f')
-        hf.create_dataset('xyz_geometries', data=geometries)
         hf.create_dataset('lambda_vec', data=lambda_vec, dtype='f')
-        hf.create_dataset('max_mm_geometry', data=[max_mm_geometry])
+        hf.create_dataset('max_mm_structure', data=[max_mm_structure])
         hf.create_dataset('max_mm_lambda', data=max_mm_lambda, dtype='f')
 
         hf.create_dataset('forming_bonds',
@@ -849,10 +862,14 @@ class TransitionStateGuesser():
         hf.create_dataset('breaking_bonds',
                           data=np.array(np.array(list(breaking_bonds)),
                                         dtype='i'))
+        
+        
+        dt = h5py.string_dtype(encoding='utf-8')
+        hf.create_dataset('structures', data=np.array(structures, dtype=dt))
 
         if scf_energies is not None:
             hf.create_dataset('scf_energies', data=scf_energies, dtype='f')
-            hf.create_dataset('max_scf_geometry', data=[max_scf_geometry])
+            hf.create_dataset('max_scf_structure', data=[max_scf_structure])
             hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
 
     def load_results(self, fname):
@@ -862,12 +879,10 @@ class TransitionStateGuesser():
         hf = h5py.File(fname, 'r')
         results = {}
         results['mm_energies'] = hf['mm_energies'][:]
-        results['xyz_geometries'] = [
-            s.decode('utf-8') for s in hf['xyz_geometries'][:]
-        ]
         results['lambda_vec'] = hf['lambda_vec'][:]
-        results['max_mm_geometry'] = hf['max_mm_geometry'][0].decode('utf-8')
+        results['max_mm_structure'] = hf['max_mm_structure'][0].decode('utf-8')
         results['max_mm_lambda'] = hf['max_mm_lambda'][()]
+        results['structures'] = [s.decode('utf-8') for s in hf['structures'][:]]
 
         reactant_ff = hf['reactant_ff'][()]
         product_ff = hf['product_ff'][()]
@@ -886,10 +901,12 @@ class TransitionStateGuesser():
 
         self.forming_bonds = set([tuple(bond) for bond in forming_bonds])
         self.breaking_bonds = set([tuple(bond) for bond in breaking_bonds])
+        
+        
 
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]
-            results['max_scf_geometry'] = hf['max_scf_geometry'][0].decode(
+            results['max_scf_structure'] = hf['max_scf_structure'][0].decode(
                 'utf-8')
             results['max_scf_lambda'] = hf['max_scf_lambda'][()]
         return results
@@ -954,10 +971,10 @@ class TransitionStateGuesser():
 
     def _print_mm_iter(self, l, e1, e2, v, e_int, n_conf=None):
         if n_conf is None:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(l, e1, e2, v, e_int)
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}".format(l, e1, e2, v)
         else:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}  {:8}".format(
-                l, e1, e2, v, e_int, n_conf)
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:8}  {:8}".format(
+                l, e1, e2, v, n_conf)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
