@@ -41,17 +41,25 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 
-def molecule_sanity_check(mol):
+def molecule_sanity_check(mol, method_type=None):
     """
     Checks molecule for charge/multiplicity combination and geometry.
 
     :param mol:
         The molecule.
+    :param method_type:
+        The method type (restricted, unrestricted or restricted_openshell).
     """
 
     assert_msg_critical(
         mol.check_multiplicity(),
         'Molecule: Incompatible multiplicity and number of electrons')
+
+    if method_type == 'restricted':
+        assert_msg_critical(
+            mol.get_multiplicity() == 1,
+            f'Molecule: Invalid multiplicity for method type {method_type}')
+
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
 
