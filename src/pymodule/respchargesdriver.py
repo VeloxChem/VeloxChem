@@ -334,7 +334,7 @@ class RespChargesDriver:
         use_xyz_file = (molecule.number_of_atoms() == 0)
         use_molecule_list = (self.molecules is not None)
 
-        if not use_xyz_file:
+        if not use_xyz_file and not use_molecule_list:
             molecules.append(molecule)
             basis_sets.append(basis)
 
