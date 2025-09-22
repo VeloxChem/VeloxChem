@@ -37,6 +37,7 @@ import os
 import math
 import copy
 import h5py
+import time
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
@@ -96,7 +97,7 @@ class TransitionStateGuesser():
         self.mm_step_size = 0.001
         self.save_mm_traj = False
         self.scf_drv = None
-        self.folder_name = 'ts_data'
+        self.folder_name = 'ts_data_' + str(int(time.time()))
         self.force_conformer_search = False
         self.skip_discont_conformer_search = True
         self.peak_conformer_search = False
@@ -158,7 +159,7 @@ class TransitionStateGuesser():
         if self.mute_ff_build:
             self.ffbuilder.ostream.mute()
             self.ostream.print_info(
-                "Building forcefields. Disable mute_ff_builder to see detailed output."
+                "Building forcefields. Disable mute_ff_build to see detailed output."
             )
             self.ostream.flush()
         self.ffbuilder.read_keywords(**ts_kwargs)
@@ -215,9 +216,9 @@ class TransitionStateGuesser():
             conf,
             constraints,
         )
-        self.ostream.print_info(f"Saving systems as xml to {self.folder_name}")
+        self.ostream.print_info(f"Saving systems as xml to {self.folder_name}/systems")
         self.ostream.flush()
-        sysbuilder.save_systems_as_xml(self.systems, self.folder_name)
+        sysbuilder.save_systems_as_xml(self.systems, self.folder_name + "/systems")
         self.results.update({
             'breaking_bonds': self.breaking_bonds,
             'forming_bonds': self.forming_bonds,
@@ -227,14 +228,7 @@ class TransitionStateGuesser():
         return
 
     def scan_mm(self):
-        # Setup
-        if not os.path.exists(self.folder_name):
-            os.makedirs(self.folder_name)
-        else:
-            for file in os.listdir(self.folder_name):
-                file_path = os.path.join(self.folder_name, file)
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
+        
         self.folder = Path().cwd() / self.folder_name
 
         if self.save_mm_traj:
@@ -263,7 +257,7 @@ class TransitionStateGuesser():
                     "force_conformer_search true. Doing conformer search at every lambda."
                 )
                 self.ostream.flush()
-                positions, Em, E1, E2, E_int, N_conf = self._run_mm_scan(
+                positions, V, E1, E2, E_int, N_conf = self._run_mm_scan(
                     self.lambda_vec,
                     rea_sim,
                     pro_sim,
@@ -271,7 +265,7 @@ class TransitionStateGuesser():
                     init_pos=pos,
                 )
             else:
-                positions, Em, E1, E2, E_int, N_conf = self._run_mm_scan(
+                positions, V, E1, E2, E_int, N_conf = self._run_mm_scan(
                     self.lambda_vec,
                     rea_sim,
                     pro_sim,
@@ -282,9 +276,9 @@ class TransitionStateGuesser():
                 # Find peak
                 searched_conformers_indices = []
                 if self.peak_conformer_search:
-                    peak_index = np.argmax(Em)
+                    peak_index = np.argmax(V)
                     self.ostream.print_info(
-                        f"Found peak MM E: {Em[peak_index]:.3f} at Lambda: {self.lambda_vec[peak_index]}."
+                        f"Found peak MM E: {V[peak_index]:.3f} at Lambda: {self.lambda_vec[peak_index]}."
                     )
                     max_index = min(
                         len(self.lambda_vec),
@@ -310,9 +304,9 @@ class TransitionStateGuesser():
 
                     for i, l in enumerate(self.lambda_vec[min_index:max_index +
                                                           1]):
-                        if Em_cs[i] < Em[min_index + i]:
+                        if Em_cs[i] < V[min_index + i]:
                             positions[min_index + i] = positions_cs[i]
-                            Em[min_index + i] = Em_cs[i]
+                            V[min_index + i] = Em_cs[i]
                             E1[min_index + i] = E1_cs[i]
                             E2[min_index + i] = E2_cs[i]
                             E_int[min_index + i] = E_int_cs[i]
@@ -351,9 +345,9 @@ class TransitionStateGuesser():
                         )
 
                         for i, i_l in enumerate(to_search_indices):
-                            if Em_cs[i] < Em[i_l]:
+                            if Em_cs[i] < V[i_l]:
                                 positions[i_l] = positions_cs[i]
-                                Em[i_l] = Em_cs[i]
+                                V[i_l] = Em_cs[i]
                                 E1[i_l] = E1_cs[i]
                                 E2[i_l] = E2_cs[i]
                                 E_int[i_l] = E_int_cs[i]
@@ -373,7 +367,7 @@ class TransitionStateGuesser():
             xyz_geom = self._mm_to_xyz_geom(mm_geom, self.molecule)
             xyz_geometries.append(xyz_geom)
         results = {
-            'mm_energies': Em,
+            'mm_energies': V,
             'mm_energies_reactant': E1,
             'mm_energies_product': E2,
             'int_energies': E_int,
@@ -382,9 +376,9 @@ class TransitionStateGuesser():
         }
 
         if exception is None:
-            max_mm_index = np.argmax(Em)
+            max_mm_index = np.argmax(V)
             max_xyz_geom = xyz_geometries[max_mm_index]
-            max_mm_energy = Em[max_mm_index]
+            max_mm_energy = V[max_mm_index]
             max_mm_lambda = self.lambda_vec[max_mm_index]
             self.ostream.print_info(
                 f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
@@ -429,7 +423,7 @@ class TransitionStateGuesser():
                      init_pos):
         pos = copy.copy(init_pos)
         positions = []
-        Em = []
+        V = []
         E1 = []
         E2 = []
         E_int = []
@@ -437,7 +431,7 @@ class TransitionStateGuesser():
         self._print_mm_header(conformer_search=conformer_search,
                               lambda_vals=lambda_vals)
         for l in lambda_vals:
-            em, e1, e2, e_int, return_pos, n_conf = self._get_mm_energy(
+            v, e1, e2, e_int, return_pos, n_conf = self._get_mm_energy(
                 self.topology,
                 self.systems[l],
                 l,
@@ -447,17 +441,17 @@ class TransitionStateGuesser():
                 conformer_search,
             )
             positions.append(return_pos)
-            Em.append(em)
+            V.append(v)
             E1.append(e1)
             E2.append(e2)
             E_int.append(e_int)
             N_conf.append(n_conf)
             if conformer_search:
-                self._print_mm_iter(l, e1, e2, em, e_int, n_conf)
+                self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
             else:
-                self._print_mm_iter(l, e1, e2, em, e_int)
+                self._print_mm_iter(l, e1, e2, v, e_int)
             pos = return_pos
-        return positions, Em, E1, E2, E_int, N_conf
+        return positions, V, E1, E2, E_int, N_conf
 
     def _get_mm_energy(
         self,
@@ -542,12 +536,12 @@ class TransitionStateGuesser():
             # )
             # self.ostream.flush()
 
-        em, e1, e2 = self._recalc_mm_energy(pos_nm, l, reasim, prosim)
+        v, e1, e2 = self._recalc_mm_energy(pos_nm, l, reasim, prosim)
         avg_x = np.mean(pos_bohr[:, 0])
         avg_y = np.mean(pos_bohr[:, 1])
         avg_z = np.mean(pos_bohr[:, 2])
         pos_bohr -= [avg_x, avg_y, avg_z]
-        return em, e1, e2, e_int, pos_bohr, n_conf
+        return v, e1, e2, e_int, pos_bohr, n_conf
 
     def _recalc_mm_energy(self, pos, l, rea_sim, pro_sim):
         rea_sim.context.setPositions(pos)
@@ -925,6 +919,7 @@ class TransitionStateGuesser():
                 '    E1',
                 '    E2',
                 '     V',
+                ' E_int',
             )
         else:
             if lambda_vals is None:
@@ -950,18 +945,19 @@ class TransitionStateGuesser():
                 '    E1',
                 '    E2',
                 '     V',
+                ' E_int',
                 'n_conf',
             )
         self.ostream.print_header(valstr)
         self.ostream.print_header(45 * '-')
         self.ostream.flush()
 
-    def _print_mm_iter(self, l, e1, e2, em, md_e, n_conf=None):
+    def _print_mm_iter(self, l, e1, e2, v, e_int, n_conf=None):
         if n_conf is None:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}".format(l, e1, e2, em)
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7.1f}".format(l, e1, e2, v, e_int)
         else:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}".format(
-                l, e1, e2, em, n_conf)
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:8}  {:8}".format(
+                l, e1, e2, v, e_int, n_conf)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 

@@ -3637,7 +3637,7 @@ class MMForceFieldGenerator:
         return json.dumps(ff_data, indent=4)
 
     @staticmethod
-    def save_forcefield_as_json(forcefield, path: str):
+    def save_forcefield_as_json(forcefield, filename: str):
         """
         Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
 
@@ -3649,7 +3649,9 @@ class MMForceFieldGenerator:
             None
         """
         json = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
-        folder = str(Path(path).parent)
+        cwd = Path().cwd()
+        path = cwd/Path(filename)
+        folder = str(path.parent)
         if not Path(folder).exists():
             Path(folder).mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as file:
