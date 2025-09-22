@@ -148,9 +148,12 @@ class CRIFockDriver
     /// @brief Computes transformed Bq vector with K metric for given similarity transformed MOs.
     /// @param lambda_p The MOs augmented by particle single excitations.
     /// @param lambda_h The MOs augmented by hole single excitations.
-    /// @param indices The vector of active indices of Bq vector.
     /// @return The transformed Gamma vector.
-    auto compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const std::vector<size_t>& indices) const -> CT3RectFlatBuffer<double>;
+    auto compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> CT3RectFlatBuffer<double>;
+    
+    /// @brief Gets mask indices of distributed auxilary AOs.
+    /// @return The mask indices of distributed auxilary AOs.
+    auto mask_indices() const -> std::map<size_t, size_t> { return _eri_buffer.mask_indices(); };
     
     private:
     /// @brief Pointer to metric matrix for J fitting.

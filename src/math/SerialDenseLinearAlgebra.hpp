@@ -34,6 +34,7 @@
 #define SerialDenseLinearAlgebra_hpp
 
 #include "DenseMatrix.hpp"
+#include "SubMatrix.hpp"
 
 namespace sdenblas {  // sdenblas namespace
 
@@ -89,6 +90,25 @@ auto serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB, cons
  @return the solution vector x.
  */
 auto serialSolve(const CDenseMatrix& mat, const std::vector<double>& vec) -> std::vector<double>;
+
+
+/**
+ Computes matrix multiplication: C = A * B.
+
+ @param matrixC the matrix C.
+ @param matrixA the matrix A.
+ @param matrixB the matrix B
+ */
+auto serialMultAB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& matrixB) -> void;
+
+/**
+ Computes matrix multiplication: C = A^t * B.
+
+ @param matrixC the matrix C.
+ @param matrixA the matrix A.
+ @param matrixB the matrix B
+ */
+auto serialMultAtB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& matrixB) -> void;
 
 }  // namespace sdenblas
 

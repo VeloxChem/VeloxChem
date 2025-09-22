@@ -229,4 +229,100 @@ serialSolve(const CDenseMatrix& mat, const std::vector<double>& vec) -> std::vec
     return sol;
 }
 
+auto
+serialMultAB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& matrixB) -> void
+{
+    // set up dimensions of matrix A
+
+    auto narow = matrixA.number_of_rows();
+    
+    auto nacol = matrixA.number_of_columns();
+
+    // set up dimensions of matrix B
+
+    auto nbrow = matrixB.number_of_rows();
+    
+    auto nbcol = matrixB.number_of_columns();
+    
+    errors::assertMsgCritical(nacol == nbrow, "sdenblas::serialMultAB: Inconsistent sizes in matrix multiplication");
+    
+    // set up dimensions of matrix C
+
+    auto ncrow = matrixB.number_of_rows();
+    
+    auto nccol = matrixB.number_of_columns();
+    
+    errors::assertMsgCritical(ncrow == narow, "sdenblas::serialMultAB: Inconsistent sizes in matrix multiplication");
+    
+    errors::assertMsgCritical(nccol == nbcol, "sdenblas::serialMultAB: Inconsistent sizes in matrix multiplication");
+    
+    // set up pointers to data
+
+    auto A = matrixA.data();
+    
+    auto B = matrixB.data();
+    
+    auto C = matrixC.data();
+
+    // compute matrix-matrix multiplication
+
+    matrixC.zero();
+    
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
+    
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, ncrow, nccol);
+    
+    ematC.noalias() = ematA * ematB;
+}
+
+auto
+serialMultAtB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& matrixB) -> void
+{
+    // set up dimensions of matrix A
+
+    auto narow = matrixA.number_of_rows();
+    
+    auto nacol = matrixA.number_of_columns();
+
+    // set up dimensions of matrix B
+
+    auto nbrow = matrixB.number_of_rows();
+    
+    auto nbcol = matrixB.number_of_columns();
+    
+    errors::assertMsgCritical(narow == nbrow, "sdenblas::serialMultAtB: Inconsistent sizes in matrix multiplication");
+    
+    // set up dimensions of matrix C
+
+    auto ncrow = matrixB.number_of_rows();
+    
+    auto nccol = matrixB.number_of_columns();
+    
+    errors::assertMsgCritical(ncrow == nacol, "sdenblas::serialMultAtB: Inconsistent sizes in matrix multiplication");
+    
+    errors::assertMsgCritical(nccol == nbcol, "sdenblas::serialMultAtB: Inconsistent sizes in matrix multiplication");
+    
+    // set up pointers to data
+
+    auto A = matrixA.data();
+    
+    auto B = matrixB.data();
+    
+    auto C = matrixC.data();
+
+    // compute matrix-matrix multiplication
+
+    matrixC.zero();
+    
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
+    
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, ncrow, nccol);
+    
+    ematC.noalias() = ematA.transpose() * ematB;
+}
+
 }  // namespace sdenblas

@@ -33,6 +33,7 @@
 #include "RIFockDriver.hpp"
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 
 #include <ranges>
 
@@ -186,75 +187,75 @@ CRIFockDriver::compute_local_bq_vector(const CMatrix &density) const -> std::vec
 }
 
 auto
-CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const std::vector<size_t>& indices) const -> CT3RectFlatBuffer<double>
+CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> CT3RectFlatBuffer<double>
 {
+    // set up AOs, MOs indices
+    
     const auto nmos = lambda_p.number_of_columns();
         
     const auto naos = lambda_p.number_of_rows();
     
-    const auto naux = _eri_buffer.indices().size();
+    const auto n2mos = nmos * nmos;
     
-    const auto nelems = naos * (naos + 1) / 2;
-        
-    CT3RectFlatBuffer<double> bmats(_eri_buffer.indices(), nmos);
+    // reduce mask indices
     
-    std::vector<double> tmat(nelems, 0.0);
+    std::vector<size_t> indices;
     
-    std::vector<double> rmat(naos * naos, 0.0);
+    for (const auto [gidx, lidx] : _eri_buffer.mask_indices()) { indices.push_back(lidx); }
     
-    auto tmat_ptr = tmat.data();
+    const auto naux = indices.size();
     
-    std::cout << "Dims (MOs, NAOs, NAUXs): " << nmos << " , " << naos << " , " << naux << std::endl;
+    CT3RectFlatBuffer<double> bmats(indices, nmos);
     
-    std::cout << "K metric: " << _k_metric->number_of_rows() << " , " << _k_metric->number_of_columns() << std::endl;
+//    std::cout << "Dims (MOs, NAOs, NAUXs): " << nmos << " , " << naos << " , " << naux << std::endl;
+//    
+//    std::cout << "K metric: " << _k_metric->number_of_rows() << " , " << _k_metric->number_of_columns() << std::endl;
+//    
+//    std::cout << "Rectangular buffer: " << bmats.width() << " , " << bmats.aux_width() << std::endl;
+    
+    // allocate local matrices for transformation
+    
+    CSubMatrix lmat({0, 0, nmos, nmos});
+    
+    CSubMatrix tmat({0, 0, naos, nmos});
+    
+    CSubMatrix rmat({0, 0, naos, naos});
     
     for (size_t i = 0; i < naux; i++)
     {
-        std::ranges::fill(tmat, 0.0);
+        const auto fmat_ptr = _eri_buffer.data(i);
         
-        // perform summation over (P|Q)^-1/2
-        
-        for (size_t j = 0; j < naux; j++)
-        {
-            const auto fact = _k_metric->at({j, i});
-            
-            const auto fmat_ptr = _eri_buffer.data(j);
-            
-            #pragma omp simd
-            for (size_t k = 0; k < nelems; k++)
-            {
-                tmat_ptr[k] += fact * fmat_ptr[k];
-            }
-        }
-        
-        // expand to full square matrix
+        // expand 3C into full square matrix for give auxilary index
         
         for (size_t k = 0; k < naos; k++)
         {
             for (size_t l = k; l < naos; l++)
             {
-                const auto fact = tmat[mathfunc::uplo_rm_index(k, l, naos)];
-                
-                rmat[k * naos + l] = fact;
-                
-                rmat[l * naos + k] = fact;
+                const auto fact = fmat_ptr[mathfunc::uplo_rm_index(k, l, naos)];
+        
+                rmat.at({k, l}) = fact;
+        
+                rmat.at({l, k}) = fact;
             }
         }
         
-        // transform to MO basis
+        // transform matrix
         
-    }
-    
-    const auto mask = _eri_buffer.mask_indices();
-    
-    if (!mask.empty())
-    {
-//        std::cout << "mask size: " << mask.size() <<  std::endl;
-//        
-//        for (const auto [lidx, gidx] : mask)
-//        {
-//            std::cout << "(" << lidx << "," << gidx << ")" << std::endl; 
-//        }
+        sdenblas::serialMultAB(tmat, rmat, lambda_h);
+        
+        sdenblas::serialMultAtB(lmat, lambda_p, tmat);
+        
+        // assign matrix
+        
+        auto ptr_buffer = bmats.data(i);
+        
+        auto ptr_lmat = lmat.data();
+        
+        #pragma omp simd
+        for (size_t j = 0; j < n2mos; j++)
+        {
+            ptr_buffer[j] = ptr_lmat[j];
+        }
     }
     
     return bmats;

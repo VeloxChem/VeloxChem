@@ -202,8 +202,7 @@ class RIFockDriver:
         """
         Compute bq vectors in MO basis using the RI Fock driver.
         """
-
-        if self.comm.Get_size() == 1:
-            return self._ri_drv.compute_bq_vector(lambda_p, lambda_h)
-        else:
-            return None
+        
+        return self._ri_drv.compute_bq_vector(lambda_p, lambda_h)
+        
+        
