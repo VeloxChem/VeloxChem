@@ -421,6 +421,12 @@ class RespChargesDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
+        else:
+            # No valid input source found
+            errmsg = 'RespChargesDriver: Either \'xyz_file\' or \'molecules\' keyword must be '
+            errmsg += 'specified for multi-conformer calculations.'
+            assert_msg_critical(False, errmsg)
+
         if self.rank == mpi_master():
             if self.weights is not None and self.energies is not None:
                 # avoid conflict between weights and energies
