@@ -338,9 +338,37 @@ class RespChargesDriver:
             molecules.append(molecule)
             basis_sets.append(basis)
 
-        else:
-            errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
-            errmsg += 'specified.'
+        elif use_molecule_list:
+            # Use the list of molecules provided by the user
+            for mol in self.molecules:
+                if self.rank == mpi_master():
+                    # Set charge and multiplicity
+                    mol.set_charge(self.net_charge)
+                    mol.set_multiplicity(self.multiplicity)
+                    # Create basis set
+                    basis_path = '.'
+                    if 'basis_path' in self.method_dict:
+                        basis_path = self.method_dict['basis_path']
+                    basis_name = self.method_dict['basis'].upper()
+                    bas = MolecularBasis.read(mol, basis_name, basis_path, ostream=None)
+                else:
+                    bas = MolecularBasis()
+                
+                # Broadcast molecule and basis set
+                mol = self.comm.bcast(mol, root=mpi_master())
+                bas = self.comm.bcast(bas, root=mpi_master())
+                
+                molecules.append(mol)
+                basis_sets.append(bas)
+            
+            info_text = f'Found {len(molecules):d} conformers from molecule list.'
+            self.ostream.print_info(info_text)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        elif use_xyz_file:
+            # XYZ file case
+            errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not specified.'
             assert_msg_critical(self.xyz_file is not None, errmsg)
 
             xyz_lines = None
