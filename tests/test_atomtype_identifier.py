@@ -14,8 +14,6 @@ class TestAtomTypeIdentifier:
         molecule = Molecule.read_xyz_string(xyz_string)
         atomtypes = atomtypeidentifier.generate_gaff_atomtypes(molecule)
 
-        assert atomtypes == expected_atomtypes
-
         atomtypeidentifier.identify_equivalences()
         equal_charges_list = []
         equal_charges = atomtypeidentifier.equivalent_charges
@@ -28,6 +26,8 @@ class TestAtomTypeIdentifier:
         assert equal_charges_list == expected_equal_charges_list
 
         assert atomtypeidentifier.equivalent_atoms == expected_equiv_atoms
+
+        assert atomtypes == expected_atomtypes
 
     def test_atomtypeidentifier_1(self):
 
@@ -45,9 +45,63 @@ class TestAtomTypeIdentifier:
         H 0.279107 0.508641 -1.406687
         H -0.597210 0.737527 1.537844
         """
-        expected_atomtypes = [
-            'br', 'o', 'n2', 'c3', 'c2', 'c2', 'c1', 'h1', 'h1', 'ha', 'h4'
-        ]
+        expected_atomtypes = {
+            'Br1': {
+                'opls': 'opls_XXX',
+                'gaff': 'br',
+                'uff': 'Br'
+            },
+            'O2': {
+                'opls': 'opls_XXX',
+                'gaff': 'o',
+                'uff': 'O'
+            },
+            'N3': {
+                'opls': 'opls_XXX',
+                'gaff': 'n2',
+                'uff': 'N'
+            },
+            'C4': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C5': {
+                'opls': 'opls_141',
+                'gaff': 'c2',
+                'uff': 'C'
+            },
+            'C6': {
+                'opls': 'opls_141',
+                'gaff': 'c2',
+                'uff': 'C'
+            },
+            'C7': {
+                'opls': 'opls_235',
+                'gaff': 'c1',
+                'uff': 'C'
+            },
+            'H8': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H9': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H10': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H11': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[8, 9]]
         expected_equiv_atoms = [
             'br_00', 'o_00', 'n2_00', 'c3_00', 'c2_00', 'c2_01', 'c1_00',
@@ -79,10 +133,88 @@ class TestAtomTypeIdentifier:
         H 0.956630 -1.813429 -1.257842
         H -0.754138 -2.423213 -1.266843
         """
-        expected_atomtypes = [
-            'cx', 'cx', 'cx', 'cx', 'cx', 'cx', 'hc', 'hc', 'hc', 'hc', 'hc',
-            'hc', 'hc', 'hc', 'hc', 'hc'
-        ]
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'C4': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'C5': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'C6': {
+                'opls': 'opls_CX',
+                'gaff': 'cx',
+                'uff': 'C'
+            },
+            'H7': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H8': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H9': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H10': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H11': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H12': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H13': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H14': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H15': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H16': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[1, 3, 5, 6], [2, 4],
                                        [7, 8, 10, 11, 13, 14, 15, 16], [9, 12]]
         expected_equiv_atoms = [
@@ -108,7 +240,48 @@ class TestAtomTypeIdentifier:
         H 3.225785 -0.764724 0.000001
         H 2.437174 0.555726 -0.893110
         """
-        expected_atomtypes = ['cl', 'ss', 's', 'cs', 'c3', 'h1', 'h1', 'h1']
+        expected_atomtypes = {
+            'Cl1': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            },
+            'S2': {
+                'opls': 'opls_SS',
+                'gaff': 'ss',
+                'uff': 'S'
+            },
+            'S3': {
+                'opls': 'opls_920S',
+                'gaff': 's',
+                'uff': 'S'
+            },
+            'C4': {
+                'opls': 'opls_cs',
+                'gaff': 'cs',
+                'uff': 'C'
+            },
+            'C5': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H6': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H7': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H8': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[6, 7, 8]]
         expected_equiv_atoms = [
             'cl_00', 'ss_00', 's_00', 'cs_00', 'c3_00', 'h1_00', 'h1_00',
@@ -132,16 +305,53 @@ class TestAtomTypeIdentifier:
         Cl -1.454268 0.839622 -1.403393
         Cl 1.454268 0.839622 -1.403393
         """
-        expected_atomtypes = ['c3', 'c3', 'cl', 'cl', 'cl', 'cl', 'cl', 'cl']
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'Cl3': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            },
+            'Cl4': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            },
+            'Cl5': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            },
+            'Cl6': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            },
+            'Cl7': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            },
+            'Cl8': {
+                'opls': 'opls_XXX',
+                'gaff': 'cl',
+                'uff': 'Cl'
+            }
+        }
         expected_equal_charges_list = [[1, 2], [3, 4, 5, 6, 7, 8]]
         expected_equiv_atoms = [
             'c3_00', 'c3_00', 'cl_00', 'cl_00', 'cl_00', 'cl_00', 'cl_00',
             'cl_00'
         ]
-
-        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list,
-                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_5(self):
 
@@ -157,7 +367,53 @@ class TestAtomTypeIdentifier:
         H 0.403972 1.666523 -0.018102
         H -0.168069 0.776197 1.422723
         """
-        expected_atomtypes = ['c', 'c', 'c3', 'o', 'o', 'h4', 'h4', 'hc', 'hc']
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_235',
+                'gaff': 'c',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_235',
+                'gaff': 'c',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'O4': {
+                'opls': 'opls_XXX',
+                'gaff': 'o',
+                'uff': 'O'
+            },
+            'O5': {
+                'opls': 'opls_XXX',
+                'gaff': 'o',
+                'uff': 'O'
+            },
+            'H6': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            },
+            'H7': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            },
+            'H8': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H9': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[1, 2], [4, 5], [6, 7], [8, 9]]
         expected_equiv_atoms = [
             'c_00', 'c_00', 'c3_00', 'o_00', 'o_00', 'h4_00', 'h4_00', 'hc_00',
@@ -183,9 +439,58 @@ class TestAtomTypeIdentifier:
         H -0.560282 1.378536 -1.411868
         H -1.408068 1.998180 0.026210
         """
-        expected_atomtypes = [
-            'br', 'o', 'n2', 'c3', 'c3', 'c1', 'h1', 'h1', 'h1', 'h1'
-        ]
+        expected_atomtypes = {
+            'Br1': {
+                'opls': 'opls_XXX',
+                'gaff': 'br',
+                'uff': 'Br'
+            },
+            'O2': {
+                'opls': 'opls_XXX',
+                'gaff': 'o',
+                'uff': 'O'
+            },
+            'N3': {
+                'opls': 'opls_XXX',
+                'gaff': 'n2',
+                'uff': 'N'
+            },
+            'C4': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C5': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C6': {
+                'opls': 'opls_235',
+                'gaff': 'c1',
+                'uff': 'C'
+            },
+            'H7': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H8': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H9': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H10': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[7, 8], [9, 10]]
         expected_equiv_atoms = [
             'br_00', 'o_00', 'n2_00', 'c3_00', 'c3_01', 'c1_00', 'h1_00',
@@ -213,10 +518,68 @@ class TestAtomTypeIdentifier:
         H -2.168354 -1.506394 0.000000
         H -0.919060 2.536214 0.000000
         """
-        expected_atomtypes = [
-            'nb', 'ca', 'ca', 'ca', 'ca', 'ca', 'oh', 'ha', 'ha', 'ha', 'h4',
-            'ho'
-        ]
+        expected_atomtypes = {
+            'N1': {
+                'opls': 'opls_520',
+                'gaff': 'nb',
+                'uff': 'N'
+            },
+            'C2': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C4': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C5': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C6': {
+                'opls': 'opls_521',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'O7': {
+                'opls': 'opls_154',
+                'gaff': 'oh',
+                'uff': 'O'
+            },
+            'H8': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H9': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H10': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H11': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            },
+            'H12': {
+                'opls': 'opls_155',
+                'gaff': 'ho',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = []
         expected_equiv_atoms = [
             'nb_00', 'ca_00', 'ca_01', 'ca_02', 'ca_03', 'ca_04', 'oh_00',
@@ -251,10 +614,103 @@ class TestAtomTypeIdentifier:
         H -2.957161 2.300824 0.000000
         H -1.628625 -2.348693 0.000000
         """
-        expected_atomtypes = [
-            'ca', 'ca', 'ca', 'ca', 'cc', 'ca', 'cd', 'ca', 'c3', 'na', 'ha',
-            'ha', 'ha', 'ha', 'h4', 'hc', 'hc', 'hc', 'hn'
-        ]
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C4': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C5': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'C6': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C7': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'C8': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C9': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'N10': {
+                'opls': 'opls_na',
+                'gaff': 'na',
+                'uff': 'N'
+            },
+            'H11': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H12': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H13': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H14': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H15': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            },
+            'H16': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H17': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H18': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H19': {
+                'opls': 'opls_240',
+                'gaff': 'hn',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[16, 17, 18]]
         expected_equiv_atoms = [
             'ca_00', 'ca_01', 'ca_02', 'ca_03', 'cc_00', 'ca_04', 'cc_01',
@@ -293,10 +749,118 @@ class TestAtomTypeIdentifier:
         H 2.420111 -0.860563 1.224708
         H -4.105938 -0.798727 0.458901
         """
-        expected_atomtypes = [
-            'ca', 'ca', 'ca', 'ca', 'ca', 'ca', 'c3', 'c3', 'c3', 'oh', 'ha',
-            'ha', 'ha', 'ha', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'ho'
-        ]
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C4': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C5': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C6': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C7': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C8': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C9': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'O10': {
+                'opls': 'opls_154',
+                'gaff': 'oh',
+                'uff': 'O'
+            },
+            'H11': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H12': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H13': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H14': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H15': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H16': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H17': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H18': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H19': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H20': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H21': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H22': {
+                'opls': 'opls_155',
+                'gaff': 'ho',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[1, 2], [3, 4], [11, 12], [13, 14],
                                        [15, 16, 17], [18, 19], [20, 21]]
         expected_equiv_atoms = [
@@ -350,12 +914,183 @@ class TestAtomTypeIdentifier:
         H -7.504000  2.584000  0.637000
         H -7.928000  1.534000 -0.765000
         """
-        expected_atomtypes = [
-            'ca', 'ca', 'h4', 'nb', 'ca', 'h4', 'ca', 'ha', 'ca', 'cc', 'ha',
-            'cd', 'h4', 'na', 'cc', 'ss', 'cd', 'ha', 'cd', 'ha', 'cc', 'cc',
-            'cd', 'ha', 'cd', 'ha', 'ss', 'cc', 'c', 'o', 'os', 'c3', 'h1',
-            'h1', 'h1'
-        ]
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_521',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H3': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            },
+            'N4': {
+                'opls': 'opls_520',
+                'gaff': 'nb',
+                'uff': 'N'
+            },
+            'C5': {
+                'opls': 'opls_521',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H6': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            },
+            'C7': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H8': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C9': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C10': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'H11': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C12': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'H13': {
+                'opls': 'opls_146',
+                'gaff': 'h4',
+                'uff': 'H'
+            },
+            'N14': {
+                'opls': 'opls_na',
+                'gaff': 'na',
+                'uff': 'N'
+            },
+            'C15': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'S16': {
+                'opls': 'opls_SS',
+                'gaff': 'ss',
+                'uff': 'S'
+            },
+            'C17': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'H18': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C19': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'H20': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C21': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'C22': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'C23': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'H24': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C25': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'H26': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'S27': {
+                'opls': 'opls_SS',
+                'gaff': 'ss',
+                'uff': 'S'
+            },
+            'C28': {
+                'opls': 'opls_508',
+                'gaff': 'cc',
+                'uff': 'C'
+            },
+            'C29': {
+                'opls': 'opls_235',
+                'gaff': 'c',
+                'uff': 'C'
+            },
+            'O30': {
+                'opls': 'opls_XXX',
+                'gaff': 'o',
+                'uff': 'O'
+            },
+            'O31': {
+                'opls': 'opls_XXX',
+                'gaff': 'os',
+                'uff': 'O'
+            },
+            'C32': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H33': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H34': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H35': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[33, 34, 35]]
         expected_equiv_atoms = [
             'ca_00', 'ca_01', 'h4_00', 'nb_00', 'ca_02', 'h4_01', 'ca_03',
@@ -388,10 +1123,78 @@ class TestAtomTypeIdentifier:
         H      2.00545    -1.44399     1.09891
         H      2.14185    -0.48639     2.66959
         """
-        expected_atomtypes = [
-            'c2', 'ce', 'ha', 'ha', 'ce', 'ha', 'cf', 'ha', 'ha', 'cf', 'c2',
-            'ha', 'ha', 'ha'
-        ]
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_141',
+                'gaff': 'c2',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_XXX',
+                'gaff': 'ce',
+                'uff': 'C'
+            },
+            'H3': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H4': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C5': {
+                'opls': 'opls_XXX',
+                'gaff': 'ce',
+                'uff': 'C'
+            },
+            'H6': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C7': {
+                'opls': 'opls_XXX',
+                'gaff': 'ce',
+                'uff': 'C'
+            },
+            'H8': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H9': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C10': {
+                'opls': 'opls_XXX',
+                'gaff': 'ce',
+                'uff': 'C'
+            },
+            'C11': {
+                'opls': 'opls_141',
+                'gaff': 'c2',
+                'uff': 'C'
+            },
+            'H12': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H13': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'H14': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[1, 11], [2, 10], [3, 4, 13, 14], [5, 7],
                                        [6, 12], [8, 9]]
         expected_equiv_atoms = [
@@ -411,7 +1214,23 @@ class TestAtomTypeIdentifier:
         H      2.002900   -0.067860    0.087740
         H      0.756160   -0.297060    0.939000
         """
-        expected_atomtypes = ['ow', 'hw', 'hw']
+        expected_atomtypes = {
+            'O1': {
+                'opls': 'opls_111',
+                'gaff': 'ow',
+                'uff': 'O'
+            },
+            'H2': {
+                'opls': 'opls_112',
+                'gaff': 'hw',
+                'uff': 'H'
+            },
+            'H3': {
+                'opls': 'opls_112',
+                'gaff': 'hw',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[2, 3]]
         expected_equiv_atoms = ['ow_00', 'hw_00', 'hw_00']
 
@@ -438,10 +1257,78 @@ class TestAtomTypeIdentifier:
         H      2.751897    0.643609    0.000031
         H      2.109264   -0.754197    0.888037
         """
-        expected_atomtypes = [
-            'c3', 'hc', 'hc', 'hc', 'c3', 'hc', 'hc', 'c3', 'hc', 'hc', 'c3',
-            'hc', 'hc', 'hc'
-        ]
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H2': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H3': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H4': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'C5': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H6': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H7': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'C8': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H9': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H10': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'C11': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H12': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H13': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H14': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[1, 11], [2, 3, 4, 12, 13, 14], [5, 8],
                                        [6, 7, 9, 10]]
         expected_equiv_atoms = [
@@ -481,11 +1368,123 @@ class TestAtomTypeIdentifier:
         H        4.5220904955    0.8575433726   -1.4930596178
         H        2.1653934540   -1.1046663754    1.9436295799
         """
-        expected_atomtypes = [
-            'ha', 'ca', 'ca', 'oh', 'ca', 'ca', 'ha', 'ca', 'c3', 'ca', 'ha',
-            'oh', 'ho', 'ho', 'oh', 'h1', 'c3', 'h1', 'n8', 'h1', 'hn', 'hn',
-            'ho'
-        ]
+        expected_atomtypes = {
+            'H1': {
+                'uff': 'H',
+                'opls': 'opls_146',
+                'gaff': 'ha'
+            },
+            'C2': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'O4': {
+                'opls': 'opls_154',
+                'gaff': 'oh',
+                'uff': 'O'
+            },
+            'C5': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C6': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H7': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C8': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C9': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C10': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H11': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'O12': {
+                'opls': 'opls_154',
+                'gaff': 'oh',
+                'uff': 'O'
+            },
+            'H13': {
+                'opls': 'opls_155',
+                'gaff': 'ho',
+                'uff': 'H'
+            },
+            'H14': {
+                'opls': 'opls_155',
+                'gaff': 'ho',
+                'uff': 'H'
+            },
+            'O15': {
+                'opls': 'opls_154',
+                'gaff': 'oh',
+                'uff': 'O'
+            },
+            'H16': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'C17': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H18': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'N19': {
+                'opls': 'opls_300',
+                'gaff': 'n8',
+                'uff': 'N'
+            },
+            'H20': {
+                'opls': 'opls_140',
+                'gaff': 'h1',
+                'uff': 'H'
+            },
+            'H21': {
+                'opls': 'opls_240',
+                'gaff': 'hn',
+                'uff': 'H'
+            },
+            'H22': {
+                'opls': 'opls_240',
+                'gaff': 'hn',
+                'uff': 'H'
+            },
+            'H23': {
+                'opls': 'opls_155',
+                'gaff': 'ho',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[18, 20], [21, 22]]
         expected_equiv_atoms = [
             'ha_00', 'ca_00', 'ca_01', 'oh_00', 'ca_02', 'ca_03', 'ha_01',
@@ -535,11 +1534,168 @@ class TestAtomTypeIdentifier:
         C        1.2497622241   -0.3983505582   -3.5756958481
         H        0.5171222467   -1.1889186966   -3.4924774810
         """
-        expected_atomtypes = [
-            'ha', 'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'cp', 'cq', 'cq',
-            'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'cp',
-            'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha'
-        ]
+        expected_atomtypes = {
+            'H1': {
+                'uff': 'H',
+                'opls': 'opls_146',
+                'gaff': 'ha'
+            },
+            'C2': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H4': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C5': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H6': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C7': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H8': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C9': {
+                'opls': 'opls_521',
+                'gaff': 'cp',
+                'uff': 'C'
+            },
+            'C10': {
+                'opls': 'opls_521',
+                'gaff': 'cp',
+                'uff': 'C'
+            },
+            'C11': {
+                'opls': 'opls_521',
+                'gaff': 'cp',
+                'uff': 'C'
+            },
+            'C12': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H13': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C14': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H15': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C16': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H17': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C18': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H19': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C20': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H21': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C22': {
+                'opls': 'opls_521',
+                'gaff': 'cp',
+                'uff': 'C'
+            },
+            'C23': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H24': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C25': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H26': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C27': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H28': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C29': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H30': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C31': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H32': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[1, 8], [2, 7], [3, 5], [4, 6], [9, 10],
                                        [11, 22], [12, 20, 23, 31],
                                        [13, 21, 24, 32], [14, 18, 25, 29],
@@ -582,10 +1738,113 @@ class TestAtomTypeIdentifier:
         H        3.3806175601    0.0777846220   -2.3279786741
         S        2.1227346696   -0.2425447327    2.2672865678
         """
-        expected_atomtypes = [
-            'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ca',
-            'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ss'
-        ]
+        expected_atomtypes = {
+            'C1': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C2': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H3': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C4': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H5': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C6': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H7': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C8': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H9': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C10': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C11': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C12': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C13': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H14': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C15': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H16': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C17': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H18': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C19': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H20': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'S21': {
+                'opls': 'opls_SS',
+                'gaff': 'ss',
+                'uff': 'S'
+            }
+        }
         expected_equal_charges_list = [[1, 12], [2, 13], [3, 14], [4, 15],
                                        [5, 16], [6, 17], [7, 18], [8, 19],
                                        [9, 20], [10, 11]]
@@ -630,11 +1889,138 @@ class TestAtomTypeIdentifier:
         H        3.5505781838    0.6708003671   -3.2100741635
         H        2.6458720151    1.7728973393   -2.1640061282
         """
-        expected_atomtypes = [
-            'ha', 'ca', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'cp', 'cp',
-            'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'c3', 'c3',
-            'hc', 'hc', 'hc', 'hc'
-        ]
+        expected_atomtypes = {
+            'H1': {
+                'uff': 'H',
+                'opls': 'opls_146',
+                'gaff': 'ha'
+            },
+            'C2': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C3': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H4': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C5': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H6': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C7': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H8': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C9': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C10': {
+                'opls': 'opls_521',
+                'gaff': 'cp',
+                'uff': 'C'
+            },
+            'C11': {
+                'opls': 'opls_521',
+                'gaff': 'cp',
+                'uff': 'C'
+            },
+            'C12': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H13': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C14': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H15': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C16': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H17': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C18': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'H19': {
+                'opls': 'opls_146',
+                'gaff': 'ha',
+                'uff': 'H'
+            },
+            'C20': {
+                'opls': 'opls_145',
+                'gaff': 'ca',
+                'uff': 'C'
+            },
+            'C21': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'C22': {
+                'opls': 'opls_135',
+                'gaff': 'c3',
+                'uff': 'C'
+            },
+            'H23': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H24': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H25': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            },
+            'H26': {
+                'opls': 'opls_140',
+                'gaff': 'hc',
+                'uff': 'H'
+            }
+        }
         expected_equal_charges_list = [[1, 13], [2, 12], [3, 14], [4, 15],
                                        [5, 16], [6, 17], [7, 18], [8, 19],
                                        [9, 20], [10, 11], [21, 22],

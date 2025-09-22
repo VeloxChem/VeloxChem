@@ -1245,49 +1245,49 @@ class MMForceFieldGenerator:
 
         # Atomtypes analysis
 
-        t = time.time()
+        # t = time.time()
         self.atoms, use_water_model, water_bonds, water_angles = self.populate_atoms(
             water_model, use_xml, ff_data_dict, ff_data_lines, gaff_version,
             atomtypeidentifier)
 
-        t_atoms = time.time() - t
-        t = time.time()
+        # t_atoms = time.time() - t
+        # t = time.time()
         # Bonds analysis
         self.bonds = self.populate_bonds(use_xml, ff_data_dict, ff_data_lines,
                                          coords, bond_indices, use_water_model,
                                          water_bonds)
 
-        t_bonds = time.time() - t
-        t = time.time()
+        # t_bonds = time.time() - t
+        # t = time.time()
         # Angles analysis
         self.angles = self.populate_angles(use_xml, ff_data_dict, ff_data_lines,
                                            coords, angle_indices,
                                            use_water_model, water_angles)
 
-        t_angles = time.time() - t
-        t = time.time()
+        # t_angles = time.time() - t
+        # t = time.time()
 
         # Dihedrals analysis
         self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
             use_xml, ff_data_dict, ff_data_lines, atomtypeidentifier,
             dihedral_indices)
 
-        t_dihedrals = time.time() - t
-        t = time.time()
+        # t_dihedrals = time.time() - t
+        # t = time.time()
         # Impropers
         self.impropers = self.populate_impropers(use_xml, ff_data_dict,
                                                  ff_data_lines, n_atoms,
                                                  angle_indices)
 
-        t_impropers = time.time() - t
+        # t_impropers = time.time() - t
 
-        self.ostream.unmute()
-        self.ostream.print_info(
-            f'Topology analysis timings (s): atoms {t_atoms:.2f}, ' +
-            f'bonds {t_bonds:.2f}, angles {t_angles:.2f}, ' +
-            f'dihedrals {t_dihedrals:.2f}, impropers {t_impropers:.2f}')
-        self.ostream.flush()
-        self.ostream.mute()
+        # self.ostream.unmute()
+        # self.ostream.print_info(
+        #     f'Topology analysis timings (s): atoms {t_atoms:.2f}, ' +
+        #     f'bonds {t_bonds:.2f}, angles {t_angles:.2f}, ' +
+        #     f'dihedrals {t_dihedrals:.2f}, impropers {t_impropers:.2f}')
+        # self.ostream.flush()
+        # self.ostream.mute()
 
         self.ostream.flush()
 
@@ -1351,6 +1351,7 @@ class MMForceFieldGenerator:
                 improper_ordering = None
 
                 if use_xml:
+                    # TODO restructure ff_data_dict so that python can natively do the lookup and the for loops can be eliminated here
                     for dihedral_data in ff_data_dict['impropers']:
                         for target_dihedral, ordering in zip(
                                 target_dihedral_types, target_orderings):
@@ -1821,6 +1822,7 @@ class MMForceFieldGenerator:
             theta, k_theta, comment = None, None, None
 
             if use_xml:
+                # TODO restructure ff_data_dict so that python can natively do the lookup and the for loops can be eliminated here
                 for angle_data in ff_data_dict['angles']:
                     for target_angle in target_angle_types:
                         if target_angle == (angle_data['class1'],
@@ -2091,7 +2093,7 @@ class MMForceFieldGenerator:
                 'equivalent_atom': equivalent_atoms[i],
             }
         print_data = list(zip(types, atom_names, labels, range(len(types))))
-        
+
         return atoms, use_water_model, water_bonds, water_angles
 
     def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
