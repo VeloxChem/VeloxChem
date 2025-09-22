@@ -1142,10 +1142,10 @@ class MMForceFieldGenerator:
                 self.molecule)
             self.connectivity_matrix = np.copy(
                 atomtypeidentifier.connectivity_matrix)
-            
+
         self.gaff_atom_types = atomtypeidentifier.gaff_atom_types
         self.atom_info_dict = atomtypeidentifier.atom_info_dict
-        
+
         atomtypeidentifier.identify_equivalences()
 
         ## TODO: change this to skip when water is used
@@ -1238,35 +1238,46 @@ class MMForceFieldGenerator:
             self.gaff_atom_types[i] = f'{self.gaff_atom_types[i].strip():<2s}'
         self.unique_atom_types = sorted(list(set(self.gaff_atom_types)))
 
-        bond_indices, angle_indices, dihedral_indices, self.pairs = self.generate_topology_indices(n_atoms)
+        bond_indices, angle_indices, dihedral_indices, self.pairs = self.generate_topology_indices(
+            n_atoms)
 
         # Read the force field and include the data in the topology dictionary.
 
         # Atomtypes analysis
 
         t = time.time()
-        self.atoms, use_water_model, water_bonds, water_angles = self.populate_atoms(water_model, use_xml, ff_data_dict, ff_data_lines, gaff_version, atomtypeidentifier)
+        self.atoms, use_water_model, water_bonds, water_angles = self.populate_atoms(
+            water_model, use_xml, ff_data_dict, ff_data_lines, gaff_version,
+            atomtypeidentifier)
 
         t_atoms = time.time() - t
         t = time.time()
         # Bonds analysis
-        self.bonds = self.populate_bonds(use_xml, ff_data_dict, ff_data_lines, coords, bond_indices, use_water_model, water_bonds)
+        self.bonds = self.populate_bonds(use_xml, ff_data_dict, ff_data_lines,
+                                         coords, bond_indices, use_water_model,
+                                         water_bonds)
 
         t_bonds = time.time() - t
         t = time.time()
         # Angles analysis
-        self.angles = self.populate_angles(use_xml, ff_data_dict, ff_data_lines, coords, angle_indices, use_water_model, water_angles)
-        
+        self.angles = self.populate_angles(use_xml, ff_data_dict, ff_data_lines,
+                                           coords, angle_indices,
+                                           use_water_model, water_angles)
+
         t_angles = time.time() - t
         t = time.time()
-        
+
         # Dihedrals analysis
-        self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(use_xml, ff_data_dict, ff_data_lines, atomtypeidentifier, dihedral_indices)
+        self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
+            use_xml, ff_data_dict, ff_data_lines, atomtypeidentifier,
+            dihedral_indices)
 
         t_dihedrals = time.time() - t
         t = time.time()
         # Impropers
-        self.impropers = self.populate_impropers(use_xml, ff_data_dict, ff_data_lines, n_atoms, angle_indices)
+        self.impropers = self.populate_impropers(use_xml, ff_data_dict,
+                                                 ff_data_lines, n_atoms,
+                                                 angle_indices)
 
         t_impropers = time.time() - t
 
@@ -1280,7 +1291,8 @@ class MMForceFieldGenerator:
 
         self.ostream.flush()
 
-    def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms, angle_indices):
+    def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
+                           angle_indices):
         impropers = {}
 
         sp2_atom_types = [
@@ -1516,7 +1528,8 @@ class MMForceFieldGenerator:
                 }
         return impropers
 
-    def populate_dihedrals(self, use_xml, ff_data_dict, ff_data_lines, atomtypeidentifier, dihedral_indices):
+    def populate_dihedrals(self, use_xml, ff_data_dict, ff_data_lines,
+                           atomtypeidentifier, dihedral_indices):
         dihedrals = {}
 
         for i, j, k, l in dihedral_indices:
@@ -1761,7 +1774,7 @@ class MMForceFieldGenerator:
                     'periodicity': dihedral_periodicities,
                     'comment': dihedral_comments,
                 }
-                
+
         rotatable_bonds_types = {}
         for i, j, k, l in dihedrals:
             # Ensure consistent ordering of bond indices
@@ -1776,11 +1789,12 @@ class MMForceFieldGenerator:
 
         # Create a 1-indexed list of rotatable bonds without duplicates
         rotatable_bonds = [[bond[0] + 1, bond[1] + 1]
-                                for bond in updated_rotatable_bonds.keys()]
-        
+                           for bond in updated_rotatable_bonds.keys()]
+
         return dihedrals, rotatable_bonds
 
-    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords, angle_indices, use_water_model, water_angles):
+    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                        angle_indices, use_water_model, water_angles):
         angles = {}
 
         for i, j, k in angle_indices:
@@ -1854,7 +1868,7 @@ class MMForceFieldGenerator:
                 'comment': comment
             }
         return angles
-        
+
     def generate_topology_indices(self, n_atoms):
         bond_indices = set()
         for i in range(n_atoms):
@@ -1912,14 +1926,14 @@ class MMForceFieldGenerator:
             if (i, l) not in exclusion_indices:
                 pairs_14.add((i, l))
         pairs_14 = sorted(list(pairs_14))
-        
+
         pairs = {}
         for i, j in pairs_14:
             pairs[(i, j)] = {'comment': None}
-        return bond_indices,angle_indices,dihedral_indices,pairs
+        return bond_indices, angle_indices, dihedral_indices, pairs
 
-    def populate_atoms(self, water_model, use_xml, ff_data_dict, ff_data_lines, gaff_version, atomtypeidentifier):
-        atom_type_params = {}
+    def populate_atoms(self, water_model, use_xml, ff_data_dict, ff_data_lines,
+                       gaff_version, atomtypeidentifier):
 
         use_gaff = False
         use_uff = False
@@ -2053,9 +2067,10 @@ class MMForceFieldGenerator:
         atoms = {}
 
         atom_names = self.get_atom_names()
+        labels = self.molecule.get_labels()
         atom_masses = self.molecule.get_masses()
         equivalent_atoms = list(atomtypeidentifier.equivalent_atoms)
-
+        types = []
         for i, atom_type in enumerate(self.atom_types_dict.values()):
             if 'gaff' in atom_type:
                 atom_type = atom_type['gaff'].strip()
@@ -2063,10 +2078,11 @@ class MMForceFieldGenerator:
             else:
                 atom_type = atom_type['uff'].strip()
                 forcefield = 'uff'
-
+            types.append(atom_type)
             atoms[i] = {
                 'type': atom_type,
                 'forcefield': forcefield,
+                'element': labels[i],
                 'name': atom_names[i],
                 'mass': atom_masses[i],
                 'charge': self.partial_charges[i],
@@ -2074,12 +2090,12 @@ class MMForceFieldGenerator:
                 'epsilon': epsilons[i],
                 'equivalent_atom': equivalent_atoms[i],
             }
-            
-        return atoms,use_water_model,water_bonds,water_angles
+        print_data = list(zip(types, atom_names, labels, range(len(types))))
+        
+        return atoms, use_water_model, water_bonds, water_angles
 
-
-
-    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords, bond_indices, use_water_model, water_bonds):
+    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                       bond_indices, use_water_model, water_bonds):
         bonds = {}
         for i, j in bond_indices:
             r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
@@ -2146,8 +2162,6 @@ class MMForceFieldGenerator:
                 'comment': comment
             }
         return bonds
-
-
 
     @staticmethod
     def get_dihedral_type_string(target_dihedral):

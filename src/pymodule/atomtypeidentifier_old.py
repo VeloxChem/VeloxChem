@@ -1571,7 +1571,7 @@ class AtomTypeIdentifier_old:
                     elif info['NumConnectedAtoms'] == 2:
                         phosphorus_type = {'opls': 'opls_900P', 'gaff': 'p2'}
 
-                    # Undefined phosphorus #todo px is already in use, use p_uff instead
+                    # Undefined phosphorus
                     else:
                         phosphorus_type = {
                             'opls': f'opls_x{info["AtomNumber"]}',
@@ -1697,8 +1697,7 @@ class AtomTypeIdentifier_old:
 
                     sulfur_type = {
                         'opls': f'opls_x{info["AtomNumber"]}',
-                        'gaff':
-                        f'sx{info["AtomNumber"]}'  #todo atomtype sx is already in use
+                        'gaff': f'sx{info["AtomNumber"]}'
                     }
 
                 self.atom_types_dict[f"S{info['AtomNumber']}"] = sulfur_type
@@ -1717,8 +1716,7 @@ class AtomTypeIdentifier_old:
                         else:
                             hydrogen_type = {
                                 'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff':
-                                f'hsx{info["AtomNumber"]}'  #todo hsx is not a valid gaff atom type
+                                'gaff': f'hsx{info["AtomNumber"]}'
                             }
 
                         self.atom_types_dict[
@@ -1744,10 +1742,7 @@ class AtomTypeIdentifier_old:
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = halogen_type
 
                 if 'H' in info['ConnectedAtoms']:
-                    hydrogen_type = {
-                        'opls': 'opls_h_x',
-                        'gaff': 'h_x'
-                    }  #todo change this to h_uff
+                    hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}
                     atom_num = info['ConnectedAtomsNumbers'][
                         info['ConnectedAtoms'].index('H')]
                     self.atom_types_dict[f'H{atom_num}'] = hydrogen_type
@@ -1762,18 +1757,14 @@ class AtomTypeIdentifier_old:
                 # Assign atom types based on AtomicSymbol and AtomNumber
                 atom_type = {
                     'opls': f'opls_{info["AtomicSymbol"]}{info["AtomNumber"]}',
-                    'gaff':
-                    f'{info["AtomicSymbol"]}{info["AtomNumber"]}'  #todo change this to metal_uff
+                    'gaff': f'{info["AtomicSymbol"]}{info["AtomNumber"]}'
                 }
 
                 self.atom_types_dict[
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = atom_type
 
                 if 'H' in info['ConnectedAtoms']:
-                    hydrogen_type = {
-                        'opls': 'opls_h_x',
-                        'gaff': 'h_x'
-                    }  #todo change this to h_uff
+                    hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}
                     atom_num = info['ConnectedAtomsNumbers'][
                         info['ConnectedAtoms'].index('H')]
                     self.atom_types_dict[f'H{atom_num}'] = hydrogen_type

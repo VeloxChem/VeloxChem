@@ -98,8 +98,8 @@ class TransitionStateGuesser():
         self.scf_drv = None
         self.folder_name = 'ts_data'
         self.force_conformer_search = False
-        self.skip_discont_conformer_search = False
-        self.peak_conformer_search = True
+        self.skip_discont_conformer_search = True
+        self.peak_conformer_search = False
         self.peak_conformer_search_range = 0
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
@@ -298,7 +298,8 @@ class TransitionStateGuesser():
                         f"Doing conformer search from Lambda: {self.lambda_vec[min_index]} to Lambda: {self.lambda_vec[max_index]}."
                     )
                     self.ostream.flush()
-                    searched_conformers_indices.extend(range(min_index, max_index + 1))
+                    searched_conformers_indices.extend(
+                        range(min_index, max_index + 1))
                     positions_cs, Em_cs, E1_cs, E2_cs, E_int_cs, N_conf_cs = self._run_mm_scan(
                         self.lambda_vec[min_index:max_index + 1],
                         rea_sim,
@@ -306,8 +307,9 @@ class TransitionStateGuesser():
                         conformer_search=True,
                         init_pos=positions[min_index],
                     )
-                    
-                    for i, l in enumerate(self.lambda_vec[min_index:max_index + 1]):
+
+                    for i, l in enumerate(self.lambda_vec[min_index:max_index +
+                                                          1]):
                         if Em_cs[i] < Em[min_index + i]:
                             positions[min_index + i] = positions_cs[i]
                             Em[min_index + i] = Em_cs[i]
@@ -315,27 +317,39 @@ class TransitionStateGuesser():
                             E2[min_index + i] = E2_cs[i]
                             E_int[min_index + i] = E_int_cs[i]
                             N_conf[min_index + i] = N_conf_cs[i]
-                            
+
                 if not self.skip_discont_conformer_search:
                     discont_indices = self._check_discontinuities(E1, E2)
-                    
-                    while len(discont_indices) > 0 and len(searched_conformers_indices) < len(self.lambda_vec):
+
+                    while len(discont_indices) > 0 and len(
+                            searched_conformers_indices) < len(self.lambda_vec):
                         self.ostream.flush()
-                        self.ostream.print_info(f"Found discontinuities at indices: {discont_indices}.")
-                        to_search_indices = sorted([i for i in discont_indices if i not in searched_conformers_indices])
+                        self.ostream.print_info(
+                            f"Found discontinuities at indices: {discont_indices}."
+                        )
+                        to_search_indices = sorted([
+                            i for i in discont_indices
+                            if i not in searched_conformers_indices
+                        ])
                         searched_conformers_indices.extend(to_search_indices)
-                        searched_conformers_indices = sorted(list(set(searched_conformers_indices)))
-                        to_search_lambda = [self.lambda_vec[i] for i in to_search_indices]
-                        self.ostream.print_info(f"Performing conformer search at lambda values: {to_search_lambda}.")
+                        searched_conformers_indices = sorted(
+                            list(set(searched_conformers_indices)))
+                        to_search_lambda = [
+                            self.lambda_vec[i] for i in to_search_indices
+                        ]
+                        self.ostream.print_info(
+                            f"Performing conformer search at lambda values: {to_search_lambda}."
+                        )
                         self.ostream.flush()
                         positions_cs, Em_cs, E1_cs, E2_cs, E_int_cs, N_conf_cs = self._run_mm_scan(
                             to_search_lambda,
                             rea_sim,
                             pro_sim,
                             conformer_search=True,
-                            init_pos=positions[to_search_indices[0]], # TODO improve initial guess when searching multiple regions
+                            init_pos=positions[to_search_indices[
+                                0]],  # TODO improve initial guess when searching multiple regions
                         )
-                        
+
                         for i, i_l in enumerate(to_search_indices):
                             if Em_cs[i] < Em[i_l]:
                                 positions[i_l] = positions_cs[i]
@@ -344,7 +358,7 @@ class TransitionStateGuesser():
                                 E2[i_l] = E2_cs[i]
                                 E_int[i_l] = E_int_cs[i]
                                 N_conf[i_l] = N_conf_cs[i]
-                        
+
                         discont_indices = self._check_discontinuities(E1, E2)
 
             pass
@@ -396,18 +410,18 @@ class TransitionStateGuesser():
                 "The force field scan crashed. Saving results in self.results and raising exception"
             )
             raise exception
-        
+
     def _check_discontinuities(self, E1, E2):
         discont_indices = []
-        for i,e1 in enumerate(E1[:-1]):
-            if e1 > E1[i+1]:
+        for i, e1 in enumerate(E1[:-1]):
+            if e1 > E1[i + 1]:
                 discont_indices.append(i)
-                discont_indices.append(i+1)
+                discont_indices.append(i + 1)
 
-        for i,e2 in enumerate(E2[:-1]):
-            if e2 < E2[i+1]:
+        for i, e2 in enumerate(E2[:-1]):
+            if e2 < E2[i + 1]:
                 discont_indices.append(i)
-                discont_indices.append(i+1)
+                discont_indices.append(i + 1)
         discont_indices = set(sorted(discont_indices))
         return discont_indices
 
@@ -897,8 +911,10 @@ class TransitionStateGuesser():
             self.ostream.print_blank()
             self.ostream.print_header("MM parameters:")
             self.ostream.print_header(f"MD steps:       {self.mm_steps:>10}")
-            self.ostream.print_header(f"MD temperature: {self.mm_temperature:>8} K")
-            self.ostream.print_header(f"MD step size:   {self.mm_step_size:>7} ps")
+            self.ostream.print_header(
+                f"MD temperature: {self.mm_temperature:>8} K")
+            self.ostream.print_header(
+                f"MD step size:   {self.mm_step_size:>7} ps")
             self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
             self.ostream.print_header(
                 f"saving MD traj: {str(self.save_mm_traj):>10}")
@@ -912,7 +928,8 @@ class TransitionStateGuesser():
             )
         else:
             if lambda_vals is None:
-                self.ostream.print_header("Starting MM scan with conformer search")
+                self.ostream.print_header(
+                    "Starting MM scan with conformer search")
             else:
                 self.ostream.print_header(
                     f"Starting MM scan with conformer search for lambda values {lambda_vals}"
@@ -921,8 +938,10 @@ class TransitionStateGuesser():
                 f"conf. steps:    {self.conformer_steps:>10}")
             self.ostream.print_header(
                 f"conf. snapshots:{self.conformer_snapshots:>10}")
-            self.ostream.print_header(f"MD temperature: {self.mm_temperature:>8} K")
-            self.ostream.print_header(f"MD step size:   {self.mm_step_size:>7} ps")
+            self.ostream.print_header(
+                f"MD temperature: {self.mm_temperature:>8} K")
+            self.ostream.print_header(
+                f"MD step size:   {self.mm_step_size:>7} ps")
             self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
             self.ostream.print_header(
                 f"saving MD traj: {str(self.save_mm_traj):>10}")
