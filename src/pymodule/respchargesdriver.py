@@ -115,6 +115,7 @@ class RespChargesDriver:
 
         # conformers
         self.xyz_file = None
+        self.molecules = None
         self.net_charge = 0.0
         self.multiplicity = 1
         self.method_dict = None
