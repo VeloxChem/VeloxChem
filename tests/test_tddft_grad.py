@@ -87,12 +87,14 @@ class TestGrad:
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
-    @pytest.mark.skip
     def test_tda_lrcwpbeh(self):
         xcfun_label = "lrc-wpbeh"
         tamm_dancoff = True
         ref_grad = np.array(
-            )
+            [[0., -0.000000000000004, 0.076205604655348],
+             [-0., -0.050007199772849, -0.038080925818616],
+             [0., 0.050007199772858, -0.038080925818619]])
+
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
     def test_rpa_slater(self):
@@ -119,7 +121,7 @@ class TestGrad:
         xcfun_label = "lrc-wpbeh"
         tamm_dancoff = False
         ref_grad = np.array(
-            [[-0.000000000000001,  0.000000000000004,  0.076746538972703],
-             [-0.,                -0.050926793834548, -0.038346546437516],
-             [ 0.,                 0.050926793834542, -0.03834654643751 ]])
+            [[-0.000000000000001, 0.000000000000004, 0.076746538972703],
+             [-0., -0.050926793834548, -0.038346546437516],
+             [0., 0.050926793834542, -0.03834654643751]])
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
