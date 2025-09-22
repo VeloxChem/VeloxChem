@@ -951,8 +951,8 @@ class AtomBdeDriver:
         target_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_target_atoms_keys, unique_target_atoms_indices = self._fetch_unique_target_atom(
             target_atoms_dict,
-            use_equiv=self.use_equivalent,
-            only_sp3_carbon_connections=self.only_sp3_carbon_connections)
+            use_equiv = self.use_equivalence,
+            only_sp3_carbon_connections = self.only_sp3_carbon_connections)
 
         if self._debug:
             self.ostream.print_info(
@@ -994,8 +994,8 @@ class AtomBdeDriver:
         target_atoms_dict = self._atoms_analyzer(whole_molecule)
         unique_target_atoms_keys, unique_target_atoms_indices = self._fetch_unique_target_atom(
             target_atoms_dict,
-            use_equiv=self.use_equivalence,
-            only_sp3_carbon_connections=self.only_sp3_carbon_connections)
+            use_equiv = self.use_equivalence,
+            only_sp3_carbon_connections = self.only_sp3_carbon_connections)
 
         if self._debug:
             self.ostream.print_info(f'unique_target_atoms_indices {unique_target_atoms_indices}')
