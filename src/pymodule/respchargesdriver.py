@@ -168,6 +168,7 @@ class RespChargesDriver:
                 'custom_mk_radii':
                     ('seq_fixed_str', 'custom MK radii for RESP charges'),
                 'xyz_file': ('str', 'xyz file containing the conformers'),
+                'molecules': ('list', 'list of molecule objects for conformers'),
                 'net_charge': ('float', 'net charge of the molecule'),
                 'multiplicity': ('int', 'spin multiplicity of the molecule'),
                 'weights': ('seq_fixed', 'weight factors of conformers'),
