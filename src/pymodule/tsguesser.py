@@ -524,6 +524,8 @@ class TransitionStateGuesser():
         else:
             opm_dyn = OpenMMDynamics()
             opm_dyn.ostream.mute()
+            # platform settings for small molecule
+            opm_dyn.openmm_platform = "CPU"
             # opm_dyn.create_system_from_molecule(mol, ff_gen)
             pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
 

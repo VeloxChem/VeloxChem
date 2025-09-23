@@ -372,7 +372,7 @@ class EvbSystemBuilder():
 
         return system, topology, system_mol, reaction_atoms
 
-    def _get_mapped_atom_ids_from_residue(self, residue: mmapp.Residue):
+    def _get_mapped_atom_ids_from_residue(self, residue):
         # create a graph of the residue
         # if the bonds are not available, create them based on proximity from the positions
 

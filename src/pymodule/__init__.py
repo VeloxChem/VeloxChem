@@ -108,7 +108,6 @@ from .molecularorbitals import molorb
 
 # Python classes
 from .atomtypeidentifier import AtomTypeIdentifier
-from .atomtypeidentifier_old import AtomTypeIdentifier_old
 from .seminario import Seminario
 from .inputparser import InputParser
 from .outputstream import OutputStream
@@ -175,7 +174,6 @@ from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 from .mmforcefieldgenerator import MMForceFieldGenerator
-from .mmforcefieldgenerator_old import MMForceFieldGenerator_old
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
@@ -204,6 +202,7 @@ from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
 from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
+from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 

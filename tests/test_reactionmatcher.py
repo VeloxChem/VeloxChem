@@ -1,9 +1,19 @@
 import pytest
+import sys
 
 from veloxchem.molecule import Molecule
 from veloxchem.evbdriver import EvbDriver
 
+try:
+    import openmm
+    import rdkit
+except ImportError:
+    pass
 
+
+@pytest.mark.skipif(('openmm' not in sys.modules) or
+                    ('rdkit' not in sys.modules),
+                    reason='openmm or rdkit not available')
 class TestReactionMatcher:
 
     @staticmethod
@@ -18,7 +28,7 @@ class TestReactionMatcher:
             mol = Molecule.read_smiles(smiles)
             rea.append(mol)
             q = [mol.get_charge() / mol.number_of_atoms()
-                 ] * mol.number_of_atoms()
+                ] * mol.number_of_atoms()
             rea_charges.append(q)
         pro = []
         pro_charges = []
@@ -26,7 +36,7 @@ class TestReactionMatcher:
             mol = Molecule.read_smiles(smiles)
             pro.append(mol)
             q = [mol.get_charge() / mol.number_of_atoms()
-                 ] * mol.number_of_atoms()
+                ] * mol.number_of_atoms()
             pro_charges.append(q)
 
         evb = EvbDriver()
