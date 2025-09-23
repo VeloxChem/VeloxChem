@@ -1605,6 +1605,12 @@ class MMForceFieldGenerator:
         epsilons = []
         water_bonds = None
         water_angles = None
+        # Atoms analysis
+
+        atoms = {}
+
+        atom_names = self.get_atom_names()
+        atom_masses = self.molecule.get_masses()
 
         for i, atom_type in enumerate(self.atom_types_dict.values()):
             atom_type_found = False
@@ -1619,6 +1625,7 @@ class MMForceFieldGenerator:
                             comment = 'GAFF'
                             atom_type_found = True
                             use_gaff = True
+                            atom_type = gafftype
                             break
 
                 else:
@@ -1630,6 +1637,7 @@ class MMForceFieldGenerator:
                             comment = 'GAFF'
                             atom_type_found = True
                             use_gaff = True
+                            atom_type = gafftype
                             break
 
             if not atom_type_found:
@@ -1668,6 +1676,7 @@ class MMForceFieldGenerator:
                     epsilon = self.tm_parameters[element]['epsilon']
                     comment = 'TM'
                     use_tm = True
+                    atom_type = element
 
                 # Case for atoms in UFF but not in GAFF
                 elif element in self.uff_parameters:
@@ -1678,6 +1687,7 @@ class MMForceFieldGenerator:
                     epsilon = self.uff_parameters[element]['epsilon']
                     comment = 'UFF'
                     use_uff = True
+                    atom_type = element
 
                 else:
                     assert_msg_critical(
@@ -1687,6 +1697,24 @@ class MMForceFieldGenerator:
             sigmas.append(sigma)
             epsilons.append(epsilon)
 
+            atoms[i] = {
+                'type': atom_type,
+                'name': atom_names[i],
+                'mass': atom_masses[i],
+                'charge': self.partial_charges[i],
+                'sigma': sigma,
+                'epsilon': epsilon,
+                'equivalent_atom': equivalent_atoms[i],
+                'comment': comment,
+            }
+            
+        self.print_references(water_model, gaff_version, use_gaff, use_uff,
+                              use_tm, use_water_model)
+
+        return atoms, use_water_model, water_bonds, water_angles
+
+    def print_references(self, water_model, gaff_version, use_gaff, use_uff,
+                         use_tm, use_water_model):
         if use_gaff:
             if gaff_version is not None:
                 self.ostream.print_info(
@@ -1723,38 +1751,6 @@ class MMForceFieldGenerator:
             self.ostream.print_reference('Reference: ' + wff_ref)
             self.ostream.print_blank()
             self.ostream.flush()
-
-        # Atoms analysis
-
-        atoms = {}
-
-        atom_names = self.get_atom_names()
-        labels = self.molecule.get_labels()
-        atom_masses = self.molecule.get_masses()
-
-        types = []
-        for i, atom_type in enumerate(self.atom_types_dict.values()):
-            if 'gaff' in atom_type:
-                atom_type = atom_type['gaff'].strip()
-                forcefield = 'gaff'
-            else:
-                atom_type = atom_type['uff'].strip()
-                forcefield = 'uff'
-            types.append(atom_type)
-            atoms[i] = {
-                'type': atom_type,
-                'forcefield': forcefield,
-                'element': labels[i],
-                'name': atom_names[i],
-                'mass': atom_masses[i],
-                'charge': self.partial_charges[i],
-                'sigma': sigmas[i],
-                'epsilon': epsilons[i],
-                'equivalent_atom': equivalent_atoms[i],
-            }
-        print_data = list(zip(types, atom_names, labels, range(len(types))))
-
-        return atoms, use_water_model, water_bonds, water_angles
 
     def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
                        bond_indices, use_water_model, water_bonds):
