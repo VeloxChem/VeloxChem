@@ -184,6 +184,8 @@ class TransitionStateGuesser():
         self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
         )
+        self.mol_charge = self.molecule.get_charge()
+        self.mol_multiplicity = self.molecule.get_multiplicity()
 
         conf = {
             "name": "vacuum",
@@ -394,11 +396,10 @@ class TransitionStateGuesser():
                 'max_mm_lambda': max_mm_lambda,
             })
             self.results.update(results)
-            mult = self.molecule.get_multiplicity()
-            charge = self.molecule.get_charge()
+
             self.molecule = Molecule.read_xyz_string(max_mm_structure)
-            self.molecule.set_multiplicity(mult)
-            self.molecule.set_charge(charge)
+            self.molecule.set_multiplicity(self.mol_multiplicity)
+            self.molecule.set_charge(self.mol_charge)
             self._save_results(self.results_file, self.results)
             return self.results
         else:
@@ -606,16 +607,17 @@ class TransitionStateGuesser():
         )
         self.ostream.flush()
         self.results.update(results)
-        mult = self.molecule.get_multiplicity()
-        charge = self.molecule.get_charge()
+
         self.molecule = Molecule.read_xyz_string(max_scf_structure)
-        self.molecule.set_multiplicity(mult)
-        self.molecule.set_charge(charge)
+        self.molecule.set_multiplicity(self.mol_multiplicity)
+        self.molecule.set_charge(self.mol_charge)
         self._save_results(self.results_file, self.results)
         return self.results
 
     def _get_scf_energy(self, structure):
         self.molecule = Molecule.read_xyz_string(structure)
+        self.molecule.set_multiplicity(self.mol_multiplicity)
+        self.molecule.set_charge(self.mol_charge)
         if self.scf_drv is None:
             scf_drv = ScfRestrictedDriver()
             scf_drv.xcfun = self.scf_xcfun
