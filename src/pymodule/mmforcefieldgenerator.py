@@ -1245,51 +1245,116 @@ class MMForceFieldGenerator:
 
         # Atomtypes analysis
 
-        # t = time.time()
         self.atoms, use_water_model, water_bonds, water_angles = self.populate_atoms(
-            water_model, use_xml, ff_data_dict, ff_data_lines, gaff_version,
-            atomtypeidentifier)
+            water_model,
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            gaff_version,
+            list(atomtypeidentifier.equivalent_atoms),
+        )
 
-        # t_atoms = time.time() - t
-        # t = time.time()
-        # Bonds analysis
-        self.bonds = self.populate_bonds(use_xml, ff_data_dict, ff_data_lines,
-                                         coords, bond_indices, use_water_model,
-                                         water_bonds)
+        self.bonds = self.populate_bonds(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            coords,
+            bond_indices,
+            use_water_model,
+            water_bonds,
+        )
 
-        # t_bonds = time.time() - t
-        # t = time.time()
-        # Angles analysis
-        self.angles = self.populate_angles(use_xml, ff_data_dict, ff_data_lines,
-                                           coords, angle_indices,
-                                           use_water_model, water_angles)
-
-        # t_angles = time.time() - t
-        # t = time.time()
+        self.angles = self.populate_angles(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            coords,
+            angle_indices,
+            use_water_model,
+            water_angles,
+        )
 
         # Dihedrals analysis
         self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
-            use_xml, ff_data_dict, ff_data_lines, atomtypeidentifier,
-            dihedral_indices)
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            dihedral_indices,
+            atomtypeidentifier,
+        )
 
-        # t_dihedrals = time.time() - t
-        # t = time.time()
-        # Impropers
-        self.impropers = self.populate_impropers(use_xml, ff_data_dict,
-                                                 ff_data_lines, n_atoms,
-                                                 angle_indices)
-
-        # t_impropers = time.time() - t
-
-        # self.ostream.unmute()
-        # self.ostream.print_info(
-        #     f'Topology analysis timings (s): atoms {t_atoms:.2f}, ' +
-        #     f'bonds {t_bonds:.2f}, angles {t_angles:.2f}, ' +
-        #     f'dihedrals {t_dihedrals:.2f}, impropers {t_impropers:.2f}')
-        # self.ostream.flush()
-        # self.ostream.mute()
+        self.impropers = self.populate_impropers(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            n_atoms,
+            angle_indices,
+        )
 
         self.ostream.flush()
+
+    def generate_topology_indices(self, n_atoms):
+        bond_indices = set()
+        for i in range(n_atoms):
+            for j in range(i + 1, n_atoms):
+                if self.connectivity_matrix[i, j] == 1:
+                    bond_indices.add((i, j))
+        bond_indices = sorted(list(bond_indices))
+
+        # Angles
+
+        angle_indices = set()
+
+        for i, j in bond_indices:
+            for k in range(n_atoms):
+                if k in [i, j]:
+                    continue
+                if self.connectivity_matrix[j, k] == 1:
+                    inds = (i, j, k) if i < k else (k, j, i)
+                    angle_indices.add(inds)
+                if self.connectivity_matrix[k, i] == 1:
+                    inds = (k, i, j) if k < j else (j, i, k)
+                    angle_indices.add(inds)
+        angle_indices = sorted(list(angle_indices))
+
+        # Dihedrals
+
+        dihedral_indices = set()
+
+        for i, j, k in angle_indices:
+            for l in range(n_atoms):
+                if l in [i, j, k]:
+                    continue
+                if self.connectivity_matrix[k, l] == 1:
+                    inds = (i, j, k, l) if i < l else (l, k, j, i)
+                    dihedral_indices.add(inds)
+                if self.connectivity_matrix[l, i] == 1:
+                    inds = (l, i, j, k) if l < k else (k, j, i, l)
+                    dihedral_indices.add(inds)
+        dihedral_indices = sorted(list(dihedral_indices))
+
+        # Exclusions
+
+        exclusion_indices = []
+        if self.nrexcl >= 2:
+            for i, j in bond_indices:
+                exclusion_indices.append((i, j))
+        if self.nrexcl >= 3:
+            for i, j, k in angle_indices:
+                exclusion_indices.append((i, k))
+
+        # 1-4 pairs
+
+        pairs_14 = set()
+        for i, j, k, l in dihedral_indices:
+            if (i, l) not in exclusion_indices:
+                pairs_14.add((i, l))
+        pairs_14 = sorted(list(pairs_14))
+
+        pairs = {}
+        for i, j in pairs_14:
+            pairs[(i, j)] = {'comment': None}
+        return bond_indices, angle_indices, dihedral_indices, pairs
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
@@ -1529,8 +1594,322 @@ class MMForceFieldGenerator:
                 }
         return impropers
 
-    def populate_dihedrals(self, use_xml, ff_data_dict, ff_data_lines,
-                           atomtypeidentifier, dihedral_indices):
+    def populate_atoms(self, water_model, use_xml, ff_data_dict, ff_data_lines,
+                       gaff_version, equivalent_atoms):
+
+        use_gaff = False
+        use_uff = False
+        use_tm = False
+        use_water_model = False
+        sigmas = []
+        epsilons = []
+        water_bonds = None
+        water_angles = None
+
+        for i, atom_type in enumerate(self.atom_types_dict.values()):
+            atom_type_found = False
+            if 'gaff' in atom_type:
+                gafftype = atom_type['gaff'].strip()
+                if use_xml:
+                    for atom_type_data in ff_data_dict['atom_types']:
+                        # Note: need strip() for converting e.g. 'c ' to 'c'
+                        if atom_type_data['class'] == gafftype:
+                            sigma = float(atom_type_data['sigma'])
+                            epsilon = float(atom_type_data['epsilon'])
+                            comment = 'GAFF'
+                            atom_type_found = True
+                            use_gaff = True
+                            break
+
+                else:
+                    for line in ff_data_lines:
+                        if line.startswith(f'  {gafftype}     '):
+                            atom_ff = line[5:].strip().split()
+                            sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
+                            epsilon = float(atom_ff[1]) * 4.184
+                            comment = 'GAFF'
+                            atom_type_found = True
+                            use_gaff = True
+                            break
+
+            if not atom_type_found:
+                element = atom_type['uff'].strip()
+                gafftype = atom_type.get('gaff', '').strip()
+                if gafftype in ['ow', 'hw']:
+                    assert_msg_critical(
+                        water_model is not None,
+                        'MMForceFieldGenerator: water model not specified.')
+                    assert_msg_critical(
+                        water_model in self.water_parameters,
+                        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}"
+                    )
+
+                    sigma = self.water_parameters[water_model][atom_type][
+                        'sigma']
+                    epsilon = self.water_parameters[water_model][atom_type][
+                        'epsilon']
+
+                    water_bonds = self.water_parameters[water_model]['bonds']
+                    water_angles = self.water_parameters[water_model]['angles']
+                    self.partial_charges = [
+                        self.water_parameters[water_model][a]['charge']
+                        for a in self.gaff_atom_types
+                    ]
+                    atom_type_found = True
+                    use_water_model = True
+                    self.eq_param = False
+                    comment = water_model
+
+                elif element in self.tm_parameters:
+                    tmmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
+                    tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.'  ##TODO: rephrase
+                    self.ostream.print_info(tmmsg)
+                    sigma = self.tm_parameters[element]['sigma']
+                    epsilon = self.tm_parameters[element]['epsilon']
+                    comment = 'TM'
+                    use_tm = True
+
+                # Case for atoms in UFF but not in GAFF
+                elif element in self.uff_parameters:
+                    uffmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
+                    uffmsg += ' Taking sigma and epsilon from UFF.'
+                    self.ostream.print_info(uffmsg)
+                    sigma = self.uff_parameters[element]['sigma']
+                    epsilon = self.uff_parameters[element]['epsilon']
+                    comment = 'UFF'
+                    use_uff = True
+
+                else:
+                    assert_msg_critical(
+                        False,
+                        f'MMForceFieldGenerator: atom type {atom_type} not found in GAFF or UFF.'
+                    )
+            sigmas.append(sigma)
+            epsilons.append(epsilon)
+
+        if use_gaff:
+            if gaff_version is not None:
+                self.ostream.print_info(
+                    f'Using GAFF (v{gaff_version}) parameters.')
+            else:
+                self.ostream.print_info('Using GAFF parameters.')
+            gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
+            gaff_ref += ' D. A. Case, J. Comput. Chem. 2004, 25, 1157-1174.'
+            self.ostream.print_reference('Reference: ' + gaff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_uff:
+            self.ostream.print_info('Using UFF parameters.')
+            uff_ref = 'A. K. Rappé, C. J. Casewit, K. S.  Colwell, W. A. Goddard III,'
+            uff_ref += ' W. M. Skiff, J. Am. Chem. Soc. 1992, 114, 10024-10035.'
+            self.ostream.print_reference('Reference: ' + uff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_tm:
+            self.ostream.print_info('Using TM parameters.')
+            tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
+            tm_ref += 'J. Chem. Theory Comput. 2016 12 (8), 3681-3688.'
+            self.ostream.print_reference('Reference: ' + tm_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_water_model:
+            self.ostream.print_info(
+                f'Using modified water model parameters for {water_model}.')
+            wff_ref = 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski,'
+            wff_ref += 'A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
+            self.ostream.print_reference('Reference: ' + wff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # Atoms analysis
+
+        atoms = {}
+
+        atom_names = self.get_atom_names()
+        labels = self.molecule.get_labels()
+        atom_masses = self.molecule.get_masses()
+
+        types = []
+        for i, atom_type in enumerate(self.atom_types_dict.values()):
+            if 'gaff' in atom_type:
+                atom_type = atom_type['gaff'].strip()
+                forcefield = 'gaff'
+            else:
+                atom_type = atom_type['uff'].strip()
+                forcefield = 'uff'
+            types.append(atom_type)
+            atoms[i] = {
+                'type': atom_type,
+                'forcefield': forcefield,
+                'element': labels[i],
+                'name': atom_names[i],
+                'mass': atom_masses[i],
+                'charge': self.partial_charges[i],
+                'sigma': sigmas[i],
+                'epsilon': epsilons[i],
+                'equivalent_atom': equivalent_atoms[i],
+            }
+        print_data = list(zip(types, atom_names, labels, range(len(types))))
+
+        return atoms, use_water_model, water_bonds, water_angles
+
+    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                       bond_indices, use_water_model, water_bonds):
+        bonds = {}
+        for i, j in bond_indices:
+            r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
+
+            at_1 = self.gaff_atom_types[i]
+            at_2 = self.gaff_atom_types[j]
+            patterns = [
+                re.compile(r'\A' + f'{at_1}-{at_2}  '),
+                re.compile(r'\A' + f'{at_2}-{at_1}  '),
+            ]
+            target_bond_types = [
+                # Note: need strip() for converting e.g. 'c ' to 'c'
+                (at_1.strip(), at_2.strip()),
+                (at_2.strip(), at_1.strip()),
+            ]
+
+            bond_found = False
+            r, k_r, comment = None, None, None
+
+            if use_xml:
+                for bond_data in ff_data_dict['bonds']:
+                    for target_bond in target_bond_types:
+                        if target_bond == (bond_data['class1'],
+                                           bond_data['class2']):
+                            r = float(bond_data['length'])
+                            k_r = float(bond_data['k'])
+                            comment = '-'.join(target_bond)
+                            bond_found = True
+                            break
+
+            elif use_water_model:
+                r = water_bonds['equilibrium']
+                k_r = water_bonds['force_constant']
+                comment = 'ow-hw'
+                bond_found = True
+
+            else:
+                for line in ff_data_lines:
+                    for p in patterns:
+                        m = re.search(p, line)
+                        if m is not None:
+                            bond_ff = line[5:].strip().split()
+                            r = float(bond_ff[1]) * 0.1
+                            k_r = float(bond_ff[0]) * 4.184 * 2 * 100
+                            comment = m.group(0)
+                            bond_found = True
+                            break
+
+            if not bond_found:
+                # Default value for bonds
+                r, k_r, comment = r_eq, 2.5e+5, 'Guessed'
+
+            if self.eq_param:
+                if abs(r - r_eq) > self.r_thresh:
+                    msg = f'Updated bond length {i + 1}-{j + 1} '
+                    msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
+                    self.ostream.print_info(msg)
+                r = r_eq
+
+            bonds[(i, j)] = {
+                'type': 'harmonic',
+                'force_constant': k_r,
+                'equilibrium': r,
+                'comment': comment
+            }
+        return bonds
+
+    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                        angle_indices, use_water_model, water_angles):
+        angles = {}
+
+        for i, j, k in angle_indices:
+            a = coords[i] - coords[j]
+            b = coords[k] - coords[j]
+            theta_eq = safe_arccos(
+                np.dot(a, b) / np.linalg.norm(a) /
+                np.linalg.norm(b)) * 180 / np.pi
+
+            at_1 = self.gaff_atom_types[i]
+            at_2 = self.gaff_atom_types[j]
+            at_3 = self.gaff_atom_types[k]
+            patterns = [
+                re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
+                re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
+            ]
+            target_angle_types = [
+                # Note: need strip() for converting e.g. 'c ' to 'c'
+                (at_1.strip(), at_2.strip(), at_3.strip()),
+                (at_3.strip(), at_2.strip(), at_1.strip()),
+            ]
+
+            angle_found = False
+            theta, k_theta, comment = None, None, None
+
+            if use_xml:
+                # TODO restructure ff_data_dict so that python can natively do the lookup and the for loops can be eliminated here
+                for angle_data in ff_data_dict['angles']:
+                    for target_angle in target_angle_types:
+                        if target_angle == (angle_data['class1'],
+                                            angle_data['class2'],
+                                            angle_data['class3']):
+                            theta = float(angle_data['angle']) / np.pi * 180.0
+                            k_theta = float(angle_data['k'])
+                            comment = '-'.join(target_angle)
+                            angle_found = True
+                            break
+
+            elif use_water_model:
+                k_theta = water_angles['force_constant']
+                theta = water_angles['equilibrium']
+                comment = water_angles['comment']
+                angle_found = True
+
+            else:
+                for line in ff_data_lines:
+                    for p in patterns:
+                        m = re.search(p, line)
+                        if m is not None:
+                            angle_ff = line[8:].strip().split()
+                            theta = float(angle_ff[1])
+                            k_theta = float(angle_ff[0]) * 4.184 * 2
+                            comment = m.group(0)
+                            angle_found = True
+                            break
+
+            if not angle_found:
+                # Default value for angles
+                theta, k_theta, comment = theta_eq, 1000, 'Guessed'
+
+            if self.eq_param:
+                if abs(theta - theta_eq) > self.theta_thresh:
+                    msg = f'Updated bond angle {i + 1}-{j + 1}-{k + 1} '
+                    msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.3f} deg'
+                    self.ostream.print_info(msg)
+                theta = theta_eq
+
+            angles[(i, j, k)] = {
+                'type': 'harmonic',
+                'force_constant': k_theta,
+                'equilibrium': theta,
+                'comment': comment
+            }
+        return angles
+
+    def populate_dihedrals(
+        self,
+        use_xml,
+        ff_data_dict,
+        ff_data_lines,
+        dihedral_indices,
+        atomtypeidentifier,
+    ):
         dihedrals = {}
 
         for i, j, k, l in dihedral_indices:
@@ -1793,377 +2172,6 @@ class MMForceFieldGenerator:
                            for bond in updated_rotatable_bonds.keys()]
 
         return dihedrals, rotatable_bonds
-
-    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords,
-                        angle_indices, use_water_model, water_angles):
-        angles = {}
-
-        for i, j, k in angle_indices:
-            a = coords[i] - coords[j]
-            b = coords[k] - coords[j]
-            theta_eq = safe_arccos(
-                np.dot(a, b) / np.linalg.norm(a) /
-                np.linalg.norm(b)) * 180 / np.pi
-
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            at_3 = self.gaff_atom_types[k]
-            patterns = [
-                re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
-                re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
-            ]
-            target_angle_types = [
-                # Note: need strip() for converting e.g. 'c ' to 'c'
-                (at_1.strip(), at_2.strip(), at_3.strip()),
-                (at_3.strip(), at_2.strip(), at_1.strip()),
-            ]
-
-            angle_found = False
-            theta, k_theta, comment = None, None, None
-
-            if use_xml:
-                # TODO restructure ff_data_dict so that python can natively do the lookup and the for loops can be eliminated here
-                for angle_data in ff_data_dict['angles']:
-                    for target_angle in target_angle_types:
-                        if target_angle == (angle_data['class1'],
-                                            angle_data['class2'],
-                                            angle_data['class3']):
-                            theta = float(angle_data['angle']) / np.pi * 180.0
-                            k_theta = float(angle_data['k'])
-                            comment = '-'.join(target_angle)
-                            angle_found = True
-                            break
-
-            elif use_water_model:
-                k_theta = water_angles['force_constant']
-                theta = water_angles['equilibrium']
-                comment = water_angles['comment']
-                angle_found = True
-
-            else:
-                for line in ff_data_lines:
-                    for p in patterns:
-                        m = re.search(p, line)
-                        if m is not None:
-                            angle_ff = line[8:].strip().split()
-                            theta = float(angle_ff[1])
-                            k_theta = float(angle_ff[0]) * 4.184 * 2
-                            comment = m.group(0)
-                            angle_found = True
-                            break
-
-            if not angle_found:
-                # Default value for angles
-                theta, k_theta, comment = theta_eq, 1000, 'Guessed'
-
-            if self.eq_param:
-                if abs(theta - theta_eq) > self.theta_thresh:
-                    msg = f'Updated bond angle {i + 1}-{j + 1}-{k + 1} '
-                    msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.3f} deg'
-                    self.ostream.print_info(msg)
-                theta = theta_eq
-
-            angles[(i, j, k)] = {
-                'type': 'harmonic',
-                'force_constant': k_theta,
-                'equilibrium': theta,
-                'comment': comment
-            }
-        return angles
-
-    def generate_topology_indices(self, n_atoms):
-        bond_indices = set()
-        for i in range(n_atoms):
-            for j in range(i + 1, n_atoms):
-                if self.connectivity_matrix[i, j] == 1:
-                    bond_indices.add((i, j))
-        bond_indices = sorted(list(bond_indices))
-
-        # Angles
-
-        angle_indices = set()
-
-        for i, j in bond_indices:
-            for k in range(n_atoms):
-                if k in [i, j]:
-                    continue
-                if self.connectivity_matrix[j, k] == 1:
-                    inds = (i, j, k) if i < k else (k, j, i)
-                    angle_indices.add(inds)
-                if self.connectivity_matrix[k, i] == 1:
-                    inds = (k, i, j) if k < j else (j, i, k)
-                    angle_indices.add(inds)
-        angle_indices = sorted(list(angle_indices))
-
-        # Dihedrals
-
-        dihedral_indices = set()
-
-        for i, j, k in angle_indices:
-            for l in range(n_atoms):
-                if l in [i, j, k]:
-                    continue
-                if self.connectivity_matrix[k, l] == 1:
-                    inds = (i, j, k, l) if i < l else (l, k, j, i)
-                    dihedral_indices.add(inds)
-                if self.connectivity_matrix[l, i] == 1:
-                    inds = (l, i, j, k) if l < k else (k, j, i, l)
-                    dihedral_indices.add(inds)
-        dihedral_indices = sorted(list(dihedral_indices))
-
-        # Exclusions
-
-        exclusion_indices = []
-        if self.nrexcl >= 2:
-            for i, j in bond_indices:
-                exclusion_indices.append((i, j))
-        if self.nrexcl >= 3:
-            for i, j, k in angle_indices:
-                exclusion_indices.append((i, k))
-
-        # 1-4 pairs
-
-        pairs_14 = set()
-        for i, j, k, l in dihedral_indices:
-            if (i, l) not in exclusion_indices:
-                pairs_14.add((i, l))
-        pairs_14 = sorted(list(pairs_14))
-
-        pairs = {}
-        for i, j in pairs_14:
-            pairs[(i, j)] = {'comment': None}
-        return bond_indices, angle_indices, dihedral_indices, pairs
-
-    def populate_atoms(self, water_model, use_xml, ff_data_dict, ff_data_lines,
-                       gaff_version, atomtypeidentifier):
-
-        use_gaff = False
-        use_uff = False
-        use_tm = False
-        use_water_model = False
-        sigmas = []
-        epsilons = []
-        water_bonds = None
-        water_angles = None
-
-        for i, atom_type in enumerate(self.atom_types_dict.values()):
-            atom_type_found = False
-            if 'gaff' in atom_type:
-                gafftype = atom_type['gaff'].strip()
-                if use_xml:
-                    for atom_type_data in ff_data_dict['atom_types']:
-                        # Note: need strip() for converting e.g. 'c ' to 'c'
-                        if atom_type_data['class'] == gafftype:
-                            sigma = float(atom_type_data['sigma'])
-                            epsilon = float(atom_type_data['epsilon'])
-                            comment = 'GAFF'
-                            atom_type_found = True
-                            use_gaff = True
-                            break
-
-                else:
-                    for line in ff_data_lines:
-                        if line.startswith(f'  {gafftype}     '):
-                            atom_ff = line[5:].strip().split()
-                            sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
-                            epsilon = float(atom_ff[1]) * 4.184
-                            comment = 'GAFF'
-                            atom_type_found = True
-                            use_gaff = True
-                            break
-
-            if not atom_type_found:
-                element = atom_type['uff'].strip()
-                gafftype = atom_type.get('gaff', '').strip()
-                if gafftype in ['ow', 'hw']:
-                    assert_msg_critical(
-                        water_model is not None,
-                        'MMForceFieldGenerator: water model not specified.')
-                    assert_msg_critical(
-                        water_model in self.water_parameters,
-                        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}"
-                    )
-
-                    sigma = self.water_parameters[water_model][atom_type][
-                        'sigma']
-                    epsilon = self.water_parameters[water_model][atom_type][
-                        'epsilon']
-
-                    water_bonds = self.water_parameters[water_model]['bonds']
-                    water_angles = self.water_parameters[water_model]['angles']
-                    self.partial_charges = [
-                        self.water_parameters[water_model][a]['charge']
-                        for a in self.gaff_atom_types
-                    ]
-                    atom_type_found = True
-                    use_water_model = True
-                    self.eq_param = False
-                    comment = water_model
-
-                elif element in self.tm_parameters:
-                    tmmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
-                    tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.'  ##TODO: rephrase
-                    self.ostream.print_info(tmmsg)
-                    sigma = self.tm_parameters[element]['sigma']
-                    epsilon = self.tm_parameters[element]['epsilon']
-                    comment = 'TM'
-                    use_tm = True
-
-                # Case for atoms in UFF but not in GAFF
-                elif element in self.uff_parameters:
-                    uffmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
-                    uffmsg += ' Taking sigma and epsilon from UFF.'
-                    self.ostream.print_info(uffmsg)
-                    sigma = self.uff_parameters[element]['sigma']
-                    epsilon = self.uff_parameters[element]['epsilon']
-                    comment = 'UFF'
-                    use_uff = True
-
-                else:
-                    assert_msg_critical(
-                        False,
-                        f'MMForceFieldGenerator: atom type {atom_type} not found in GAFF or UFF.'
-                    )
-            sigmas.append(sigma)
-            epsilons.append(epsilon)
-
-        if use_gaff:
-            if gaff_version is not None:
-                self.ostream.print_info(
-                    f'Using GAFF (v{gaff_version}) parameters.')
-            else:
-                self.ostream.print_info('Using GAFF parameters.')
-            gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
-            gaff_ref += ' D. A. Case, J. Comput. Chem. 2004, 25, 1157-1174.'
-            self.ostream.print_reference('Reference: ' + gaff_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        if use_uff:
-            self.ostream.print_info('Using UFF parameters.')
-            uff_ref = 'A. K. Rappé, C. J. Casewit, K. S.  Colwell, W. A. Goddard III,'
-            uff_ref += ' W. M. Skiff, J. Am. Chem. Soc. 1992, 114, 10024-10035.'
-            self.ostream.print_reference('Reference: ' + uff_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        if use_tm:
-            self.ostream.print_info('Using TM parameters.')
-            tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
-            tm_ref += 'J. Chem. Theory Comput. 2016 12 (8), 3681-3688.'
-            self.ostream.print_reference('Reference: ' + tm_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        if use_water_model:
-            self.ostream.print_info(
-                f'Using modified water model parameters for {water_model}.')
-            wff_ref = 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski,'
-            wff_ref += 'A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
-            self.ostream.print_reference('Reference: ' + wff_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        # Atoms analysis
-
-        atoms = {}
-
-        atom_names = self.get_atom_names()
-        labels = self.molecule.get_labels()
-        atom_masses = self.molecule.get_masses()
-        equivalent_atoms = list(atomtypeidentifier.equivalent_atoms)
-        types = []
-        for i, atom_type in enumerate(self.atom_types_dict.values()):
-            if 'gaff' in atom_type:
-                atom_type = atom_type['gaff'].strip()
-                forcefield = 'gaff'
-            else:
-                atom_type = atom_type['uff'].strip()
-                forcefield = 'uff'
-            types.append(atom_type)
-            atoms[i] = {
-                'type': atom_type,
-                'forcefield': forcefield,
-                'element': labels[i],
-                'name': atom_names[i],
-                'mass': atom_masses[i],
-                'charge': self.partial_charges[i],
-                'sigma': sigmas[i],
-                'epsilon': epsilons[i],
-                'equivalent_atom': equivalent_atoms[i],
-            }
-        print_data = list(zip(types, atom_names, labels, range(len(types))))
-
-        return atoms, use_water_model, water_bonds, water_angles
-
-    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
-                       bond_indices, use_water_model, water_bonds):
-        bonds = {}
-        for i, j in bond_indices:
-            r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
-
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            patterns = [
-                re.compile(r'\A' + f'{at_1}-{at_2}  '),
-                re.compile(r'\A' + f'{at_2}-{at_1}  '),
-            ]
-            target_bond_types = [
-                # Note: need strip() for converting e.g. 'c ' to 'c'
-                (at_1.strip(), at_2.strip()),
-                (at_2.strip(), at_1.strip()),
-            ]
-
-            bond_found = False
-            r, k_r, comment = None, None, None
-
-            if use_xml:
-                for bond_data in ff_data_dict['bonds']:
-                    for target_bond in target_bond_types:
-                        if target_bond == (bond_data['class1'],
-                                           bond_data['class2']):
-                            r = float(bond_data['length'])
-                            k_r = float(bond_data['k'])
-                            comment = '-'.join(target_bond)
-                            bond_found = True
-                            break
-
-            elif use_water_model:
-                r = water_bonds['equilibrium']
-                k_r = water_bonds['force_constant']
-                comment = 'ow-hw'
-                bond_found = True
-
-            else:
-                for line in ff_data_lines:
-                    for p in patterns:
-                        m = re.search(p, line)
-                        if m is not None:
-                            bond_ff = line[5:].strip().split()
-                            r = float(bond_ff[1]) * 0.1
-                            k_r = float(bond_ff[0]) * 4.184 * 2 * 100
-                            comment = m.group(0)
-                            bond_found = True
-                            break
-
-            if not bond_found:
-                # Default value for bonds
-                r, k_r, comment = r_eq, 2.5e+5, 'Guessed'
-
-            if self.eq_param:
-                if abs(r - r_eq) > self.r_thresh:
-                    msg = f'Updated bond length {i + 1}-{j + 1} '
-                    msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
-                    self.ostream.print_info(msg)
-                r = r_eq
-
-            bonds[(i, j)] = {
-                'type': 'harmonic',
-                'force_constant': k_r,
-                'equilibrium': r,
-                'comment': comment
-            }
-        return bonds
 
     @staticmethod
     def get_dihedral_type_string(target_dihedral):
@@ -3650,7 +3658,7 @@ class MMForceFieldGenerator:
         """
         json = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
         cwd = Path().cwd()
-        path = cwd/Path(filename)
+        path = cwd / Path(filename)
         folder = str(path.parent)
         if not Path(folder).exists():
             Path(folder).mkdir(parents=True, exist_ok=True)

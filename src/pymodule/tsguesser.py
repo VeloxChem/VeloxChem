@@ -835,7 +835,7 @@ class TransitionStateGuesser():
         scf_energies = results.get('scf_energies', None)
         max_scf_structure = results.get('max_scf_structure', None)
         max_scf_lambda = results.get('max_scf_lambda', None)
-        
+
         structures = results.get('structures', None)
 
         reactant = self.reactant.get_forcefield_as_json(self.reactant)
@@ -862,8 +862,7 @@ class TransitionStateGuesser():
         hf.create_dataset('breaking_bonds',
                           data=np.array(np.array(list(breaking_bonds)),
                                         dtype='i'))
-        
-        
+
         dt = h5py.string_dtype(encoding='utf-8')
         hf.create_dataset('structures', data=np.array(structures, dtype=dt))
 
@@ -901,8 +900,6 @@ class TransitionStateGuesser():
 
         self.forming_bonds = set([tuple(bond) for bond in forming_bonds])
         self.breaking_bonds = set([tuple(bond) for bond in breaking_bonds])
-        
-        
 
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]
@@ -921,14 +918,15 @@ class TransitionStateGuesser():
                     f"Starting MM scan for lambda values {lambda_vals}")
             self.ostream.print_blank()
             self.ostream.print_header("MM parameters:")
-            self.ostream.print_header(f"MD steps:       {self.mm_steps:>10}")
             self.ostream.print_header(
-                f"MD temperature: {self.mm_temperature:>8} K")
+                f"MD steps:              {self.mm_steps:>10}")
             self.ostream.print_header(
-                f"MD step size:   {self.mm_step_size:>7} ps")
-            self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
+                f"MD temperature:        {self.mm_temperature:>8} K")
             self.ostream.print_header(
-                f"saving MD traj: {str(self.save_mm_traj):>10}")
+                f"MD step size:          {self.mm_step_size:>7} ps")
+            self.ostream.print_header(f"folder name: {self.folder_name:>20}")
+            self.ostream.print_header(
+                f"saving MD traj:        {str(self.save_mm_traj):>10}")
             # self.ostream.print_header(
             #     f"conf. search:   {str(conformer_search):>10}")
             valstr = '{} | {} | {} | {}'.format(
@@ -947,16 +945,16 @@ class TransitionStateGuesser():
                     f"Starting MM scan with conformer search for lambda values {lambda_vals}"
                 )
             self.ostream.print_header(
-                f"conf. steps:    {self.conformer_steps:>10}")
+                f"conf. steps:           {self.conformer_steps:>10}")
             self.ostream.print_header(
-                f"conf. snapshots:{self.conformer_snapshots:>10}")
+                f"conf. snapshots:       {self.conformer_snapshots:>10}")
             self.ostream.print_header(
-                f"MD temperature: {self.mm_temperature:>8} K")
+                f"MD temperature:        {self.mm_temperature:>8} K")
             self.ostream.print_header(
-                f"MD step size:   {self.mm_step_size:>7} ps")
-            self.ostream.print_header(f"folder name:    {self.folder_name:>10}")
+                f"MD step size:          {self.mm_step_size:>7} ps")
+            self.ostream.print_header(f"folder name: {self.folder_name:>20}")
             self.ostream.print_header(
-                f"saving MD traj: {str(self.save_mm_traj):>10}")
+                f"saving MD traj:        {str(self.save_mm_traj):>10}")
             valstr = '{} | {} | {} | {} | {}'.format(
                 'Lambda',
                 '    E1',
