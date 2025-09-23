@@ -248,9 +248,9 @@ serialMultAB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& m
     
     // set up dimensions of matrix C
 
-    auto ncrow = matrixB.number_of_rows();
+    auto ncrow = matrixC.number_of_rows();
     
-    auto nccol = matrixB.number_of_columns();
+    auto nccol = matrixC.number_of_columns();
     
     errors::assertMsgCritical(ncrow == narow, "sdenblas::serialMultAB: Inconsistent sizes in matrix multiplication");
     
@@ -296,9 +296,9 @@ serialMultAtB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& 
     
     // set up dimensions of matrix C
 
-    auto ncrow = matrixB.number_of_rows();
+    auto ncrow = matrixC.number_of_rows();
     
-    auto nccol = matrixB.number_of_columns();
+    auto nccol = matrixC.number_of_columns();
     
     errors::assertMsgCritical(ncrow == nacol, "sdenblas::serialMultAtB: Inconsistent sizes in matrix multiplication");
     

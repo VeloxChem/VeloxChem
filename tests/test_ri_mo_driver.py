@@ -37,11 +37,11 @@ class TestRIMODriver:
         
         ri_fock_drv.prepare_buffers(mol_h2o, bas_sto3g, bas_aux, k_metric=True, verbose=True)
         
-        lambda_p = SubMatrix([0, 0, 7, 7], 0.1)
+        lambda_p = SubMatrix([0, 0, 7, 5], 0.7)
         
-        lambda_h = SubMatrix([0, 0, 7, 7], 0.3)
+        lambda_h = SubMatrix([0, 0, 7, 5], 0.3)
         
         mints = ri_fock_drv.compute_mo_bq_vectors(lambda_p, lambda_h)
        
-        #assert False
+        assert True
             
