@@ -435,7 +435,7 @@ export_general(py::module &m) -> void
         .def(
             "values",
              [](const CT3RectFlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
-                 const auto nrows = self.mask_indices().size();
+                 const auto nrows = (self.mask_indices().size() > 0) ? self.mask_indices().size() : self.width();
                  const auto ncols = self.width();
                  const auto nelems = static_cast<py::ssize_t>(nrows * ncols);
                  const auto tdim  = static_cast<py::ssize_t>(sizeof(double));

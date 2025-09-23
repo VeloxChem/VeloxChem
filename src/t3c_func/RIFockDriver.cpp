@@ -258,6 +258,11 @@ CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& l
         }
     }
     
+//    for (size_t i = 0; i < nmos * nmos; i++)
+//    {
+//        std::cout <<  bmats.data(0)[i] << std::endl;
+//    }
+   
     return bmats;
 }
 
