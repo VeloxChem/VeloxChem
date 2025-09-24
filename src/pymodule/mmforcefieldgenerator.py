@@ -1246,12 +1246,12 @@ class MMForceFieldGenerator:
         # Atomtypes analysis
 
         self.atoms, use_water_model, water_bonds, water_angles = self.populate_atoms(
-            water_model,
             use_xml,
             ff_data_dict,
             ff_data_lines,
             gaff_version,
             list(atomtypeidentifier.equivalent_atoms),
+            water_model,
         )
 
         self.bonds = self.populate_bonds(
@@ -1594,8 +1594,8 @@ class MMForceFieldGenerator:
                 }
         return impropers
 
-    def populate_atoms(self, water_model, use_xml, ff_data_dict, ff_data_lines,
-                       gaff_version, equivalent_atoms):
+    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines,
+                       gaff_version, equivalent_atoms, water_model):
 
         use_gaff = False
         use_uff = False
@@ -1639,10 +1639,7 @@ class MMForceFieldGenerator:
                             use_gaff = True
                             atom_type = gafftype
                             break
-
-            if not atom_type_found:
-                element = atom_type['uff'].strip()
-                gafftype = atom_type.get('gaff', '').strip()
+                        
                 if gafftype in ['ow', 'hw']:
                     assert_msg_critical(
                         water_model is not None,
@@ -1657,18 +1654,18 @@ class MMForceFieldGenerator:
                     epsilon = self.water_parameters[water_model][atom_type][
                         'epsilon']
 
-                    water_bonds = self.water_parameters[water_model]['bonds']
-                    water_angles = self.water_parameters[water_model]['angles']
-                    self.partial_charges = [
-                        self.water_parameters[water_model][a]['charge']
-                        for a in self.gaff_atom_types
-                    ]
+                    self.partial_charges[i] = self.water_parameters[water_model][
+                        atom_type]['charge']
+
                     atom_type_found = True
                     use_water_model = True
                     self.eq_param = False
                     comment = water_model
 
-                elif element in self.tm_parameters:
+            if not atom_type_found:
+                element = atom_type['uff'].strip()
+
+                if element in self.tm_parameters:
                     tmmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
                     tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.'  ##TODO: rephrase
                     self.ostream.print_info(tmmsg)
@@ -1708,6 +1705,9 @@ class MMForceFieldGenerator:
                 'comment': comment,
             }
             
+        if use_water_model:
+            water_bonds = self.water_parameters[water_model]['bonds']
+            water_angles = self.water_parameters[water_model]['angles']
         self.print_references(water_model, gaff_version, use_gaff, use_uff,
                               use_tm, use_water_model)
 
@@ -1804,7 +1804,12 @@ class MMForceFieldGenerator:
 
             if not bond_found:
                 # Default value for bonds
-                r, k_r, comment = r_eq, 2.5e+5, 'Guessed'
+                labels = self.molecule.get_labels()
+                if labels[i] == 'H' or labels[j] == 'H':
+                    k_r = 1e+5
+                else:
+                    k_r = 2.5e+5
+                r, comment = r_eq, 'Guessed'
 
             if self.eq_param:
                 if abs(r - r_eq) > self.r_thresh:

@@ -99,9 +99,9 @@ class TransitionStateGuesser():
         self.scf_drv = None
         self.folder_name = 'ts_data_' + str(int(time.time()))
         self.force_conformer_search = False
-        self.skip_discont_conformer_search = True
+        self.discont_conformer_search = False
         self.peak_conformer_search = False
-        self.peak_conformer_search_range = 0
+        self.peak_conformer_search_range = 1
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
@@ -320,7 +320,7 @@ class TransitionStateGuesser():
                             E_int[min_index + i] = E_int_cs[i]
                             N_conf[min_index + i] = N_conf_cs[i]
 
-                if not self.skip_discont_conformer_search:
+                if self.discont_conformer_search:
                     discont_indices = self._check_discontinuities(E1, E2)
 
                     while len(discont_indices) > 0 and len(
@@ -638,7 +638,7 @@ class TransitionStateGuesser():
             scf_results = self.scf_drv.compute(self.molecule, basis)
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
-    def show_results(self, ts_results=None, atom_indices=False, filename=None):
+    def show_results(self, ts_results=None, filename=None, **mol_show_kwargs):
         """Show the results of the transition state guesser.
         This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
 
@@ -688,7 +688,7 @@ class TransitionStateGuesser():
                 description='Lambda',
                 value=final_lambda,
             ),
-            atom_indices=ipywidgets.fixed(atom_indices),
+            **mol_show_kwargs,
         )
 
     def _show_iteration(
@@ -698,7 +698,7 @@ class TransitionStateGuesser():
         lambda_vec,
         step,
         scf_energies=None,
-        atom_indices=False,
+        **mol_show_kwargs,
     ):
         """
         Show the geometry at a specific iteration.
@@ -801,12 +801,12 @@ class TransitionStateGuesser():
             mol.show(
                 bonds=reactant_bonds | product_bonds,
                 dashed_bonds=changing_bonds,
-                atom_indices=atom_indices,
                 width=640,
                 height=360,
+                **mol_show_kwargs,
             )
         else:
-            mol.show(atom_indices=atom_indices, width=640, height=360)
+            mol.show(width=640, height=360, **mol_show_kwargs)
 
     def _mm_to_xyz_str(self, positions, molecule=None):
         if molecule is None:
@@ -931,6 +931,7 @@ class TransitionStateGuesser():
             self.ostream.print_header(f"folder name: {self.folder_name:>20}")
             self.ostream.print_header(
                 f"saving MD traj:        {str(self.save_mm_traj):>10}")
+            self.ostream.print_blank()
             # self.ostream.print_header(
             #     f"conf. search:   {str(conformer_search):>10}")
             valstr = '{} | {} | {} | {}'.format(
@@ -938,7 +939,6 @@ class TransitionStateGuesser():
                 '    E1',
                 '    E2',
                 '     V',
-                ' E_int',
             )
         else:
             if lambda_vals is None:
@@ -959,12 +959,12 @@ class TransitionStateGuesser():
             self.ostream.print_header(f"folder name: {self.folder_name:>20}")
             self.ostream.print_header(
                 f"saving MD traj:        {str(self.save_mm_traj):>10}")
+            self.ostream.print_blank()
             valstr = '{} | {} | {} | {} | {}'.format(
                 'Lambda',
                 '    E1',
                 '    E2',
                 '     V',
-                ' E_int',
                 'n_conf',
             )
         self.ostream.print_header(valstr)
@@ -975,7 +975,7 @@ class TransitionStateGuesser():
         if n_conf is None:
             valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}".format(l, e1, e2, v)
         else:
-            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:8}  {:8}".format(
+            valstr = "{:8.2f}  {:7.1f}  {:7.1f}  {:7.1f}  {:7}".format(
                 l, e1, e2, v, n_conf)
         self.ostream.print_header(valstr)
         self.ostream.flush()
