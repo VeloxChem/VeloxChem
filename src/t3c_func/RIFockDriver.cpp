@@ -207,23 +207,28 @@ CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& l
     
     CT3RectFlatBuffer<double> bmats(indices, nmos);
     
-//    std::cout << "Dims (MOs, NAOs, NAUXs): " << nmos << " , " << naos << " , " << naux << std::endl;
-//    
-//    std::cout << "K metric: " << _k_metric->number_of_rows() << " , " << _k_metric->number_of_columns() << std::endl;
-//    
-//    std::cout << "Rectangular buffer: " << bmats.width() << " , " << bmats.aux_width() << std::endl;
+    // set up pointers for OMP region
     
-    // allocate local matrices for transformation
+    auto ptr_bmats = &bmats;
     
-    CSubMatrix lmat({0, 0, nmos, nmos});
+    auto ptr_eri_buffer = &_eri_buffer;
     
-    CSubMatrix tmat({0, 0, naos, nmos});
+    auto ptr_lambda_h = &lambda_h;
     
-    CSubMatrix rmat({0, 0, naos, naos});
-    
+    auto ptr_lambda_p = &lambda_p;
+
+#pragma omp parallel for shared(ptr_bmats, ptr_eri_buffer, ptr_lambda_h, ptr_lambda_p, naos, nmos)
     for (size_t i = 0; i < naux; i++)
     {
-        const auto fmat_ptr = _eri_buffer.data(i);
+        // thread local matrices for transformation
+        
+        CSubMatrix lmat({0, 0, nmos, nmos});
+        
+        CSubMatrix tmat({0, 0, naos, nmos});
+        
+        CSubMatrix rmat({0, 0, naos, naos});
+        
+        const auto fmat_ptr = ptr_eri_buffer->data(i);
         
         // expand 3C into full square matrix for give auxilary index
         
@@ -241,13 +246,13 @@ CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& l
         
         // transform matrix
         
-        sdenblas::serialMultAB(tmat, rmat, lambda_h);
+        sdenblas::serialMultAB(tmat, rmat, *ptr_lambda_h);
         
-        sdenblas::serialMultAtB(lmat, lambda_p, tmat);
+        sdenblas::serialMultAtB(lmat, *ptr_lambda_p, tmat);
         
         // assign matrix
         
-        auto ptr_buffer = bmats.data(i);
+        auto ptr_buffer = ptr_bmats->data(i);
         
         auto ptr_lmat = lmat.data();
         
