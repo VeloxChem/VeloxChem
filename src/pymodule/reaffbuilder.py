@@ -491,7 +491,6 @@ class ReactionForceFieldBuilder():
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
-            combined_molecule.write_xyz_file(f"combined_{name}_{i}")
         combined_molecule.set_charge(charge)
         if total_multiplicity > -1:
             combined_molecule.set_multiplicity(total_multiplicity)
