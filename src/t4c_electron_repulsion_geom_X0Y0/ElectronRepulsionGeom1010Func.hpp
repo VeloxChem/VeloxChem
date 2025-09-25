@@ -403,7 +403,7 @@ compute_geom_1010(T&                               distributor,
     
     if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({3, 1})))
     {
-        erirec::comp_electron_repulsion_geom1010_ssdp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        erirec::comp_electron_repulsion_geom1010_ssfp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
         return;
     }
     
