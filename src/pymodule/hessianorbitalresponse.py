@@ -652,7 +652,8 @@ class HessianOrbitalResponse(CphfSolver):
 
         if self._embedding_hess_drv is not None:
             pe_fock_grad_contr = (
-                self._embedding_hess_drv.compute_pe_fock_gradient_contributions(i=i))
+                self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
+                    i=i))
             for x in range(3):
                 fmat_deriv[x] += pe_fock_grad_contr[x]
 

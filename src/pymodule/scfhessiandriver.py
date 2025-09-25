@@ -597,8 +597,9 @@ class ScfHessianDriver(HessianDriver):
             # for range-separated functionals
             if need_omega:
                 fock_hess_2000_rs = fock_hess_2000_drv.compute(
-                        ao_basis, screener_atom_i, screener, den_mat_for_fock,
-                        den_mat_for_fock2, i, 'kx_rs', erf_k_coef, omega, thresh_int)
+                    ao_basis, screener_atom_i, screener, den_mat_for_fock,
+                    den_mat_for_fock2, i, 'kx_rs', erf_k_coef, omega,
+                    thresh_int)
 
             # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
             xy_pairs_upper_triang = [
@@ -705,7 +706,8 @@ class ScfHessianDriver(HessianDriver):
             if need_omega:
                 fock_hess_1100_rs = fock_hess_1100_drv.compute(
                     ao_basis, screener_atom_pair, screener, den_mat_for_fock,
-                    den_mat_for_fock2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
+                    den_mat_for_fock2, i, j, 'kx_rs', erf_k_coef, omega,
+                    thresh_int)
 
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
@@ -722,8 +724,9 @@ class ScfHessianDriver(HessianDriver):
             # for range-separated functionals
             if need_omega:
                 fock_hess_1010_rs = fock_hess_1010_drv.compute(
-                    ao_basis, screener_atom_i, screener_atom_j, den_mat_for_fock2,
-                    den_mat_for_fock2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
+                    ao_basis, screener_atom_i, screener_atom_j,
+                    den_mat_for_fock2, den_mat_for_fock2, i, j, 'kx_rs',
+                    erf_k_coef, omega, thresh_int)
 
             # 'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
             xy_pairs = [(x, y) for x in range(3) for y in range(3)]
