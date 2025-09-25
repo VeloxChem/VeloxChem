@@ -491,12 +491,14 @@ class ScfHessianDriver(HessianDriver):
             exchange_scaling_factor = 1.0
             fock_factor = 1.0
 
-        # TODO: range-separated Fock
-        need_omega = (self._dft and self.scf_driver.xcfun.is_range_separated())
+        need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(
-                False, 'ScfHessianDriver: Not implemented for' +
-                ' range-separated functional')
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
         den_mat_for_fock = make_matrix(ao_basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
@@ -592,6 +594,12 @@ class ScfHessianDriver(HessianDriver):
                 den_mat_for_fock2, i, fock_type, exchange_scaling_factor, 0.0,
                 thresh_int)
 
+            # for range-separated functionals
+            if need_omega:
+                fock_hess_2000_rs = fock_hess_2000_drv.compute(
+                        ao_basis, screener_atom_i, screener, den_mat_for_fock,
+                        den_mat_for_fock2, i, 'kx_rs', erf_k_coef, omega, thresh_int)
+
             # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
             xy_pairs_upper_triang = [
                 (x, y) for x in range(3) for y in range(x, 3)
@@ -599,6 +607,9 @@ class ScfHessianDriver(HessianDriver):
 
             for idx, (x, y) in enumerate(xy_pairs_upper_triang):
                 hess_val = fock_factor * fock_hess_2000[idx]
+                if need_omega:
+                    # range-separated functional contribution
+                    hess_val -= fock_hess_2000_rs[idx]
                 hessian_2nd_order_derivatives[i, i, x, y] += hess_val
                 if x != y:
                     hessian_2nd_order_derivatives[i, i, y, x] += hess_val
@@ -690,6 +701,12 @@ class ScfHessianDriver(HessianDriver):
                 den_mat_for_fock2, i, j, fock_type, exchange_scaling_factor,
                 0.0, thresh_int)
 
+            # range-separated functionals
+            if need_omega:
+                fock_hess_1100_rs = fock_hess_1100_drv.compute(
+                    ao_basis, screener_atom_pair, screener, den_mat_for_fock,
+                    den_mat_for_fock2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
+
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
 
@@ -702,12 +719,22 @@ class ScfHessianDriver(HessianDriver):
                 den_mat_for_fock2, i, j, fock_type, exchange_scaling_factor,
                 0.0, thresh_int)
 
+            # for range-separated functionals
+            if need_omega:
+                fock_hess_1010_rs = fock_hess_1010_drv.compute(
+                    ao_basis, screener_atom_i, screener_atom_j, den_mat_for_fock2,
+                    den_mat_for_fock2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
+
             # 'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
             xy_pairs = [(x, y) for x in range(3) for y in range(3)]
 
             for idx, (x, y) in enumerate(xy_pairs):
                 hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * (
                     fock_hess_1100[idx] + fock_hess_1010[idx])
+                if need_omega:
+                    # range-separated functional contribution
+                    hessian_2nd_order_derivatives[i, j, x, y] -= (
+                        fock_hess_1100_rs[idx] + fock_hess_1010_rs[idx])
 
             # lower triangle is transpose of the upper part
             if i != j:
