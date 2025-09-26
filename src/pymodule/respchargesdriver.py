@@ -112,6 +112,7 @@ class RespChargesDriver:
         # method
         self.xcfun = None
         self.restart = True
+        self.scf_max_iter = None
 
         # conformers
         self.xyz_file = None
