@@ -521,6 +521,8 @@ class RespChargesDriver:
                 if self.filename is not None:
                     scf_drv.filename = self.filename
                 scf_drv.restart = self.restart
+                if self.scf_max_iter is not None:
+                    scf_drv.max_iter = self.scf_max_iter
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
                     scf_drv.xcfun = self.xcfun
