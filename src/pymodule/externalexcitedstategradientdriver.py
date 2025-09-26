@@ -296,7 +296,6 @@ conda activate vlxenv_new_compile
                     if root != 0:
                         gradients.append(gradients_qchem[f'excited_state_{root_to_extract}'])
 
-            print(gradients)
             return gradients
         except Exception as e:
             print(f"Error extracting gradients: {e}")
@@ -529,8 +528,13 @@ conda activate vlxenv_new_compile
                 root_str = ', '.join(map(str, self.roots_to_follow))
                 full_path = os.path.abspath(self.xyz_filename)
                 with open(input_file, 'w') as file:
-                    file.write('!wB97X-D3 ENGRAD def2-svp TIGHTSCF\n\n')
+                    if self.qm_driver.solvation[0] is True:
+                        file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
+                    else:
+                        file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD\n')
+                    # file.write(f'%moinp "current_input_excited.gbw"\n')
                     file.write(f'%TDDFT NROOTS {self.qm_driver.roots_to_check}\n')
+                    file.write(f'sf {self.qm_driver.spin_flip}\n')
                     file.write('SGRADLIST\n')
                     file.write(f'{root_str}\n')
                     file.write('NACME\n')
@@ -539,7 +543,7 @@ conda activate vlxenv_new_compile
                     file.write('%METHOD STORECISGRAD TRUE END\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
-                    file.write(f'nprocs {self.qm_driver.nprocs * 2}\n')
+                    file.write(f'nprocs {self.qm_driver.nprocs}\n')
                     file.write('END\n')
                     file.write(f'* xyzfile {self.qm_driver.charge} {self.qm_driver.spin} {full_path}\n')
         

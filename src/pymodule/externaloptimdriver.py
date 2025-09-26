@@ -42,7 +42,7 @@ from .molecule import Molecule
 from .clustermanager import ClusterManager
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
-
+from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
 
 class ExternalOptimDriver:
 
@@ -65,7 +65,7 @@ class ExternalOptimDriver:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-        self.nprocs = qm_driver.nprocs * 3
+        self.nprocs = qm_driver.nprocs
         # output stream
         self.ostream = ostream
         self.constraints = []
@@ -75,6 +75,10 @@ class ExternalOptimDriver:
         self.xc_func = qm_driver.xc_func
         self.basis_set_label = qm_driver.basis_set_label
         self.method = qm_driver.method
+        
+        self.qm_driver = qm_driver
+        self.root_to_optim = 0
+        self.roots_to_check = 10
 
         self.tracked_roots = None
         self.energies = None
@@ -402,9 +406,18 @@ conda activate vlxenv_simd_master
 
                 with open(input_file, 'w') as file:
                     if self.solvation[0] is True:
-                        file.write(f'!{self.method} {self.xc_func} {self.basis_set_label} OPT {self.solvation[1]}({self.solvation[2]})\n')
+                        file.write(f'!{self.xc_func} {self.basis_set_label} OPT {self.solvation[1]}({self.solvation[2]})\n')
                     else:
-                        file.write(f'!{self.method} {self.xc_func} {self.basis_set_label} OPT\n')
+                        file.write(f'!{self.xc_func} {self.basis_set_label} OPT\n')
+                    if isinstance(self.qm_driver, ExternalExcitedStatesScfDriver):
+                        file.write('%TDDFT\n')
+                        file.write(f'sf {self.qm_driver.spin_flip}\n')
+                        file.write(f'    NROOTS {self.roots_to_check}\n')
+                        file.write(f'    IROOT {self.root_to_optim}\n')
+                        # file.write(f'   FOLLOWIROOT True \n')
+                        file.write('END\n')
+                        
+
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')

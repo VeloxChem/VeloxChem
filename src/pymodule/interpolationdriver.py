@@ -30,6 +30,8 @@ import os
 import numpy as np
 import math
 import random
+import torch
+import gpytorch
 from scipy.optimize import linear_sum_assignment
 from scipy.linalg import cho_factor, cho_solve
 import sys
@@ -45,6 +47,7 @@ from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
+from .gprinterpolationdriver import GPRInterpolationDriver
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -102,11 +105,12 @@ class InterpolationDriver():
 
         # Create InterpolationDatapoint, z-matrix required!
         self.impes_coordinate = InterpolationDatapoint(z_matrix)#, self.comm,self.ostream)
-
+        self.gpr_intdriver = None
+        
         self.dihedral_function = None
         # simple or Shepard interpolation
         self.interpolation_type = 'shepard'
-        self.weightfunction_type = 'Cartesian'
+        self.weightfunction_type = 'cartesian'
         self.exponent_p = None
         self.scaling_time = False
         self.exponent_q = None
@@ -159,7 +163,7 @@ class InterpolationDriver():
                 'interpolation_type':
                     ('str', 'type of interpolation (simple/Shepard)'),
                 'weightfunction_type':
-                    ('str', 'type of interpolation (Cartesian/Cartesian-Hessian)'),
+                    ('str', 'type of interpolation (cartesian/cartesian-hessian)'),
                 'exponent_p': ('int', 'the main exponent'),
                 'exponent_q': ('int', 'the additional exponent (Shepard IM)'),
                 'confidence_radius': ('float', 'the confidence radius'),
@@ -802,7 +806,7 @@ class InterpolationDriver():
                     
                     sum_sym_dihedral = 0.0
                     sum_sym_dihedral_prime = np.zeros_like(data_point.cartesian_coordinates.reshape(-1))
-           
+
                     for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
 
                         if tuple(sorted(element)) in self.symmetry_information[7][3]:                                       
@@ -815,11 +819,11 @@ class InterpolationDriver():
 
 
                         elif tuple(sorted(element)) in self.symmetry_information[7][2]:
+                            
                             dist_check[i] = np.sin(dist_org[i])
                             sum_sym_dihedral += self.te_weight_general(dist_org[i], 2)
                             sum_sym_dihedral_prime += self.te_weight_gradient_general(dist_org[i], self.impes_coordinate.b_matrix[i,:], 2)      
                             dist_correlation[i] = 0.0
-
 
                         else:
                             
@@ -832,6 +836,7 @@ class InterpolationDriver():
                     self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
                     self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
                     self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_correlation[self.symmetry_information[-1][1]:]**2))))
+
 
                     if sum_sym_dihedral == 0.0:
                         continue
@@ -848,6 +853,7 @@ class InterpolationDriver():
 
                     potentials.append(pes)
                     dist_hessian = np.matmul(dist_check.T, hessian)
+
                     for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]):
                         
                         grad[i] *= np.cos(dist_org[i])
@@ -855,7 +861,6 @@ class InterpolationDriver():
                     
                     pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
                     pot_gradients.append(pes_prime)
-
                 
             # ---------------------------------------------------------------------------
             # 1. raw (unnormalised) Shepard weights and their gradients
@@ -1239,8 +1244,6 @@ class InterpolationDriver():
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
         weight_gradient[self.symmetry_information[3]] = weight_gradient_sub
         
-        
-
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
 
     def cartesian_hessian_distance(self, data_point):
@@ -1412,6 +1415,7 @@ class InterpolationDriver():
            leading to the large deviation.
         """
         constraints = []
+        print(len(datapoints), self.z_matrix, self.symmetry_information)
         for datapoint in datapoints:
             internal_coord_elem_distance = []
             org_interal_coord_elem_distance = []
@@ -1433,19 +1437,19 @@ class InterpolationDriver():
                     org_interal_coord_elem_distance.append(1.0)
                     internal_coord_elem_distance.append(self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx])
 
+    
             N = len(z_matrix)
 
             partial_energies = np.zeros(N)
             partial_gradient = np.zeros(N) 
 
-        
+            
+            
             # First handle linear parts
             for i in range(N):
                 partial_energies[i] += internal_coord_elem_distance[i] * datapoint.internal_gradient[i]
                 partial_gradient[i] += org_interal_coord_elem_distance[i] * datapoint.internal_gradient[i]
 
-
-            # Now handle quadratic parts (diagonal + cross)
             for i in range(N):
                 # Diagonal
                 partial_energies[i] += 0.5 * internal_coord_elem_distance[i] * datapoint.internal_hessian[i,i] * internal_coord_elem_distance[i]
@@ -1472,7 +1476,7 @@ class InterpolationDriver():
             pred_E, pred_G, _ = self.compute_potential(datapoint, self.impes_coordinate.internal_coordinates_values)
             pred_im_G_int = self.transform_gradient_to_internal_coordinates(molecule, pred_G, self.impes_coordinate.b_matrix)
             pred_qm_G_int = self.transform_gradient_to_internal_coordinates(molecule, qm_gradient, self.impes_coordinate.b_matrix)
-            print('Difference in the gradient', pred_im_G_int - pred_qm_G_int)
+ 
 
             print("max energy diff",
                 abs((E_pred_check - pred_E)))
@@ -1480,10 +1484,11 @@ class InterpolationDriver():
             g_pred_check = partial_gradient              # already Hartree/bohr
             max_grad_diff = np.max(np.abs(g_pred_check - pred_im_G_int))
             print("max grad diff", max_grad_diff)
-    
+
             delta_E = abs(qm_energy - pred_E)
             delta_G = np.linalg.norm(pred_qm_G_int - pred_im_G_int)
 
+            print(' \n\n Energy error with QM ', delta_E * hartree_in_kcalpermol(), delta_G)
             delta_g = pred_qm_G_int - pred_im_G_int
 
             single_energy_error = []
@@ -1494,14 +1499,19 @@ class InterpolationDriver():
 
             eps = 1e-12
 
+        
             abs_pE       = np.abs(partial_energies)
             
+            print('Partial energies', abs_pE, delta_g, abs_pE * np.abs(delta_g))
             wE_raw  = abs_pE * np.abs(delta_g)            # or: np.abs(Delta_q_eff * delta_g)
             w_E_1    = wE_raw / (wE_raw.sum() + eps)
             single_E_err_1 = delta_E * w_E_1
             
+            print('Sum weights 1', wE_raw, wE_raw.sum() + eps, w_E_1.sum(), sum(abs_pE), sum(abs_pg))
+
             w_E_2          = abs_pE / (abs_pE.sum() + eps)     # weights  Σw=1
             single_E_err = delta_E * w_E_2                     # each coord’s share
+
 
             print(' \n\n Energy error with QM 1: ', single_E_err_1 * hartree_in_kcalpermol(), 
                   "sum_1_kcal =", single_E_err_1.sum() * hartree_in_kcalpermol(), '2', single_E_err * hartree_in_kcalpermol(),
@@ -1655,3 +1665,40 @@ class InterpolationDriver():
             mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
         
         return [new_map], mapping_dict, assigned
+
+    def compute_internal_coordinates_values(self, coordinates):
+        """
+        Creates an array with the values of the internal coordinates
+        and saves it in self.
+        """
+
+        cartesian_coordinates = coordinates
+
+        n_atoms = cartesian_coordinates.shape[0]
+        coords = cartesian_coordinates.reshape((n_atoms * 3))
+
+        int_coords = []
+
+        internal_coordinates = []
+        for z in self.z_matrix:
+            
+            if len(z) == 2:
+                q = geometric.internal.Distance(*z)
+            elif len(z) == 3:
+                q = geometric.internal.Angle(*z)
+            elif len(z) == 4:
+                q = geometric.internal.Dihedral(*z)
+            else:
+                assert_msg_critical(False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
+            internal_coordinates.append(q)
+
+
+        for q in internal_coordinates:
+            if (isinstance(q, geometric.internal.Distance)):
+                int_coords.append(1.0 / q.value(coords))
+            else:
+                int_coords.append(q.value(coords))
+
+        X = np.array(int_coords)
+        return X
+    

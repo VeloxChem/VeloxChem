@@ -671,13 +671,20 @@ conda activate vlxenv_new_compile
                 current_root = root 
                 full_path = os.path.abspath(self.xyz_filename)
                 with open(input_file, 'w') as file:
-                    file.write('!wB97X-D3 freq def2-svp TIGHTSCF\n\n')
+                    basis_set = self.qm_driver.basis_set_label
+                    if "RIJK" in basis_set:
+                        basis_set = basis_set.replace("RIJK", "RIJCOSX")
+                    if self.qm_driver.solvation[0] is True:
+                        file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {basis_set} freq {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
+                    else:
+                        file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {basis_set} freq\n')
                     file.write(f'%TDDFT NROOTS {self.qm_driver.roots_to_check}\n')
+                    file.write(f'sf {self.qm_driver.spin_flip}\n')
                     file.write(f'IROOT {current_root}\n')
                     file.write('END\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
-                    file.write(f'nprocs {self.qm_driver.nprocs}\n')
+                    file.write(f'nprocs {self.qm_driver.nprocs * 3}\n')
                     file.write('END\n')
                     file.write(f'* xyzfile {self.qm_driver.charge} {self.qm_driver.spin} {full_path}\n')
             

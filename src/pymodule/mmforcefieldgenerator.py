@@ -121,6 +121,7 @@ class MMForceFieldGenerator:
         self.scan_xyz_files = None
         self.atom_types = None
         self.rotatable_bonds = []
+        self.excited_states_rot_bond = []
 
         # topology settings
         self.eq_param = True
@@ -1793,11 +1794,11 @@ class MMForceFieldGenerator:
             rotatable_bonds_types[bond_indices] = bond_types
 
         # Check if the rotatable bonds are indeed rotatable or not
-        updated_rotatable_bonds = self.check_rotatable_bonds(rotatable_bonds_types)
+        updated_rotatable_bonds, excitited_state_rot_bonds = self.check_rotatable_bonds(rotatable_bonds_types)
 
         # Create a 1-indexed list of rotatable bonds without duplicates
         self.rotatable_bonds = [[bond[0] + 1, bond[1] + 1] for bond in updated_rotatable_bonds.keys()]
-
+        self.excited_states_rot_bond = [[bond[0] + 1, bond[1] + 1] for bond in excitited_state_rot_bonds.keys()]
         # Impropers
 
         self.impropers = {}
@@ -2298,7 +2299,7 @@ class MMForceFieldGenerator:
             key: tuple of atom indices
             value: tuple of atom types
         """
-
+        es_rot_bond_type = rotatable_bonds_types.copy()
         non_rotatable_bonds = set()
         for atom1 in ['c2', 'n2', 'cc', 'ce', 'nc', 'ne']:
             for atom2 in ['c2', 'n2', 'cd', 'cf', 'nd', 'nf']:
@@ -2310,9 +2311,15 @@ class MMForceFieldGenerator:
                 non_rotatable_bonds.add((atom2, atom1))
         non_rotatable_bonds = list(non_rotatable_bonds)
 
+        excited_states_rotatable_bond = set()
+        for atom1 in ['c2', 'cc', 'ce']:  # sp2 carbons involved in double bonds
+            for atom2 in ['c2', 'cd', 'cf']:  # their corresponding partners
+                excited_states_rotatable_bond.add((atom1, atom2))
+                excited_states_rotatable_bond.add((atom2, atom1))
+
         # Identify bonds to delete based on criteria
         bonds_to_delete = []
-
+        es_bond_to_delete = []
         for (i, j), bond in rotatable_bonds_types.items():
             # Check if the bond is non-rotatable due to atom types
             if bond in non_rotatable_bonds:
@@ -2322,16 +2329,22 @@ class MMForceFieldGenerator:
             # Check if any side atom of the bond is involved in a triple bond
             if (bond[0] in ['c1','n1','cg','ch']) or (bond[1] in ['c1', 'n1','cg','ch']):
                 bonds_to_delete.append((i, j))
+                es_bond_to_delete.append((i, j))
+
                 continue
 
             # Check if the bond is part of a ring
             if self.is_bond_in_ring(i, j):
                 bonds_to_delete.append((i, j))
+                es_bond_to_delete.append((i, j))
                 continue
 
         # Remove identified non-rotatable bonds
         for key in bonds_to_delete:
             rotatable_bonds_types.pop(key, None)
+
+        for key in es_bond_to_delete:
+            es_rot_bond_type.pop(key, None)
 
         # Exclude bonds involving terminal atoms
         bonds_to_delete = []
@@ -2342,11 +2355,19 @@ class MMForceFieldGenerator:
             if len(atom_i_connections) == 1 or len(atom_j_connections) == 1:
                 bonds_to_delete.append((i, j))
 
-        # Remove terminal atom bonds
-        for key in bonds_to_delete:
-            rotatable_bonds_types.pop(key, None)
+        es_bonds_to_delete = []
+        for (i, j), bond in es_rot_bond_type.items():
+            atom_i_connections = np.where(self.connectivity_matrix[i] == 1)[0]
+            atom_j_connections = np.where(self.connectivity_matrix[j] == 1)[0]
 
-        return rotatable_bonds_types
+            if len(atom_i_connections) == 1 or len(atom_j_connections) == 1:
+                es_bonds_to_delete.append((i, j))
+
+        # Remove terminal atom bonds
+        for key in es_bonds_to_delete:
+            es_rot_bond_type.pop(key, None)
+
+        return rotatable_bonds_types, es_rot_bond_type
 
     def is_bond_in_ring(self, atom_i, atom_j):
         """

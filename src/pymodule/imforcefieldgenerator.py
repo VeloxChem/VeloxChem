@@ -195,7 +195,7 @@ class IMForceFieldGenerator:
         self.symmetry_information = None
         self.symmetry_dihedral_lists = {}
 
-        self.drivers = {'ground_state': None, 'excited_state':None}
+        self.drivers = {'gs': None, 'es':None}
 
         if isinstance(ground_state_driver, ScfRestrictedDriver):
         # should be necessary to initialize
@@ -203,7 +203,7 @@ class IMForceFieldGenerator:
             qm_grad_driver = ScfGradientDriver(ground_state_driver)
             qm_hess_driver = ScfHessianDriver(ground_state_driver)
             
-            self.drivers['ground_state'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
+            self.drivers['gs'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
         ##########################################################
         ################# External Settings ######################
         ##########################################################
@@ -211,13 +211,13 @@ class IMForceFieldGenerator:
         if isinstance(ground_state_driver, ExternalScfDriver):
             qm_grad_driver = ExternalGradientDriver(ground_state_driver)
             qm_hess_driver = ExternalHessianDriver(ground_state_driver)
-            self.drivers['ground_state'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
+            self.drivers['gs'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
         
         if isinstance(excited_state_driver, ExternalExcitedStatesScfDriver):
             
             excited_state_gradient_driver = ExternalExcitedStatesGradientDriver(excited_state_driver)
             excited_state_hessian_driver = ExternalExcitedStatesHessianDriver(excited_state_driver)
-            self.drivers['excited_state'] = (excited_state_driver, excited_state_gradient_driver, excited_state_hessian_driver)
+            self.drivers['es'] = (excited_state_driver, excited_state_gradient_driver, excited_state_hessian_driver)
 
         self.states_interpolation_settings = {root: None for root in roots_to_follow}
         self.states_data_point_density = {root: None for root in roots_to_follow}
@@ -287,7 +287,7 @@ class IMForceFieldGenerator:
         self.add_structures_along_rcs = False
         self.use_symmetry = True
         self.identfy_relevant_int_coordinates = True
-        self.add_bayes_model = True
+        self.add_gpr_model = True
         self.use_opt_confidence_radius = [False, 'single', 0.5]
 
 
@@ -482,7 +482,7 @@ class IMForceFieldGenerator:
             self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
         else:
             int_driver = InterpolationDriver()
-            int_driver.imforcefield_file = self.imforcefieldfiles[0]
+            int_driver.imforcefield_file = self.imforcefieldfiles[self.roots_to_follow[0]]
             _, self.z_matrix = int_driver.read_labels()
 
         angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), len(self.z_matrix))
@@ -509,7 +509,10 @@ class IMForceFieldGenerator:
         ff_gen.create_topology(molecule)
 
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+        es_rotatable_bonds = deepcopy(ff_gen.excited_states_rot_bond)
         dihedrals_dict = deepcopy(ff_gen.dihedrals)
+
+        rotatable_bonds.extend(es_rotatable_bonds)
 
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
@@ -518,10 +521,9 @@ class IMForceFieldGenerator:
 
         regrouped, rot_groups = regroup_by_rotatable_connection(molecule, symmetry_groups_ref, rotatable_bonds_zero_based, molecule.get_connectivity_matrix())
 
-        
         self.symmetry_information = {'gs': (), 'es': ()}
         for root in self.roots_to_follow:
-            if root == 0:
+            if root == 0 or root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
         
                 non_core_atoms = [element for group in regrouped['gs'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
@@ -538,9 +540,25 @@ class IMForceFieldGenerator:
                 self.symmetry_information['gs'] = (symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
 
 
-            if root == 1:
+            if root == 1 and self.drivers['es'] is None and self.drivers['es'][0].spin_flip is False:
+                non_core_atoms = [element for group in regrouped['gs'] for element in group]
+                core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
+                angles_to_set, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups['gs'], rotatable_bonds_zero_based)
+                dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
+                indices_list = []
+                for key, dihedral_list in self.symmetry_dihedral_lists.items():
+                
+                    for i, element in enumerate(self.z_matrix[dihedral_index:], start=dihedral_index):
+
+                        if tuple(sorted(element)) in dihedral_list:
+                            indices_list.append(i)
+
+                self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
+
+            if root >= 2 and len(self.symmetry_information['es']) == 0 and self.drivers['es']:
                 non_core_atoms = [element for group in regrouped['es'] for element in group]
                 core_atoms = [element for element in symmetry_groups[0] if element not in non_core_atoms]
+                print(rot_groups['es'], rotatable_bonds_zero_based)
                 angles_to_set, _, _, self.symmetry_dihedral_lists = self.adjust_symmetry_dihedrals(molecule, rot_groups['es'], rotatable_bonds_zero_based)
                 dihedrals_to_set = {key: [] for key in angles_to_set.keys()}
                 indices_list = []
@@ -553,10 +571,14 @@ class IMForceFieldGenerator:
 
                 self.symmetry_information['es'] = (symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [angle_index, dihedral_index])
 
-
+        
         if self.reaction_molecules_dict is not None and extract_z_matrix is None:
-            self.atom_transfer_reaction_path = self.determine_atom_transfer_reaction_path(self.reaction_molecules_dict['reactants'], self.reaction_molecules_dict['products'])
+            for entry in self.reaction_molecules_dict:
+                if entry['root'] not in self.atom_transfer_reaction_path:
 
+                    self.atom_transfer_reaction_path = {entry['root']: []}
+                self.atom_transfer_reaction_path[entry['root']].append(self.determine_atom_transfer_reaction_path(entry['reactants'], entry['products']))
+            
         if self.add_conformal_structures:
 
             rotatable_dihedrals_dict = {}
@@ -630,7 +652,6 @@ class IMForceFieldGenerator:
             
             self.conformal_structures = {None : conformal_structures['molecules']}
 
-
     def compute(self, molecule, basis):
 
         """
@@ -645,7 +666,13 @@ class IMForceFieldGenerator:
         to expand/generate the interpolation forcefield with new data points.
 
         """
-        
+
+        # if self.drivers['gs'] is not None or self.drivers['es'] is not None and self.drivers['es'][0].spin_flip and 0 in self.roots_to_follow:
+        #     print('The root 1 is a spin flip state -> therefore the simulation for that stat is done based on the ground state driver')
+        #     print('The root 0 is not a TRUE state in spin flip therefore all the roots need to be lifted by 1 accordingly!')
+        #     assert_msg_critical(False, 'Spin flip calculations are only possible for excited states -> therefore root 0 cannot be followed in a spin flip calculation! /n ' \
+        #     'provide the excited_state_driver and the root 1 in order to run the ground state dynamics in the spin flip case!')
+            
         # First set up the system for which the database needs to be constructed
         root_extract_z_matrix = None
         if self.imforcefieldfiles is not None:
@@ -676,6 +703,7 @@ class IMForceFieldGenerator:
             'potential energy surface of the ground state!')
 
             for root in self.roots_to_follow:
+                    
                 imforcefieldfile = self.imforcefieldfiles[root]
                 self.states_interpolation_settings[root] = { 'interpolation_type':self.interpolation_type,
                                     'weightfunction_type':self.weightfunction_type,
@@ -686,20 +714,67 @@ class IMForceFieldGenerator:
                                     'use_inverse_bond_length':True
                                 }
                 
-            self.dynamics_settings = {  'drivers': self.drivers,
+            self.dynamics_settings = {  'drivers':self.drivers,
                                         'basis_set_label': basis.get_main_basis_label(),
                                         'duration':self.duration, 'temperature':self.temperature, 'solvent':self.solvent,
                                         'pressure':self.force_constant, 'force_constant': self.force_constant, 'ensemble':self.ensemble,
                                         'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
-                                        'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
+                                        'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file, 'reference_struc_energy_file':self.reference_struc_energy_file,
                                         'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 
                                         'energy_threshold':self.energy_threshold, 'grad_rmsd_thrsh': self.gradient_rmsd_thrsh, 'force_orient_thrsh':self.force_orient_thrsh,
                                         'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow, 'excitation_pulse':self.excitation_pulse}
+            
             files_to_add_conf = []
             for root in self.roots_to_follow:
 
                 if not os.path.exists(self.imforcefieldfiles[root]):
                     files_to_add_conf.append(root)
+            
+            if self.atom_transfer_reaction_path is not None and len(files_to_add_conf) != 0:
+
+                for ts_root, reaction_mol in self.atom_transfer_reaction_path.items():
+                    
+                    if self.use_minimized_structures[0]:       
+                        
+                        if ts_root == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
+                        
+                            opt_qm_driver = ScfRestrictedDriver()
+                            opt_qm_driver.xcfun = 'b3lyp'
+                            opt_drv = OptimizationDriver(opt_qm_driver)
+                            current_basis = MolecularBasis.read(reaction_mol, 'def2-svp')
+                            _, scf_results = self.compute_energy(opt_qm_driver, reaction_mol, current_basis)
+                            opt_drv.ostream.mute()
+                            
+                            opt_constraint_list = []
+                            for constraint in self.use_minimized_structures[1]:
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                                
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            opt_drv.constraints = opt_constraint_list
+
+                            opt_results = opt_drv.compute(reaction_mol, current_basis, scf_results)
+                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                            mol = optimized_molecule
+                            print(optimized_molecule.get_xyz_string())
+                        elif ts_root == 0 and isinstance(self.drivers['gs'][0], ExternalScfDriver):
+                            optim_driver = ExternalOptimDriver(self.drivers['gs'][0])
+                            optim_driver.constraints = self.use_minimized_structures[1]
+                            opt_mol_string, energy = optim_driver.optimize(reaction_mol)
+                
+                            optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                            mol = optimized_molecule
+                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                        
+                        current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
+                        self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
             
             if self.add_conformal_structures and len(files_to_add_conf) != 0:
                 for counter, entry in enumerate(self.conformal_structures.items()):
@@ -727,35 +802,85 @@ class IMForceFieldGenerator:
 
                         
                         current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
-                        self.add_point(mol, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+                        self.add_point(mol, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
                         if self.z_matrix is None:
                             self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
                         print('Molecule added to the database',  self.density_of_datapoints)
 
             elif not self.add_conformal_structures and len(files_to_add_conf) != 0:
                 
+                molecules_to_add_info = []
                 if self.use_minimized_structures[0]:       
-                    opt_qm_driver = ScfRestrictedDriver()
-                    opt_qm_driver.xcfun = 'b3lyp'
-                    opt_drv = OptimizationDriver(opt_qm_driver)
-                    current_basis = MolecularBasis.read(molecule, 'def2-svp')
-                    _, scf_results = self.compute_energy(opt_qm_driver, molecule, current_basis)
-                    opt_drv.ostream.mute()
-                    opt_results = opt_drv.compute(molecule, current_basis, scf_results)
-                    optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                    molecule = optimized_molecule
-                    print(optimized_molecule.get_xyz_string())
+                    for opt_roots in self.roots_to_follow:
+                        if opt_roots not in files_to_add_conf:
+                            continue
+                        root_to_add = opt_roots
+                        if opt_roots == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
                         
-                current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
-                self.add_point(molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
-                print(molecule.get_xyz_string())
-                if self.z_matrix is None:
-                    self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
-                print('Molecule added to the database',  self.density_of_datapoints)
-            
+                            opt_qm_driver = ScfRestrictedDriver()
+                            opt_qm_driver.xcfun = 'b3lyp'
+                            opt_drv = OptimizationDriver(opt_qm_driver)
+                            current_basis = MolecularBasis.read(molecule, 'def2-svp')
+                            _, scf_results = self.compute_energy(opt_qm_driver, molecule, current_basis)
+                            opt_drv.ostream.mute()
+                            
+                            opt_constraint_list = []
+                            for constraint in self.use_minimized_structures[1]:
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0] + 1} {constraint[1] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                                
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0] + 1} {constraint[1] + 1} {constraint[2] + 1} {constraint[3] + 1}"
+                                    opt_constraint_list.append(opt_constraint)
+                            opt_drv.constraints = opt_constraint_list
+                            
+                            opt_results = opt_drv.compute(molecule, current_basis, scf_results)
+                            energy = opt_results['opt_energies'][-1]
+                            optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                            molecule = optimized_molecule
 
-            self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
-            
+                        elif opt_roots == 0 and isinstance(self.drivers['gs'][0], ExternalScfDriver):
+
+                            optim_driver = ExternalOptimDriver(self.drivers['gs'][0])
+                            optim_driver.constraints = self.use_minimized_structures[1]
+                            opt_mol_string, energy = optim_driver.optimize(molecule)
+                            optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                            molecule = optimized_molecule
+
+                        
+                        
+                        elif opt_roots > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
+
+                            optim_driver = ExternalOptimDriver(self.drivers['es'][0])
+                            optim_driver.constraints = self.use_minimized_structures[1]
+                            optim_driver.root_to_optim = opt_roots
+                            opt_mol_string, energy = optim_driver.optimize(molecule)
+                            optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                            molecule = optimized_molecule
+
+
+
+                        current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
+                        molecules_to_add_info.append((molecule, current_basis, [root_to_add]))
+
+                    self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+
+                    
+                else:
+                    current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
+                    molecules_to_add_info.append((molecule, current_basis, files_to_add_conf))
+                    self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+                   
+
+            self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)    
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
             self.states_data_point_density = density_of_datapoints
             
@@ -778,13 +903,14 @@ class IMForceFieldGenerator:
                         im_database_driver.distance_thrsh = self.distance_thrsh
                         im_database_driver.non_core_symmetry_groups = self.symmetry_information
                         im_database_driver.starting_state = state
+                    
                         im_database_driver.platform = 'CUDA'
 
                         im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])
                         im_database_driver.use_symmetry = self.use_symmetry
                         im_database_driver.ghost_atom = self.ghost_atom
 
-                        im_database_driver.add_bayes_model = self.add_bayes_model
+                        im_database_driver.add_gpr_model = self.add_gpr_model
 
                         im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
         
@@ -857,14 +983,18 @@ class IMForceFieldGenerator:
                                         'energy_threshold':self.energy_threshold, 'grad_rmsd_thrsh': self.gradient_rmsd_thrsh, 'force_orient_thrsh':self.force_orient_thrsh,
                                         'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow}
             
-            
+            files_to_add_conf = []
+
+            if not os.path.exists(self.imforcefieldfiles[self.roots_to_follow[0]]):
+                    files_to_add_conf.append(self.roots_to_follow[0])
+
             if self.atom_transfer_reaction_path is not None and not os.path.exists(imforcefieldfile):
 
                 for reaction_mol in self.atom_transfer_reaction_path:
                     
                     if self.use_minimized_structures[0]:       
-                    
-                        if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                        optimized_molecule = None
+                        if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
                         
                             opt_qm_driver = ScfRestrictedDriver()
                             opt_qm_driver.xcfun = 'b3lyp'
@@ -890,19 +1020,28 @@ class IMForceFieldGenerator:
 
                             opt_results = opt_drv.compute(reaction_mol, current_basis, scf_results)
                             optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                            mol = optimized_molecule
+
                             print(optimized_molecule.get_xyz_string())
-                        elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
-                            optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                        elif self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ExternalScfDriver):
+                            optim_driver = ExternalOptimDriver(self.drivers['gs'][0])
                             optim_driver.constraints = self.use_minimized_structures[1]
                             opt_mol_string, energy = optim_driver.optimize(reaction_mol)
                 
                             optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-                            mol = optimized_molecule
+        
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                
+
+                        elif self.roots_to_follow[0] > 1 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
+
+                            optim_driver = ExternalOptimDriver(self.drivers['es'][0])
+                            optim_driver.constraints = self.use_minimized_structures[1]
+                            optim_driver.root_to_optim = self.roots_to_follow[0]
+                            opt_mol_string, energy  = optim_driver.optimize(mol)
+                            optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                           
+
                         current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
-                        self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+                        self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
 
 
 
@@ -912,8 +1051,8 @@ class IMForceFieldGenerator:
                     for i, mol in enumerate(molecules):
 
                         if self.use_minimized_structures[0]:       
-                    
-                            if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                            optimized_molecule = None
+                            if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
                             
                                 opt_qm_driver = ScfRestrictedDriver()
                                 opt_qm_driver.xcfun = 'b3lyp'
@@ -939,26 +1078,36 @@ class IMForceFieldGenerator:
                                 
                                 opt_results = opt_drv.compute(molecule, current_basis, scf_results)
                                 optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                                mol = optimized_molecule
+
                                 print(optimized_molecule.get_xyz_string())
 
-                            elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
+                            elif self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ExternalScfDriver):
 
-                                optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                                optim_driver = ExternalOptimDriver(self.drivers['gs'][0])
                                 optim_driver.constraints = self.use_minimized_structures[1]
                                 opt_mol_string, energy  = optim_driver.optimize(mol)
                                 optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-                                mol = optimized_molecule
+
+                                print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', mol.get_xyz_string())
+                            
+                            elif self.roots_to_follow[0] > 1 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
+
+                                optim_driver = ExternalOptimDriver(self.drivers['es'][0])
+                                optim_driver.constraints = self.use_minimized_structures[1]
+                                optim_driver.root_to_optim = self.roots_to_follow[0]
+                                opt_mol_string, energy  = optim_driver.optimize(mol)
+                                optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+
                                 print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', mol.get_xyz_string())
                     
-                        current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
-                        self.add_point(mol, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+                        current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
+                        self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
             
             elif not self.add_conformal_structures and not os.path.exists(imforcefieldfile):
                 
                 if self.use_minimized_structures[0]:       
-                    
-                    if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                    optimized_molecule = None
+                    if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
                     
                         opt_qm_driver = ScfRestrictedDriver()
                         opt_qm_driver.xcfun = 'b3lyp'
@@ -985,24 +1134,41 @@ class IMForceFieldGenerator:
                         opt_results = opt_drv.compute(molecule, current_basis, scf_results)
                         energy = opt_results['opt_energies'][-1]
                         optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
-                        molecule = optimized_molecule
+
                         print(optimized_molecule.get_xyz_string())
 
-                    elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
+                    elif self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ExternalScfDriver):
 
-                        optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                        optim_driver = ExternalOptimDriver(self.drivers['gs'][0])
                         optim_driver.constraints = self.use_minimized_structures[1]
                         opt_mol_string, energy = optim_driver.optimize(molecule)
                         optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-                        molecule = optimized_molecule
+
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
 
-                current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
-                self.add_point(molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
-                print(molecule.get_xyz_string())
-                if self.z_matrix is None:
-                    self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
-                print('Molecule added to the database',  self.density_of_datapoints)
+                    elif self.roots_to_follow[0] > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
+
+                        optim_driver = ExternalOptimDriver(self.drivers['es'][0])
+                        optim_driver.constraints = self.use_minimized_structures[1]
+                        optim_driver.root_to_optim = self.roots_to_follow[0]
+                        opt_mol_string, energy = optim_driver.optimize(molecule)
+                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+
+                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+
+                        current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
+                        self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
+                        print(molecule.get_xyz_string())
+                        if self.z_matrix is None:
+                            self.z_matrix = self.define_z_matrix(optimized_molecule, self.reaction_coordinates)
+                        print('Molecule added to the database',  self.density_of_datapoints)
+                else:
+                    current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
+                    self.add_point(molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
+                    print(molecule.get_xyz_string())
+                    if self.z_matrix is None:
+                        self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
+                    print('Molecule added to the database',  self.density_of_datapoints)
 
 
             self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
@@ -1021,11 +1187,11 @@ class IMForceFieldGenerator:
                             if self.use_minimized_structures[0]:   
                                 energy = None
                                 self.use_minimized_structures[1].append(key)
-                                if isinstance(self.drivers['ground_state'][0], ScfRestrictedDriver):
+                                if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
 
-                                    opt_drv = OptimizationDriver(self.drivers['ground_state'][0])
+                                    opt_drv = OptimizationDriver(self.drivers['gs'][0])
                                     current_basis = MolecularBasis.read(mol, 'def2-svp')
-                                    _, scf_results = self.compute_energy(self.drivers['ground_state'][0], mol, current_basis)
+                                    _, scf_results = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
                                     opt_drv.ostream.mute()
                                     
                                     opt_constraint_list = []
@@ -1047,19 +1213,19 @@ class IMForceFieldGenerator:
                                     optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                                     energy = opt_results['opt_energies'][-1]
                                     print(optimized_molecule.get_xyz_string())
-                                elif isinstance(self.drivers['ground_state'][0], ExternalScfDriver):
-                                    optim_driver = ExternalOptimDriver(self.drivers['ground_state'][0])
+                                elif self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ExternalScfDriver):
+                                    optim_driver = ExternalOptimDriver(self.drivers['gs'][0])
                                     optim_driver.constraints = self.use_minimized_structures[1]
                                     opt_mol_string, energy = optim_driver.optimize(mol)
                                     optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
                                     print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
-                            
-                            current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
+                                    mol = optimized_molecule
+                            current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
                             
                             if self.roots_to_follow[0] == 0 and energy is None:
-                                energy, scf_results = self.compute_energy(self.drivers['ground_state'][0], optimized_molecule, current_basis)
+                                energy, scf_results = self.compute_energy(self.drivers['gs'][0], mol, current_basis)
                             elif self.roots_to_follow[0] > 0 and energy is None:
-                                energy, scf_results = self.compute_energy(self.drivers['excited_state'][0], optimized_molecule, current_basis)
+                                energy, scf_results = self.compute_energy(self.drivers['es'][0], mol, current_basis)
                             impes_driver = InterpolationDriver(self.z_matrix)
                             impes_driver.update_settings(self.states_interpolation_settings[self.roots_to_follow[0]])
                             if self.roots_to_follow[0] == 0:
@@ -1121,7 +1287,7 @@ class IMForceFieldGenerator:
                         im_database_driver.identfy_relevant_int_coordinates = (self.identfy_relevant_int_coordinates, self.use_minimized_structures[1])
                         im_database_driver.use_symmetry = self.use_symmetry
 
-                        im_database_driver.add_bayes_model = self.add_bayes_model
+                        im_database_driver.add_gpr_model = self.add_gpr_model
                         im_database_driver.ghost_atom = self.ghost_atom
                         im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
                         
@@ -1604,9 +1770,9 @@ class IMForceFieldGenerator:
             database_quality = False
             drivers = None
             if root == 0:
-                drivers = self.drivers['ground_state']
+                drivers = self.drivers['gs']
             else:
-                drivers = self.drivers['excited_state']
+                drivers = self.drivers['es']
             all_structures = given_molecular_strucutres[root]
             current_datafile = states_interpolation_settings[root]['imforcefield_file']
             datapoint_molecules, _ = self.database_extracter(current_datafile, molecule.get_labels())
@@ -1696,9 +1862,9 @@ class IMForceFieldGenerator:
                         print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
                 
                 # if self.roots_to_follow[0] == 0 and energy is None:
-                #     energy, scf_results = self.compute_energy(self.drivers['ground_state'][0], optimized_molecule, current_basis)
+                #     energy, scf_results = self.compute_energy(self.drivers['gs'][0], optimized_molecule, current_basis)
                 # elif self.roots_to_follow[0] > 0 and energy is None:
-                #     energy, scf_results = self.compute_energy(self.drivers['excited_state'][0], optimized_molecule, current_basis)
+                #     energy, scf_results = self.compute_energy(self.drivers['es'][0], optimized_molecule, current_basis)
                 impes_driver = InterpolationDriver(self.z_matrix)
                 impes_driver.update_settings(states_interpolation_settings[root])
                 if root == 0:
@@ -1978,7 +2144,7 @@ class IMForceFieldGenerator:
         return z_matrix
     
 
-    def add_point(self, molecule, basis, interpolation_settings, symmetry_information={}, files_to_add=None):
+    def add_point(self, molecule_specific_information, interpolation_settings, symmetry_information={}):
         """ Adds a new point to the database.
 
             :param molecule:
@@ -2001,14 +2167,18 @@ class IMForceFieldGenerator:
         symmetry_mapping_groups = []
         symmetry_exclusion_groups = []
 
- 
-        if len(symmetry_information) != 0:
 
-            for key, sym_inf in symmetry_information.items():
-                if 'gs' == key and 0 in self.roots_to_follow and len(sym_inf[2]) != 0:
+        if len(symmetry_information) != 0:
+            
+            for entries in molecule_specific_information:
+                molecule = entries[0]
+                basis = entries[1]
+                states = entries[2]
+                symmetry_point = False
+                if 0 in states and len(symmetry_information['gs'][2]) != 0 or 1 in states and self.drivers['es'][0].spin_flip and len(symmetry_information['gs'][2]) != 0:
                     symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
-                    symmetry_exclusion_groups = [item for element in sym_inf[1] for item in element]
-                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, sym_inf[1], sym_inf[5])
+                    symmetry_exclusion_groups = [item for element in symmetry_information['gs'][1] for item in element]
+                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['gs'][1], symmetry_information['gs'][5])
                     
                     # Generate all combinations
                     keys = list(sym_dihedrals.keys())
@@ -2034,13 +2204,14 @@ class IMForceFieldGenerator:
                             if self.symmetry_information is not None:
                                 print('opt_dihedral_angle', opt_dihedral_angle)
                                 self.symmetry_information['gs'][8][dihedral].append(opt_dihedral_angle)
-
+                        if i > 0:
+                            symmetry_point = True
                         current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
-                        adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change))
-                elif 'es' == key and any(x > 0 for x in self.roots_to_follow) and len(sym_inf[2]) != 0:
+                        adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
+                if 1 in states and len(symmetry_information['es'][2]) != 0 and self.drivers['es'][0].spin_flip is False:
                     symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
-                    symmetry_exclusion_groups = [item for element in sym_inf[1] for item in element]
-                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, sym_inf[1], sym_inf[5])
+                    symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
+                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['es'][1], symmetry_information['es'][5])
                     
                     # Generate all combinations
                     keys = list(sym_dihedrals.keys())
@@ -2062,228 +2233,468 @@ class IMForceFieldGenerator:
                             if self.symmetry_information is not None:
                                 self.symmetry_information['es'][8][dihedral].append(opt_dihedral_angle + angle)
 
+                        if i > 0:
+                            symmetry_point = True
                         current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
-                        adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change))
-                else:
-                    adjusted_molecule[key].append((molecule, basis, 1, None)) 
-        
-        else:
-            adjusted_molecule['gs'].append((molecule, basis, 1, None))  
-            adjusted_molecule['es'].append((molecule, basis, 1, None))  
-        
-        for state, key in enumerate(self.drivers.keys()):
-
-            drivers = None
+                        adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
+                elif any(x > 1 for x in states) and len(symmetry_information['es'][2]) != 0 and 1 in states and self.drivers['es'][0].spin_flip is True:
+                    symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
+                    symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
+                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['es'][1], symmetry_information['es'][5])
                     
-            if state == 0 and self.drivers[key] is not None and 0 in self.roots_to_follow:
-                drivers = self.drivers[key]
-                if files_to_add is not None and 0 not in files_to_add:
-                    continue
+                    # Generate all combinations
+                    keys = list(sym_dihedrals.keys())
+                    values = list(sym_dihedrals.values())
+                    combinations = list(itertools.product(*values))
 
-            elif state == 1 and self.drivers['excited_state'] is not None and any(x > 0 for x in self.roots_to_follow):
-                drivers = self.drivers[key]
-                if files_to_add is not None and any(n == 0 for n in files_to_add):
-                    continue
-            else:
-                continue
-            
-            for mol_state, entries in adjusted_molecule.items():
-                if state == 0 and mol_state != 'gs':
-                    continue
-                if state == 1 and mol_state != 'es':
-                    continue
+                    # Convert to list of dictionaries
+                    molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
+                    print('MOlecule configs', molecule_configs)
+                    for i, molecule_config in enumerate(molecule_configs):
+                        cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                        dihedral_to_change = []
+                        for dihedral, angle in molecule_config.items():
+                            print('Dihedral', dihedral)
+                            opt_dihedral_angle = cur_molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
+                            cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
+                            dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+                            print('påt_dihedral', opt_dihedral_angle + angle)
+                            if self.symmetry_information is not None:
+                                self.symmetry_information['es'][8][dihedral].append(opt_dihedral_angle + angle)
 
-                for label_counter, mol_basis in enumerate(entries):
-
-                    energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
-                    gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
-                    hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
-
-                    masses = molecule.get_masses().copy()
-                    masses_cart = np.repeat(masses, 3)
-                    inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-                    
-
-                    for number in range(len(energies)):
-                        if files_to_add is not None and (state + number) not in files_to_add:
-                            continue
-                        interpolation_driver = InterpolationDriver()
-                        interpolation_driver.update_settings(interpolation_settings[state + self.roots_to_follow[number]])
-                        interpolation_driver.imforcefield_file = interpolation_settings[state + self.roots_to_follow[number]]['imforcefield_file']
-                        if self.z_matrix is None:
-                            self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
-                        sorted_labels = []
-                        if interpolation_settings[state + self.roots_to_follow[number]]['imforcefield_file'] in os.listdir(os.getcwd()):
-                            org_labels, self.z_matrix = interpolation_driver.read_labels()
-                            labels = [label for label in org_labels if '_symmetry' not in label]
-                            sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
+                        if i > 0:
+                            symmetry_point = True
+                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                        adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
                 
-                        label = None
-                        grad = gradients[number].copy()
-                        hess = hessians[number].copy()
+                else:
+                    if 0 in entries[2]:
+                        adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point)) 
+                    if any(x > 0 for x in entries[2]): 
+                        states = [state for state in entries[2] if state > 0]
+                        adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point)) 
+        # else:
+        #     adjusted_molecule['gs'].append((molecule, basis, 1, None))  
+        #     adjusted_molecule['es'].append((molecule, basis, 1, None))  
 
 
-                        if self.ghost_atom[0]:
+        for key, entries in adjusted_molecule.items():
+            if len(entries) == 0:
+                continue
+            print(key, entries)
+            drivers = self.drivers[key]
 
-                            # All DOFs: 0 to 17
-                            n_atoms = len(molecule.get_labels()) + 1
-                            full_cart_indices = np.arange(3 * n_atoms)
 
-                            # Cartesian indices to remove: 3 * ghost_atom_index + [0, 1, 2]
-                            ghost_cartesian_indices = np.arange(3 * self.ghost_atom[1], 3 * self.ghost_atom[1] + 3)
+            org_roots = None
+            if isinstance(drivers[0], ExternalExcitedStatesScfDriver):
+                org_roots = drivers[0].roots.copy()           
 
-                            # Remaining indices
-                            indices = np.setdiff1d(full_cart_indices, ghost_cartesian_indices)
+            label_counter = 0
+            for mol_basis in entries:
+                if isinstance(drivers[0], ExternalExcitedStatesScfDriver):
+                    root_to_follow_calc = mol_basis[4]
+                    # if self.drivers['es'][0].spin_flip is True:
+                    #     root_to_follow_calc = [root for root in mol_basis[4]]
 
-                            grad = grad.reshape(-1)  # if it's (6, 3), flatten to (18,)
-                            grad = grad[indices].reshape(-1, 3) 
-                            hess = hess[np.ix_(indices, indices)]  # shape will now be (15, 15)
+                    drivers[0].roots = root_to_follow_calc            
+                    drivers[1].roots_to_follow = root_to_follow_calc 
+                    drivers[2].roots_to_follow = root_to_follow_calc 
+                
+                energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
+                print('Energies one', energies)
+                # gradients = [np.zeros((len(mol_basis[0].get_labels()), 3)) for _ in range(len(energies))]
+                # hessians = [np.zeros((3 * len(mol_basis[0].get_labels()), 3 * len(mol_basis[0].get_labels()))) for _ in range(len(energies))]
+                gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
+                hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
+        
+                for number in range(len(energies)):
+    
+                    interpolation_driver = InterpolationDriver()
+                    interpolation_driver.update_settings(interpolation_settings[mol_basis[4][number]])
+                    interpolation_driver.imforcefield_file = interpolation_settings[mol_basis[4][number]]['imforcefield_file']
+                    if self.z_matrix is None:
+                        self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
+                    sorted_labels = []
+                    if interpolation_settings[mol_basis[4][number]]['imforcefield_file'] in os.listdir(os.getcwd()):
+                        org_labels, self.z_matrix = interpolation_driver.read_labels()
+                        labels = [label for label in org_labels if '_symmetry' not in label]
+                        sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
+            
+                    label = None
+                    grad = gradients[number].copy()
+                    hess = hessians[number].copy()
+                    if self.ghost_atom[0]:
+                        # All DOFs: 0 to 17
+                        n_atoms = len(molecule.get_labels()) + 1
+                        full_cart_indices = np.arange(3 * n_atoms)
+                        # Cartesian indices to remove: 3 * ghost_atom_index + [0, 1, 2]
+                        ghost_cartesian_indices = np.arange(3 * self.ghost_atom[1], 3 * self.ghost_atom[1] + 3)
+                        # Remaining indices
+                        indices = np.setdiff1d(full_cart_indices, ghost_cartesian_indices)
+                        grad = grad.reshape(-1)  # if it's (6, 3), flatten to (18,)
+                        grad = grad[indices].reshape(-1, 3) 
+                        hess = hess[np.ix_(indices, indices)]  # shape will now be (15, 15)
+                       
+                    # grad_mw = grad / np.sqrt(masses)[:, None]
+                    # H_mw = hess * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
+                    
+    
+                    if mol_basis[5] == False:
+                        label = f'point_{len(sorted_labels) + 1}'
+                        old_label = f'point_{len(sorted_labels) + 1}'
+                        current_label = f'point_{len(sorted_labels) + 1}'
+                    else:
+                        label = f'{old_label}_symmetry_{label_counter}'
+                    impes_coordinate = InterpolationDatapoint(self.z_matrix)
+                    impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
+                    # impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+                    impes_coordinate.energy = energies[number]
+                    impes_coordinate.gradient = grad
+                    impes_coordinate.hessian = hess
+                    impes_coordinate.transform_gradient_and_hessian()
+                    # for i, element in enumerate(self.z_matrix[symmetry_information['gs'][-1][1]:], start=symmetry_information['gs'][-1][1]):
+                        
+                    #     if set([element[0] + 1, element[1] + 1, element[2] + 1, element[3] + 1]) == set(mol_basis[3][0]):
+                            
+                    #         specific_hessian_entry = np.linalg.multi_dot([impes_coordinate.b_matrix[i, :].T, H_mw, impes_coordinate.b_matrix[i, :]])
+                    #         print('Hessina spec dihedral curvature', specific_hessian_entry)
+
+                    print('Org Molecules', mol_basis[0].get_xyz_string())
+                    if mol_basis[2] > 1:
+                        
+                        rotation_combinations = None
+                        
+                        if mol_basis[2] == 3:
+                            from itertools import product
+                            rotations = [0.0, 2*np.pi/3, 4*np.pi/3]
+                            dihedrals = mol_basis[3]  # your list of rotatable dihedrals
+                            rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+                        
+                        if mol_basis[2] == 2:
+                            from itertools import product
+                            rotations = [0.0, np.pi]
+                            dihedrals = mol_basis[3]  # your list of rotatable dihedrals
+                            rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+                        print('rot comb', rotation_combinations)
+                        
+                        org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                        masks = [org_mask]
+                        for combo in rotation_combinations:
+                            if all(r == 0 for r in combo):
+                                continue  # skip the base geometry if desired
+                            
+                                
+                            rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
+                            for angle, dihedral in zip(combo, dihedrals):
+                                print('dihedral', angle, dihedral, (mol_basis[0].get_dihedral(dihedral, 'radian')))
+                                rot_mol.set_dihedral(dihedral, mol_basis[0].get_dihedral(dihedral, 'radian') - angle, 'radian')
+                                print('dihedral', np.cos(3.0 * mol_basis[0].get_dihedral(dihedral, 'radian')), np.cos(3.0 * (mol_basis[0].get_dihedral(dihedral, 'radian') - angle)))
+                            print('rot_molecules', combo, rot_mol.get_xyz_string())
+                            target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
+                            reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
+                            
+                            target_coordinates_core = target_coordinates.copy()
+                            reference_coordinates_core = reference_coordinates.copy()
+                                
+                            target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
+                            reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
+                            rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
+                                                                    reference_coordinates_core)
+                            # Rotate the data point
+                            rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+                            rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
+                            mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
+                                                                                mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
+                            
+                            
+                            z_matrix_dict = {tuple(sorted(element)): i 
+                                for i, element in enumerate(impes_coordinate.z_matrix)}
+                            
+                            mapping_dict = [mapping_dict_12]
+                            
+                            print(mapping_dict)
+                            reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
+        
+                            for ord in range(len(mapping_dict)):
+                                mask = []
+                                inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
+                                reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
+                                for i, element in enumerate(impes_coordinate.z_matrix):
+                                    # Otherwise, reorder the element
+                                    reordered_element = [inverse_mapping.get(x, x) for x in element]
+                                    key = tuple(sorted(reordered_element))
+                                    z_mat_index = z_matrix_dict.get(key)
+                                    mask.append(z_mat_index)
+                                    reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
+                                # impes_coordinate_2 = InterpolationDatapoint(z_matrix)
+                                # impes_coordinate_2.cartesian_coordinates = new_molecule.get_coordinates_in_bohr()
+                                # impes_coordinate_2.inv_sqrt_masses = inv_sqrt_masses
+                                # impes_coordinate_2.energy = energies_2[number]
+                                # impes_coordinate_2.gradient = grad_mw_2
+                                # impes_coordinate_2.hessian = H_mw_2
+                                # impes_coordinate_2.transform_gradient_and_hessian()
+                                
+                                
+                                # print(impes_coordinate.internal_coordinates_values[mask] - impes_coordinate_2.internal_coordinates_values)
+                                # print(impes_coordinate_2.internal_hessian[0] - impes_coordinate.internal_hessian[np.ix_(mask, mask)][0])
+                                # print('gradient', impes_coordinate_2.internal_gradient - impes_coordinate.internal_gradient[mask])
+                                # print('grad', grad_mw - grad_mw_2)
+                                # exit()
+                                
+                                reorded_int_coords.append(reorded_int_coord)
+                                masks.append(mask)
+                            
+
+                        impes_coordinate.mapping_masks = masks
+                    else:
+                        org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+                        masks = [org_mask]
+                        impes_coordinate.mapping_masks = masks
+                            
+                    # trust_radius = impes_coordinate.determine_trust_radius(molecule, self.interpolation_settings, self.dynamics_settings, label, specific_coordiante, self.allowed_deviation, sym_inf=self.symmetry_information)
+                    trust_radius = self.use_opt_confidence_radius[2]
+                    impes_coordinate.confidence_radius = trust_radius
+                    
+                    impes_coordinate.write_hdf5(interpolation_settings[mol_basis[4][number]]['imforcefield_file'], label)
+                    interpolation_driver.imforcefield_file = interpolation_settings[mol_basis[4][number]]['imforcefield_file']
+                    
+                    labels, z_matrix = interpolation_driver.read_labels()
+                    
+                    print(f"Database expansion with {', '.join(labels)}")
+
+                drivers[0].roots_to_follow = org_roots
+                drivers[1].roots_to_follow = org_roots
+                drivers[2].roots_to_follow = org_roots
+                label_counter += 1
+
+
+        # for state, key in enumerate(self.drivers.keys()):
+        #     roots_to_follow_changed = False
+        #     drivers = None
+        #     identification_state = state        
+        #     if state == 0 and self.drivers[key] is not None and 0 in self.roots_to_follow:
+        #         drivers = self.drivers[key]
+        #         if files_to_add is not None and 0 not in files_to_add:
+        #             continue
+
+        #     elif state == 1 and self.drivers['es'] is not None and any(x > 0 for x in self.roots_to_follow):
+        #         drivers = self.drivers[key]
+        #         if 0 not in self.roots_to_follow:
+        #             identification_state = 0
+        #         if files_to_add is not None and any(n == 0 for n in files_to_add):
+        #             continue
+        #         elif len(files_to_add) != self.roots_to_follow:
+        #             drivers[1].roots_to_follow = files_to_add
+        #             drivers[2].roots_to_follow = files_to_add
+        #             roots_to_follow_changed = True
+
+        #     else:
+        #         continue
+            
+            
+        #     for mol_state, entries in adjusted_molecule.items():
+        #         if state == 0 and mol_state != 'gs':
+        #             continue
+        #         if state == 1 and mol_state != 'es':
+        #             continue
+
+        #         for label_counter, mol_basis in enumerate(entries):
+
+        #             energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
+        #             gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
+        #             hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
+
+
+        #             masses = molecule.get_masses().copy()
+        #             masses_cart = np.repeat(masses, 3)
+        #             inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
+                    
+
+        #             for number in range(len(energies)):
+        #                 if files_to_add is not None and (identification_state + self.roots_to_follow[number]) not in files_to_add:
+        #                     continue
+        #                 interpolation_driver = InterpolationDriver()
+        #                 interpolation_driver.update_settings(interpolation_settings[identification_state + self.roots_to_follow[number]])
+        #                 interpolation_driver.imforcefield_file = interpolation_settings[identification_state + self.roots_to_follow[number]]['imforcefield_file']
+        #                 if self.z_matrix is None:
+        #                     self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
+        #                 sorted_labels = []
+        #                 if interpolation_settings[identification_state + self.roots_to_follow[number]]['imforcefield_file'] in os.listdir(os.getcwd()):
+        #                     org_labels, self.z_matrix = interpolation_driver.read_labels()
+        #                     labels = [label for label in org_labels if '_symmetry' not in label]
+        #                     sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
+                
+        #                 label = None
+        #                 grad = gradients[number].copy()
+        #                 hess = hessians[number].copy()
+
+
+        #                 if self.ghost_atom[0]:
+
+        #                     # All DOFs: 0 to 17
+        #                     n_atoms = len(molecule.get_labels()) + 1
+        #                     full_cart_indices = np.arange(3 * n_atoms)
+
+        #                     # Cartesian indices to remove: 3 * ghost_atom_index + [0, 1, 2]
+        #                     ghost_cartesian_indices = np.arange(3 * self.ghost_atom[1], 3 * self.ghost_atom[1] + 3)
+
+        #                     # Remaining indices
+        #                     indices = np.setdiff1d(full_cart_indices, ghost_cartesian_indices)
+
+        #                     grad = grad.reshape(-1)  # if it's (6, 3), flatten to (18,)
+        #                     grad = grad[indices].reshape(-1, 3) 
+        #                     hess = hess[np.ix_(indices, indices)]  # shape will now be (15, 15)
 
                            
 
-                        grad_mw = grad / np.sqrt(masses)[:, None]
-                        H_mw = hess * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
+        #                 grad_mw = grad / np.sqrt(masses)[:, None]
+        #                 H_mw = hess * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
                         
         
-                        if label_counter == 0:
-                            label = f'point_{len(sorted_labels) + 1}'
-                            old_label = f'point_{len(sorted_labels) + 1}'
-                            current_label = f'point_{len(sorted_labels) + 1}'
-                        else:
-                            label = f'{old_label}_symmetry_{label_counter}'
-                        impes_coordinate = InterpolationDatapoint(self.z_matrix)
-                        impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
-                        # impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-                        impes_coordinate.energy = energies[number]
-                        impes_coordinate.gradient = grad
-                        impes_coordinate.hessian = hess
-                        impes_coordinate.transform_gradient_and_hessian()
+        #                 if label_counter == 0:
+        #                     label = f'point_{len(sorted_labels) + 1}'
+        #                     old_label = f'point_{len(sorted_labels) + 1}'
+        #                     current_label = f'point_{len(sorted_labels) + 1}'
+        #                 else:
+        #                     label = f'{old_label}_symmetry_{label_counter}'
+        #                 impes_coordinate = InterpolationDatapoint(self.z_matrix)
+        #                 impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
+        #                 # impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+        #                 impes_coordinate.energy = energies[number]
+        #                 impes_coordinate.gradient = grad
+        #                 impes_coordinate.hessian = hess
+        #                 impes_coordinate.transform_gradient_and_hessian()
 
-                        # for i, element in enumerate(self.z_matrix[symmetry_information['gs'][-1][1]:], start=symmetry_information['gs'][-1][1]):
+        #                 # for i, element in enumerate(self.z_matrix[symmetry_information['gs'][-1][1]:], start=symmetry_information['gs'][-1][1]):
                             
-                        #     if set([element[0] + 1, element[1] + 1, element[2] + 1, element[3] + 1]) == set(mol_basis[3][0]):
+        #                 #     if set([element[0] + 1, element[1] + 1, element[2] + 1, element[3] + 1]) == set(mol_basis[3][0]):
                                 
-                        #         specific_hessian_entry = np.linalg.multi_dot([impes_coordinate.b_matrix[i, :].T, H_mw, impes_coordinate.b_matrix[i, :]])
-                        #         print('Hessina spec dihedral curvature', specific_hessian_entry)
+        #                 #         specific_hessian_entry = np.linalg.multi_dot([impes_coordinate.b_matrix[i, :].T, H_mw, impes_coordinate.b_matrix[i, :]])
+        #                 #         print('Hessina spec dihedral curvature', specific_hessian_entry)
    
 
 
-                        print('Org Molecules', mol_basis[0].get_xyz_string())
+        #                 print('Org Molecules', mol_basis[0].get_xyz_string())
 
-                        if mol_basis[2] > 1:
+        #                 if mol_basis[2] > 1:
                             
-                            rotation_combinations = None
+        #                     rotation_combinations = None
                             
-                            if mol_basis[2] == 3:
-                                from itertools import product
-                                rotations = [0.0, 2*np.pi/3, 4*np.pi/3]
-                                dihedrals = mol_basis[3]  # your list of rotatable dihedrals
-                                rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+        #                     if mol_basis[2] == 3:
+        #                         from itertools import product
+        #                         rotations = [0.0, 2*np.pi/3, 4*np.pi/3]
+        #                         dihedrals = mol_basis[3]  # your list of rotatable dihedrals
+        #                         rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
                             
-                            if mol_basis[2] == 2:
-                                from itertools import product
-                                rotations = [0.0, np.pi]
-                                dihedrals = mol_basis[3]  # your list of rotatable dihedrals
-                                rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
-                            print('rot comb', rotation_combinations)
+        #                     if mol_basis[2] == 2:
+        #                         from itertools import product
+        #                         rotations = [0.0, np.pi]
+        #                         dihedrals = mol_basis[3]  # your list of rotatable dihedrals
+        #                         rotation_combinations = list(product(rotations, repeat=len(dihedrals)))
+        #                     print('rot comb', rotation_combinations)
                             
 
-                            org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                            masks = [org_mask]
-                            for combo in rotation_combinations:
-                                if all(r == 0 for r in combo):
-                                    continue  # skip the base geometry if desired
+        #                     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+        #                     masks = [org_mask]
+        #                     for combo in rotation_combinations:
+        #                         if all(r == 0 for r in combo):
+        #                             continue  # skip the base geometry if desired
                                 
                                     
-                                rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
-                                for angle, dihedral in zip(combo, dihedrals):
-                                    print('dihedral', angle, dihedral, (mol_basis[0].get_dihedral(dihedral, 'radian')))
-                                    rot_mol.set_dihedral(dihedral, mol_basis[0].get_dihedral(dihedral, 'radian') - angle, 'radian')
-                                    print('dihedral', np.cos(3.0 * mol_basis[0].get_dihedral(dihedral, 'radian')), np.cos(3.0 * (mol_basis[0].get_dihedral(dihedral, 'radian') - angle)))
+        #                         rot_mol = Molecule(self.molecule.get_labels(), mol_basis[0].get_coordinates_in_bohr(), 'bohr')
+        #                         for angle, dihedral in zip(combo, dihedrals):
+        #                             print('dihedral', angle, dihedral, (mol_basis[0].get_dihedral(dihedral, 'radian')))
+        #                             rot_mol.set_dihedral(dihedral, mol_basis[0].get_dihedral(dihedral, 'radian') - angle, 'radian')
+        #                             print('dihedral', np.cos(3.0 * mol_basis[0].get_dihedral(dihedral, 'radian')), np.cos(3.0 * (mol_basis[0].get_dihedral(dihedral, 'radian') - angle)))
 
-                                print('rot_molecules', combo, rot_mol.get_xyz_string())
-                                target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
-                                reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
+        #                         print('rot_molecules', combo, rot_mol.get_xyz_string())
+        #                         target_coordinates = self.calculate_translation_coordinates(rot_mol.get_coordinates_in_bohr())
+        #                         reference_coordinates = self.calculate_translation_coordinates(mol_basis[0].get_coordinates_in_bohr())
                                 
-                                target_coordinates_core = target_coordinates.copy()
-                                reference_coordinates_core = reference_coordinates.copy()
+        #                         target_coordinates_core = target_coordinates.copy()
+        #                         reference_coordinates_core = reference_coordinates.copy()
 
                                     
-                                target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
-                                reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
+        #                         target_coordinates_core = np.delete(target_coordinates, symmetry_exclusion_groups, axis=0)
+        #                         reference_coordinates_core = np.delete(reference_coordinates, symmetry_exclusion_groups, axis=0)
 
-                                rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
-                                                                        reference_coordinates_core)
+        #                         rotation_matrix = geometric.rotate.get_rot(target_coordinates_core,
+        #                                                                 reference_coordinates_core)
 
-                                # Rotate the data point
-                                rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
-                                rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
+        #                         # Rotate the data point
+        #                         rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+        #                         rotated_coordinates = np.ascontiguousarray(rotated_coordinates)
 
-                                mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
-                                                                                    mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
+        #                         mapping_dict_12 = self.perform_symmetry_assignment(symmetry_mapping_groups, symmetry_exclusion_groups, 
+        #                                                                             mol_basis[0].get_coordinates_in_bohr()[symmetry_exclusion_groups], rotated_coordinates[symmetry_exclusion_groups])
                                 
                                 
-                                z_matrix_dict = {tuple(sorted(element)): i 
-                                    for i, element in enumerate(impes_coordinate.z_matrix)}
+        #                         z_matrix_dict = {tuple(sorted(element)): i 
+        #                             for i, element in enumerate(impes_coordinate.z_matrix)}
                                 
-                                mapping_dict = [mapping_dict_12]
+        #                         mapping_dict = [mapping_dict_12]
                                 
-                                print(mapping_dict)
+        #                         print(mapping_dict)
 
-                                reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
+        #                         reorded_int_coords = [impes_coordinate.internal_coordinates_values.copy()]
             
-                                for ord in range(len(mapping_dict)):
-                                    mask = []
-                                    inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
-                                    reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
-                                    for i, element in enumerate(impes_coordinate.z_matrix):
-                                        # Otherwise, reorder the element
-                                        reordered_element = [inverse_mapping.get(x, x) for x in element]
-                                        key = tuple(sorted(reordered_element))
-                                        z_mat_index = z_matrix_dict.get(key)
-                                        mask.append(z_mat_index)
-                                        reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
+        #                         for ord in range(len(mapping_dict)):
+        #                             mask = []
+        #                             inverse_mapping = {v: k for k, v in mapping_dict[ord].items()}
+        #                             reorded_int_coord = np.zeros_like(impes_coordinate.internal_coordinates_values)
+        #                             for i, element in enumerate(impes_coordinate.z_matrix):
+        #                                 # Otherwise, reorder the element
+        #                                 reordered_element = [inverse_mapping.get(x, x) for x in element]
+        #                                 key = tuple(sorted(reordered_element))
+        #                                 z_mat_index = z_matrix_dict.get(key)
+        #                                 mask.append(z_mat_index)
+        #                                 reorded_int_coord[i] = (float(reorded_int_coords[0][z_mat_index]))
 
-                                    # impes_coordinate_2 = InterpolationDatapoint(z_matrix)
-                                    # impes_coordinate_2.cartesian_coordinates = new_molecule.get_coordinates_in_bohr()
-                                    # impes_coordinate_2.inv_sqrt_masses = inv_sqrt_masses
-                                    # impes_coordinate_2.energy = energies_2[number]
-                                    # impes_coordinate_2.gradient = grad_mw_2
-                                    # impes_coordinate_2.hessian = H_mw_2
-                                    # impes_coordinate_2.transform_gradient_and_hessian()
+        #                             # impes_coordinate_2 = InterpolationDatapoint(z_matrix)
+        #                             # impes_coordinate_2.cartesian_coordinates = new_molecule.get_coordinates_in_bohr()
+        #                             # impes_coordinate_2.inv_sqrt_masses = inv_sqrt_masses
+        #                             # impes_coordinate_2.energy = energies_2[number]
+        #                             # impes_coordinate_2.gradient = grad_mw_2
+        #                             # impes_coordinate_2.hessian = H_mw_2
+        #                             # impes_coordinate_2.transform_gradient_and_hessian()
                                     
                                     
-                                    # print(impes_coordinate.internal_coordinates_values[mask] - impes_coordinate_2.internal_coordinates_values)
-                                    # print(impes_coordinate_2.internal_hessian[0] - impes_coordinate.internal_hessian[np.ix_(mask, mask)][0])
-                                    # print('gradient', impes_coordinate_2.internal_gradient - impes_coordinate.internal_gradient[mask])
-                                    # print('grad', grad_mw - grad_mw_2)
-                                    # exit()
+        #                             # print(impes_coordinate.internal_coordinates_values[mask] - impes_coordinate_2.internal_coordinates_values)
+        #                             # print(impes_coordinate_2.internal_hessian[0] - impes_coordinate.internal_hessian[np.ix_(mask, mask)][0])
+        #                             # print('gradient', impes_coordinate_2.internal_gradient - impes_coordinate.internal_gradient[mask])
+        #                             # print('grad', grad_mw - grad_mw_2)
+        #                             # exit()
                                     
-                                    reorded_int_coords.append(reorded_int_coord)
-                                    masks.append(mask)
+        #                             reorded_int_coords.append(reorded_int_coord)
+        #                             masks.append(mask)
                                 
 
     
-                            impes_coordinate.mapping_masks = masks
-                        else:
-                            org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
-                            masks = [org_mask]
-                            impes_coordinate.mapping_masks = masks
+        #                     impes_coordinate.mapping_masks = masks
+        #                 else:
+        #                     org_mask = [i for i in range(len(impes_coordinate.z_matrix))]
+        #                     masks = [org_mask]
+        #                     impes_coordinate.mapping_masks = masks
 
                                 
 
-                        # trust_radius = impes_coordinate.determine_trust_radius(molecule, self.interpolation_settings, self.dynamics_settings, label, specific_coordiante, self.allowed_deviation, sym_inf=self.symmetry_information)
-                        trust_radius = self.use_opt_confidence_radius[2]
-                        impes_coordinate.confidence_radius = trust_radius
+        #                 # trust_radius = impes_coordinate.determine_trust_radius(molecule, self.interpolation_settings, self.dynamics_settings, label, specific_coordiante, self.allowed_deviation, sym_inf=self.symmetry_information)
+        #                 trust_radius = self.use_opt_confidence_radius[2]
+        #                 impes_coordinate.confidence_radius = trust_radius
                         
-                        impes_coordinate.write_hdf5(interpolation_settings[state + self.roots_to_follow[number]]['imforcefield_file'], label)
+        #                 impes_coordinate.write_hdf5(interpolation_settings[identification_state + self.roots_to_follow[number]]['imforcefield_file'], label)
 
-                        interpolation_driver.imforcefield_file = interpolation_settings[state + self.roots_to_follow[number]]['imforcefield_file']
+        #                 interpolation_driver.imforcefield_file = interpolation_settings[identification_state + self.roots_to_follow[number]]['imforcefield_file']
                         
-                        labels, z_matrix = interpolation_driver.read_labels()
+        #                 labels, z_matrix = interpolation_driver.read_labels()
                         
-                        print(f"Database expansion with {', '.join(labels)}")
-    
+        #                 print(f"Database expansion with {', '.join(labels)}")
+
+        #         if roots_to_follow_changed:
+        #             drivers[1].roots_to_follow = files_to_add
+        #             drivers[2].roots_to_follow = files_to_add
+        #             roots_to_follow_changed = False
+
     def calculate_translation_coordinates(self, cart_coord):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
         center = np.mean(cart_coord, axis=0)
@@ -2340,21 +2751,22 @@ class IMForceFieldGenerator:
              
             symmetry_group_dihedral_list = symmetry_group_dihedral(symmetry_group, all_dihedrals, rot_bonds)
             symmetry_group_dihedral_dict[tuple(symmetry_group)] = symmetry_group_dihedral_list
-
+            print('dihedral list', symmetry_group_dihedral_list)
+            
             if len(symmetry_group) == 3:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
-                angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/3.0])
 
-                periodicities[symmetry_group_dihedral_list[0]] = 3
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 3
                 dihedral_groups[3].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
 
             elif len(symmetry_group) == 2:
 
                 # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
-                angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/2.0])
+                angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/2.0])
 
-                periodicities[symmetry_group_dihedral_list[0]] = 2
+                periodicities[tuple(symmetry_group_dihedral_list[0])] = 2
                 dihedral_groups[2].extend([tuple(sorted(element, reverse=False)) for element in symmetry_group_dihedral_list])
 
         return angles_to_set, periodicities, symmetry_group_dihedral_dict, dihedral_groups       

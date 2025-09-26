@@ -70,9 +70,11 @@ class ExternalExcitedStatesScfDriver:
         self.ostream = ostream
         self.charge = charge
         self.spin = multiplicity
-
+        
+        self.dispersion = 'D3'
         self.xc_func = 'pbe0'
         self.basis_set_label = 'def2-svp'
+        self.add_ghost_atom = False
 
         roots_to_follow_rm_gs = [x for x in roots_to_follow if x != 0]
 
@@ -84,6 +86,7 @@ class ExternalExcitedStatesScfDriver:
         self.roots_to_check = 10
         self.energies = None
         self.method = None
+        self.solvation = (False, 'CPCM', 'water')
         self.spin_flip = False
         self.NAC = False
         self.cluster = False
@@ -271,6 +274,8 @@ conda activate vlxenv_simd_master
         """
         energies = []
         gs_energy = 0
+        spin_multplicity = []
+        spin_s2_values = []
         try:
             if self.program == 'MOLCAS':
                 with open(self.output_filename, 'r') as file:
@@ -290,19 +295,40 @@ conda activate vlxenv_simd_master
 
                 with open(self.output_files[0], 'r') as file:
                     content = file.read()
-                excited_state_match = re.search(r'Total Energy\s*:\s*([-0-9.]+)', content)
-                if excited_state_match:
-                    gs_energy = float(excited_state_match.group(1))
-                else:
-                    print("Excited state energy not found.")
-            
-                state_energy_matches = re.findall(r'STATE\s+\d+:\s+E=\s+([-0-9.]+)\s+au', content)
-                if state_energy_matches:
+                
+                if self.spin_flip is False:
+                    excited_state_match = re.search(r'Total Energy\s*:\s*([-0-9.]+)', content)
+                    if excited_state_match:
+                        gs_energy = float(excited_state_match.group(1))
+                    else:
+                        print("Excited state energy not found.")
+                
+                    state_energy_matches = re.findall(r'STATE\s+\d+:\s+E=\s+([-0-9.]+)\s+au', content)
+                    if state_energy_matches:
 
-                    # Convert all matched state energies to float and add to the list
-                    energies.extend([float(energy) + gs_energy for energy in state_energy_matches])
+                        # Convert all matched state energies to float and add to the list
+                        energies.extend([float(energy) + gs_energy for energy in state_energy_matches])
+                    else:
+                        print("Excited state energy not found.")
                 else:
-                    print("Excited state energy not found.")
+                    excited_state_match = re.search(r'Total Energy\s*:\s*([-0-9.]+)', content)
+                    if excited_state_match:
+                        gs_energy = float(excited_state_match.group(1))
+                    else:
+                        print("Excited state energy not found.")
+                    s2_values = re.findall(r'<S\*\*2>\s+=\s+([-0-9.]+)', content)
+                    multi_values = re.findall(r'<S\*\*2>\s*=.*?Mult\s+([-0-9.]+)', content)
+                    
+                    spin_s2_values = [float(s2_value) for s2_value in s2_values]
+                    spin_multplicity = [float(multi_val) for multi_val in multi_values]
+
+                    state_energy_matches = re.findall(r'STATE\s+\d+:\s+E=\s+([-0-9.]+)\s+au', content)
+                    if state_energy_matches:
+                        # Convert all matched state energies to float and add to the list
+                        energies.extend([float(energy) + gs_energy for energy in state_energy_matches])
+                    else:
+                        print("Excited state energy not found.")
+                    
 
             elif self.program == 'QCHEM':
                 energies = []
@@ -342,20 +368,19 @@ conda activate vlxenv_simd_master
                 print('Here is the spin_multi', spin_multplicity)
 
 
+            energies = sorted(energies)
 
-            lowest_values = energies
-
-            indices = np.argsort(energies)[:self.roots_to_check]
-            # Get the corresponding values of the n smallest elements
-            lowest_values = [(i, energies[i]) for i in indices]
             if self.spin_flip is True:
-                lowest_values = [(i, energies[i]) for i in indices if spin_multplicity[i] < 0.1 or spin_multplicity[i] > 1.9]
+                energies = [energies[i] for i in range(len(energies)) if spin_s2_values[i] < 0.1 or spin_s2_values[i] > 1.9]
+
+            # indices = np.argsort(energies)[:self.roots_to_check]
+            # # Get the corresponding values of the n smallest elements
+            # lowest_values = [(i, energies[i]) for i in indices]
+            
             #reordered_spin_multiplicity = [spin_multplicity[i] for i in indices]
             
-            reordered_energies = [lowest_value[1] for lowest_value in lowest_values if lowest_value[0] + 1 in self.roots]
-            self.tracked_roots = [lowest_value[0] for lowest_value in lowest_values if lowest_value[0] + 1 in self.roots]
-
-            print('Here are the enegies', energies, reordered_energies, self.tracked_roots)
+            reordered_energies = [energies[idx] for idx in range(len(energies)) if (idx + 1) in self.roots]
+            self.tracked_roots = [idx + 1 for idx in range(len(energies)) if idx in self.roots]
 
             return reordered_energies
         except Exception as e:
@@ -404,9 +429,13 @@ conda activate vlxenv_simd_master
                 if self.path_on_cluster is not None:
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
                 with open(input_file, 'w') as file:
-                    file.write('!wB97X-D3 def2-SVP TIGHTSCF\n')
+                    if self.solvation[0] is True:
+                        file.write(f'!{self.xc_func} {self.dispersion} {self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
+                    else:
+                        file.write(f'! {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
                     file.write(f'%{self.method}\n')
                     file.write(f'NROOTS {self.roots_to_check}\n')
+                    file.write(f'sf {self.spin_flip}\n')
                     file.write('END\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
