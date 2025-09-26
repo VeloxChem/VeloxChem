@@ -518,9 +518,14 @@ class RespChargesDriver:
                     scf_drv = ScfRestrictedDriver(self.comm, ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
-                if self.filename is not None:
-                    scf_drv.filename = self.filename
-                scf_drv.restart = self.restart
+                
+                # Use unique filename for each conformer to prevent restart conflicts
+                scf_drv.filename = f'conformer_{ind + 1}'
+                
+                # Disable restart for multi-conformer calculations to avoid
+                # using previous conformer's checkpoint as initial guess
+                scf_drv.restart = False
+                
                 if self.scf_max_iter is not None:
                     scf_drv.max_iter = self.scf_max_iter
                 if (self.method_dict is None or
