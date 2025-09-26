@@ -152,6 +152,7 @@ class RespChargesDriver:
             'resp_charges': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'restart': ('bool', 'restart from checkpoint file'),
+                'scf_max_iter': ('int', 'maximum SCF iterations'),
                 'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
