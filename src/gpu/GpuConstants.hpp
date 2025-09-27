@@ -33,9 +33,23 @@
 #ifndef GpuConstants_hpp
 #define GpuConstants_hpp
 
-#define TILE_DIM_X_K 8
-#define TILE_DIM_Y_K 8
-#define TILE_SIZE_K 64
+#if defined(USE_CUDA)
+
+  #define TILE_DIM_X_K 8
+  #define TILE_DIM_Y_K 16
+  #define TILE_SIZE_K 128
+
+#elif defined(USE_HIP)
+
+  #define TILE_DIM_X_K 8
+  #define TILE_DIM_Y_K 8
+  #define TILE_SIZE_K 64
+
+#else
+
+  #error "Please define either USE_CUDA or USE_HIP"
+
+#endif
 
 #define TILE_DIM 16
 #define TILE_DIM_SMALL 1
