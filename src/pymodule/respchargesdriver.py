@@ -523,7 +523,8 @@ class RespChargesDriver:
                 scf_drv.filename = f'conformer_{ind + 1}'
                 
                 # Disable restart for multi-conformer calculations to avoid
-                # using previous conformer's checkpoint as initial guess
+                # using previous conformer's checkpoint as initial guess as this 
+                # lead to convergence issues
                 scf_drv.restart = False
                 
                 if self.scf_max_iter is not None:
