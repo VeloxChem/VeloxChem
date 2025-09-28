@@ -41,6 +41,7 @@
 #include "ThreeCenterOverlapDriver.hpp"
 #include "T3FlatBuffer.hpp"
 #include "RIFockDriver.hpp"
+#include "RIJKFockDriver.hpp"
 #include "RIFockGradDriver.hpp"
 #include "T4CScreener.hpp"
 
@@ -95,6 +96,12 @@ export_t3cintegrals(py::module& m)
         .def("compute_bq_vector", py::overload_cast<const CSubMatrix&, const CSubMatrix&> (&CRIFockDriver::compute_bq_vector, py::const_),
              "Computes transformed Bq vector for given similarity transformed MOs.")
         .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.");
+    
+    // CRIJKFockDriver class
+    // Note: RIJKFockDriver is prefixed by an underscore and will be used in rijkfockdriver.py
+    PyClass<CRIJKFockDriver>(m, "_RIJKFockDriver")
+        .def(py::init<>())
+        .def("compute_bq_vectors", &CRIJKFockDriver::compute_bq_vectors, "Computes B^Q vectors in batches.");
     
     // CRIFockGradDriver class
     PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")

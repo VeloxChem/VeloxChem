@@ -34,8 +34,6 @@
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 
-#include <iostream>
-
 CRIFockDriver::CRIFockDriver()
 
     : _j_metric(nullptr)
@@ -190,7 +188,7 @@ CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& l
     
     if (!mask.empty())
     {
-        std::cout << "mask size:" << std::endl;
+        //std::cout << "mask size:" << std::endl;
     }
     
     return std::vector<double>();
