@@ -1064,6 +1064,16 @@ class ScfDriver:
                 num_gpus_per_node //= int(os.environ['SLURM_NTASKS_PER_NODE'])
 
         assert_msg_critical(
+            'OMP_NUM_THREADS' in os.environ,
+            'OMP_NUM_THREADS not set. Please set OMP_NUM_THREADS to number ' +
+            'of GPU devices per node.')
+
+        n_threads = int(os.environ['OMP_NUM_THREADS'])
+        assert_msg_critical(
+            num_gpus_per_node == n_threads,
+            'OMP_NUM_THREADS does not match number of GPU devices per node.')
+
+        assert_msg_critical(
             num_gpus_per_node > 0,
             'SCF driver: Invalid number of GPUs per MPI process')
 
@@ -1763,14 +1773,14 @@ class ScfDriver:
 
                     for idx in range(len(all_timer_summary)):
                         for key, val in all_timer_summary[idx].items():
-                            valstr = f'rank {idx:<5d} {key:<22s} : {val:.2f} sec'
+                            valstr = f'rank {idx:<5d} {key:<22s} : {val:.3f} sec'
                             self.ostream.print_info('Timer : ' + valstr)
                         self.ostream.print_blank()
 
                     for idx in range(len(all_gpu_timer_summary)):
                         for gpu_idx in range(len(all_gpu_timer_summary[idx])):
                             for key, val in all_gpu_timer_summary[idx][gpu_idx].items():
-                                valstr = f'rank {idx:<5d} gpu {gpu_idx:<5d} {key:<22s} : {val:.2f} sec'
+                                valstr = f'rank {idx:<5d} gpu {gpu_idx:<5d} {key:<22s} : {val:.3f} sec'
                                 self.ostream.print_info('GPU Timer : ' + valstr)
                             self.ostream.print_blank()
 
