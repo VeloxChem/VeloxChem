@@ -46,7 +46,6 @@ from .matrices import Matrices
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
-from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 
@@ -173,7 +172,8 @@ class HessianOrbitalResponse(CphfSolver):
                 if at % self.nodes == self.rank:
                     local_atoms.append(at)
 
-        # Gathers information of which rank has which atom, and then broadcasts this to all ranks
+        # Gathers information of which rank has which atom,
+        # and then broadcasts this to all ranks
         atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
         gathered_atom_idx_rank = self.comm.gather(atom_idx_rank)
         if self.rank == mpi_master():
@@ -535,7 +535,8 @@ class HessianOrbitalResponse(CphfSolver):
 
             profiler.add_timing_info('distRHS', tm.time() - uij_t0)
 
-        # fill up the missing values in dist_cphf_rhs with zeros so later indexing does not fail
+        # fill up the missing values in dist_cphf_rhs with zeros
+        # so later indexing does not fail
         if atom_pairs is not None:
             for i in range(molecule.number_of_atoms()):
                 if i not in atoms_in_pairs:
@@ -650,8 +651,9 @@ class HessianOrbitalResponse(CphfSolver):
             gmats_100 = Matrices()
 
         if self._embedding_hess_drv is not None:
-            pe_fock_grad_contr = self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
-                i=i)
+            pe_fock_grad_contr = (
+                self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
+                    i=i))
             for x in range(3):
                 fmat_deriv[x] += pe_fock_grad_contr[x]
 
@@ -666,12 +668,14 @@ class HessianOrbitalResponse(CphfSolver):
             exchange_scaling_factor = 1.0
             fock_type = "2jk"
 
-        # TODO: range-separated Fock
         need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(
-                False, 'HessianOrbitalResponse: Not implemented for' +
-                ' range-separated functional')
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
@@ -695,10 +699,21 @@ class HessianOrbitalResponse(CphfSolver):
         # scaling of Fock gradient for non-hybrid functionals
         factor = 2.0 if fock_type == 'j' else 1.0
 
+        if need_omega:
+            # for range-separated functional
+            gmats_eri_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                 den_mat_for_fock, i, 'kx_rs',
+                                                 erf_k_coef, omega, thresh_int)
+
         # calculate gradient contributions
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_eri = gmats_eri.matrix_to_numpy(label)
             fmat_deriv[x] += gmat_eri * factor
+
+            if need_omega:
+                # range-separated functional contribution
+                gmat_eri_rs = gmats_eri_rs.matrix_to_numpy(label)
+                fmat_deriv[x] -= gmat_eri_rs
 
         gmats_eri = Matrices()
 
