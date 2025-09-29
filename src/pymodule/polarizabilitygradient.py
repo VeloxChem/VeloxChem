@@ -674,6 +674,16 @@ class PolarizabilityGradient:
         # scaling of ERI gradient for non-hybrid functionals
         factor = 2.0 if fock_type == 'j' else 1.0
 
+        # range-separated functionals
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
+
         # ERI threshold
         thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
@@ -775,6 +785,38 @@ class PolarizabilityGradient:
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy)
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx)
                 eri_deriv_contrib[x, y, iatom] *= factor
+                if need_omega:
+                    # for range_separated functionals
+                    erigrad_rel_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                        den_mat_for_fock_gs,
+                                                        den_mat_for_fock_rel,
+                                                        iatom, 'kx_rs', erf_k_coef,
+                                                        omega, thresh_int)
+                    erigrad_xpy_xy_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                           den_mat_for_fock_xpy_x,
+                                                           den_mat_for_fock_xpy_m_xpyT_y,
+                                                           iatom, 'kx_rs', erf_k_coef,
+                                                           omega, thresh_int)
+                    erigrad_xpy_yx_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                           den_mat_for_fock_xpy_m_xpyT_x,
+                                                           den_mat_for_fock_xpy_y,
+                                                           iatom, 'kx_rs', erf_k_coef,
+                                                           omega, thresh_int)
+                    erigrad_xmy_xy_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                           den_mat_for_fock_xmy_x,
+                                                           den_mat_for_fock_xmy_p_xmyT_y,
+                                                           iatom, 'kx_rs', erf_k_coef,
+                                                           omega, thresh_int)
+                    erigrad_xmy_yx_rs = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                           den_mat_for_fock_xmy_p_xmyT_x,
+                                                           den_mat_for_fock_xmy_y,
+                                                           iatom, 'kx_rs', erf_k_coef,
+                                                           omega, thresh_int)
+                    eri_deriv_contrib[x, y, iatom] -= np.array(erigrad_rel_rs)
+                    eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xpy_xy_rs)
+                    eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xpy_yx_rs)
+                    eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xmy_xy_rs)
+                    eri_deriv_contrib[x, y, iatom] -= 0.5 * np.array(erigrad_xmy_yx_rs)
 
         return eri_deriv_contrib
 
