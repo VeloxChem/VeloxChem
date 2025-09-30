@@ -592,6 +592,39 @@ class LinearSolver:
         else:
             self._dist_bung.append(bung, axis=1)
 
+    def _append_trial_vectors_unrestricted(self, bger, bung):
+        """
+        Appends distributed trial vectors.
+
+        :param bger:
+            The distributed gerade trial vectors.
+        :param bung:
+            The distributed ungerade trial vectors.
+        """
+
+        bger_a, bger_b = bger
+        bung_a, bung_b = bung
+
+        if self._dist_bger_alpha is None:
+            self._dist_bger_alpha = DistributedArray(bger_a.data, self.comm, distribute=False)
+        else:
+            self._dist_bger_alpha.append(bger_a, axis=1)
+
+        if self._dist_bger_beta is None:
+            self._dist_bger_beta = DistributedArray(bger_b.data, self.comm, distribute=False)
+        else:
+            self._dist_bger_beta.append(bger_b, axis=1)
+
+        if self._dist_bung_alpha is None:
+            self._dist_bung_alpha = DistributedArray(bung_a.data, self.comm, distribute=False)
+        else:
+            self._dist_bung_alpha.append(bung_a, axis=1)
+
+        if self._dist_bung_beta is None:
+            self._dist_bung_beta = DistributedArray(bung_b.data, self.comm, distribute=False)
+        else:
+            self._dist_bung_beta.append(bung_b, axis=1)
+
     def _append_sigma_vectors(self, e2bger, e2bung):
         """
         Appends distributed sigma (E2 b) vectors.
@@ -615,6 +648,39 @@ class LinearSolver:
                                                  distribute=False)
         else:
             self._dist_e2bung.append(e2bung, axis=1)
+
+    def _append_sigma_vectors_unrestricted(self, e2bger, e2bung):
+        """
+        Appends distributed sigma (E2 b) vectors.
+
+        :param e2bger:
+            The distributed gerade sigma vectors.
+        :param e2bung:
+            The distributed ungerade sigma vectors.
+        """
+
+        e2bger_a, e2bger_b = e2bger
+        e2bung_a, e2bung_b = e2bung
+
+        if self._dist_e2bger_alpha is None:
+            self._dist_e2bger_alpha = DistributedArray(e2bger_a.data, self.comm, distribute=False)
+        else:
+            self._dist_e2bger_alpha.append(e2bger_a, axis=1)
+
+        if self._dist_e2bger_beta is None:
+            self._dist_e2bger_beta = DistributedArray(e2bger_b.data, self.comm, distribute=False)
+        else:
+            self._dist_e2bger_beta.append(e2bger_b, axis=1)
+
+        if self._dist_e2bung_alpha is None:
+            self._dist_e2bung_alpha = DistributedArray(e2bung_a.data, self.comm, distribute=False)
+        else:
+            self._dist_e2bung_alpha.append(e2bung_a, axis=1)
+
+        if self._dist_e2bung_beta is None:
+            self._dist_e2bung_beta = DistributedArray(e2bung_b.data, self.comm, distribute=False)
+        else:
+            self._dist_e2bung_beta.append(e2bung_b, axis=1)
 
     def _append_fock_matrices(self, fock_ger, fock_ung):
         """
@@ -669,7 +735,8 @@ class LinearSolver:
                        eri_dict,
                        dft_dict,
                        pe_dict,
-                       profiler=None):
+                       profiler=None,
+                       method_type='restricted'):
 
         if self.use_subcomms and self.ri_coulomb:
             self.use_subcomms = False
@@ -681,13 +748,23 @@ class LinearSolver:
         # TODO: enable RI-J with subcomms
 
         if self.use_subcomms:
-            self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
-                                         scf_tensors, eri_dict, dft_dict,
-                                         pe_dict, profiler)
+            if method_type == 'restricted':
+                self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
+                                             scf_tensors, eri_dict, dft_dict,
+                                             pe_dict, profiler)
+            else:
+                assert_msg_critical(False,
+                    'LinearSolver._e2n_half_size: '
+                    'Cannot use subcomms for unrestricted case')
         else:
-            self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule, basis,
-                                            scf_tensors, eri_dict, dft_dict,
-                                            pe_dict, profiler)
+            if method_type == 'restricted':
+                self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule, basis,
+                                                scf_tensors, eri_dict, dft_dict,
+                                                pe_dict, profiler)
+            else:
+                self._e2n_half_size_single_comm_unrestricted(vecs_ger, vecs_ung, molecule, basis,
+                                                scf_tensors, eri_dict, dft_dict,
+                                                pe_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
                                 vecs_ger,
@@ -698,7 +775,8 @@ class LinearSolver:
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                profiler=None):
+                                profiler=None,
+                                method_type='restricted'):
         """
         Computes the E2 b matrix vector product.
 
@@ -1068,7 +1146,8 @@ class LinearSolver:
                                    eri_dict,
                                    dft_dict,
                                    pe_dict,
-                                   profiler=None):
+                                   profiler=None,
+                                   method_type='restricted'):
         """
         Computes the E2 b matrix vector product.
 
@@ -1328,6 +1407,752 @@ class LinearSolver:
                 self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
+
+        self.ostream.print_blank()
+
+    def _comp_lr_fock(self,
+                      dens,
+                      molecule,
+                      basis,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None,
+                      comm=None):
+        """
+        Computes Fock/Fxc matrix (2e part) for linear response calculation.
+
+        :param dens:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param profiler:
+            The profiler.
+
+        :return:
+            The Fock matrix (2e part).
+        """
+
+        if comm is None:
+            comm = self.comm
+            redistribute_xc_molgrid = False
+        else:
+            # use subcommunicators
+            redistribute_xc_molgrid = True
+
+        comm_rank = comm.Get_rank()
+
+        screening = eri_dict['screening']
+
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
+        if comm_rank == mpi_master():
+            num_densities = len(dens)
+        else:
+            num_densities = None
+        num_densities = comm.bcast(num_densities, root=mpi_master())
+
+        if comm_rank != mpi_master():
+            dens = [None for idx in range(num_densities)]
+
+        for idx in range(num_densities):
+            dens[idx] = comm.bcast(dens[idx], root=mpi_master())
+
+        thresh_int = int(-math.log10(self.eri_thresh))
+
+        t0 = tm.time()
+
+        fock_drv = FockDriver(comm)
+        fock_drv._set_block_size_factor(self._block_size_factor)
+
+        # determine fock_type and exchange_scaling_factor
+        fock_type = '2jk'
+        exchange_scaling_factor = 1.0
+        if self._dft:
+            if self.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+
+        # further determine exchange_scaling_factor, erf_k_coef and omega
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
+
+        fock_arrays = []
+
+        for idx in range(num_densities):
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'LinearSolver: RI is only applicable to pure DFT functional'
+                )
+
+            if self.ri_coulomb and fock_type == 'j':
+                # symmetrize density for RI-J
+                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
+
+                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+            else:
+                den_mat_for_fock = make_matrix(basis, mat_t.general)
+                den_mat_for_fock.set_values(dens[idx])
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
+
+            fock_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            if fock_type == 'j':
+                # for pure functional
+                fock_np *= 2.0
+
+            if need_omega:
+                # for range-separated functional
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            'kx_rs', erf_k_coef, omega,
+                                            thresh_int)
+
+                fock_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            fock_arrays.append(fock_np)
+
+        if profiler is not None:
+            profiler.add_timing_info('FockERI', tm.time() - t0)
+
+        if self._dft:
+            t0 = tm.time()
+
+            if redistribute_xc_molgrid:
+                molgrid.re_distribute_counts_and_displacements(
+                    comm.Get_rank(), comm.Get_size())
+
+            xc_drv = XCIntegrator()
+            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
+                                      gs_density, molgrid, self.xcfun)
+
+            if profiler is not None:
+                profiler.add_timing_info('FockXC', tm.time() - t0)
+
+        if self._pe:
+            t0 = tm.time()
+            for idx in range(num_densities):
+                # Note: only closed shell density for now
+                dm = dens[idx] * 2.0
+                V_emb = self._embedding_drv.compute_pe_contributions(
+                    density_matrix=dm)
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += V_emb
+
+            if profiler is not None:
+                profiler.add_timing_info('FockPE', tm.time() - t0)
+
+        if self._cpcm:
+
+            t0 = tm.time()
+
+            for idx in range(num_densities):
+                Fock_sol = self.cpcm_drv.compute_response_fock(
+                    molecule, basis, dens[idx] * 2.0, self.cpcm_cg_thresh,
+                    self.non_equilibrium_solv)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += Fock_sol
+
+            if profiler is not None:
+                profiler.add_timing_info('FockCPCM', tm.time() - t0)
+
+        for idx in range(len(fock_arrays)):
+            fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
+
+        if comm_rank == mpi_master():
+            return fock_arrays
+        else:
+            return None
+
+    def _comp_lr_fock_unrestricted(self,
+                      dens,
+                      molecule,
+                      basis,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None,
+                      comm=None):
+        """
+        Computes Fock/Fxc matrix (2e part) for linear response calculation.
+
+        :param dens:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param profiler:
+            The profiler.
+
+        :return:
+            The Fock matrix (2e part).
+        """
+
+        dens_a, dens_b = dens
+
+        if comm is None:
+            comm = self.comm
+            redistribute_xc_molgrid = False
+        else:
+            # use subcommunicators
+            redistribute_xc_molgrid = True
+
+        comm_rank = comm.Get_rank()
+
+        screening = eri_dict['screening']
+
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
+        if comm_rank == mpi_master():
+            num_densities = len(dens_a)
+        else:
+            num_densities = None
+        num_densities = comm.bcast(num_densities, root=mpi_master())
+
+        if comm_rank != mpi_master():
+            dens_a = [None for idx in range(num_densities)]
+            dens_b = [None for idx in range(num_densities)]
+
+        for idx in range(num_densities):
+            dens_a[idx] = comm.bcast(dens_a[idx], root=mpi_master())
+            dens_b[idx] = comm.bcast(dens_b[idx], root=mpi_master())
+
+        thresh_int = int(-math.log10(self.eri_thresh))
+
+        t0 = tm.time()
+
+        fock_drv = FockDriver(comm)
+        fock_drv._set_block_size_factor(self._block_size_factor)
+
+        # determine fock_type and exchange_scaling_factor
+        fock_type = '2jk'
+        exchange_scaling_factor = 1.0
+        if self._dft:
+            if self.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+
+        # further determine exchange_scaling_factor, erf_k_coef and omega
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
+
+        fock_arrays = []
+
+        for idx in range(num_densities):
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'LinearSolver: RI is only applicable to pure DFT functional'
+                )
+
+            if self.ri_coulomb and fock_type == 'j':
+                # TODO: unrestricted
+                # symmetrize density for RI-J
+                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
+
+                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+            else:
+                # for now we calculate Ka, Kb and Jab separately for open-shell
+                den_mat_for_Ka = make_matrix(basis, mat_t.general)
+                den_mat_for_Ka.set_values(dens_a[idx])
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_Ka, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+                K_a_np = fock_mat.to_numpy()
+
+                den_mat_for_Kb = make_matrix(basis, mat_t.general)
+                den_mat_for_Kb.set_values(dens_b[idx])
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_Kb, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                K_b_np = fock_mat.to_numpy()
+
+                den_mat_for_Jab = make_matrix(basis, mat_t.general)
+                den_mat_for_Jab.set_values(dens_a[idx] + dens_b[idx])
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_Jab, 'j',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                J_ab_np = fock_mat.to_numpy()
+
+                fock_mat_a_np = J_ab_np - K_a_np
+                fock_mat_b_np = J_ab_np - K_b_np
+
+            if need_omega:
+                # for range-separated functional
+                fock_mat = fock_drv.compute(screening, den_mat_for_Ka, 'kx_rs',
+                                            erf_k_coef, omega, thresh_int)
+
+                fock_mat_a_np -= fock_mat.to_numpy()
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_Kb, 'kx_rs',
+                                            erf_k_coef, omega, thresh_int)
+
+                fock_mat_b_np -= fock_mat.to_numpy()
+
+            den_mat_for_Ka = Matrix()
+            den_mat_for_Kb = Matrix()
+            den_mat_for_Jab = Matrix()
+            fock_mat = Matrix()
+
+            fock_arrays.append([fock_mat_a_np, fock_mat_b_np])
+
+        if profiler is not None:
+            profiler.add_timing_info('FockERI', tm.time() - t0)
+
+        if self._dft:
+            # TODO: unrestricted
+            t0 = tm.time()
+
+            if redistribute_xc_molgrid:
+                molgrid.re_distribute_counts_and_displacements(
+                    comm.Get_rank(), comm.Get_size())
+
+            xc_drv = XCIntegrator()
+            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
+                                      gs_density, molgrid, self.xcfun)
+
+            if profiler is not None:
+                profiler.add_timing_info('FockXC', tm.time() - t0)
+
+        if self._pe:
+            # TODO: unrestricted
+            t0 = tm.time()
+            for idx in range(num_densities):
+                # Note: only closed shell density for now
+                dm = dens[idx] * 2.0
+                V_emb = self._embedding_drv.compute_pe_contributions(
+                    density_matrix=dm)
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += V_emb
+
+            if profiler is not None:
+                profiler.add_timing_info('FockPE', tm.time() - t0)
+
+        if self._cpcm:
+            # TODO: unrestricted
+
+            t0 = tm.time()
+
+            for idx in range(num_densities):
+                Fock_sol = self.cpcm_drv.compute_response_fock(
+                    molecule, basis, dens[idx] * 2.0, self.cpcm_cg_thresh,
+                    self.non_equilibrium_solv)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += Fock_sol
+
+            if profiler is not None:
+                profiler.add_timing_info('FockCPCM', tm.time() - t0)
+
+        for idx in range(len(fock_arrays)):
+            fock_arrays[idx][0] = comm.reduce(fock_arrays[idx][0], root=mpi_master())
+            fock_arrays[idx][1] = comm.reduce(fock_arrays[idx][1], root=mpi_master())
+
+        if comm_rank == mpi_master():
+            return fock_arrays
+        else:
+            return None
+
+    def _e2n_half_size_single_comm_unrestricted(self,
+                                   vecs_ger,
+                                   vecs_ung,
+                                   molecule,
+                                   basis,
+                                   scf_tensors,
+                                   eri_dict,
+                                   dft_dict,
+                                   pe_dict,
+                                   profiler=None):
+        """
+        Computes the E2 b matrix vector product.
+
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param profiler:
+            The profiler.
+
+        :return:
+            The gerade and ungerade E2 b matrix vector product in half-size.
+        """
+
+        vecs_ger_a, vecs_ger_b = vecs_ger
+        vecs_ung_a, vecs_ung_b = vecs_ung
+
+        print('vecs_ger_a.shape', vecs_ger_a.data.shape)
+        print('vecs_ger_b.shape', vecs_ger_b.data.shape)
+        print()
+
+        print('vecs_ung_a.shape', vecs_ung_a.data.shape)
+        print('vecs_ung_b.shape', vecs_ung_b.data.shape)
+        print()
+
+        n_ger = vecs_ger_a.shape(1)
+        n_ung = vecs_ung_a.shape(1)
+
+        n_general = min(n_ger, n_ung)
+        n_extra_ger = n_ger - n_general
+        n_extra_ung = n_ung - n_general
+
+        # prepare molecular orbitals
+
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                vecs_ger_a.data.ndim == 2 and vecs_ung_a.data.ndim == 2,
+                'LinearSolver._e2n_half_size: '
+                'invalid shape of trial vectors')
+            assert_msg_critical(
+                vecs_ger_b.data.ndim == 2 and vecs_ung_b.data.ndim == 2,
+                'LinearSolver._e2n_half_size: '
+                'invalid shape of trial vectors')
+
+            assert_msg_critical(
+                vecs_ger_a.shape(0) == vecs_ung_a.shape(0),
+                'LinearSolver._e2n_half_size: '
+                'inconsistent shape of trial vectors')
+            assert_msg_critical(
+                vecs_ger_b.shape(0) == vecs_ung_b.shape(0),
+                'LinearSolver._e2n_half_size: '
+                'inconsistent shape of trial vectors')
+
+            mo_a = scf_tensors['C_alpha']
+            mo_b = scf_tensors['C_beta']
+
+            fa = scf_tensors['F_alpha']
+            fb = scf_tensors['F_beta']
+
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
+
+            norb = mo_a.shape[1]
+
+            if getattr(self, 'core_excitation', False):
+                # TODO: unrestricted
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
+                    range(nocc, norb))
+                mo_core_exc = mo[:, core_exc_orb_inds]
+                fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            else:
+                fa_mo = np.linalg.multi_dot([mo_a.T, fa, mo_a])
+                fb_mo = np.linalg.multi_dot([mo_b.T, fb, mo_b])
+
+        # determine number of batches
+
+        n_ao = mo_a.shape[0] if self.rank == mpi_master() else None
+
+        n_total = n_general + n_extra_ger + n_extra_ung
+
+        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+
+        # go through batches
+
+        if self.rank == mpi_master():
+            batch_str = f'Processing {n_total} Fock build'
+            if n_total > 1:
+                batch_str += 's'
+            batch_str += '...'
+            self.ostream.print_info(batch_str)
+            self.ostream.flush()
+
+        if self._debug:
+            self.ostream.print_info(
+                '==DEBUG== batch_size: {}'.format(batch_size))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        for batch_ind in range(num_batches):
+
+            if self._debug:
+                self.ostream.print_info('==DEBUG== batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
+
+            # form density matrices
+
+            batch_start = batch_size * batch_ind
+            batch_end = min(batch_start + batch_size, n_total)
+
+            if self.rank == mpi_master():
+                dks_a = []
+                kns_a = []
+                dks_b = []
+                kns_b = []
+            else:
+                dks_a = None
+                kns_a = None
+                dks_b = None
+                kns_b = None
+
+            for col in range(batch_start, batch_end):
+
+                # determine vec_type
+
+                if col < n_general:
+                    vec_type = 'general'
+                elif n_extra_ger > 0:
+                    vec_type = 'gerade'
+                elif n_extra_ung > 0:
+                    vec_type = 'ungerade'
+
+                # form full-size vec
+
+                if vec_type == 'general':
+                    v_ger_a = vecs_ger_a.get_full_vector(col)
+                    v_ung_a = vecs_ung_a.get_full_vector(col)
+                    v_ger_b = vecs_ger_b.get_full_vector(col)
+                    v_ung_b = vecs_ung_b.get_full_vector(col)
+                    if self.rank == mpi_master():
+                        # full-size trial vector
+                        vec_a = np.hstack((v_ger_a, v_ger_a))
+                        vec_a += np.hstack((v_ung_a, -v_ung_a))
+                        vec_b = np.hstack((v_ger_b, v_ger_b))
+                        vec_b += np.hstack((v_ung_b, -v_ung_b))
+
+                elif vec_type == 'gerade':
+                    v_ger_a = vecs_ger_a.get_full_vector(col)
+                    v_ger_b = vecs_ger_b.get_full_vector(col)
+                    if self.rank == mpi_master():
+                        # full-size gerade trial vector
+                        vec_a = np.hstack((v_ger_a, v_ger_a))
+                        vec_b = np.hstack((v_ger_b, v_ger_b))
+
+                elif vec_type == 'ungerade':
+                    v_ung_a = vecs_ung_a.get_full_vector(col)
+                    v_ung_b = vecs_ung_b.get_full_vector(col)
+                    if self.rank == mpi_master():
+                        # full-size ungerade trial vector
+                        vec_a = np.hstack((v_ung_a, -v_ung_a))
+                        vec_b = np.hstack((v_ung_b, -v_ung_b))
+
+                # build density
+
+                if self.rank == mpi_master():
+                    half_size_a = vec_a.shape[0] // 2
+                    half_size_b = vec_b.shape[0] // 2
+
+                    print('vec_a.shape', vec_a.shape, nocc_a, norb - nocc_a)
+                    print()
+
+                    if getattr(self, 'core_excitation', False):
+                        # TODO: unrestricted
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals)
+                        core_exc_orb_inds = list(range(
+                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_exc, dak, mo_core_exc.T])
+                    else:
+                        kn_a = self.lrvec2mat(vec_a, nocc_a, norb)
+                        kn_b = self.lrvec2mat(vec_b, nocc_b, norb)
+                        dak = self.commut_mo_density(kn_a, nocc_a)
+                        dbk = self.commut_mo_density(kn_b, nocc_b)
+                        dak = np.linalg.multi_dot([mo_a, dak, mo_a.T])
+                        dbk = np.linalg.multi_dot([mo_b, dbk, mo_b.T])
+
+                    dks_a.append(dak)
+                    dks_b.append(dbk)
+                    kns_a.append(kn_a)
+                    kns_b.append(kn_b)
+
+            # form Fock matrices
+
+            fock = self._comp_lr_fock_unrestricted((dks_a, dks_b), molecule, basis, eri_dict, dft_dict,
+                                      pe_dict, profiler)
+
+            if self.rank == mpi_master():
+                raw_fock_ger_a = []
+                raw_fock_ung_a = []
+                raw_fock_ger_b = []
+                raw_fock_ung_b = []
+
+                raw_kns_ger_a = []
+                raw_kns_ung_a = []
+                raw_kns_ger_b = []
+                raw_kns_ung_b = []
+
+                for col in range(batch_start, batch_end):
+                    ifock = col - batch_start
+
+                    if col < n_general:
+                        raw_fock_ger_a.append(0.5 * (fock[ifock][0] - fock[ifock][0].T))
+                        raw_fock_ung_a.append(0.5 * (fock[ifock][0] + fock[ifock][0].T))
+                        raw_kns_ger_a.append(0.5 * (kns_a[ifock] + kns_a[ifock].T))
+                        raw_kns_ung_a.append(0.5 * (kns_a[ifock] - kns_a[ifock].T))
+                        raw_fock_ger_b.append(0.5 * (fock[ifock][1] - fock[ifock][1].T))
+                        raw_fock_ung_b.append(0.5 * (fock[ifock][1] + fock[ifock][1].T))
+                        raw_kns_ger_b.append(0.5 * (kns_b[ifock] + kns_b[ifock].T))
+                        raw_kns_ung_b.append(0.5 * (kns_b[ifock] - kns_b[ifock].T))
+
+                    elif n_extra_ger > 0:
+                        raw_fock_ger_a.append(0.5 * (fock[ifock][0] - fock[ifock][0].T))
+                        raw_kns_ger_a.append(0.5 * (kns_a[ifock] + kns_a[ifock].T))
+                        raw_fock_ger_b.append(0.5 * (fock[ifock][1] - fock[ifock][1].T))
+                        raw_kns_ger_b.append(0.5 * (kns_b[ifock] + kns_b[ifock].T))
+
+                    elif n_extra_ung > 0:
+                        raw_fock_ung_a.append(0.5 * (fock[ifock][0] + fock[ifock][0].T))
+                        raw_kns_ung_a.append(0.5 * (kns_a[ifock] - kns_a[ifock].T))
+                        raw_fock_ung_b.append(0.5 * (fock[ifock][1] + fock[ifock][1].T))
+                        raw_kns_ung_b.append(0.5 * (kns_b[ifock] - kns_b[ifock].T))
+
+                fock_a = raw_fock_ger_a + raw_fock_ung_a
+                kns_a = raw_kns_ger_a + raw_kns_ung_a
+                fock_b = raw_fock_ger_b + raw_fock_ung_b
+                kns_b = raw_kns_ger_b + raw_kns_ung_b
+
+                batch_ger = len(raw_fock_ger_a)
+                batch_ung = len(raw_fock_ung_a)
+
+            e2_ger_a = None
+            e2_ung_a = None
+            e2_ger_b = None
+            e2_ung_b = None
+
+            fock_ger_a = None
+            fock_ung_a = None
+            fock_ger_b = None
+            fock_ung_b = None
+
+            if self.rank == mpi_master():
+
+                e2_ger_a = np.zeros((half_size_a, batch_ger))
+                e2_ung_a = np.zeros((half_size_a, batch_ung))
+                e2_ger_b = np.zeros((half_size_b, batch_ger))
+                e2_ung_b = np.zeros((half_size_b, batch_ung))
+
+                if self.nonlinear:
+                    fock_ger_a = np.zeros((norb**2, batch_ger))
+                    fock_ung_a = np.zeros((norb**2, batch_ung))
+
+                for ifock in range(batch_ger + batch_ung):
+                    fak = fock_a[ifock]
+                    fbk = fock_b[ifock]
+
+                    if getattr(self, 'core_excitation', False):
+                        # TODO: unrestricted
+                        core_exc_orb_inds = list(range(
+                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        fak_mo = np.linalg.multi_dot(
+                            [mo_core_exc.T, fak, mo_core_exc])
+                    else:
+                        fak_mo = np.linalg.multi_dot([mo_a.T, fak, mo_a])
+                        fbk_mo = np.linalg.multi_dot([mo_b.T, fbk, mo_b])
+
+                    kfa_mo = self.commut(fa_mo.T, kns_a[ifock])
+                    kfb_mo = self.commut(fb_mo.T, kns_b[ifock])
+
+                    fat_mo = fak_mo + kfa_mo
+                    fbt_mo = fbk_mo + kfb_mo
+
+                    if getattr(self, 'core_excitation', False):
+                        # TODO: unrestricted
+                        gmo = -self.commut_mo_density(fat_mo, nocc,
+                                                      self.num_core_orbitals)
+                        gmo_vec_halfsize = self.lrmat2vec(
+                            gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                    else:
+                        gmo_a = -self.commut_mo_density(fat_mo, nocc_a)
+                        gmo_b = -self.commut_mo_density(fbt_mo, nocc_b)
+                        gmo_vec_halfsize_a = self.lrmat2vec(gmo_a, nocc_a, norb)[:half_size_a]
+                        gmo_vec_halfsize_b = self.lrmat2vec(gmo_b, nocc_b, norb)[:half_size_b]
+
+                    # Note: fak_mo_vec uses full MO coefficients matrix since
+                    # it is only for fock_ger/fock_ung in nonlinear response
+                    fak_mo_vec = np.linalg.multi_dot([mo_a.T, fak, mo_a]).reshape(norb**2)
+                    fbk_mo_vec = np.linalg.multi_dot([mo_b.T, fbk, mo_b]).reshape(norb**2)
+
+                    if ifock < batch_ger:
+                        e2_ger_a[:, ifock] = -gmo_vec_halfsize_a
+                        e2_ger_b[:, ifock] = -gmo_vec_halfsize_b
+                        if self.nonlinear:
+                            fock_ger_a[:, ifock] = fak_mo_vec
+                            fock_ger_b[:, ifock] = fbk_mo_vec
+                    else:
+                        e2_ung_a[:, ifock - batch_ger] = -gmo_vec_halfsize_a
+                        e2_ung_b[:, ifock - batch_ger] = -gmo_vec_halfsize_b
+                        if self.nonlinear:
+                            fock_ung_a[:, ifock - batch_ger] = fak_mo_vec
+                            fock_ung_b[:, ifock - batch_ger] = fbk_mo_vec
+
+            vecs_e2_ger_a = DistributedArray(e2_ger_a, self.comm)
+            vecs_e2_ung_a = DistributedArray(e2_ung_a, self.comm)
+            vecs_e2_ger_b = DistributedArray(e2_ger_b, self.comm)
+            vecs_e2_ung_b = DistributedArray(e2_ung_b, self.comm)
+            self._append_sigma_vectors_unrestricted((vecs_e2_ger_a, vecs_e2_ger_b), (vecs_e2_ung_a, vecs_e2_ung_b))
+
+            if self.nonlinear:
+                # TODO: unrestricted
+                dist_fock_ger = DistributedArray(fock_ger, self.comm)
+                dist_fock_ung = DistributedArray(fock_ung, self.comm)
+                self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+
+        self._append_trial_vectors_unrestricted((vecs_ger_a, vecs_ger_b), (vecs_ung_a, vecs_ung_b))
 
         self.ostream.print_blank()
 
@@ -1863,6 +2688,121 @@ class LinearSolver:
                 'LinearSolver: trial vectors are empty')
 
         return dist_new_ger, dist_new_ung
+
+    def _setup_trials_unrestricted(self,
+                      vectors,
+                      precond,
+                      dist_bger=None,
+                      dist_bung=None,
+                      renormalize=True):
+        """
+        Computes orthonormalized trial vectors.
+
+        :param vectors:
+            The set of vectors.
+        :param precond:
+            The preconditioner.
+        :param dist_bger:
+            The distributed gerade subspace.
+        :param dist_bung:
+            The distributed ungerade subspace.
+        :param renormalize:
+            The flag for normalization.
+
+        :return:
+            The orthonormalized gerade and ungerade trial vectors.
+        """
+
+        if dist_bger is not None:
+            dist_bger_a, dist_bger_b = dist_bger
+        else:
+            dist_bger_a, dist_bger_b = None, None
+
+        if dist_bung is not None:
+            dist_bung_a, dist_bung_b = dist_bung
+        else:
+            dist_bung_a, dist_bung_b = None, None
+
+        ((dist_new_ger_a, dist_new_ger_b),
+         (dist_new_ung_a, dist_new_ung_b)) = self._precond_trials_unrestricted(vectors, precond)
+
+        if dist_new_ger_a.data.size == 0:
+            dist_new_ger_a.data = np.zeros((dist_new_ung_a.shape(0), 0))
+
+        if dist_new_ger_b.data.size == 0:
+            dist_new_ger_b.data = np.zeros((dist_new_ung_b.shape(0), 0))
+
+        if dist_new_ung_a.data.size == 0:
+            dist_new_ung_a.data = np.zeros((dist_new_ger_a.shape(0), 0))
+
+        if dist_new_ung_b.data.size == 0:
+            dist_new_ung_b.data = np.zeros((dist_new_ger_b.shape(0), 0))
+
+        if dist_bger is not None:
+            dist_bger_ab_data = np.vstack((dist_bger_a.data, dist_bger_b.data))
+            dist_new_ger_ab_data = np.vstack((dist_new_ger_a.data, dist_new_ger_b.data))
+            dist_bger_ab = DistributedArray(dist_bger_ab_data, self.comm, distribute=False)
+            dist_new_ger_ab = DistributedArray(dist_new_ger_ab_data, self.comm, distribute=False)
+            # t = t - (b (b.T t))
+            bT_new_ger_ab = dist_bger_ab.matmul_AtB_allreduce(dist_new_ger_ab)
+            dist_new_ger_ab_proj = dist_bger_ab.matmul_AB_no_gather(bT_new_ger_ab)
+            dist_new_ger_ab.data -= dist_new_ger_ab_proj.data
+
+            alpha_vec_size = dist_new_ger_a.shape(0)
+            dist_new_ger_a.data = dist_new_ger_ab.data[:alpha_vec_size].copy()
+            dist_new_ger_b.data = dist_new_ger_ab.data[alpha_vec_size:].copy()
+
+        if dist_bung is not None:
+            dist_bung_ab_data = np.vstack((dist_bung_a.data, dist_bung_b.data))
+            dist_new_ung_ab_data = np.vstack((dist_new_ung_a.data, dist_new_ung_b.data))
+            dist_bung_ab = DistributedArray(dist_bung_ab_data, self.comm, distribute=False)
+            dist_new_ung_ab = DistributedArray(dist_new_ung_ab_data, self.comm, distribute=False)
+            # t = t - (b (b.T t))
+            bT_new_ung_ab = dist_bung_ab.matmul_AtB_allreduce(dist_new_ung_ab)
+            dist_new_ung_ab_proj = dist_bung_ab.matmul_AB_no_gather(bT_new_ung_ab)
+            dist_new_ung_ab.data -= dist_new_ung_ab_proj.data
+
+            alpha_vec_size = dist_new_ung_a.shape(0)
+            dist_new_ung_a.data = dist_new_ung_ab.data[:alpha_vec_size].copy()
+            dist_new_ung_b.data = dist_new_ung_ab.data[alpha_vec_size:].copy()
+
+        if renormalize:
+            if dist_new_ger_a.data.ndim > 0 and dist_new_ger_a.shape(0) > 0:
+
+                dist_new_ger_ab_data = np.vstack((dist_new_ger_a.data, dist_new_ger_b.data))
+                dist_new_ger_ab = DistributedArray(dist_new_ger_ab_data, self.comm, distribute=False)
+
+                dist_new_ger_ab = self._remove_linear_dependence_half_size(
+                    dist_new_ger_ab, self.lindep_thresh)
+                dist_new_ger_ab = self._orthogonalize_gram_schmidt_half_size(
+                    dist_new_ger_ab)
+                dist_new_ger_ab = self._normalize_half_size(dist_new_ger_ab)
+
+                alpha_vec_size = dist_new_ger_a.shape(0)
+                dist_new_ger_a.data = dist_new_ger_ab.data[:alpha_vec_size].copy()
+                dist_new_ger_b.data = dist_new_ger_ab.data[alpha_vec_size:].copy()
+
+            if dist_new_ung_a.data.ndim > 0 and dist_new_ung_a.shape(0) > 0:
+
+                dist_new_ung_ab_data = np.vstack((dist_new_ung_a.data, dist_new_ung_b.data))
+                dist_new_ung_ab = DistributedArray(dist_new_ung_ab_data, self.comm, distribute=False)
+
+                dist_new_ung_ab = self._remove_linear_dependence_half_size(
+                    dist_new_ung_ab, self.lindep_thresh)
+                dist_new_ung_ab = self._orthogonalize_gram_schmidt_half_size(
+                    dist_new_ung_ab)
+                dist_new_ung_ab = self._normalize_half_size(dist_new_ung_ab)
+
+                alpha_vec_size = dist_new_ung_a.shape(0)
+                dist_new_ung_a.data = dist_new_ung_ab.data[:alpha_vec_size].copy()
+                dist_new_ung_b.data = dist_new_ung_ab.data[alpha_vec_size:].copy()
+
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                dist_new_ger_ab.data.size > 0 or dist_new_ung_ab.data.size > 0,
+                'LinearSolver: trial vectors are empty')
+
+        return ((dist_new_ger_a, dist_new_ger_b), (dist_new_ung_a, dist_new_ung_b))
 
     def get_prop_grad(self, operator, components, molecule, basis, scf_tensors):
         """

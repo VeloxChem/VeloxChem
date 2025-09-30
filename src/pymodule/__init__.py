@@ -139,6 +139,7 @@ from .excitondriver import ExcitonModelDriver
 from .tdaeigensolver import TdaEigenSolver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver

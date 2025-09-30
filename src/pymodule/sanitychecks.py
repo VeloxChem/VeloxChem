@@ -58,7 +58,7 @@ def molecule_sanity_check(mol, method_type=None):
     if method_type == 'restricted':
         assert_msg_critical(
             mol.get_multiplicity() == 1,
-            f'Molecule: Invalid multiplicity for method type {method_type}')
+            f'Molecule: Invalid multiplicity for {method_type}')
 
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
