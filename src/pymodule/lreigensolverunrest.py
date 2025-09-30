@@ -382,14 +382,19 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
             self._cur_iter = iteration
 
-            e2gg = (self._dist_bger_alpha.matmul_AtB(self._dist_e2bger_alpha) +
-                    self._dist_bger_beta.matmul_AtB(self._dist_e2bger_beta))
-            e2uu = (self._dist_bung_alpha.matmul_AtB(self._dist_e2bung_alpha) +
-                    self._dist_bung_beta.matmul_AtB(self._dist_e2bung_beta))
-            s2ug = (self._dist_bung_alpha.matmul_AtB(self._dist_bger_alpha) +
-                    self._dist_bung_beta.matmul_AtB(self._dist_bger_beta))
+            # TODO: put together _dist_bger_alpha and _dist_bger_beta
+            e2gg_a = self._dist_bger_alpha.matmul_AtB(self._dist_e2bger_alpha)
+            e2gg_b = self._dist_bger_beta.matmul_AtB(self._dist_e2bger_beta)
+            e2uu_a = self._dist_bung_alpha.matmul_AtB(self._dist_e2bung_alpha)
+            e2uu_b = self._dist_bung_beta.matmul_AtB(self._dist_e2bung_beta)
+            s2ug_a = self._dist_bung_alpha.matmul_AtB(self._dist_bger_alpha)
+            s2ug_b = self._dist_bung_beta.matmul_AtB(self._dist_bger_beta)
 
             if self.rank == mpi_master():
+
+                e2gg = e2gg_a + e2gg_b
+                e2uu = e2uu_a + e2uu_b
+                s2ug = s2ug_a + s2ug_b
 
                 # Equations:
                 # E[2] X_g - w S[2] X_u = 0
@@ -398,8 +403,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                 # Solutions:
                 # (S_gu (E_uu)^-1 S_ug) X_g = 1/w^2 E_gg X_g
                 # X_u = w (E_uu)^-1 S_ug X_g
-
-                # alpha
 
                 evals, evecs = np.linalg.eigh(e2uu)
                 e2uu_inv = np.linalg.multi_dot(
@@ -430,8 +433,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     c_ung[:, k] /= norm
             else:
                 wn = None
-                c_ger = None
-                c_ung = None
+                c_ger, c_ung = None, None
             wn = self.comm.bcast(wn, root=mpi_master())
             c_ger = self.comm.bcast(c_ger, root=mpi_master())
             c_ung = self.comm.bcast(c_ung, root=mpi_master())
@@ -818,7 +820,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
-                        # TODO: add beta contribution
                         elec_trans_dipoles[s, ind] = np.vdot(
                             edip_grad_a[ind], eigvec_a)
                         velo_trans_dipoles[s, ind] = np.vdot(
