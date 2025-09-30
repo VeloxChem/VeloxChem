@@ -201,21 +201,13 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
-        self._dist_bger_alpha = None
-        self._dist_bung_alpha = None
-        self._dist_e2bger_alpha = None
-        self._dist_e2bung_alpha = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
-        self._dist_bger_beta = None
-        self._dist_bung_beta = None
-        self._dist_e2bger_beta = None
-        self._dist_e2bung_beta = None
-
-        self._dist_fock_ger_alpha = None
-        self._dist_fock_ung_alpha = None
-
-        self._dist_fock_ger_beta = None
-        self._dist_fock_ung_beta = None
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -352,11 +344,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         # generate initial guess from scratch
         else:
             igs = self._initial_excitations(self.nstates, (orb_ene_a, orb_ene_b), (nocc_a, nocc_b), norb)
-            (bger_alpha, bger_beta), (bung_alpha, bung_beta) = self._setup_trials_unrestricted(igs, None)
+            bger, bung = self._setup_trials(igs, None)
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size((bger_alpha, bger_beta), (bung_alpha, bung_beta),
+            self._e2n_half_size(bger, bung,
                                 molecule, basis, scf_tensors,
                                 eri_dict, dft_dict, pe_dict, profiler,
                                 method_type='unrestricted')
@@ -382,19 +374,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
             self._cur_iter = iteration
 
-            # TODO: put together _dist_bger_alpha and _dist_bger_beta
-            e2gg_a = self._dist_bger_alpha.matmul_AtB(self._dist_e2bger_alpha)
-            e2gg_b = self._dist_bger_beta.matmul_AtB(self._dist_e2bger_beta)
-            e2uu_a = self._dist_bung_alpha.matmul_AtB(self._dist_e2bung_alpha)
-            e2uu_b = self._dist_bung_beta.matmul_AtB(self._dist_e2bung_beta)
-            s2ug_a = self._dist_bung_alpha.matmul_AtB(self._dist_bger_alpha)
-            s2ug_b = self._dist_bung_beta.matmul_AtB(self._dist_bger_beta)
+            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger)
+            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung)
+            s2ug = self._dist_bung.matmul_AtB(self._dist_bger)
 
             if self.rank == mpi_master():
-
-                e2gg = e2gg_a + e2gg_b
-                e2uu = e2uu_a + e2uu_b
-                s2ug = s2ug_a + s2ug_b
 
                 # Equations:
                 # E[2] X_g - w S[2] X_u = 0
@@ -441,15 +425,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             for k in range(self.nstates):
                 w = wn[k]
 
-                x_ger_a = self._dist_bger_alpha.matmul_AB_no_gather(c_ger[:, k])
-                x_ung_a = self._dist_bung_alpha.matmul_AB_no_gather(c_ung[:, k])
-                x_ger_b = self._dist_bger_beta.matmul_AB_no_gather(c_ger[:, k])
-                x_ung_b = self._dist_bung_beta.matmul_AB_no_gather(c_ung[:, k])
+                x_ger = self._dist_bger.matmul_AB_no_gather(c_ger[:, k])
+                x_ung = self._dist_bung.matmul_AB_no_gather(c_ung[:, k])
 
-                e2x_ger_a = self._dist_e2bger_alpha.matmul_AB_no_gather(c_ger[:, k])
-                e2x_ung_a = self._dist_e2bung_alpha.matmul_AB_no_gather(c_ung[:, k])
-                e2x_ger_b = self._dist_e2bger_beta.matmul_AB_no_gather(c_ger[:, k])
-                e2x_ung_b = self._dist_e2bung_beta.matmul_AB_no_gather(c_ung[:, k])
+                e2x_ger = self._dist_e2bger.matmul_AB_no_gather(c_ger[:, k])
+                e2x_ung = self._dist_e2bung.matmul_AB_no_gather(c_ung[:, k])
 
                 if self.nonlinear:
                     # TODO: unrestricted
@@ -464,42 +444,28 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                                     self.comm,
                                                     distribute=False)
 
-                s2x_ger_a = x_ger_a.data
-                s2x_ung_a = x_ung_a.data
-                s2x_ger_b = x_ger_b.data
-                s2x_ung_b = x_ung_b.data
+                s2x_ger = x_ger.data
+                s2x_ung = x_ung.data
 
-                r_ger_a = e2x_ger_a.data - w * s2x_ung_a
-                r_ung_a = e2x_ung_a.data - w * s2x_ger_a
-                r_ger_b = e2x_ger_b.data - w * s2x_ung_b
-                r_ung_b = e2x_ung_b.data - w * s2x_ger_b
+                r_ger = e2x_ger.data - w * s2x_ung
+                r_ung = e2x_ung.data - w * s2x_ger
 
-                r_data_a = np.hstack((
-                    r_ger_a.reshape(-1, 1),
-                    r_ung_a.reshape(-1, 1),
-                ))
-                r_data_b = np.hstack((
-                    r_ger_b.reshape(-1, 1),
-                    r_ung_b.reshape(-1, 1),
+                r_data = np.hstack((
+                    r_ger.reshape(-1, 1),
+                    r_ung.reshape(-1, 1),
                 ))
 
-                r_a = DistributedArray(r_data_a, self.comm, distribute=False)
-                r_b = DistributedArray(r_data_b, self.comm, distribute=False)
+                r = DistributedArray(r_data, self.comm, distribute=False)
 
-                x_data_a = np.hstack((
-                    x_ger_a.data.reshape(-1, 1),
-                    x_ung_a.data.reshape(-1, 1),
-                ))
-                x_data_b = np.hstack((
-                    x_ger_b.data.reshape(-1, 1),
-                    x_ung_b.data.reshape(-1, 1),
+                x_data = np.hstack((
+                    x_ger.data.reshape(-1, 1),
+                    x_ung.data.reshape(-1, 1),
                 ))
 
-                x_a = DistributedArray(x_data_a, self.comm, distribute=False)
-                x_b = DistributedArray(x_data_b, self.comm, distribute=False)
+                x = DistributedArray(x_data, self.comm, distribute=False)
 
-                r_norms_2 = r_a.squared_norm(axis=0) + r_b.squared_norm(axis=0)
-                x_norms_2 = x_a.squared_norm(axis=0) + x_b.squared_norm(axis=0)
+                r_norms_2 = r.squared_norm(axis=0)
+                x_norms_2 = x.squared_norm(axis=0)
 
                 rn = np.sqrt(np.sum(r_norms_2))
                 xn = np.sqrt(np.sum(x_norms_2))
@@ -511,26 +477,26 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                 if relative_residual_norm[k] < self.conv_thresh:
                     exc_energies[k] = w
-                    exc_solutions[k] = (x_a, x_b)
+                    exc_solutions[k] = x
                 else:
-                    exc_residuals[k] = (r_a, r_b)
+                    exc_residuals[k] = r
 
             # write to output
             if self.rank == mpi_master():
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(
-                        self._dist_bger_alpha.shape(1)))
+                        self._dist_bger.shape(1)))
                 self.ostream.print_info(
                     '{:d} ungerade trial vectors in reduced space'.format(
-                        self._dist_bung_alpha.shape(1)))
+                        self._dist_bung.shape(1)))
                 self.ostream.print_blank()
 
                 profiler.print_memory_subspace(
                     {
-                        'dist_bger': self._dist_bger_alpha,
-                        'dist_bung': self._dist_bung_alpha,
-                        'dist_e2bger': self._dist_e2bger_alpha,
-                        'dist_e2bung': self._dist_e2bung_alpha,
+                        'dist_bger': self._dist_bger,
+                        'dist_bung': self._dist_bung,
+                        'dist_e2bger': self._dist_e2bger,
+                        'dist_e2bung': self._dist_e2bung,
                         'exc_solutions': exc_solutions,
                         'exc_residuals': exc_residuals,
                     }, self.ostream)
@@ -558,17 +524,15 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                 for k, w in enumerate(list(wn))
             }
 
-            (new_trials_ger_a, new_trials_ger_b), (new_trials_ung_a,
-                    new_trials_ung_b) = self._setup_trials_unrestricted(
-                exc_residuals, precond, (self._dist_bger_alpha, self._dist_bger_beta),
-                (self._dist_bung_alpha, self._dist_bung_beta))
+            new_trials_ger, new_trials_ung = self._setup_trials(
+                exc_residuals, precond, self._dist_bger, self._dist_bung)
 
             exc_residuals.clear()
 
             profiler.stop_timer('Orthonorm.')
 
             if self.rank == mpi_master():
-                n_new_trials = new_trials_ger_a.shape(1) + new_trials_ung_a.shape(1)
+                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
             else:
                 n_new_trials = None
             n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
@@ -585,8 +549,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                        rsp_vector_labels)
                 self._add_nstates_to_checkpoint()
 
-            self._e2n_half_size((new_trials_ger_a, new_trials_ger_b),
-                                (new_trials_ung_a, new_trials_ung_b),
+            self._e2n_half_size(new_trials_ger, new_trials_ung,
                                 molecule, basis, scf_tensors, eri_dict,
                                 dft_dict, pe_dict, profiler,
                                 method_type='unrestricted')
@@ -611,19 +574,13 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         profiler.check_memory_usage('End of LR eigensolver')
         profiler.print_memory_usage(self.ostream)
 
-        self._dist_bger_alpha = None
-        self._dist_bung_alpha = None
-        self._dist_e2bger_alpha = None
-        self._dist_e2bung_alpha = None
-        self._dist_bger_beta = None
-        self._dist_bung_beta = None
-        self._dist_e2bger_beta = None
-        self._dist_e2bung_beta = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
-        self._dist_fock_ger_alpha = None
-        self._dist_fock_ung_alpha = None
-        self._dist_fock_ger_beta = None
-        self._dist_fock_ung_beta = None
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
 
         # calculate properties
         if self.is_converged:
@@ -661,10 +618,21 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             excitation_details = []
 
             for s in range(self.nstates):
-                eigvec_a = self.get_full_solution_vector(exc_solutions[s][0])
-                eigvec_b = self.get_full_solution_vector(exc_solutions[s][1])
+                eigvec_full = self.get_full_solution_vector(exc_solutions[s])
 
                 if self.rank == mpi_master():
+                    n_ov_a = nocc_a * (norb - nocc_a)
+                    n_ov_b = nocc_b * (norb - nocc_b)
+
+                    eigvec_a = np.hstack((
+                        eigvec_full[:n_ov_a],
+                        eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
+                        ))
+                    eigvec_b = np.hstack((
+                        eigvec_full[n_ov_a:n_ov_a + n_ov_b],
+                        eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
+                        ))
+
                     if self.core_excitation:
                         # TODO: unrestricted
                         mo_occ = scf_tensors['C_alpha'][:, :self.
@@ -1096,12 +1064,13 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     np.zeros(n_exc_b).reshape(-1, 1),
                     np.zeros(n_exc_b).reshape(-1, 1),
                 ))
-            else:
-                X_alpha = None
-                X_beta = None
 
-            final[k] = (DistributedArray(X_alpha, self.comm),
-                        DistributedArray(X_beta, self.comm))
+                # put alpha and beta together
+                X = np.vstack((X_alpha, X_beta))
+            else:
+                X = None
+
+            final[k] = DistributedArray(X, self.comm)
 
         k_offset = len(final)
 
@@ -1127,16 +1096,17 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     Xn_ger.reshape(-1, 1),
                     Xn_ung.reshape(-1, 1),
                 ))
-            else:
-                X_alpha = None
-                X_beta = None
 
-            final[k + k_offset] = (DistributedArray(X_alpha, self.comm),
-                                   DistributedArray(X_beta, self.comm))
+                # put alpha and beta together
+                X = np.vstack((X_alpha, X_beta))
+            else:
+                X = None
+
+            final[k + k_offset] = DistributedArray(X, self.comm)
 
         return final
 
-    def _precond_trials_unrestricted(self, vectors, precond):
+    def _precond_trials(self, vectors, precond):
         """
         Applies preconditioner to distributed trial vectors.
 
@@ -1149,43 +1119,33 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             The preconditioned gerade and ungerade trial vectors.
         """
 
-        trials_ger_alpha = []
-        trials_ung_alpha = []
-        trials_ger_beta = []
-        trials_ung_beta = []
+        trials_ger = []
+        trials_ung = []
 
-        for k, (Xa, Xb) in vectors.items():
+        for k, X in vectors.items():
             if precond is not None:
-                va = self._preconditioning(precond[k][0], Xa)
-                vb = self._preconditioning(precond[k][1], Xb)
+                v = self._preconditioning(precond[k], X)
             else:
-                va = Xa
-                vb = Xb
-            norms_2 = va.squared_norm(axis=0) + vb.squared_norm(axis=0)
+                v = X
+            norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.norm_thresh:
                 norms = np.sqrt(norms_2)
                 # gerade
                 if norms[0] > self.norm_thresh:
-                    trials_ger_alpha.append(va.data[:, 0].copy())
-                    trials_ger_beta.append(vb.data[:, 0].copy())
+                    trials_ger.append(v.data[:, 0])
                 # ungerade
                 if norms[1] > self.norm_thresh:
-                    trials_ung_alpha.append(va.data[:, 1].copy())
-                    trials_ung_beta.append(vb.data[:, 1].copy())
+                    trials_ung.append(v.data[:, 1])
 
-        new_ger_alpha = np.array(trials_ger_alpha).T
-        new_ung_alpha = np.array(trials_ung_alpha).T
-        new_ger_beta = np.array(trials_ger_beta).T
-        new_ung_beta = np.array(trials_ung_beta).T
+        new_ger = np.array(trials_ger).T
+        new_ung = np.array(trials_ung).T
 
-        dist_new_ger_alpha = DistributedArray(new_ger_alpha, self.comm, distribute=False)
-        dist_new_ung_alpha = DistributedArray(new_ung_alpha, self.comm, distribute=False)
-        dist_new_ger_beta = DistributedArray(new_ger_beta, self.comm, distribute=False)
-        dist_new_ung_beta = DistributedArray(new_ung_beta, self.comm, distribute=False)
+        dist_new_ger = DistributedArray(new_ger, self.comm, distribute=False)
+        dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
 
-        return ((dist_new_ger_alpha, dist_new_ger_beta), (dist_new_ung_alpha, dist_new_ung_beta))
+        return dist_new_ger, dist_new_ung
 
     def _get_precond(self, orb_ene, nocc, norb, w):
         """
@@ -1220,8 +1180,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         ediag_a_sq = ediag_a**2
         sdiag_a_sq = sdiag_a**2
+
         ediag_b_sq = ediag_b**2
         sdiag_b_sq = sdiag_b**2
+
         w_sq = w**2
 
         # constructing matrix block diagonals
@@ -1241,7 +1203,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             pb_beta_diag.reshape(-1, 1),
         ))
 
-        return (DistributedArray(p_mat_alpha, self.comm), DistributedArray(p_mat_beta, self.comm))
+        # put alpha and beta together
+        p_mat = np.vstack((p_mat_alpha, p_mat_beta))
+
+        return DistributedArray(p_mat, self.comm)
 
     def _preconditioning(self, precond, v_in):
         """

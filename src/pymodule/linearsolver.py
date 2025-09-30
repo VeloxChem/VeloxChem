@@ -592,39 +592,6 @@ class LinearSolver:
         else:
             self._dist_bung.append(bung, axis=1)
 
-    def _append_trial_vectors_unrestricted(self, bger, bung):
-        """
-        Appends distributed trial vectors.
-
-        :param bger:
-            The distributed gerade trial vectors.
-        :param bung:
-            The distributed ungerade trial vectors.
-        """
-
-        bger_a, bger_b = bger
-        bung_a, bung_b = bung
-
-        if self._dist_bger_alpha is None:
-            self._dist_bger_alpha = DistributedArray(bger_a.data, self.comm, distribute=False)
-        else:
-            self._dist_bger_alpha.append(bger_a, axis=1)
-
-        if self._dist_bger_beta is None:
-            self._dist_bger_beta = DistributedArray(bger_b.data, self.comm, distribute=False)
-        else:
-            self._dist_bger_beta.append(bger_b, axis=1)
-
-        if self._dist_bung_alpha is None:
-            self._dist_bung_alpha = DistributedArray(bung_a.data, self.comm, distribute=False)
-        else:
-            self._dist_bung_alpha.append(bung_a, axis=1)
-
-        if self._dist_bung_beta is None:
-            self._dist_bung_beta = DistributedArray(bung_b.data, self.comm, distribute=False)
-        else:
-            self._dist_bung_beta.append(bung_b, axis=1)
-
     def _append_sigma_vectors(self, e2bger, e2bung):
         """
         Appends distributed sigma (E2 b) vectors.
@@ -648,39 +615,6 @@ class LinearSolver:
                                                  distribute=False)
         else:
             self._dist_e2bung.append(e2bung, axis=1)
-
-    def _append_sigma_vectors_unrestricted(self, e2bger, e2bung):
-        """
-        Appends distributed sigma (E2 b) vectors.
-
-        :param e2bger:
-            The distributed gerade sigma vectors.
-        :param e2bung:
-            The distributed ungerade sigma vectors.
-        """
-
-        e2bger_a, e2bger_b = e2bger
-        e2bung_a, e2bung_b = e2bung
-
-        if self._dist_e2bger_alpha is None:
-            self._dist_e2bger_alpha = DistributedArray(e2bger_a.data, self.comm, distribute=False)
-        else:
-            self._dist_e2bger_alpha.append(e2bger_a, axis=1)
-
-        if self._dist_e2bger_beta is None:
-            self._dist_e2bger_beta = DistributedArray(e2bger_b.data, self.comm, distribute=False)
-        else:
-            self._dist_e2bger_beta.append(e2bger_b, axis=1)
-
-        if self._dist_e2bung_alpha is None:
-            self._dist_e2bung_alpha = DistributedArray(e2bung_a.data, self.comm, distribute=False)
-        else:
-            self._dist_e2bung_alpha.append(e2bung_a, axis=1)
-
-        if self._dist_e2bung_beta is None:
-            self._dist_e2bung_beta = DistributedArray(e2bung_b.data, self.comm, distribute=False)
-        else:
-            self._dist_e2bung_beta.append(e2bung_b, axis=1)
 
     def _append_fock_matrices(self, fock_ger, fock_ung):
         """
@@ -1837,11 +1771,8 @@ class LinearSolver:
             The gerade and ungerade E2 b matrix vector product in half-size.
         """
 
-        vecs_ger_a, vecs_ger_b = vecs_ger
-        vecs_ung_a, vecs_ung_b = vecs_ung
-
-        n_ger = vecs_ger_a.shape(1)
-        n_ung = vecs_ung_a.shape(1)
+        n_ger = vecs_ger.shape(1)
+        n_ung = vecs_ung.shape(1)
 
         n_general = min(n_ger, n_ung)
         n_extra_ger = n_ger - n_general
@@ -1851,22 +1782,13 @@ class LinearSolver:
 
         if self.rank == mpi_master():
             assert_msg_critical(
-                vecs_ger_a.data.ndim == 2 and vecs_ung_a.data.ndim == 2,
+                vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
                 'LinearSolver._e2n_half_size: '
                 'invalid shape of trial vectors')
             assert_msg_critical(
-                vecs_ger_b.data.ndim == 2 and vecs_ung_b.data.ndim == 2,
+                vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
                 'LinearSolver._e2n_half_size: '
                 'invalid shape of trial vectors')
-
-            assert_msg_critical(
-                vecs_ger_a.shape(0) == vecs_ung_a.shape(0),
-                'LinearSolver._e2n_half_size: '
-                'inconsistent shape of trial vectors')
-            assert_msg_critical(
-                vecs_ger_b.shape(0) == vecs_ung_b.shape(0),
-                'LinearSolver._e2n_half_size: '
-                'inconsistent shape of trial vectors')
 
             mo_a = scf_tensors['C_alpha']
             mo_b = scf_tensors['C_beta']
@@ -1888,6 +1810,12 @@ class LinearSolver:
             else:
                 fa_mo = np.linalg.multi_dot([mo_a.T, fa, mo_a])
                 fb_mo = np.linalg.multi_dot([mo_b.T, fb, mo_b])
+
+        else:
+            nocc_a = None
+            norb = None
+
+        nocc_a, norb = self.comm.bcast((nocc_a, norb), root=mpi_master())
 
         # determine number of batches
 
@@ -1950,12 +1878,16 @@ class LinearSolver:
 
                 # form full-size vec
 
+                n_ov_a = nocc_a * (norb - nocc_a)
+
                 if vec_type == 'general':
-                    v_ger_a = vecs_ger_a.get_full_vector(col)
-                    v_ung_a = vecs_ung_a.get_full_vector(col)
-                    v_ger_b = vecs_ger_b.get_full_vector(col)
-                    v_ung_b = vecs_ung_b.get_full_vector(col)
+                    v_ger = vecs_ger.get_full_vector(col)
+                    v_ung = vecs_ung.get_full_vector(col)
                     if self.rank == mpi_master():
+                        v_ger_a = v_ger[:n_ov_a]
+                        v_ger_b = v_ger[n_ov_a:]
+                        v_ung_a = v_ung[:n_ov_a]
+                        v_ung_b = v_ung[n_ov_a:]
                         # full-size trial vector
                         vec_a = np.hstack((v_ger_a, v_ger_a))
                         vec_a += np.hstack((v_ung_a, -v_ung_a))
@@ -1963,17 +1895,19 @@ class LinearSolver:
                         vec_b += np.hstack((v_ung_b, -v_ung_b))
 
                 elif vec_type == 'gerade':
-                    v_ger_a = vecs_ger_a.get_full_vector(col)
-                    v_ger_b = vecs_ger_b.get_full_vector(col)
+                    v_ger = vecs_ger.get_full_vector(col)
                     if self.rank == mpi_master():
+                        v_ger_a = v_ger[:n_ov_a]
+                        v_ger_b = v_ger[n_ov_a:]
                         # full-size gerade trial vector
                         vec_a = np.hstack((v_ger_a, v_ger_a))
                         vec_b = np.hstack((v_ger_b, v_ger_b))
 
                 elif vec_type == 'ungerade':
-                    v_ung_a = vecs_ung_a.get_full_vector(col)
-                    v_ung_b = vecs_ung_b.get_full_vector(col)
+                    v_ung = vecs_ung.get_full_vector(col)
                     if self.rank == mpi_master():
+                        v_ung_a = v_ung[:n_ov_a]
+                        v_ung_b = v_ung[n_ov_a:]
                         # full-size ungerade trial vector
                         vec_a = np.hstack((v_ung_a, -v_ung_a))
                         vec_b = np.hstack((v_ung_b, -v_ung_b))
@@ -2129,11 +2063,17 @@ class LinearSolver:
                             fock_ung_a[:, ifock - batch_ger] = fak_mo_vec
                             fock_ung_b[:, ifock - batch_ger] = fbk_mo_vec
 
-            vecs_e2_ger_a = DistributedArray(e2_ger_a, self.comm)
-            vecs_e2_ung_a = DistributedArray(e2_ung_a, self.comm)
-            vecs_e2_ger_b = DistributedArray(e2_ger_b, self.comm)
-            vecs_e2_ung_b = DistributedArray(e2_ung_b, self.comm)
-            self._append_sigma_vectors_unrestricted((vecs_e2_ger_a, vecs_e2_ger_b), (vecs_e2_ung_a, vecs_e2_ung_b))
+                # put alpha and beta together
+                e2_ger = np.vstack((e2_ger_a, e2_ger_b))
+                e2_ung = np.vstack((e2_ung_a, e2_ung_b))
+
+            else:
+                e2_ger = None
+                e2_ung = None
+
+            vecs_e2_ger = DistributedArray(e2_ger, self.comm)
+            vecs_e2_ung = DistributedArray(e2_ung, self.comm)
+            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
             if self.nonlinear:
                 # TODO: unrestricted
@@ -2141,7 +2081,7 @@ class LinearSolver:
                 dist_fock_ung = DistributedArray(fock_ung, self.comm)
                 self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
-        self._append_trial_vectors_unrestricted((vecs_ger_a, vecs_ger_b), (vecs_ung_a, vecs_ung_b))
+        self._append_trial_vectors(vecs_ger, vecs_ung)
 
         self.ostream.print_blank()
 
@@ -2677,121 +2617,6 @@ class LinearSolver:
                 'LinearSolver: trial vectors are empty')
 
         return dist_new_ger, dist_new_ung
-
-    def _setup_trials_unrestricted(self,
-                      vectors,
-                      precond,
-                      dist_bger=None,
-                      dist_bung=None,
-                      renormalize=True):
-        """
-        Computes orthonormalized trial vectors.
-
-        :param vectors:
-            The set of vectors.
-        :param precond:
-            The preconditioner.
-        :param dist_bger:
-            The distributed gerade subspace.
-        :param dist_bung:
-            The distributed ungerade subspace.
-        :param renormalize:
-            The flag for normalization.
-
-        :return:
-            The orthonormalized gerade and ungerade trial vectors.
-        """
-
-        if dist_bger is not None:
-            dist_bger_a, dist_bger_b = dist_bger
-        else:
-            dist_bger_a, dist_bger_b = None, None
-
-        if dist_bung is not None:
-            dist_bung_a, dist_bung_b = dist_bung
-        else:
-            dist_bung_a, dist_bung_b = None, None
-
-        ((dist_new_ger_a, dist_new_ger_b),
-         (dist_new_ung_a, dist_new_ung_b)) = self._precond_trials_unrestricted(vectors, precond)
-
-        if dist_new_ger_a.data.size == 0:
-            dist_new_ger_a.data = np.zeros((dist_new_ung_a.shape(0), 0))
-
-        if dist_new_ger_b.data.size == 0:
-            dist_new_ger_b.data = np.zeros((dist_new_ung_b.shape(0), 0))
-
-        if dist_new_ung_a.data.size == 0:
-            dist_new_ung_a.data = np.zeros((dist_new_ger_a.shape(0), 0))
-
-        if dist_new_ung_b.data.size == 0:
-            dist_new_ung_b.data = np.zeros((dist_new_ger_b.shape(0), 0))
-
-        if dist_bger is not None:
-            dist_bger_ab_data = np.vstack((dist_bger_a.data, dist_bger_b.data))
-            dist_new_ger_ab_data = np.vstack((dist_new_ger_a.data, dist_new_ger_b.data))
-            dist_bger_ab = DistributedArray(dist_bger_ab_data, self.comm, distribute=False)
-            dist_new_ger_ab = DistributedArray(dist_new_ger_ab_data, self.comm, distribute=False)
-            # t = t - (b (b.T t))
-            bT_new_ger_ab = dist_bger_ab.matmul_AtB_allreduce(dist_new_ger_ab)
-            dist_new_ger_ab_proj = dist_bger_ab.matmul_AB_no_gather(bT_new_ger_ab)
-            dist_new_ger_ab.data -= dist_new_ger_ab_proj.data
-
-            alpha_vec_size = dist_new_ger_a.shape(0)
-            dist_new_ger_a.data = dist_new_ger_ab.data[:alpha_vec_size].copy()
-            dist_new_ger_b.data = dist_new_ger_ab.data[alpha_vec_size:].copy()
-
-        if dist_bung is not None:
-            dist_bung_ab_data = np.vstack((dist_bung_a.data, dist_bung_b.data))
-            dist_new_ung_ab_data = np.vstack((dist_new_ung_a.data, dist_new_ung_b.data))
-            dist_bung_ab = DistributedArray(dist_bung_ab_data, self.comm, distribute=False)
-            dist_new_ung_ab = DistributedArray(dist_new_ung_ab_data, self.comm, distribute=False)
-            # t = t - (b (b.T t))
-            bT_new_ung_ab = dist_bung_ab.matmul_AtB_allreduce(dist_new_ung_ab)
-            dist_new_ung_ab_proj = dist_bung_ab.matmul_AB_no_gather(bT_new_ung_ab)
-            dist_new_ung_ab.data -= dist_new_ung_ab_proj.data
-
-            alpha_vec_size = dist_new_ung_a.shape(0)
-            dist_new_ung_a.data = dist_new_ung_ab.data[:alpha_vec_size].copy()
-            dist_new_ung_b.data = dist_new_ung_ab.data[alpha_vec_size:].copy()
-
-        if renormalize:
-            if dist_new_ger_a.data.ndim > 0 and dist_new_ger_a.shape(0) > 0:
-
-                dist_new_ger_ab_data = np.vstack((dist_new_ger_a.data, dist_new_ger_b.data))
-                dist_new_ger_ab = DistributedArray(dist_new_ger_ab_data, self.comm, distribute=False)
-
-                dist_new_ger_ab = self._remove_linear_dependence_half_size(
-                    dist_new_ger_ab, self.lindep_thresh)
-                dist_new_ger_ab = self._orthogonalize_gram_schmidt_half_size(
-                    dist_new_ger_ab)
-                dist_new_ger_ab = self._normalize_half_size(dist_new_ger_ab)
-
-                alpha_vec_size = dist_new_ger_a.shape(0)
-                dist_new_ger_a.data = dist_new_ger_ab.data[:alpha_vec_size].copy()
-                dist_new_ger_b.data = dist_new_ger_ab.data[alpha_vec_size:].copy()
-
-            if dist_new_ung_a.data.ndim > 0 and dist_new_ung_a.shape(0) > 0:
-
-                dist_new_ung_ab_data = np.vstack((dist_new_ung_a.data, dist_new_ung_b.data))
-                dist_new_ung_ab = DistributedArray(dist_new_ung_ab_data, self.comm, distribute=False)
-
-                dist_new_ung_ab = self._remove_linear_dependence_half_size(
-                    dist_new_ung_ab, self.lindep_thresh)
-                dist_new_ung_ab = self._orthogonalize_gram_schmidt_half_size(
-                    dist_new_ung_ab)
-                dist_new_ung_ab = self._normalize_half_size(dist_new_ung_ab)
-
-                alpha_vec_size = dist_new_ung_a.shape(0)
-                dist_new_ung_a.data = dist_new_ung_ab.data[:alpha_vec_size].copy()
-                dist_new_ung_b.data = dist_new_ung_ab.data[alpha_vec_size:].copy()
-
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger_ab.data.size > 0 or dist_new_ung_ab.data.size > 0,
-                'LinearSolver: trial vectors are empty')
-
-        return ((dist_new_ger_a, dist_new_ger_b), (dist_new_ung_a, dist_new_ung_b))
 
     def get_prop_grad(self, operator, components, molecule, basis, scf_tensors, spin='alpha'):
         """
