@@ -1736,15 +1736,15 @@ class LinearSolver:
             return None
 
     def _e2n_half_size_single_comm_unrestricted(self,
-                                   vecs_ger,
-                                   vecs_ung,
-                                   molecule,
-                                   basis,
-                                   scf_tensors,
-                                   eri_dict,
-                                   dft_dict,
-                                   pe_dict,
-                                   profiler=None):
+                                                vecs_ger,
+                                                vecs_ung,
+                                                molecule,
+                                                basis,
+                                                scf_tensors,
+                                                eri_dict,
+                                                dft_dict,
+                                                pe_dict,
+                                                profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -1785,10 +1785,11 @@ class LinearSolver:
                 vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
                 'LinearSolver._e2n_half_size: '
                 'invalid shape of trial vectors')
+
             assert_msg_critical(
-                vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
+                vecs_ger.shape(0) == vecs_ung.shape(0),
                 'LinearSolver._e2n_half_size: '
-                'invalid shape of trial vectors')
+                'inconsistent shape of trial vectors')
 
             mo_a = scf_tensors['C_alpha']
             mo_b = scf_tensors['C_beta']
