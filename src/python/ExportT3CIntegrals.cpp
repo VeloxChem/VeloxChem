@@ -101,7 +101,8 @@ export_t3cintegrals(py::module& m)
     // Note: RIJKFockDriver is prefixed by an underscore and will be used in rijkfockdriver.py
     PyClass<CRIJKFockDriver>(m, "_RIJKFockDriver")
         .def(py::init<>())
-        .def("compute_bq_vectors", &CRIJKFockDriver::compute_bq_vectors, "Computes B^Q vectors in batches.");
+        .def("compute_bq_vectors", &CRIJKFockDriver::compute_bq_vectors, "Computes B^Q vectors in batches.")
+        .def("compute_j_fock", &CRIJKFockDriver::compute_j_fock, "Computes Coulomb Fock matrix."); 
     
     // CRIFockGradDriver class
     PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")

@@ -36,6 +36,7 @@
 #include <cmath>
 
 #include "OpenMPFunc.hpp"
+#include "BatchFunc.hpp"
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 
 #include <iostream>
@@ -73,6 +74,12 @@ CRIJKFockDriver::compute_bq_vectors(const CMolecule&        molecule,
     const auto natoms = molecule.number_of_atoms();
     
     const auto nbatches = ((natoms % 10) == 0) ? natoms / 10 : natoms / 10 + 1;
+  
+    // set up pointers for OMP region
+    
+    auto ptr_bq_vectors = &_bq_vectors;
+    
+    auto ptr_metric = &metric;
     
     // compute atomic batches contributions to B^Q vectors
     
@@ -82,17 +89,22 @@ CRIJKFockDriver::compute_bq_vectors(const CMolecule&        molecule,
     {
         const auto atoms = omp::partition_atoms(natoms, i, nbatches);
         
-        const auto tints = eri_drv.compute(basis, aux_basis, molecule, atoms);
+        const auto buffer = eri_drv.compute(basis, aux_basis, molecule, atoms);
+        
+        auto ptr_buffer = &buffer;
+        
+        const auto nlocaux = lindices.size();
      
-        for (size_t j = 0; j < lindices.size(); j++)
+#pragma omp parallel for shared(ptr_bq_vectors, ptr_metric, ptr_buffer) schedule(dynamic)
+        for (size_t j = 0; j < nlocaux; j++)
         {
-            auto ptr_bq_vec = _bq_vectors.data(j);
+            auto ptr_bq_vec = ptr_bq_vectors->data(j);
             
-            for (const auto [gidx, lidx] : tints.mask_indices())
+            for (const auto [gidx, lidx] : ptr_buffer->mask_indices())
             {
-                if (const auto fact = metric.at({lindices[j], gidx}); std::fabs(fact) > 1.0e-15)
+                if (const auto fact = ptr_metric->at({gidx, lindices[j]}); std::fabs(fact) > 1.0e-15)
                 {
-                    auto ptr_tints = tints.data(lidx);
+                    auto ptr_tints = ptr_buffer->data(lidx);
                     
                     #pragma omp simd
                     for (size_t k = 0; k < nelems; k++)
@@ -103,4 +115,127 @@ CRIJKFockDriver::compute_bq_vectors(const CMolecule&        molecule,
             }
         }
     }
+}
+
+auto
+CRIJKFockDriver::compute_j_fock(const CMatrix     &density,
+                                const std::string &label) const -> CMatrix
+{
+    if ((label == "2jk") || (label == "2jkx") || (label == "j") || (label == "j_rs"))
+    {
+        CMatrix fmat(density);
+    
+        fmat.assign_flat_values(_comp_j_vector(_comp_m_vector(density)));
+        
+        // rescale Fock matrix for closed shell case
+        
+        if ((label == "2jk") || (label == "2jkx"))
+        {
+            fmat.scale(2.0);
+        }
+        
+        return fmat;
+    }
+    else
+    {
+        return CMatrix();
+    }
+}
+
+auto
+CRIJKFockDriver::_comp_m_vector(const CMatrix &density) const -> std::vector<double>
+{
+    const auto ndim = _bq_vectors.aux_width();
+    
+    const auto nrows = _bq_vectors.width();
+    
+    const auto nelems = nrows * (nrows + 1) / 2;
+    
+    std::vector<double> mvec(ndim, 0.0);
+    
+    const auto dvec = density.flat_values();
+    
+    // set up pointers for OMP region
+    
+    auto ptr_bq_vectors = &_bq_vectors;
+    
+    auto dvec_ptr = dvec.data();
+    
+    auto mvec_ptr = mvec.data();
+    
+    #pragma omp parallel for shared(ptr_bq_vectors, mvec_ptr, dvec_ptr) schedule(dynamic)
+    for (size_t i = 0; i < ndim; i++)
+    {
+        auto tint_ptr = ptr_bq_vectors->data(i);
+         
+        double fsum = 0.0;
+        
+        #pragma omp simd reduction(+:fsum)
+        for (size_t j = 0; j < nelems; j++)
+        {
+            fsum += dvec_ptr[j] * tint_ptr[j];
+        }
+        
+        mvec_ptr[i] = fsum;
+    }
+    
+    return mvec;
+}
+
+auto
+CRIJKFockDriver::_comp_j_vector(const std::vector<double>& mvector) const -> std::vector<double>
+{
+    const auto nrows = _bq_vectors.width();
+    
+    const auto nelems = nrows * (nrows + 1) / 2;
+    
+    std::vector<double> jvec(nelems, 0.0);
+    
+    // set up pointers for OMP region
+    
+    auto ptr_bq_vectors = &_bq_vectors;
+    
+    auto mvec_ptr = mvector.data();
+    
+    auto jvec_ptr = jvec.data();
+    
+    // set up batch size for OMP region
+    
+    const size_t bsize = 500;
+    
+    #pragma omp parallel shared(ptr_bq_vectors, mvec_ptr, jvec_ptr, nelems, bsize)
+    {
+        #pragma omp single nowait
+        {
+            const auto nbatches = batch::number_of_batches(nelems, bsize);
+            
+            for (size_t i = 0; i < nbatches; i++)
+            {
+                const auto bpair = batch::batch_range(i, nelems, bsize);
+                
+                #pragma omp task firstprivate(bpair)
+                {
+                    const size_t bstart = bpair.first;
+                    
+                    const size_t bend = bpair.second;
+                    
+                    for (size_t j = 0; j < ptr_bq_vectors->aux_width(); j++)
+                    {
+                        auto tint_ptr = ptr_bq_vectors->data(j);
+                        
+                        if (const auto fact = mvec_ptr[j]; std::fabs(fact) > 1.0e-15)
+                        {
+                            #pragma omp simd
+                            for (size_t k = bstart; k < bend; k++)
+                            {
+                                jvec_ptr[k] += tint_ptr[k] * fact;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return jvec;
 }

@@ -159,7 +159,7 @@ class RIJKFockDriver:
                            auxiliary_basis,
                            verbose=True):
         """
-        Computes cholesky decomposed J metric for the RI-JK Fock driver.
+        Computes B^Q vectors (distributed) for the RI-JK Fock driver.
         
         :param molecule:
             The molecule to compute three-center integrals.
@@ -203,3 +203,35 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
         
+    def compute_j_fock(self,
+                       density,
+                       label,
+                       verbose=True):
+        """
+        Computes Coulomb Fock matrix.
+        
+        :param density:
+            The AO density matrix (restricted).
+        :param label:
+            The label of Fock matrix type ("J", "J_rs", "2JK", "2JK_rs").
+        :param verbose:
+            The information printout level.
+        """
+        
+        if verbose:
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            
+        ri_prep_t0 = time.time()
+
+        fmat = self._ri_drv.compute_j_fock(density, label)
+        
+        if verbose:
+            self.ostream.print_info('Coulomb contribution done in ' +
+                                    f'{time.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            
+        return fmat

@@ -34,9 +34,12 @@
 #define RIJKFockDriver_hpp
 
 #include "SubMatrix.hpp"
+#include "Matrix.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "T3FlatBuffer.hpp"
+
+#include <string>
 
 /// Class CRIJKFockDriver provides methods for computing Coulomb/Exchange Fock matrices
 /// using three center electron repulsion integrals.
@@ -91,10 +94,27 @@ class CRIJKFockDriver
                             const int               rank,
                             const int               nodes) -> void;
     
+    /// @brief Computes Coulomb Fock matrix for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param label The label of Fock matrix type.
+    /// @return The Fock matrix.
+    auto compute_j_fock(const CMatrix     &density,
+                        const std::string &label) const -> CMatrix;
+    
     private:
     
     /// @brief The distributed B^Q vectors.
     CT3FlatBuffer<double> _bq_vectors;
+    
+    /// @brief Computes M^P vector  for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @return The M^P vectors.
+    auto _comp_m_vector(const CMatrix &density) const -> std::vector<double>;
+    
+    /// @brief Computes J vector  from given M^P vector.
+    /// @param mvector The M^P vector.
+    /// @return The computed J vector.
+    auto _comp_j_vector(const std::vector<double>& mvector) const -> std::vector<double>;
 };
 
 #endif /* RIJKFockDriver_hpp */
