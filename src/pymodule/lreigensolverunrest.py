@@ -625,12 +625,19 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
-                                           basis, scf_tensors)
-            lmom_grad = self.get_prop_grad('linear momentum', 'xyz', molecule,
-                                           basis, scf_tensors)
-            mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
-                                           basis, scf_tensors)
+            edip_grad_a = self.get_prop_grad('electric dipole', 'xyz', molecule,
+                                           basis, scf_tensors, spin='alpha')
+            lmom_grad_a = self.get_prop_grad('linear momentum', 'xyz', molecule,
+                                           basis, scf_tensors, spin='alpha')
+            mdip_grad_a = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
+                                           basis, scf_tensors, spin='alpha')
+
+            edip_grad_b = self.get_prop_grad('electric dipole', 'xyz', molecule,
+                                           basis, scf_tensors, spin='beta')
+            lmom_grad_b = self.get_prop_grad('linear momentum', 'xyz', molecule,
+                                           basis, scf_tensors, spin='beta')
+            mdip_grad_b = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
+                                           basis, scf_tensors, spin='beta')
 
             eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
@@ -652,10 +659,12 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             excitation_details = []
 
             for s in range(self.nstates):
-                eigvec = self.get_full_solution_vector(exc_solutions[s])
+                eigvec_a = self.get_full_solution_vector(exc_solutions[s][0])
+                eigvec_b = self.get_full_solution_vector(exc_solutions[s][1])
 
                 if self.rank == mpi_master():
                     if self.core_excitation:
+                        # TODO: unrestricted
                         mo_occ = scf_tensors['C_alpha'][:, :self.
                                                         num_core_orbitals]
                         mo_vir = scf_tensors['C_alpha'][:, nocc:]
@@ -664,10 +673,15 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                         y_mat = eigvec[eigvec.size // 2:].reshape(
                             self.num_core_orbitals, -1)
                     else:
-                        mo_occ = scf_tensors['C_alpha'][:, :nocc]
-                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
-                        z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
-                        y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
+                        mo_occ_a = scf_tensors['C_alpha'][:, :nocc_a]
+                        mo_vir_a = scf_tensors['C_alpha'][:, nocc_a:]
+                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(nocc_a, -1)
+                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(nocc_a, -1)
+
+                        mo_occ_b = scf_tensors['C_beta'][:, :nocc_b]
+                        mo_vir_b = scf_tensors['C_beta'][:, nocc_b:]
+                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(nocc_b, -1)
+                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(nocc_b, -1)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -804,12 +818,25 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
+                        # TODO: add beta contribution
                         elec_trans_dipoles[s, ind] = np.vdot(
-                            edip_grad[ind], eigvec)
+                            edip_grad_a[ind], eigvec_a)
                         velo_trans_dipoles[s, ind] = np.vdot(
-                            lmom_grad[ind], eigvec) / (-eigvals[s])
+                            lmom_grad_a[ind], eigvec_a) / (-eigvals[s])
                         magn_trans_dipoles[s, ind] = np.vdot(
-                            mdip_grad[ind], eigvec)
+                            mdip_grad_a[ind], eigvec_a)
+
+                        elec_trans_dipoles[s, ind] += np.vdot(
+                            edip_grad_b[ind], eigvec_b)
+                        velo_trans_dipoles[s, ind] += np.vdot(
+                            lmom_grad_b[ind], eigvec_b) / (-eigvals[s])
+                        magn_trans_dipoles[s, ind] += np.vdot(
+                            mdip_grad_b[ind], eigvec_b)
+
+                        # TODO: move factor elsewhere
+                        elec_trans_dipoles[s, ind] /= 2.0
+                        velo_trans_dipoles[s, ind] /= 2.0
+                        magn_trans_dipoles[s, ind] /= 2.0
 
                     # write to h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):
@@ -818,8 +845,12 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                     # save excitation details
                     excitation_details.append(
-                        self.get_excitation_details(eigvec, mo_occ.shape[1],
-                                                    mo_vir.shape[1]))
+                        self.get_excitation_details_unrestricted(
+                            (eigvec_a, eigvec_b),
+                            (mo_occ_a.shape[1],
+                             mo_occ_b.shape[1]),
+                            (mo_vir_a.shape[1],
+                             mo_vir_b.shape[1])))
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
@@ -1102,11 +1133,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             final[k + k_offset] = (DistributedArray(X_alpha, self.comm),
                                    DistributedArray(X_beta, self.comm))
 
-        print()
-        for k in final:
-            print(k, 'a', final[k][0].data.shape, 'b', final[k][1].data.shape)
-        print()
-
         return final
 
     def _precond_trials_unrestricted(self, vectors, precond):
@@ -1129,22 +1155,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
         for k, (Xa, Xb) in vectors.items():
             if precond is not None:
-                print(precond[k][0].data.shape, Xa.data.shape)
-                print(precond[k][1].data.shape, Xb.data.shape)
-            else:
-                print(Xa.data.shape)
-                print(Xb.data.shape)
-            print('---')
-        print()
-
-        for k, (Xa, Xb) in vectors.items():
-            if precond is not None:
                 va = self._preconditioning(precond[k][0], Xa)
                 vb = self._preconditioning(precond[k][1], Xb)
             else:
                 va = Xa
                 vb = Xb
-                print('vb shape', vb.data.shape)
             norms_2 = va.squared_norm(axis=0) + vb.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
@@ -1154,18 +1169,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                 if norms[0] > self.norm_thresh:
                     trials_ger_alpha.append(va.data[:, 0].copy())
                     trials_ger_beta.append(vb.data[:, 0].copy())
-                    print('vb.data.shape', vb.data[:, 0].copy().shape)
                 # ungerade
                 if norms[1] > self.norm_thresh:
                     trials_ung_alpha.append(va.data[:, 1].copy())
                     trials_ung_beta.append(vb.data[:, 1].copy())
-
-        print(len(trials_ger_beta))
-        for elem in trials_ger_beta:
-            print('  ', '->', len(elem))
-        print()
-        import sys
-        sys.stdout.flush()
 
         new_ger_alpha = np.array(trials_ger_alpha).T
         new_ung_alpha = np.array(trials_ung_alpha).T

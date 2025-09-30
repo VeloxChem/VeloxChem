@@ -1840,14 +1840,6 @@ class LinearSolver:
         vecs_ger_a, vecs_ger_b = vecs_ger
         vecs_ung_a, vecs_ung_b = vecs_ung
 
-        print('vecs_ger_a.shape', vecs_ger_a.data.shape)
-        print('vecs_ger_b.shape', vecs_ger_b.data.shape)
-        print()
-
-        print('vecs_ung_a.shape', vecs_ung_a.data.shape)
-        print('vecs_ung_b.shape', vecs_ung_b.data.shape)
-        print()
-
         n_ger = vecs_ger_a.shape(1)
         n_ung = vecs_ung_a.shape(1)
 
@@ -1991,9 +1983,6 @@ class LinearSolver:
                 if self.rank == mpi_master():
                     half_size_a = vec_a.shape[0] // 2
                     half_size_b = vec_b.shape[0] // 2
-
-                    print('vec_a.shape', vec_a.shape, nocc_a, norb - nocc_a)
-                    print()
 
                     if getattr(self, 'core_excitation', False):
                         # TODO: unrestricted
@@ -2804,7 +2793,7 @@ class LinearSolver:
 
         return ((dist_new_ger_a, dist_new_ger_b), (dist_new_ung_a, dist_new_ung_b))
 
-    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors):
+    def get_prop_grad(self, operator, components, molecule, basis, scf_tensors, spin='alpha'):
         """
         Computes property gradients for linear response equations.
 
@@ -2894,8 +2883,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             integral_comps = [integrals[p] for p in components]
 
-            mo = scf_tensors['C_alpha']
-            nocc = molecule.number_of_alpha_electrons()
+            if spin == 'alpha':
+                mo = scf_tensors['C_alpha']
+                nocc = molecule.number_of_alpha_electrons()
+            elif spin == 'beta':
+                mo = scf_tensors['C_beta']
+                nocc = molecule.number_of_beta_electrons()
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
@@ -3601,6 +3594,81 @@ class LinearSolver:
                             abs(de_exc_coef),
                             f'{homo_str:<8s} <- {lumo_str:<8s} {de_exc_coef:10.4f}',
                         ))
+
+        excitation_details = []
+        for exc in sorted(excitations, reverse=True):
+            excitation_details.append(exc[1])
+        for de_exc in sorted(de_excitations, reverse=True):
+            excitation_details.append(de_exc[1])
+
+        return excitation_details
+
+    def get_excitation_details_unrestricted(self, eigvec, nocc, nvir, coef_thresh=0.2):
+        """
+        Get excitation details.
+
+        :param eigvec:
+            The eigenvectors.
+        :param nocc:
+            The number of occupied molecular orbitals.
+        :param nvir:
+            The number of virtual molecular orbitals.
+        :param coef_thresh:
+            The threshold for including transitions.
+
+        :return:
+            The excitation details as a list of strings.
+        """
+
+        eigvec_a, eigvec_b = eigvec
+        nocc_a, nocc_b = nocc
+        nvir_a, nvir_b = nvir
+
+        n_ov_a = nocc_a * nvir_a
+        assert_msg_critical(
+            eigvec_a.size == n_ov_a or eigvec_a.size == n_ov_a * 2,
+            'LinearSolver.get_excitation_details: Inconsistent size')
+
+        n_ov_b = nocc_b * nvir_b
+        assert_msg_critical(
+            eigvec_b.size == n_ov_b or eigvec_b.size == n_ov_b * 2,
+            'LinearSolver.get_excitation_details: Inconsistent size')
+
+        excitations = []
+        de_excitations = []
+
+        # TODO: move factor elsewhere
+        factor = 1.0 / np.sqrt(2.0)
+
+        for nocc, nvir, eigvec, spin in [(nocc_a, nvir_a, eigvec_a, 'a'), (nocc_b, nvir_b, eigvec_b, 'b')]:
+            for i in range(nocc):
+                if getattr(self, 'core_excitation', False):
+                    # TODO: unrestricted core_excitation
+                    homo_str = f'core_{i + 1}'
+                else:
+                    homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
+                homo_str += f'({spin})'
+
+                for a in range(nvir):
+                    lumo_str = 'LUMO' if a == 0 else f'LUMO+{a}'
+                    lumo_str += f'({spin})'
+
+                    ia = i * nvir + a
+
+                    exc_coef = eigvec[ia] * factor
+                    if abs(exc_coef) > coef_thresh:
+                        excitations.append((
+                            abs(exc_coef),
+                            f'{homo_str:<12s} -> {lumo_str:<12s} {exc_coef:10.4f}',
+                        ))
+
+                    if eigvec.size == nocc * nvir * 2:
+                        de_exc_coef = eigvec[nocc * nvir + ia] * factor
+                        if abs(de_exc_coef) > coef_thresh:
+                            de_excitations.append((
+                                abs(de_exc_coef),
+                                f'{homo_str:<8s} <- {lumo_str:<8s} {de_exc_coef:10.4f}',
+                            ))
 
         excitation_details = []
         for exc in sorted(excitations, reverse=True):
