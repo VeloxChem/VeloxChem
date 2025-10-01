@@ -294,12 +294,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
             'LinearResponseUnrestrictedEigenSolver: ' +
             'not implemented for nonlinear')
 
-        # TODO: enable DFT
-        assert_msg_critical(
-            not self._dft,
-            'LinearResponseUnrestrictedEigenSolver: ' +
-            'not yet implemented for DFT')
-
         # TODO: enable PE
         assert_msg_critical(
             not self._pe,

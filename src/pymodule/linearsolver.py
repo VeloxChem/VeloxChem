@@ -451,9 +451,14 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
-                gs_density = (scf_tensors['D_alpha'].copy(),)
+                if scf_tensors['scf_type'] == 'restricted':
+                    gs_density = (scf_tensors['D_alpha'].copy(),)
+                else:
+                    gs_density = (scf_tensors['D_alpha'].copy(),
+                                  scf_tensors['D_beta'].copy())
             else:
                 gs_density = None
+            # TODO: bcast D_alpha and D_beta separately
             gs_density = self.comm.bcast(gs_density, root=mpi_master())
 
             dft_func_label = self.xcfun.get_func_label().upper()
@@ -1676,7 +1681,8 @@ class LinearSolver:
             den_mat_for_Jab = Matrix()
             fock_mat = Matrix()
 
-            fock_arrays.append([fock_mat_a_np, fock_mat_b_np])
+            fock_arrays.append(fock_mat_a_np)
+            fock_arrays.append(fock_mat_b_np)
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -1689,9 +1695,15 @@ class LinearSolver:
                 molgrid.re_distribute_counts_and_displacements(
                     comm.Get_rank(), comm.Get_size())
 
+            dens_a_and_b = []
+            for da, db in zip(dens_a, dens_b):
+                dens_a_and_b.append(da)
+                dens_a_and_b.append(db)
+
             xc_drv = XCIntegrator()
-            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
-                                      gs_density, molgrid, self.xcfun)
+            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis,
+                                      dens_a_and_b, gs_density, molgrid,
+                                      self.xcfun)
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
@@ -1705,7 +1717,8 @@ class LinearSolver:
                 V_emb = self._embedding_drv.compute_pe_contributions(
                     density_matrix=dm)
                 if comm_rank == mpi_master():
-                    fock_arrays[idx] += V_emb
+                    fock_arrays[idx * 2 + 0] += V_emb
+                    fock_arrays[idx * 2 + 1] += V_emb
 
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
@@ -1721,14 +1734,17 @@ class LinearSolver:
                     self.non_equilibrium_solv)
 
                 if comm_rank == mpi_master():
-                    fock_arrays[idx] += Fock_sol
+                    fock_arrays[idx * 2 + 0] += Fock_sol
+                    fock_arrays[idx * 2 + 1] += Fock_sol
 
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
 
-        for idx in range(len(fock_arrays)):
-            fock_arrays[idx][0] = comm.reduce(fock_arrays[idx][0], root=mpi_master())
-            fock_arrays[idx][1] = comm.reduce(fock_arrays[idx][1], root=mpi_master())
+        for idx in range(num_densities):
+            fock_arrays[idx * 2 + 0] = comm.reduce(
+                fock_arrays[idx * 2 + 0], root=mpi_master())
+            fock_arrays[idx * 2 + 1] = comm.reduce(
+                fock_arrays[idx * 2 + 1], root=mpi_master())
 
         if comm_rank == mpi_master():
             return fock_arrays
@@ -1959,8 +1975,9 @@ class LinearSolver:
 
             # form Fock matrices
 
-            fock = self._comp_lr_fock_unrestricted((dks_a, dks_b), molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, profiler)
+            fock = self._comp_lr_fock_unrestricted(
+                (dks_a, dks_b), molecule, basis, eri_dict, dft_dict, pe_dict,
+                profiler)
 
             if self.rank == mpi_master():
                 raw_fock_ger_a = []
@@ -1975,27 +1992,29 @@ class LinearSolver:
 
                 for col in range(batch_start, batch_end):
                     ifock = col - batch_start
+                    fock_a_np = fock[ifock * 2 + 0]
+                    fock_b_np = fock[ifock * 2 + 1]
 
                     if col < n_general:
-                        raw_fock_ger_a.append(0.5 * (fock[ifock][0] - fock[ifock][0].T))
-                        raw_fock_ung_a.append(0.5 * (fock[ifock][0] + fock[ifock][0].T))
+                        raw_fock_ger_a.append(0.5 * (fock_a_np - fock_a_np.T))
+                        raw_fock_ung_a.append(0.5 * (fock_a_np + fock_a_np.T))
                         raw_kns_ger_a.append(0.5 * (kns_a[ifock] + kns_a[ifock].T))
                         raw_kns_ung_a.append(0.5 * (kns_a[ifock] - kns_a[ifock].T))
-                        raw_fock_ger_b.append(0.5 * (fock[ifock][1] - fock[ifock][1].T))
-                        raw_fock_ung_b.append(0.5 * (fock[ifock][1] + fock[ifock][1].T))
+                        raw_fock_ger_b.append(0.5 * (fock_b_np - fock_b_np.T))
+                        raw_fock_ung_b.append(0.5 * (fock_b_np + fock_b_np.T))
                         raw_kns_ger_b.append(0.5 * (kns_b[ifock] + kns_b[ifock].T))
                         raw_kns_ung_b.append(0.5 * (kns_b[ifock] - kns_b[ifock].T))
 
                     elif n_extra_ger > 0:
-                        raw_fock_ger_a.append(0.5 * (fock[ifock][0] - fock[ifock][0].T))
+                        raw_fock_ger_a.append(0.5 * (fock_a_np - fock_a_np.T))
                         raw_kns_ger_a.append(0.5 * (kns_a[ifock] + kns_a[ifock].T))
-                        raw_fock_ger_b.append(0.5 * (fock[ifock][1] - fock[ifock][1].T))
+                        raw_fock_ger_b.append(0.5 * (fock_b_np - fock_b_np.T))
                         raw_kns_ger_b.append(0.5 * (kns_b[ifock] + kns_b[ifock].T))
 
                     elif n_extra_ung > 0:
-                        raw_fock_ung_a.append(0.5 * (fock[ifock][0] + fock[ifock][0].T))
+                        raw_fock_ung_a.append(0.5 * (fock_a_np + fock_a_np.T))
                         raw_kns_ung_a.append(0.5 * (kns_a[ifock] - kns_a[ifock].T))
-                        raw_fock_ung_b.append(0.5 * (fock[ifock][1] + fock[ifock][1].T))
+                        raw_fock_ung_b.append(0.5 * (fock_b_np + fock_b_np.T))
                         raw_kns_ung_b.append(0.5 * (kns_b[ifock] - kns_b[ifock].T))
 
                 fock_a = raw_fock_ger_a + raw_fock_ung_a

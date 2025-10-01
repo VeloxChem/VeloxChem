@@ -56,3 +56,19 @@ class TestUnrestrictedRPA:
         ])
 
         self.run_rpa('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
+
+    def test_pbe0_svp(self):
+
+        # vlxtag: UKS, Absorption, TDDFT
+
+        ref_exc_enes = np.array([
+            0.08832630, 0.09472770, 0.22512802, 0.48348997, 0.48361504,
+            0.51691424, 0.52828051, 0.54298284, 0.56229157, 0.60539714
+        ])
+
+        ref_osc_str = np.array([
+            0.1596, 0.0012, 0.0000, 0.1985, 0.0338, 0.0072, 0.0000, 0.0308,
+            0.0600, 0.1210
+        ])
+
+        self.run_rpa('pbe0', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
