@@ -679,26 +679,27 @@ class LinearSolver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        # TODO: enable RI-J with subcomms
+        # TODO: enable subcomms for RI-J
 
         if self.use_subcomms:
             if method_type == 'restricted':
-                self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
-                                             scf_tensors, eri_dict, dft_dict,
-                                             pe_dict, profiler)
+                self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule,
+                                             basis, scf_tensors, eri_dict,
+                                             dft_dict, pe_dict, profiler)
             else:
+                # TODO: enable subcomms for unrestricted
                 assert_msg_critical(False,
                     'LinearSolver._e2n_half_size: '
                     'Cannot use subcomms for unrestricted case')
         else:
             if method_type == 'restricted':
-                self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule, basis,
-                                                scf_tensors, eri_dict, dft_dict,
-                                                pe_dict, profiler)
+                self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule,
+                                                basis, scf_tensors, eri_dict,
+                                                dft_dict, pe_dict, profiler)
             else:
-                self._e2n_half_size_single_comm_unrestricted(vecs_ger, vecs_ung, molecule, basis,
-                                                scf_tensors, eri_dict, dft_dict,
-                                                pe_dict, profiler)
+                self._e2n_half_size_single_comm_unrestricted(
+                    vecs_ger, vecs_ung, molecule, basis, scf_tensors, eri_dict,
+                    dft_dict, pe_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
                                 vecs_ger,
@@ -709,8 +710,7 @@ class LinearSolver:
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
-                                profiler=None,
-                                method_type='restricted'):
+                                profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -1080,8 +1080,7 @@ class LinearSolver:
                                    eri_dict,
                                    dft_dict,
                                    pe_dict,
-                                   profiler=None,
-                                   method_type='restricted'):
+                                   profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -1524,14 +1523,14 @@ class LinearSolver:
             return None
 
     def _comp_lr_fock_unrestricted(self,
-                      dens,
-                      molecule,
-                      basis,
-                      eri_dict,
-                      dft_dict,
-                      pe_dict,
-                      profiler=None,
-                      comm=None):
+                                   dens,
+                                   molecule,
+                                   basis,
+                                   eri_dict,
+                                   dft_dict,
+                                   pe_dict,
+                                   profiler=None,
+                                   comm=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -1622,10 +1621,11 @@ class LinearSolver:
                 )
 
             if self.ri_coulomb and fock_type == 'j':
-                # TODO: unrestricted
+                # TODO: double check
                 # symmetrize density for RI-J
                 den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
+                dens_Jab = dens_a[idx] + dens_b[idx]
+                den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
 
                 fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
             else:
@@ -2098,193 +2098,15 @@ class LinearSolver:
             self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
             if self.nonlinear:
-                # TODO: unrestricted
-                dist_fock_ger = DistributedArray(fock_ger, self.comm)
-                dist_fock_ung = DistributedArray(fock_ung, self.comm)
-                self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+                # TODO: unrestricted for nonlinear
+                # dist_fock_ger = DistributedArray(fock_ger, self.comm)
+                # dist_fock_ung = DistributedArray(fock_ung, self.comm)
+                # self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+                pass
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
         self.ostream.print_blank()
-
-    def _comp_lr_fock(self,
-                      dens,
-                      molecule,
-                      basis,
-                      eri_dict,
-                      dft_dict,
-                      pe_dict,
-                      profiler=None,
-                      comm=None):
-        """
-        Computes Fock/Fxc matrix (2e part) for linear response calculation.
-
-        :param dens:
-            The density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param eri_dict:
-            The dictionary containing ERI information.
-        :param dft_dict:
-            The dictionary containing DFT information.
-        :param pe_dict:
-            The dictionary containing PE information.
-        :param profiler:
-            The profiler.
-
-        :return:
-            The Fock matrix (2e part).
-        """
-
-        if comm is None:
-            comm = self.comm
-            redistribute_xc_molgrid = False
-        else:
-            # use subcommunicators
-            redistribute_xc_molgrid = True
-
-        comm_rank = comm.Get_rank()
-
-        screening = eri_dict['screening']
-
-        molgrid = dft_dict['molgrid']
-        gs_density = dft_dict['gs_density']
-
-        if comm_rank == mpi_master():
-            num_densities = len(dens)
-        else:
-            num_densities = None
-        num_densities = comm.bcast(num_densities, root=mpi_master())
-
-        if comm_rank != mpi_master():
-            dens = [None for idx in range(num_densities)]
-
-        for idx in range(num_densities):
-            dens[idx] = comm.bcast(dens[idx], root=mpi_master())
-
-        thresh_int = int(-math.log10(self.eri_thresh))
-
-        t0 = tm.time()
-
-        fock_drv = FockDriver(comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
-
-        # determine fock_type and exchange_scaling_factor
-        fock_type = '2jk'
-        exchange_scaling_factor = 1.0
-        if self._dft:
-            if self.xcfun.is_hybrid():
-                fock_type = '2jkx'
-                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
-            else:
-                fock_type = 'j'
-                exchange_scaling_factor = 0.0
-
-        # further determine exchange_scaling_factor, erf_k_coef and omega
-        need_omega = (self._dft and self.xcfun.is_range_separated())
-        if need_omega:
-            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
-                                       self.xcfun.get_rs_beta())
-            erf_k_coef = -self.xcfun.get_rs_beta()
-            omega = self.xcfun.get_rs_omega()
-        else:
-            erf_k_coef, omega = None, None
-
-        fock_arrays = []
-
-        for idx in range(num_densities):
-            if self.ri_coulomb:
-                assert_msg_critical(
-                    fock_type == 'j',
-                    'LinearSolver: RI is only applicable to pure DFT functional'
-                )
-
-            if self.ri_coulomb and fock_type == 'j':
-                # symmetrize density for RI-J
-                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
-
-                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
-            else:
-                den_mat_for_fock = make_matrix(basis, mat_t.general)
-                den_mat_for_fock.set_values(dens[idx])
-
-                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                            fock_type, exchange_scaling_factor,
-                                            0.0, thresh_int)
-
-            fock_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
-
-            if fock_type == 'j':
-                # for pure functional
-                fock_np *= 2.0
-
-            if need_omega:
-                # for range-separated functional
-                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                            'kx_rs', erf_k_coef, omega,
-                                            thresh_int)
-
-                fock_np -= fock_mat.to_numpy()
-                fock_mat = Matrix()
-
-            fock_arrays.append(fock_np)
-
-        if profiler is not None:
-            profiler.add_timing_info('FockERI', tm.time() - t0)
-
-        if self._dft:
-            t0 = tm.time()
-
-            if redistribute_xc_molgrid:
-                molgrid.re_distribute_counts_and_displacements(
-                    comm.Get_rank(), comm.Get_size())
-
-            xc_drv = XCIntegrator()
-            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
-                                      gs_density, molgrid, self.xcfun)
-
-            if profiler is not None:
-                profiler.add_timing_info('FockXC', tm.time() - t0)
-
-        if self._pe:
-            t0 = tm.time()
-            for idx in range(num_densities):
-                # Note: only closed shell density for now
-                dm = dens[idx] * 2.0
-                V_emb = self._embedding_drv.compute_pe_contributions(
-                    density_matrix=dm)
-                if comm_rank == mpi_master():
-                    fock_arrays[idx] += V_emb
-
-            if profiler is not None:
-                profiler.add_timing_info('FockPE', tm.time() - t0)
-
-        if self._cpcm:
-
-            t0 = tm.time()
-
-            for idx in range(num_densities):
-                Fock_sol = self.cpcm_drv.compute_response_fock(
-                    molecule, basis, dens[idx] * 2.0, self.cpcm_cg_thresh,
-                    self.non_equilibrium_solv)
-
-                if comm_rank == mpi_master():
-                    fock_arrays[idx] += Fock_sol
-
-            if profiler is not None:
-                profiler.add_timing_info('FockCPCM', tm.time() - t0)
-
-        for idx in range(len(fock_arrays)):
-            fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
-
-        if comm_rank == mpi_master():
-            return fock_arrays
-        else:
-            return None
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -3499,7 +3321,6 @@ class LinearSolver:
         for nocc, nvir, eigvec, spin in [(nocc_a, nvir_a, eigvec_a, 'a'), (nocc_b, nvir_b, eigvec_b, 'b')]:
             for i in range(nocc):
                 if getattr(self, 'core_excitation', False):
-                    # TODO: unrestricted core_excitation
                     homo_str = f'core_{i + 1}'
                 else:
                     homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
