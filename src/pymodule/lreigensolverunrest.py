@@ -618,8 +618,12 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                 eigvec_full = self.get_full_solution_vector(exc_solutions[s])
 
                 if self.rank == mpi_master():
-                    n_ov_a = nocc_a * (norb - nocc_a)
-                    n_ov_b = nocc_b * (norb - nocc_b)
+                    if self.core_excitation:
+                        n_ov_a = self.num_core_orbitals * (norb - nocc_a)
+                        n_ov_b = self.num_core_orbitals * (norb - nocc_b)
+                    else:
+                        n_ov_a = nocc_a * (norb - nocc_a)
+                        n_ov_b = nocc_b * (norb - nocc_b)
 
                     eigvec_a = np.hstack((
                         eigvec_full[:n_ov_a],
@@ -633,13 +637,13 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     if self.core_excitation:
                         mo_occ_a = scf_tensors['C_alpha'][:, :self.num_core_orbitals]
                         mo_vir_a = scf_tensors['C_alpha'][:, nocc_a:]
-                        z_mat_a = eigvec[:eigvec_a.size // 2].reshape(self.num_core_orbitals, -1)
-                        y_mat_a = eigvec[eigvec_a.size // 2:].reshape(self.num_core_orbitals, -1)
+                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(self.num_core_orbitals, -1)
+                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(self.num_core_orbitals, -1)
 
                         mo_occ_b = scf_tensors['C_beta'][:, :self.num_core_orbitals]
                         mo_vir_b = scf_tensors['C_beta'][:, nocc_b:]
-                        z_mat_b = eigvec[:eigvec_b.size // 2].reshape(self.num_core_orbitals, -1)
-                        y_mat_b = eigvec[eigvec_b.size // 2:].reshape(self.num_core_orbitals, -1)
+                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(self.num_core_orbitals, -1)
+                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(self.num_core_orbitals, -1)
                     else:
                         mo_occ_a = scf_tensors['C_alpha'][:, :nocc_a]
                         mo_vir_a = scf_tensors['C_alpha'][:, nocc_a:]

@@ -1803,11 +1803,14 @@ class LinearSolver:
             norb = mo_a.shape[1]
 
             if getattr(self, 'core_excitation', False):
-                # TODO: unrestricted
-                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
-                    range(nocc, norb))
-                mo_core_exc = mo[:, core_exc_orb_inds]
-                fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+                core_exc_orb_inds_a = list(range(self.num_core_orbitals)) + list(
+                    range(nocc_a, norb))
+                core_exc_orb_inds_b = list(range(self.num_core_orbitals)) + list(
+                    range(nocc_b, norb))
+                mo_core_exc_a = mo_a[:, core_exc_orb_inds_a]
+                mo_core_exc_b = mo_b[:, core_exc_orb_inds_b]
+                fa_mo = np.linalg.multi_dot([mo_core_exc_a.T, fa, mo_core_exc_a])
+                fb_mo = np.linalg.multi_dot([mo_core_exc_b.T, fb, mo_core_exc_b])
             else:
                 fa_mo = np.linalg.multi_dot([mo_a.T, fa, mo_a])
                 fb_mo = np.linalg.multi_dot([mo_b.T, fb, mo_b])
@@ -1879,7 +1882,10 @@ class LinearSolver:
 
                 # form full-size vec
 
-                n_ov_a = nocc_a * (norb - nocc_a)
+                if getattr(self, 'core_excitation', False):
+                    n_ov_a = self.num_core_orbitals * (norb - nocc_a)
+                else:
+                    n_ov_a = nocc_a * (norb - nocc_a)
 
                 if vec_type == 'general':
                     v_ger = vecs_ger.get_full_vector(col)
@@ -1920,16 +1926,24 @@ class LinearSolver:
                     half_size_b = vec_b.shape[0] // 2
 
                     if getattr(self, 'core_excitation', False):
-                        # TODO: unrestricted
-                        kn = self.lrvec2mat(vec, nocc, norb,
-                                            self.num_core_orbitals)
-                        dak = self.commut_mo_density(kn, nocc,
+                        kn_a = self.lrvec2mat(vec_a, nocc_a, norb,
+                                              self.num_core_orbitals)
+                        kn_b = self.lrvec2mat(vec_b, nocc_b, norb,
+                                              self.num_core_orbitals)
+                        dak = self.commut_mo_density(kn_a, nocc_a,
                                                      self.num_core_orbitals)
-                        core_exc_orb_inds = list(range(
-                            self.num_core_orbitals)) + list(range(nocc, norb))
-                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        dbk = self.commut_mo_density(kn_b, nocc_b,
+                                                     self.num_core_orbitals)
+                        core_exc_orb_inds_a = list(range(
+                            self.num_core_orbitals)) + list(range(nocc_a, norb))
+                        core_exc_orb_inds_b = list(range(
+                            self.num_core_orbitals)) + list(range(nocc_b, norb))
+                        mo_core_exc_a = mo_a[:, core_exc_orb_inds_a]
+                        mo_core_exc_b = mo_b[:, core_exc_orb_inds_b]
                         dak = np.linalg.multi_dot(
-                            [mo_core_exc, dak, mo_core_exc.T])
+                            [mo_core_exc_a, dak, mo_core_exc_a.T])
+                        dbk = np.linalg.multi_dot(
+                            [mo_core_exc_b, dbk, mo_core_exc_b.T])
                     else:
                         kn_a = self.lrvec2mat(vec_a, nocc_a, norb)
                         kn_b = self.lrvec2mat(vec_b, nocc_b, norb)
@@ -2018,12 +2032,16 @@ class LinearSolver:
                     fbk = fock_b[ifock]
 
                     if getattr(self, 'core_excitation', False):
-                        # TODO: unrestricted
-                        core_exc_orb_inds = list(range(
-                            self.num_core_orbitals)) + list(range(nocc, norb))
-                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        core_exc_orb_inds_a = list(range(
+                            self.num_core_orbitals)) + list(range(nocc_a, norb))
+                        core_exc_orb_inds_b = list(range(
+                            self.num_core_orbitals)) + list(range(nocc_b, norb))
+                        mo_core_exc_a = mo_a[:, core_exc_orb_inds_a]
+                        mo_core_exc_b = mo_b[:, core_exc_orb_inds_b]
                         fak_mo = np.linalg.multi_dot(
-                            [mo_core_exc.T, fak, mo_core_exc])
+                            [mo_core_exc_a.T, fak, mo_core_exc_a])
+                        fbk_mo = np.linalg.multi_dot(
+                            [mo_core_exc_b.T, fbk, mo_core_exc_b])
                     else:
                         fak_mo = np.linalg.multi_dot([mo_a.T, fak, mo_a])
                         fbk_mo = np.linalg.multi_dot([mo_b.T, fbk, mo_b])
@@ -2035,11 +2053,14 @@ class LinearSolver:
                     fbt_mo = fbk_mo + kfb_mo
 
                     if getattr(self, 'core_excitation', False):
-                        # TODO: unrestricted
-                        gmo = -self.commut_mo_density(fat_mo, nocc,
-                                                      self.num_core_orbitals)
-                        gmo_vec_halfsize = self.lrmat2vec(
-                            gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                        gmo_a = -self.commut_mo_density(fat_mo, nocc_a,
+                                                        self.num_core_orbitals)
+                        gmo_b = -self.commut_mo_density(fbt_mo, nocc_b,
+                                                        self.num_core_orbitals)
+                        gmo_vec_halfsize_a = self.lrmat2vec(
+                            gmo_a, nocc_a, norb, self.num_core_orbitals)[:half_size_a]
+                        gmo_vec_halfsize_b = self.lrmat2vec(
+                            gmo_b, nocc_b, norb, self.num_core_orbitals)[:half_size_b]
                     else:
                         gmo_a = -self.commut_mo_density(fat_mo, nocc_a)
                         gmo_b = -self.commut_mo_density(fbt_mo, nocc_b)
@@ -3387,7 +3408,11 @@ class LinearSolver:
             The excitation details as a list of strings.
         """
 
-        n_ov = nocc * nvir
+        if getattr(self, 'core_excitation', False):
+            n_ov = self.num_core_orbitals * nvir
+        else:
+            n_ov = nocc * nvir
+
         assert_msg_critical(
             eigvec.size == n_ov or eigvec.size == n_ov * 2,
             'LinearSolver.get_excitation_details: Inconsistent size')
@@ -3450,12 +3475,17 @@ class LinearSolver:
         nocc_a, nocc_b = nocc
         nvir_a, nvir_b = nvir
 
-        n_ov_a = nocc_a * nvir_a
+        if getattr(self, 'core_excitation', False):
+            n_ov_a = self.num_core_orbitals * nvir_a
+            n_ov_b = self.num_core_orbitals * nvir_b
+        else:
+            n_ov_a = nocc_a * nvir_a
+            n_ov_b = nocc_b * nvir_b
+
         assert_msg_critical(
             eigvec_a.size == n_ov_a or eigvec_a.size == n_ov_a * 2,
             'LinearSolver.get_excitation_details: Inconsistent size')
 
-        n_ov_b = nocc_b * nvir_b
         assert_msg_critical(
             eigvec_b.size == n_ov_b or eigvec_b.size == n_ov_b * 2,
             'LinearSolver.get_excitation_details: Inconsistent size')
