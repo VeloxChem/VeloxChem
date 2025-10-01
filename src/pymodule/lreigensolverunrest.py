@@ -830,16 +830,16 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     # write to h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):
                         write_rsp_solution(final_h5_fname,
-                                           'S{:d}'.format(s + 1), eigvec)
+                                           'S{:d}(a)'.format(s + 1), eigvec_a)
+                        write_rsp_solution(final_h5_fname,
+                                           'S{:d}(a)'.format(s + 1), eigvec_b)
 
                     # save excitation details
                     excitation_details.append(
                         self.get_excitation_details_unrestricted(
                             (eigvec_a, eigvec_b),
-                            (mo_occ_a.shape[1],
-                             mo_occ_b.shape[1]),
-                            (mo_vir_a.shape[1],
-                             mo_vir_b.shape[1])))
+                            (mo_occ_a.shape[1], mo_occ_b.shape[1]),
+                            (mo_vir_a.shape[1], mo_vir_b.shape[1])))
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()

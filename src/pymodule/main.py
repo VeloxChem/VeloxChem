@@ -573,7 +573,9 @@ def main():
 
     # Response
 
-    if task_type == 'response' and scf_drv.scf_type == 'restricted':
+    if (task_type == 'response' and
+            scf_drv.scf_type in ['restricted', 'unrestricted']):
+
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
         rsp_dict['program_end_time'] = program_end_time
@@ -581,7 +583,8 @@ def main():
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream,
+                             method_type=scf_drv.scf_type)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if not rsp_prop.is_converged:

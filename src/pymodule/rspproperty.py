@@ -39,6 +39,7 @@ from .cppsolver import ComplexResponse
 from .tdacppsolver import ComplexResponseTDA
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .shgdriver import ShgDriver
@@ -80,7 +81,7 @@ class ResponseProperty:
         self._rsp_driver = None
         self._rsp_property = None
 
-    def init_driver(self, comm=None, ostream=None):
+    def init_driver(self, comm=None, ostream=None, method_type='restricted'):
         """
         Initializes response driver.
 
@@ -88,6 +89,8 @@ class ResponseProperty:
             The MPI communicator.
         :param ostream:
             The output stream.
+        :param method_type:
+            The method type (restricted, unrestricted or restricted_openshell).
         """
 
         if comm is None:
@@ -188,8 +191,15 @@ class ResponseProperty:
             if self.tamm_dancoff:
                 self._rsp_driver = TdaEigenSolver(self.comm, self.ostream)
             else:
-                self._rsp_driver = LinearResponseEigenSolver(
-                    self.comm, self.ostream)
+                if method_type == 'restricted':
+                    self._rsp_driver = LinearResponseEigenSolver(
+                        self.comm, self.ostream)
+                elif method_type == 'unrestricted':
+                    self._rsp_driver = LinearResponseUnrestrictedEigenSolver(
+                        self.comm, self.ostream)
+                else:
+                    assert_msg_critical(
+                        False, 'ResponseProperty: invalid method_type')
 
             self._rsp_driver._input_keywords['response'].update({
                 'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
