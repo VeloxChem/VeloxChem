@@ -870,7 +870,7 @@ class ComplexResponse(LinearSolver):
         return None
 
     @staticmethod
-    def get_full_solution_vector(solution):
+    def get_full_solution_vector(solution, root=mpi_master()):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -881,12 +881,12 @@ class ComplexResponse(LinearSolver):
             The full solution vector.
         """
 
-        x_realger = solution.get_full_vector(0)
-        x_realung = solution.get_full_vector(1)
-        x_imagung = solution.get_full_vector(2)
-        x_imagger = solution.get_full_vector(3)
+        x_realger = solution.get_full_vector(0, root=root)
+        x_realung = solution.get_full_vector(1, root=root)
+        x_imagung = solution.get_full_vector(2, root=root)
+        x_imagger = solution.get_full_vector(3, root=root)
 
-        if solution.rank == mpi_master():
+        if solution.rank == root:
             x_real = np.hstack((x_realger, x_realger)) + np.hstack(
                 (x_realung, -x_realung))
             x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(

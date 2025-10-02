@@ -1590,16 +1590,44 @@ class ThgDriver(NonlinearSolver):
                     'D': X[op_d],
                 })
 
-        list_x3_a3 = [self.get_x3_a3(inp, da, nocc, norb) for inp in inp_list]
+        # determine counts and displacements for x3_a3 tasks
+        n_tasks = len(inp_list)
+        ave, res = divmod(n_tasks, self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        # create list of (task_id, rank) pairs
+        task_rank_pairs = []
+        for rank, (count, displ) in enumerate(zip(counts, displacements)):
+            for idx in range(count):
+                task_rank_pairs.append((displ + idx, rank))
+
+        # collect full solution vectors to their corresponding ranks
+        for task_id, rank in task_rank_pairs:
+            inp_list[task_id]['Na_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Na'], root=rank)
+            inp_list[task_id]['Nb_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nb'], root=rank)
+            inp_list[task_id]['Nc_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nc'], root=rank)
+            inp_list[task_id]['Nd_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nd'], root=rank)
+
+        # compute x3_a3 on individual ranks
+        list_x3_a3 = []
+        for task_id, rank in task_rank_pairs:
+            if self.rank == rank:
+                list_x3_a3.append(self.get_x3_a3(inp_list[task_id], da, nocc, norb))
+
+        # collect all x3_a3 results
+        # all_x3_a3 will be a list of list
+        all_x3_a3 = self.comm.gather(list_x3_a3, root=mpi_master())
 
         if self.rank == mpi_master():
-            for terms in list_x3_a3:
-                if terms['key'] not in na_x3_ny_nz_dict:
-                    na_x3_ny_nz_dict[terms['key']] = 0.0
-                if terms['key'] not in na_a3_nx_ny_dict:
-                    na_a3_nx_ny_dict[terms['key']] = 0.0
-                na_x3_ny_nz_dict[terms['key']] += terms['x3']
-                na_a3_nx_ny_dict[terms['key']] += terms['a3']
+            for local_x3_a3 in all_x3_a3:
+                for terms in local_x3_a3:
+                    if terms['key'] not in na_x3_ny_nz_dict:
+                        na_x3_ny_nz_dict[terms['key']] = 0.0
+                    if terms['key'] not in na_a3_nx_ny_dict:
+                        na_a3_nx_ny_dict[terms['key']] = 0.0
+                    na_x3_ny_nz_dict[terms['key']] += terms['x3']
+                    na_a3_nx_ny_dict[terms['key']] += terms['a3']
 
         inp_list = []
 
@@ -1653,16 +1681,50 @@ class ThgDriver(NonlinearSolver):
                         'C': C,
                     })
 
-        list_x2_a2 = [self.get_x2_a2(inp, da, nocc, norb) for inp in inp_list]
+        # determine counts and displacements for x2_a2 tasks
+        n_tasks = len(inp_list)
+        ave, res = divmod(n_tasks, self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        # create list of (task_id, rank) pairs
+        task_rank_pairs = []
+        for rank, (count, displ) in enumerate(zip(counts, displacements)):
+            for idx in range(count):
+                task_rank_pairs.append((displ + idx, rank))
+
+        # collect full solution vectors to their corresponding ranks
+        for task_id, rank in task_rank_pairs:
+
+            inp_list[task_id]['Na_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Na'], root=rank)
+
+            if inp_list[task_id]['flag'] == 'CD':
+                inp_list[task_id]['Ncd_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Ncd'], root=rank)
+                inp_list[task_id]['Nb_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nb'], root=rank)
+
+            elif inp_list[task_id]['flag'] == 'BD':
+                inp_list[task_id]['Nbd_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nbd'], root=rank)
+                inp_list[task_id]['Nc_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nc'], root=rank)
+
+        # compute x2_a2 on individual ranks
+        list_x2_a2 = []
+        for task_id, rank in task_rank_pairs:
+            if self.rank == rank:
+                list_x2_a2.append(self.get_x2_a2(inp_list[task_id], da, nocc, norb))
+
+        # collect all x2_a2 results
+        # all_x2_a2 will be a list of list
+        all_x2_a2 = self.comm.gather(list_x2_a2, root=mpi_master())
 
         if self.rank == mpi_master():
-            for terms in list_x2_a2:
-                if terms['key'] not in na_x2_nyz_dict:
-                    na_x2_nyz_dict[terms['key']] = 0.0
-                if terms['key'] not in nx_a2_nyz_dict:
-                    nx_a2_nyz_dict[terms['key']] = 0.0
-                na_x2_nyz_dict[terms['key']] += terms['x2']
-                nx_a2_nyz_dict[terms['key']] += terms['a2']
+            for local_x2_a2 in all_x2_a2:
+                for terms in local_x2_a2:
+                    if terms['key'] not in na_x2_nyz_dict:
+                        na_x2_nyz_dict[terms['key']] = 0.0
+                    if terms['key'] not in nx_a2_nyz_dict:
+                        nx_a2_nyz_dict[terms['key']] = 0.0
+                    na_x2_nyz_dict[terms['key']] += terms['x2']
+                    nx_a2_nyz_dict[terms['key']] += terms['a2']
 
             return {
                 'NaX3NyNz': na_x3_ny_nz_dict,
@@ -1977,46 +2039,43 @@ class ThgDriver(NonlinearSolver):
 
         w = inp_dict['freq']
 
-        Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
-        Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
-        Nc = ComplexResponse.get_full_solution_vector(inp_dict['Nc'])
-        Nd = ComplexResponse.get_full_solution_vector(inp_dict['Nd'])
+        Na = inp_dict['Na_full']
+        Nb = inp_dict['Nb_full']
+        Nc = inp_dict['Nc_full']
+        Nd = inp_dict['Nd_full']
 
-        if self.rank == mpi_master():
-            kb = self.complex_lrvec2mat(Nb, nocc, norb)
-            kc = self.complex_lrvec2mat(Nc, nocc, norb)
-            kd = self.complex_lrvec2mat(Nd, nocc, norb)
+        kb = self.complex_lrvec2mat(Nb, nocc, norb)
+        kc = self.complex_lrvec2mat(Nc, nocc, norb)
+        kd = self.complex_lrvec2mat(Nd, nocc, norb)
 
-            A = inp_dict['A']
-            B = inp_dict['B']
-            C = inp_dict['C']
-            D = inp_dict['D']
+        A = inp_dict['A']
+        B = inp_dict['B']
+        C = inp_dict['C']
+        D = inp_dict['D']
 
-            # Na X[3]NyNz
+        # Na X[3]NyNz
 
-            na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kc, kd, B, da, nocc, norb))
-            na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kd, kc, B, da, nocc, norb))
-            na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kd, kb, C, da, nocc, norb))
-            na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kb, kd, C, da, nocc, norb))
-            na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kb, kc, D, da, nocc, norb))
-            na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kc, kb, D, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kc, kd, B, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kd, kc, B, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kd, kb, C, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kb, kd, C, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kb, kc, D, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kc, kb, D, da, nocc, norb))
 
-            # NaA[3]NxNy
+        # NaA[3]NxNy
 
-            na_a3_nx_ny += np.dot(self._a3_contract(kb, kc, A, da, nocc, norb),Nd)
-            na_a3_nx_ny += np.dot(self._a3_contract(kb, kd, A, da, nocc, norb),Nc)
-            na_a3_nx_ny += np.dot(self._a3_contract(kc, kb, A, da, nocc, norb),Nd)
-            na_a3_nx_ny += np.dot(self._a3_contract(kc, kd, A, da, nocc, norb),Nb)
-            na_a3_nx_ny += np.dot(self._a3_contract(kd, kb, A, da, nocc, norb),Nc)
-            na_a3_nx_ny += np.dot(self._a3_contract(kd, kc, A, da, nocc, norb),Nb)
+        na_a3_nx_ny += np.dot(self._a3_contract(kb, kc, A, da, nocc, norb),Nd)
+        na_a3_nx_ny += np.dot(self._a3_contract(kb, kd, A, da, nocc, norb),Nc)
+        na_a3_nx_ny += np.dot(self._a3_contract(kc, kb, A, da, nocc, norb),Nd)
+        na_a3_nx_ny += np.dot(self._a3_contract(kc, kd, A, da, nocc, norb),Nb)
+        na_a3_nx_ny += np.dot(self._a3_contract(kd, kb, A, da, nocc, norb),Nc)
+        na_a3_nx_ny += np.dot(self._a3_contract(kd, kc, A, da, nocc, norb),Nb)
 
-            return {
-                'key': (w, w, w),
-                'x3': (1. / 15) * na_x3_ny_nz,
-                'a3': (1. / 15) * na_a3_nx_ny,
-            }
-        else:
-            return None
+        return {
+            'key': (w, w, w),
+            'x3': (1. / 15) * na_x3_ny_nz,
+            'a3': (1. / 15) * na_a3_nx_ny,
+        }
 
     def get_x2_a2(self, inp_dict, da, nocc, norb):
         """
@@ -2041,44 +2100,39 @@ class ThgDriver(NonlinearSolver):
         w = inp_dict['freq']
         A = inp_dict['A']
 
-        Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
+        Na = inp_dict['Na_full']
 
         if inp_dict['flag'] == 'CD':
-            Ncd = ComplexResponse.get_full_solution_vector(inp_dict['Ncd'])
-            Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
+            Ncd = inp_dict['Ncd_full']
+            Nb = inp_dict['Nb_full']
 
         elif inp_dict['flag'] == 'BD':
-            Nbd = ComplexResponse.get_full_solution_vector(inp_dict['Nbd'])
-            Nc = ComplexResponse.get_full_solution_vector(inp_dict['Nc'])
+            Nbd = inp_dict['Nbd_full']
+            Nc = inp_dict['Nc_full']
 
-        if self.rank == mpi_master():
+        if inp_dict['flag'] == 'CD':
+            kcd = self.complex_lrvec2mat(2.0  * Ncd, nocc, norb)
+            kb = self.complex_lrvec2mat(Nb, nocc, norb)
+            B = inp_dict['B']
 
-            if inp_dict['flag'] == 'CD':
-                kcd = self.complex_lrvec2mat(2.0  * Ncd, nocc, norb)
-                kb = self.complex_lrvec2mat(Nb, nocc, norb)
-                B = inp_dict['B']
+            na_x2_nyz += np.dot(Na.T,self._x2_contract(kcd, B, da, nocc, norb))
+            nx_a2_nyz += np.dot(self._a2_contract(kb, A, da, nocc, norb), 2.0  * Ncd)
+            nx_a2_nyz += np.dot(self._a2_contract(kcd, A, da, nocc, norb),Nb)
 
-                na_x2_nyz += np.dot(Na.T,self._x2_contract(kcd, B, da, nocc, norb))
-                nx_a2_nyz += np.dot(self._a2_contract(kb, A, da, nocc, norb), 2.0  * Ncd)
-                nx_a2_nyz += np.dot(self._a2_contract(kcd, A, da, nocc, norb),Nb)
+        elif inp_dict['flag'] == 'BD':
+            kbd = self.complex_lrvec2mat(Nbd, nocc, norb)
+            kc = self.complex_lrvec2mat(Nc, nocc, norb)
+            C = inp_dict['C']
 
-            elif inp_dict['flag'] == 'BD':
-                kbd = self.complex_lrvec2mat(Nbd, nocc, norb)
-                kc = self.complex_lrvec2mat(Nc, nocc, norb)
-                C = inp_dict['C']
+            na_x2_nyz += np.dot(Na.T, self._x2_contract(kbd, C, da, nocc, norb))
+            nx_a2_nyz += np.dot(self._a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.dot(self._a2_contract(kbd, A, da, nocc, norb), Nc)
 
-                na_x2_nyz += np.dot(Na.T, self._x2_contract(kbd, C, da, nocc, norb))
-                nx_a2_nyz += np.dot(self._a2_contract(kc, A, da, nocc, norb), Nbd)
-                nx_a2_nyz += np.dot(self._a2_contract(kbd, A, da, nocc, norb), Nc)
-
-            return {
-                'key': (w, w, w),
-                'x2': -(1. / 15) * na_x2_nyz,
-                'a2': -(1. / 15) * nx_a2_nyz,
-            }
-
-        else:
-            return {}
+        return {
+            'key': (w, w, w),
+            'x2': -(1. / 15) * na_x2_nyz,
+            'a2': -(1. / 15) * nx_a2_nyz,
+        }
 
 
 
