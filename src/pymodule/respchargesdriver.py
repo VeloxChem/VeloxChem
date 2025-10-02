@@ -112,9 +112,11 @@ class RespChargesDriver:
         # method
         self.xcfun = None
         self.restart = True
+        self.scf_max_iter = None
 
         # conformers
         self.xyz_file = None
+        self.molecules = None
         self.net_charge = 0.0
         self.multiplicity = 1
         self.method_dict = None
@@ -150,6 +152,7 @@ class RespChargesDriver:
             'resp_charges': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'restart': ('bool', 'restart from checkpoint file'),
+                'scf_max_iter': ('int', 'maximum SCF iterations'),
                 'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
@@ -167,6 +170,7 @@ class RespChargesDriver:
                 'custom_mk_radii':
                     ('seq_fixed_str', 'custom MK radii for RESP charges'),
                 'xyz_file': ('str', 'xyz file containing the conformers'),
+                'molecules': ('list', 'list of molecule objects for conformers'),
                 'net_charge': ('float', 'net charge of the molecule'),
                 'multiplicity': ('int', 'spin multiplicity of the molecule'),
                 'weights': ('seq_fixed', 'weight factors of conformers'),
@@ -330,14 +334,43 @@ class RespChargesDriver:
         basis_sets = []
 
         use_xyz_file = (molecule.number_of_atoms() == 0)
+        use_molecule_list = (self.molecules is not None)
 
-        if not use_xyz_file:
+        if not use_xyz_file and not use_molecule_list:
             molecules.append(molecule)
             basis_sets.append(basis)
 
-        else:
-            errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
-            errmsg += 'specified.'
+        elif use_molecule_list:
+            # Use the list of molecules provided by the user
+            for mol in self.molecules:
+                if self.rank == mpi_master():
+                    # Set charge and multiplicity
+                    mol.set_charge(self.net_charge)
+                    mol.set_multiplicity(self.multiplicity)
+                    # Create basis set
+                    basis_path = '.'
+                    if 'basis_path' in self.method_dict:
+                        basis_path = self.method_dict['basis_path']
+                    basis_name = self.method_dict['basis'].upper()
+                    bas = MolecularBasis.read(mol, basis_name, basis_path, ostream=None)
+                else:
+                    bas = MolecularBasis()
+                
+                # Broadcast molecule and basis set
+                mol = self.comm.bcast(mol, root=mpi_master())
+                bas = self.comm.bcast(bas, root=mpi_master())
+                
+                molecules.append(mol)
+                basis_sets.append(bas)
+            
+            info_text = f'Found {len(molecules):d} conformers from molecule list.'
+            self.ostream.print_info(info_text)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        elif use_xyz_file:
+            # XYZ file case
+            errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not specified.'
             assert_msg_critical(self.xyz_file is not None, errmsg)
 
             xyz_lines = None
@@ -389,6 +422,12 @@ class RespChargesDriver:
             self.ostream.print_info(info_text)
             self.ostream.print_blank()
             self.ostream.flush()
+
+        else:
+            # No valid input source found
+            errmsg = 'RespChargesDriver: Either \'xyz_file\' or \'molecules\' keyword must be '
+            errmsg += 'specified for multi-conformer calculations.'
+            assert_msg_critical(False, errmsg)
 
         if self.rank == mpi_master():
             if self.weights is not None and self.energies is not None:
@@ -453,6 +492,8 @@ class RespChargesDriver:
                 if self.filename is not None:
                     scf_drv.filename = self.filename
                 scf_drv.restart = self.restart
+                if self.scf_max_iter is not None:
+                    scf_drv.max_iter = self.scf_max_iter
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
                     scf_drv.xcfun = self.xcfun
@@ -477,9 +518,17 @@ class RespChargesDriver:
                     scf_drv = ScfRestrictedDriver(self.comm, ostream)
                 else:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
-                if self.filename is not None:
-                    scf_drv.filename = self.filename
-                scf_drv.restart = self.restart
+                
+                # Use unique filename for each conformer to prevent restart conflicts
+                scf_drv.filename = f'conformer_{ind + 1}'
+                
+                # Disable restart for multi-conformer calculations to avoid
+                # using previous conformer's checkpoint as initial guess as this 
+                # lead to convergence issues
+                scf_drv.restart = False
+                
+                if self.scf_max_iter is not None:
+                    scf_drv.max_iter = self.scf_max_iter
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
                     scf_drv.xcfun = self.xcfun
