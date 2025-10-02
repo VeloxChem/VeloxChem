@@ -1590,6 +1590,12 @@ class ThgDriver(NonlinearSolver):
                     'D': X[op_d],
                 })
 
+        self.ostream.print_info('Collecting response vectors for X3 and A3 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        x3_a3_t0 = time.time()
+
         # determine counts and displacements for x3_a3 tasks
         n_tasks = len(inp_list)
         ave, res = divmod(n_tasks, self.nodes)
@@ -1608,6 +1614,15 @@ class ThgDriver(NonlinearSolver):
             inp_list[task_id]['Nb_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nb'], root=rank)
             inp_list[task_id]['Nc_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nc'], root=rank)
             inp_list[task_id]['Nd_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nd'], root=rank)
+
+        self.ostream.print_info(f'Time spent in collecting response vectors: {time.time() - x3_a3_t0:.2f} sec')
+        self.ostream.print_blank()
+
+        self.ostream.print_info('Computing X3 and A3 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        x3_a3_t0 = time.time()
 
         # compute x3_a3 on individual ranks
         list_x3_a3 = []
@@ -1628,6 +1643,10 @@ class ThgDriver(NonlinearSolver):
                         na_a3_nx_ny_dict[terms['key']] = 0.0
                     na_x3_ny_nz_dict[terms['key']] += terms['x3']
                     na_a3_nx_ny_dict[terms['key']] += terms['a3']
+
+        self.ostream.print_info(f'Time spent in computing X3 and A3 terms: {time.time() - x3_a3_t0:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         inp_list = []
 
@@ -1681,6 +1700,12 @@ class ThgDriver(NonlinearSolver):
                         'C': C,
                     })
 
+        self.ostream.print_info('Collecting response vectors for X2 and A2 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        x2_a2_t0 = time.time()
+
         # determine counts and displacements for x2_a2 tasks
         n_tasks = len(inp_list)
         ave, res = divmod(n_tasks, self.nodes)
@@ -1706,6 +1731,15 @@ class ThgDriver(NonlinearSolver):
                 inp_list[task_id]['Nbd_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nbd'], root=rank)
                 inp_list[task_id]['Nc_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nc'], root=rank)
 
+        self.ostream.print_info(f'Time spent in collecting response vectors: {time.time() - x2_a2_t0:.2f} sec')
+        self.ostream.print_blank()
+
+        self.ostream.print_info('Computing X2 and A2 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        x2_a2_t0 = time.time()
+
         # compute x2_a2 on individual ranks
         list_x2_a2 = []
         for task_id, rank in task_rank_pairs:
@@ -1726,13 +1760,17 @@ class ThgDriver(NonlinearSolver):
                     na_x2_nyz_dict[terms['key']] += terms['x2']
                     nx_a2_nyz_dict[terms['key']] += terms['a2']
 
+        self.ostream.print_info(f'Time spent in computing X2 and A2 terms: {time.time() - x2_a2_t0:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        if self.rank == mpi_master():
             return {
                 'NaX3NyNz': na_x3_ny_nz_dict,
                 'NaA3NxNy': na_a3_nx_ny_dict,
                 'NaX2Nyz': na_x2_nyz_dict,
                 'NxA2Nyz': nx_a2_nyz_dict,
             }
-
 
         return None
 
