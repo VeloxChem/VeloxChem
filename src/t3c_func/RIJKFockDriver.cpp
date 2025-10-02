@@ -38,6 +38,7 @@
 #include "OpenMPFunc.hpp"
 #include "BatchFunc.hpp"
 #include "ThreeCenterElectronRepulsionDriver.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 
 #include <iostream>
 
@@ -140,6 +141,41 @@ CRIJKFockDriver::compute_j_fock(const CMatrix     &density,
     {
         return CMatrix();
     }
+}
+
+auto
+CRIJKFockDriver::compute_k_fock(const CSubMatrix &molorbs) const -> CSubMatrix
+{
+    // set up dimensions
+    
+    const auto naos = molorbs.number_of_rows();
+    
+    const auto nmos = molorbs.number_of_columns();
+    
+    const auto naux = _bq_vectors.aux_width();
+    
+    auto kmat = CSubMatrix({0, 0, naos, naos}, 0.0);
+    
+    std::cout << "Dims :" << naos << "," << nmos << "," << naux << std::endl;
+    
+    // set up full B^Q matrices
+    
+    auto bqao = CSubMatrix({0, 0, naos, naos});
+    
+    auto bqmo = CSubMatrix({0, 0, nmos, naos});
+    
+    for (size_t i = 0; i < naux; i++)
+    {
+        _bq_vectors.unpack_data(bqao, i);
+        
+        bqmo.zero();
+        
+        sdenblas::serialMultAtB(bqmo, molorbs, bqao);
+        
+        sdenblas::serialMultAtB(kmat, bqmo, bqmo);
+    }
+    
+    return kmat;
 }
 
 auto
