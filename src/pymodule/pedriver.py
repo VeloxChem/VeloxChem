@@ -114,7 +114,15 @@ class PEDriver:
                 }
             }
         }
+
+        # SolvationBuilder works with 'spce' or 'tip3p'
+        # The SEP parameters for water are the same regardless of 'spce' or 'tip3p'
+        parameters["spce"] = parameters["water"]
+        parameters["tip3p"] = parameters["water"]
+
         return parameters
+
+
 
     def write_pe_potential(self, solvation_builder, qm_molecule, potfile='pe.pot',
                            solvent_name="water", residue_name="water"):
@@ -147,9 +155,9 @@ class PEDriver:
             residue_name = solvation_builder.residue_name
 
         # Check if we have parameters for the specified solvent
-        if solvent_name not in self.pe_parameters:
-            raise ValueError(f"No PE parameters found for solvent: {solvent_name}. "
-                             f"Available solvents: {list(self.pe_parameters.keys())}")
+        # if solvent_name not in self.pe_parameters:
+        #     raise ValueError(f"No PE parameters found for solvent: {solvent_name}. "
+        #                      f"Available solvents: {list(self.pe_parameters.keys())}")
         
         # Extract MM enviroment atoms (all atoms except QM region)
         qm_natoms = qm_molecule.number_of_atoms()
@@ -168,12 +176,15 @@ class PEDriver:
         mm_coords = all_coords[qm_natoms:]
         mm_labels = all_labels[qm_natoms:]
 
+        # Get number of atoms per solvent molecule:
+        atoms_per_molecule = len(solvation_builder.solvent_labels[0])
+
         # Write PE potential
-        self._write_pe_file(mm_coords, mm_labels, potfile, solvent_name, residue_name)
+        self._write_pe_file(mm_coords, mm_labels, potfile, solvent_name, residue_name, atoms_per_molecule)
 
         return potfile
 
-    def _write_pe_file(self, mm_coords, mm_labels, potfile, solvent_name, residue_name):
+    def _write_pe_file(self, mm_coords, mm_labels, potfile, solvent_name, residue_name, atoms_per_molecule):
         """
         Write the PE potential.
 
@@ -197,7 +208,6 @@ class PEDriver:
             f.write("xyz:\n")
 
             # Group atoms by molecules
-            atoms_per_molecule = self._get_atoms_per_molecule(solvent_name)
             n_molecules = len(mm_coords) // atoms_per_molecule
 
             for mol_id in range(n_molecules):
@@ -207,30 +217,31 @@ class PEDriver:
                 for i in range(start_idx, end_idx):
                     label = mm_labels[i]
                     x, y, z  = mm_coords[i]
-                    f.write(f"{label}  {x:12.7f}  {y:12.7f}  {residue_name}  {mol_id + 1}\n")
+                    f.write(f"{label}  {x:12.7f}  {y:12.7f}  {z:12.7f}  {residue_name}  {mol_id + 1}\n")
 
             f.write("@end\n")
 
             # Write charges section
-            for i, label in enumerate(mm_labels):
+            f.write("@charges\n")
+            for i in range(atoms_per_molecule):
+                label = mm_labels[i] # This will be O, H, H for water
                 if label in params:
                     charge = params[label]['charge']
-                    f.write(f"{label}  {charge:12.8f}  {residue_name}\n")
+                    f.write(f"{label} {charge:11.8f}  {residue_name}\n")
                 else:
                     raise ValueError(f"No charge parameter found for element: {label}")
-
-            f.write("@end\n")
+            f.write("@end\n\n")
 
             # Write polarizabilities section
             f.write("@polarizabilities\n")
-            for i, label in enumerate(mm_labels):
+            for i in range(atoms_per_molecule):
+                label = mm_labels[i]
                 if label in params:
                     pols = params[label]['polarizability']
                     pols_str = "  ".join([f"{p:12.8f}" for p in pols])
-                    f.write(f"{label}  {pols_str}  {residue_name}\n")
+                    f.write(f"{label}   {pols_str}  {residue_name}\n")
                 else:
                     raise ValueError(f"No polarizability parameter found for element: {label}")
-
             f.write("@end\n")
 
             if self.rank == mpi_master():
@@ -238,22 +249,6 @@ class PEDriver:
                 self.ostream.print_info(f"Number of MM atoms: {len(mm_coords)}")
                 self.ostream.print_info(f"Number of molecules: {n_molecules}")
                 self.ostream.flush()
-
-    def _get_atoms_per_molecule(self, solvent_name):
-        """
-        Get the number of atoms per molecule for the specified solvent.
-
-        :param solvent_name:
-            The name of the solvent in the parameters dictionary.
-
-        :return:
-            The number of atoms per molecule for the specified solvent.
-        """
-        if solvent_name in self.pe_parameters:
-            # Count the number of unique atom types for the solvent
-            return len(self.pe_parameters[solvent_name])
-        else:
-            raise ValueError(f"No atom count found for solvent: {solvent_name}")
         
     def compute(self, qm_molecule, basis, solvation_builder=None,
                 potfile='pe.pot', solvent_name="water", **scf_kwargs):
