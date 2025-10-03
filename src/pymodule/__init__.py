@@ -204,6 +204,7 @@ from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
+from .pedriver import PEDriver
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions
