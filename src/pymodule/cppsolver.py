@@ -101,6 +101,9 @@ class ComplexResponse(LinearSolver):
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
 
+        # useful in rare cases when user wants to control the writing of h5
+        self.write_h5 = True
+
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
             'a_components': ('str_lower', 'Cartesian components of A operator'),
@@ -108,6 +111,7 @@ class ComplexResponse(LinearSolver):
             'b_components': ('str_lower', 'Cartesian components of B operator'),
             'frequencies': ('seq_range', 'frequencies'),
             'damping': ('float', 'damping parameter'),
+            'write_h5': ('bool', 'write checkpoint and final h5'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -760,7 +764,7 @@ class ComplexResponse(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
-            if self.force_checkpoint:
+            if self.force_checkpoint and self.write_h5:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
 
@@ -776,8 +780,9 @@ class ComplexResponse(LinearSolver):
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                               rsp_vector_labels)
+        if self.write_h5:
+            self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                                   rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
@@ -855,7 +860,7 @@ class ComplexResponse(LinearSolver):
                     self._print_results(ret_dict)
 
                     # write spectrum to h5 file
-                    if final_h5_fname is not None:
+                    if (final_h5_fname is not None) and self.write_h5:
                         self.write_cpp_rsp_results_to_hdf5(
                             final_h5_fname, ret_dict)
 

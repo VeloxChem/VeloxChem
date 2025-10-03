@@ -86,10 +86,14 @@ class ThgDriver(NonlinearSolver):
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumber()
 
+        # useful in rare cases when user wants to control the writing of h5
+        self.write_h5 = True
+
         # input keywords
         self._input_keywords['response'].update({
             'frequencies': ('seq_range', 'frequencies'),
             'damping': ('float', 'damping parameter'),
+            'write_h5': ('bool', 'write checkpoint and final h5'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -247,6 +251,7 @@ class ThgDriver(NonlinearSolver):
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
+            Nb_drv.write_h5 = self.write_h5
 
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
@@ -966,6 +971,7 @@ class ThgDriver(NonlinearSolver):
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             N_total_drv.checkpoint_file = str(fpath) + '_thg_2_full.h5'
+            N_total_drv.write_h5 = self.write_h5
 
         # commutpute second-order response vectors
 
