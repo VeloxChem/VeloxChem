@@ -915,7 +915,7 @@ class TddftOrbitalResponse(CphfSolver):
 
             for idx in range(num_densities):
                 Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
-                                                   self._cpcm_grid,
+                                                   self.cpcm_drv._cpcm_grid,
                                                    dens[idx] * 2.0)
                 if comm_rank == mpi_master():
                     if self.non_equilibrium_solv:
@@ -931,11 +931,11 @@ class TddftOrbitalResponse(CphfSolver):
                 rhs = self.comm.bcast(rhs, root=mpi_master())
 
                 cpcm_rsp_q = self.cpcm_drv.cg_solve_parallel_direct(
-                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, None, self.cpcm_cg_thresh)
+                    self.cpcm_drv._cpcm_grid, self.cpcm_drv._cpcm_sw_func,
+                    self.cpcm_drv._cpcm_precond, rhs, None, self.cpcm_cg_thresh)
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
-                    molecule, basis, self._cpcm_grid, cpcm_rsp_q)
+                    molecule, basis, self.cpcm_drv._cpcm_grid, cpcm_rsp_q)
 
                 if comm_rank == mpi_master():
                     if self.non_equilibrium_solv:

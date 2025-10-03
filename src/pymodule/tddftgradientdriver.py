@@ -484,12 +484,14 @@ class TddftGradientDriver(GradientDriver):
             exchange_scaling_factor = 1.0
             fock_type = '2jk'
 
-        # TODO: range-separated Fock
         need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(
-                False, 'TddftGradientDriver: Not implemented for' +
-                ' range-separated functional')
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
         fock_grad_drv = FockGeom1000Driver()
         fock_grad_drv._set_block_size_factor(self._block_size_factor)
@@ -627,6 +629,30 @@ class TddftGradientDriver(GradientDriver):
                         idx, iatom, :] += 0.5 * np.array(atomgrad_xpy) * factor
                     self.gradient[
                         idx, iatom, :] += 0.5 * np.array(atomgrad_xmy) * factor
+
+                    if need_omega:
+                        # for range-separated functional
+                        atomgrad_rel_rs = fock_grad_drv.compute(
+                            basis, screener_atom, screener, den_mat_for_fock_gs,
+                            den_mat_for_fock_rel, iatom, 'kx_rs', erf_k_coef,
+                            omega, thresh_int)
+
+                        atomgrad_xpy_rs = fock_grad_drv.compute(
+                            basis, screener_atom, screener,
+                            den_mat_for_fock_xpy, den_mat_for_fock_xpy_m_xpyT,
+                            iatom, 'kx_rs', erf_k_coef, omega, thresh_int)
+
+                        atomgrad_xmy_rs = fock_grad_drv.compute(
+                            basis, screener_atom, screener,
+                            den_mat_for_fock_xmy, den_mat_for_fock_xmy_p_xmyT,
+                            iatom, 'kx_rs', erf_k_coef, omega, thresh_int)
+
+                        self.gradient[idx,
+                                      iatom, :] -= np.array(atomgrad_rel_rs)
+                        self.gradient[
+                            idx, iatom, :] -= 0.5 * np.array(atomgrad_xpy_rs)
+                        self.gradient[
+                            idx, iatom, :] -= 0.5 * np.array(atomgrad_xmy_rs)
 
         grad_timing['Fock_grad'] += time.time() - t0
 
