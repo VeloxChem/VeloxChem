@@ -39,6 +39,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import _RIJKFockDriver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import SubMatrix
+from .veloxchemlib import Matrix
 from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
@@ -238,10 +239,12 @@ class RIJKFockDriver:
             
         return gmat
         
-    def compute_k_fock(self, molorbs, verbose=True):
+    def compute_k_fock(self, density, molorbs, verbose=True):
         """
         Computes exchange Fock matrix.
         
+        :param density:
+            The AO density matrix (restricted).
         :param molorbs:
             The molecular orbitals (restricted).
         :param verbose:
@@ -262,12 +265,14 @@ class RIJKFockDriver:
         occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
         occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
         
-        print(occ_mos.to_numpy())
+        fmat = self._ri_drv.compute_k_fock(density, occ_mos)
         
-        fmat = self._ri_drv.compute_k_fock(occ_mos)
-        
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
+    
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
+            
+        return gmat

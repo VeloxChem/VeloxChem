@@ -213,8 +213,6 @@ class CT3FlatBuffer
                     matrix.at({j, i}) = fact;
                 }
             }
-            
-            std::cout << "I am here" << std::endl;
         }
     }
     

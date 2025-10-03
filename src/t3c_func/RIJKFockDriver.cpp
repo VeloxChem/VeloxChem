@@ -144,8 +144,10 @@ CRIJKFockDriver::compute_j_fock(const CMatrix     &density,
 }
 
 auto
-CRIJKFockDriver::compute_k_fock(const CSubMatrix &molorbs) const -> CSubMatrix
+CRIJKFockDriver::compute_k_fock(const CMatrix &density, const CSubMatrix &molorbs) const -> CMatrix
 {
+    CMatrix fmat(density);
+    
     // set up dimensions
     
     const auto naos = molorbs.number_of_rows();
@@ -155,8 +157,6 @@ CRIJKFockDriver::compute_k_fock(const CSubMatrix &molorbs) const -> CSubMatrix
     const auto naux = _bq_vectors.aux_width();
     
     auto kmat = CSubMatrix({0, 0, naos, naos}, 0.0);
-    
-    std::cout << "Dims :" << naos << "," << nmos << "," << naux << std::endl;
     
     // set up full B^Q matrices
     
@@ -175,7 +175,9 @@ CRIJKFockDriver::compute_k_fock(const CSubMatrix &molorbs) const -> CSubMatrix
         sdenblas::serialMultAtB(kmat, bqmo, bqmo);
     }
     
-    return kmat;
+    fmat.assign_values(kmat);
+    
+    return fmat;
 }
 
 auto

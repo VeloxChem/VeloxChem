@@ -11,6 +11,8 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem import TwoCenterElectronRepulsionDriver
 from veloxchem.rijkfockdriver import RIJKFockDriver
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.fockdriver import FockDriver
 
 
 class TestRIMODriver:
@@ -37,6 +39,38 @@ class TestRIMODriver:
         ri_fock_drv.compute_metric(mol_h2o, bas_sto3g)
         
         ri_fock_drv.compute_bq_vectors(mol_h2o, bas_sto3g, bas_sto3g)
-       
+        
+        
+    def test_h2o_compute_k_fock(self):
+
+        mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
+        
+        scf_drv = ScfRestrictedDriver()
+        scf_results = scf_drv.compute(mol_h2o, bas_sto3g)
+        
+        dmat = make_matrix(bas_sto3g, mat_t.symmetric)
+        dmat.set_values(scf_results['D_alpha'])
+        
+        molorbs = scf_drv.molecular_orbitals
+        
+        ri_fock_drv = RIJKFockDriver()
+        ri_fock_drv.compute_metric(mol_h2o, bas_aux)
+        
+        ri_fock_drv.compute_bq_vectors(mol_h2o, bas_sto3g, bas_aux)
+        
+        fmat = ri_fock_drv.compute_k_fock(dmat, molorbs)
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_sto3g, mol_h2o, "eri")
+        
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv._compute_fock_omp(t4c_drv, dmat, "k", 0.0, 0.0, 15)
+                                              
+        print(fock_mat.full_matrix().to_numpy())
+        
+        print(np.max(np.abs(fock_mat.full_matrix().to_numpy() - fmat.full_matrix().to_numpy())))
+        
         assert False
             
