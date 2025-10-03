@@ -1888,17 +1888,60 @@ class ThgDriver(NonlinearSolver):
             if self.rank == rank:
                 list_s4_r4.append(self.get_s4_and_r4_terms(inp_list[task_id], D0, nocc, norb))
 
-        # collect all s4_r4 results
-        # all_s4_r4 will be a list of list
-        all_s4_r4 = self.comm.gather(list_s4_r4, root=mpi_master())
+        self.ostream.print_info(f'Time spent in computing S4 and R4 terms: {time.time() - s4_r4_t0:.2f} sec')
+        self.ostream.print_blank()
 
-        # make list_s4_r4 a flat list containing all s4_r4 results
+        self.ostream.print_info('Collecting S4 and R4 results...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        s4_r4_t0 = time.time()
+
+        # collect all s4_r4 results
+
+        # since list_s4_r4 contains s4 which is a complex array
+        # we need to gather the results manually
+        all_s4_r4 = []
+
+        # loop over maximum number of tasks per rank
+        for idx in range(counts[0]):
+            # given the size of elements we use send and recv here
+            if self.rank == mpi_master():
+                all_s4_r4.append({
+                    's4_key': list_s4_r4[idx]['s4_key'],
+                    's4': list_s4_r4[idx]['s4'].copy(),
+                    'r4_key': list_s4_r4[idx]['r4_key'],
+                    'r4': list_s4_r4[idx]['r4'],
+                })
+                for comm_rank in range(1, self.nodes):
+                    s4_r4_data = self.comm.recv(source=comm_rank, tag=comm_rank)
+                    if s4_r4_data is not None:
+                        all_s4_r4.append({
+                            's4_key': s4_r4_data['s4_key'],
+                            's4': s4_r4_data['s4_real'] + 1j * s4_r4_data['s4_imag'],
+                            'r4_key': s4_r4_data['r4_key'],
+                            'r4': s4_r4_data['r4'],
+                        })
+            else:
+                if idx < len(list_s4_r4):
+                    # we want to send real and contiguous numpy array
+                    s4_r4_data = {
+                        's4_key': list_s4_r4[idx]['s4_key'],
+                        's4_real': list_s4_r4[idx]['s4'].real.copy(),
+                        's4_imag': list_s4_r4[idx]['s4'].imag.copy(),
+                        'r4_key': list_s4_r4[idx]['r4_key'],
+                        'r4': list_s4_r4[idx]['r4'],
+                    }
+                else:
+                    # in case some rank does not have as many tasks
+                    s4_r4_data = None
+                self.comm.send(s4_r4_data, dest=mpi_master(), tag=self.rank)
+
         list_s4_r4 = []
         if self.rank == mpi_master():
-            for partial_s4_r4 in all_s4_r4:
-                list_s4_r4 += partial_s4_r4
+            list_s4_r4 = all_s4_r4
 
-        self.ostream.print_info(f'Time spent in computing S4 and R4 terms: {time.time() - s4_r4_t0:.2f} sec')
+        self.ostream.print_info(f'Time spent in collecting S4 and R4 results: {time.time() - s4_r4_t0:.2f} sec')
         self.ostream.print_blank()
         self.ostream.flush()
 
