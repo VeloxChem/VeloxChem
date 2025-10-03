@@ -238,7 +238,8 @@ class TrajectoryDriver:
         u = mda.Universe(self.topology_file,
                          self.trajectory_file,
                          refresh_offsets=True)
-
+                         
+        
         # add topology attributes to suppress warnings from writing PDB files
         u.add_TopologyAttr('altLocs')
         u.add_TopologyAttr('icodes')
@@ -246,6 +247,13 @@ class TrajectoryDriver:
         u.add_TopologyAttr('tempfactors')
         u.add_TopologyAttr('record_types')
         u.add_TopologyAttr('formalcharges')
+
+        u.guess_TopologyAttrs(to_guess=["types", "bonds"], force_guess=["types"])
+
+
+        # For the formal charges when not present (only PDB)
+        #u.add_TopologyAttr('charges')
+        #u.atoms.charges = np.zeros(u.atoms.n_atoms, dtype=float)
 
         grps = [p for p in range(self.nodes)]
         subcomm = SubCommunicators(self.comm, grps)
