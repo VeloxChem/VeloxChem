@@ -34,7 +34,7 @@ from pathlib import Path
 from mpi4py import MPI
 import sys
 
-from .velochemlib import mpi_master, bohr_in_angstrom
+from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .outputstream import OutputStream
