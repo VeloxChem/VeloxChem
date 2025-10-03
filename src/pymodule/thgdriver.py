@@ -1839,9 +1839,62 @@ class ThgDriver(NonlinearSolver):
 
                 inp_list.append(inp_dict)
 
-        list_s4_r4 = [
-            self.get_s4_and_r4_terms(inp, D0, nocc, norb) for inp in inp_list
-        ]
+        self.ostream.print_info('Collecting response vectors for S4 and R4 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        s4_r4_t0 = time.time()
+
+        # determine counts and displacements for s4_r4 tasks
+        n_tasks = len(inp_list)
+        ave, res = divmod(n_tasks, self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        # create list of (task_id, rank) pairs
+        task_rank_pairs = []
+        for rank, (count, displ) in enumerate(zip(counts, displacements)):
+            for idx in range(count):
+                task_rank_pairs.append((displ + idx, rank))
+
+        # collect full solution vectors to their corresponding ranks
+        for task_id, rank in task_rank_pairs:
+
+            inp_list[task_id]['Nb_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nb'], root=rank)
+            inp_list[task_id]['Nc_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nc'], root=rank)
+            inp_list[task_id]['Nd_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Nd'], root=rank)
+
+            if self.damping > 0:
+                inp_list[task_id]['Na_full'] = ComplexResponse.get_full_solution_vector(inp_list[task_id]['Na'], root=rank)
+
+        self.ostream.print_info(f'Time spent in collecting response vectors: {time.time() - s4_r4_t0:.2f} sec')
+        self.ostream.print_blank()
+
+        self.ostream.print_info('Computing S4 and R4 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        s4_r4_t0 = time.time()
+
+        # compute s4_r4 on individual ranks
+        list_s4_r4 = []
+        for task_id, rank in task_rank_pairs:
+            if self.rank == rank:
+                list_s4_r4.append(self.get_s4_and_r4_terms(inp_list[task_id], D0, nocc, norb))
+
+        # collect all s4_r4 results
+        # all_s4_r4 will be a list of list
+        all_s4_r4 = self.comm.gather(list_s4_r4, root=mpi_master())
+
+        # make list_s4_r4 a flat list containing all s4_r4 results
+        list_s4_r4 = []
+        if self.rank == mpi_master():
+            for partial_s4_r4 in all_s4_r4:
+                list_s4_r4 += partial_s4_r4
+
+        self.ostream.print_info(f'Time spent in computing S4 and R4 terms: {time.time() - s4_r4_t0:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         if self.rank == mpi_master():
             local_s4_dict = {}
@@ -1912,44 +1965,41 @@ class ThgDriver(NonlinearSolver):
         s4_key = (op, w)
         r4_key = (op, w1)
 
-        Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
-        Nc = ComplexResponse.get_full_solution_vector(inp_dict['Nc'])
-        Nd = ComplexResponse.get_full_solution_vector(inp_dict['Nd'])
+        Nb = inp_dict['Nb_full']
+        Nc = inp_dict['Nc_full']
+        Nd = inp_dict['Nd_full']
 
         if self.damping > 0:
-            Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
+            Na = inp_dict['Na_full']
 
-        if self.rank == mpi_master():
-            kB = self.complex_lrvec2mat(Nb, nocc, norb)
-            kC = self.complex_lrvec2mat(Nc, nocc, norb)
-            kD = self.complex_lrvec2mat(Nd, nocc, norb)
+        kB = self.complex_lrvec2mat(Nb, nocc, norb)
+        kC = self.complex_lrvec2mat(Nc, nocc, norb)
+        kD = self.complex_lrvec2mat(Nd, nocc, norb)
 
-            s4_term -= w1 * self._s4(kB, kC, kD, D0, nocc, norb)
-            s4_term -= w2 * self._s4(kC, kB, kD, D0, nocc, norb)
-            s4_term -= w3 * self._s4(kD, kB, kC, D0, nocc, norb)
+        s4_term -= w1 * self._s4(kB, kC, kD, D0, nocc, norb)
+        s4_term -= w2 * self._s4(kC, kB, kD, D0, nocc, norb)
+        s4_term -= w3 * self._s4(kD, kB, kC, D0, nocc, norb)
 
-            if self.damping > 0:
-                kA = self.complex_lrvec2mat(Na, nocc, norb)
+        if self.damping > 0:
+            kA = self.complex_lrvec2mat(Na, nocc, norb)
 
-                Nb_h = self.flip_xy(Nb)
-                Nc_h = self.flip_xy(Nc)
-                Nd_h = self.flip_xy(Nd)
+            Nb_h = self.flip_xy(Nb)
+            Nc_h = self.flip_xy(Nc)
+            Nd_h = self.flip_xy(Nd)
 
-                r4_term += 1j * self.damping * np.dot(Nd_h, self._s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
-                r4_term += 1j * self.damping * np.dot(Nc_h, self._s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
-                r4_term += 1j * self.damping * np.dot(Nd_h, self._s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
-                r4_term += 1j * self.damping * np.dot(Nb_h, self._s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
-                r4_term += 1j * self.damping * np.dot(Nc_h, self._s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
-                r4_term += 1j * self.damping * np.dot(Nb_h, self._s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(Nd_h, self._s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(Nc_h, self._s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(Nd_h, self._s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(Nb_h, self._s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(Nc_h, self._s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
+            r4_term += 1j * self.damping * np.dot(Nb_h, self._s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
 
-            return {
-                's4_key': s4_key,
-                'r4_key': r4_key,
-                's4': s4_term,
-                'r4': r4_term,
-            }
-        else:
-            return None
+        return {
+            's4_key': s4_key,
+            'r4_key': r4_key,
+            's4': s4_term,
+            'r4': r4_term,
+        }
 
     def get_t4(self, wi, e4_dict, Nx, track, da, nocc, norb):
         """
