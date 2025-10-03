@@ -155,9 +155,9 @@ class PEDriver:
             residue_name = solvation_builder.residue_name
 
         # Check if we have parameters for the specified solvent
-        # if solvent_name not in self.pe_parameters:
-        #     raise ValueError(f"No PE parameters found for solvent: {solvent_name}. "
-        #                      f"Available solvents: {list(self.pe_parameters.keys())}")
+        if solvent_name not in self.pe_parameters:
+            raise ValueError(f"No PE parameters found for solvent: {solvent_name}. "
+                             f"Available solvents: {list(self.pe_parameters.keys())}")
         
         # Extract MM enviroment atoms (all atoms except QM region)
         qm_natoms = qm_molecule.number_of_atoms()
