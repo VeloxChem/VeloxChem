@@ -130,6 +130,10 @@ class ResponseProperty:
                 self._rsp_dict['residue'] == 'none' and
                 self._rsp_dict['onlystatic'] == 'no'):
 
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
+
             if self._rsp_dict['is_complex'] == 'no':
                 self._rsp_driver = LinearResponseSolver(self.comm, self.ostream)
 
@@ -155,6 +159,10 @@ class ResponseProperty:
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['onlystatic'] == 'no' and
               self._rsp_dict['is_complex'] == 'yes'):
+
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
 
             if self.tamm_dancoff:
                 self._rsp_driver = ComplexResponseTDA(self.comm, self.ostream)
@@ -189,6 +197,10 @@ class ResponseProperty:
               self._rsp_dict['onlystatic'] == 'yes' and
               self._rsp_dict['is_complex'] == 'yes'):
 
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
+
             self._rsp_driver = C6Driver(self.comm, self.ostream)
 
         # Linear response eigensolver (RPA/TDA)
@@ -197,6 +209,10 @@ class ResponseProperty:
               self._rsp_dict['is_complex'] == 'no'):
 
             if self.tamm_dancoff:
+                assert_msg_critical(method_type == 'restricted',
+                                    'ResponseProperty: This response property is ' +
+                                    'only implemented for restricted case')
+
                 self._rsp_driver = TdaEigenSolver(self.comm, self.ostream)
             else:
                 if method_type == 'restricted':
@@ -219,12 +235,20 @@ class ResponseProperty:
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['is_complex'] == 'yes'):
 
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
+
             self._rsp_driver = QuadraticResponseDriver(self.comm, self.ostream)
 
         # SHG (quadratic response) driver
         elif (self._rsp_dict['order'] == 'quadratic' and
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['is_complex'] == 'yes'):
+
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
 
             self._rsp_driver = ShgDriver(self.comm, self.ostream)
 
@@ -233,12 +257,20 @@ class ResponseProperty:
               self._rsp_dict['residue'] == 'single' and
               self._rsp_dict['is_complex'] == 'yes'):
 
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
+
             self._rsp_driver = TpaTransitionDriver(self.comm, self.ostream)
 
         # Double res transition (quadratic response) driver
         elif (self._rsp_dict['order'] == 'quadratic' and
               self._rsp_dict['residue'] == 'double' and
               self._rsp_dict['is_complex'] == 'yes'):
+
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
 
             self._rsp_driver = DoubleResBetaDriver(self.comm, self.ostream)
 
@@ -248,12 +280,20 @@ class ResponseProperty:
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['is_complex'] == 'yes'):
 
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
+
             self._rsp_driver = CubicResponseDriver(self.comm, self.ostream)
 
         # TPA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['is_complex'] == 'yes'):
+
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
 
             if ('tpa_type' not in self._rsp_dict or
                     self._rsp_dict['tpa_type'].lower() == 'full'):
@@ -270,6 +310,10 @@ class ResponseProperty:
         # 3PA (cubic response) driver
         elif (self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['residue'] == 'single'):
+
+            assert_msg_critical(method_type == 'restricted',
+                                'ResponseProperty: This response property is ' +
+                                'only implemented for restricted case')
 
             self._rsp_driver = ThreePATransitionDriver(self.comm, self.ostream)
 
