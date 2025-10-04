@@ -661,6 +661,12 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                         z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(nocc_b, -1)
                         y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(nocc_b, -1)
 
+                # TODO: enable nto and detach_attach
+                assert_msg_critical(
+                    not (self.nto or self.detach_attach),
+                    'LinearResponseUnrestrictedEigenSolver: ' +
+                    'not yet implemented for nto or detach_attach')
+
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
                     if self.cube_origin is None or self.cube_stepsize is None:
