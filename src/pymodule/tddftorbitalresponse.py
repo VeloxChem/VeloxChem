@@ -72,8 +72,7 @@ class TddftOrbitalResponse(CphfSolver):
             'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
             'state_deriv_index': ('seq_fixed_int', 'excited state of interest'),
             'do_first_order_prop': ('bool', 'do first-order property'),
-            }
-        )
+        })
 
     def update_settings(self, orbrsp_dict, method_dict=None):
         """
@@ -89,7 +88,8 @@ class TddftOrbitalResponse(CphfSolver):
         super().update_settings(orbrsp_dict, method_dict)
 
         orbrsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['orbitalresponse'].items()
+            key: val[0]
+            for key, val in self._input_keywords['orbitalresponse'].items()
         }
 
         parse_input(self, orbrsp_keywords, orbrsp_dict)
@@ -133,11 +133,11 @@ class TddftOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot([mo_occ, lambda_ov[s], mo_vir.T])
                     for s in range(lambda_ov.shape[0])
                 ])
-                rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
-                                + 2.0 * lambda_ao.transpose(0,2,1) )
+                rel_dm_ao = (unrel_dm_ao + 2.0 * lambda_ao +
+                             2.0 * lambda_ao.transpose(0, 2, 1))
 
-                unrel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
-                                 unrel_dm_ao)
+                unrel_density = (scf_tensors['D_alpha'] +
+                                 scf_tensors['D_beta'] + unrel_dm_ao)
             else:
                 unrel_density = None
             first_order_prop.compute(molecule, basis, unrel_density)
@@ -157,7 +157,7 @@ class TddftOrbitalResponse(CphfSolver):
 
             if self.rank == mpi_master():
                 self.relaxed_dipole_moment = first_order_prop.get_property(
-                        'dipole moment')
+                    'dipole moment')
 
                 title = method + ' Relaxed Dipole Moment(s) '
                 first_order_prop.print_properties(molecule, title,
@@ -187,7 +187,8 @@ class TddftOrbitalResponse(CphfSolver):
         else:
             return None
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, rsp_results):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
+                    pe_dict, rsp_results):
         """
         Computes the right-hand side (RHS) of the RPA orbital response equation
         including the necessary density matrices using molecular data.
@@ -249,8 +250,9 @@ class TddftOrbitalResponse(CphfSolver):
             if self.state_deriv_index is None:
                 # if no states are selected, calculate all
                 # first excitd state is S1 (index starts at 1)
-                self.state_deriv_index = list(np.arange(1, 
-                                            len(rsp_results['eigenvalues'])+1))
+                self.state_deriv_index = list(
+                    np.arange(1,
+                              len(rsp_results['eigenvalues']) + 1))
 
             # number of degrees of freedon:
             dof = len(self.state_deriv_index)
@@ -269,13 +271,12 @@ class TddftOrbitalResponse(CphfSolver):
 
             if self.tamm_dancoff:
                 if self.rank == mpi_master():
-                    exc_vec[i] = (
-                        rsp_results['eigenvectors'][:nocc * nvir,
-                                                    ivec].reshape(nocc, nvir)
-                                )
+                    exc_vec[i] = (rsp_results['eigenvectors'][:nocc * nvir,
+                                                              ivec].reshape(
+                                                                  nocc, nvir))
             else:
                 eigenvector = self.get_full_solution_vector(
-                                rsp_results['eigenvectors_distributed'][ivec])
+                    rsp_results['eigenvectors_distributed'][ivec])
                 if self.rank == mpi_master():
                     exc_vec[i] = eigenvector[:nocc * nvir].reshape(nocc, nvir)
                     deexc_vec[i] = eigenvector[nocc * nvir:].reshape(nocc, nvir)
@@ -293,30 +294,24 @@ class TddftOrbitalResponse(CphfSolver):
             dm_vv = np.zeros((dof, nvir, nvir))
             unrel_dm_ao = np.zeros((dof, nao, nao))
             for i in range(dof):
-                x_plus_y_ao[i] = np.linalg.multi_dot([mo_occ, x_plus_y[i],
-                                                      mo_vir.T])
-                x_minus_y_ao[i] = np.linalg.multi_dot([mo_occ, x_minus_y[i],
-                                                       mo_vir.T])
-                dm_oo[i] = -0.5 * ( np.linalg.multi_dot([x_plus_y[i],
-                                                         x_plus_y[i].T])
-                                  + np.linalg.multi_dot([x_minus_y[i],
-                                                         x_minus_y[i].T])
-                                    )
-                dm_vv[i] = 0.5 * ( np.linalg.multi_dot([x_plus_y[i].T,
-                                                        x_plus_y[i]])
-                                 + np.linalg.multi_dot([x_minus_y[i].T,
-                                                        x_minus_y[i]])
-                                    )
-                unrel_dm_ao[i] = ( np.linalg.multi_dot([mo_occ, dm_oo[i],
-                                                        mo_occ.T])
-                                 + np.linalg.multi_dot([mo_vir, dm_vv[i],
-                                                        mo_vir.T])
-                                    )
+                x_plus_y_ao[i] = np.linalg.multi_dot(
+                    [mo_occ, x_plus_y[i], mo_vir.T])
+                x_minus_y_ao[i] = np.linalg.multi_dot(
+                    [mo_occ, x_minus_y[i], mo_vir.T])
+                dm_oo[i] = -0.5 * (
+                    np.linalg.multi_dot([x_plus_y[i], x_plus_y[i].T]) +
+                    np.linalg.multi_dot([x_minus_y[i], x_minus_y[i].T]))
+                dm_vv[i] = 0.5 * (
+                    np.linalg.multi_dot([x_plus_y[i].T, x_plus_y[i]]) +
+                    np.linalg.multi_dot([x_minus_y[i].T, x_minus_y[i]]))
+                unrel_dm_ao[i] = (
+                    np.linalg.multi_dot([mo_occ, dm_oo[i], mo_occ.T]) +
+                    np.linalg.multi_dot([mo_vir, dm_vv[i], mo_vir.T]))
 
             # Make a list of unrel. DMs and excittion vectors:
-            dm_ao_list = ( list(unrel_dm_ao) + list(x_plus_y_ao)
-                         + list(x_minus_y_ao) )
-  
+            dm_ao_list = (list(unrel_dm_ao) + list(x_plus_y_ao) +
+                          list(x_minus_y_ao))
+
             # 2) Construct the right-hand side
 
             if self._dft:
@@ -332,13 +327,13 @@ class TddftOrbitalResponse(CphfSolver):
                 # and a list with 2 list of zeros for each 4 elements above.
 
                 for s in range(dof):
-                    perturbed_dm_ao_list.extend([x_minus_y_ao[s],
-                                                 0 * x_minus_y_ao[s],
-                                                 x_minus_y_ao[s],
-                                                 0 * x_minus_y_ao[s]])
+                    perturbed_dm_ao_list.extend([
+                        x_minus_y_ao[s], 0 * x_minus_y_ao[s], x_minus_y_ao[s],
+                        0 * x_minus_y_ao[s]
+                    ])
 
-                    zero_dm_ao_list.extend([0 * x_minus_y_ao[s],
-                                            0 * x_minus_y_ao[s]])
+                    zero_dm_ao_list.extend(
+                        [0 * x_minus_y_ao[s], 0 * x_minus_y_ao[s]])
 
         else:
             dof = None
@@ -346,26 +341,28 @@ class TddftOrbitalResponse(CphfSolver):
 
             if self._dft:
                 perturbed_dm_ao_list = None
-                zero_dm_ao_list =  None
+                zero_dm_ao_list = None
 
         dof = self.comm.bcast(dof, root=mpi_master())
 
         if self._dft:
             # TODO: bcast array by array
-            perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list, root=mpi_master())
+            perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list,
+                                                   root=mpi_master())
             # TODO: bcast array by array
             dm_ao_list = self.comm.bcast(dm_ao_list, root=mpi_master())
             # TODO: bcast array by array
             # TODO: consider only bcast size of zero dm
-            zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
+            zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list,
+                                              root=mpi_master())
 
         profiler.stop_timer('Prep')
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis,
-                          eri_dict, dft_dict, pe_dict, profiler)
+        fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis, eri_dict,
+                                         dft_dict, pe_dict, profiler)
 
         profiler.start_timer('Kxc')
 
@@ -380,16 +377,17 @@ class TddftOrbitalResponse(CphfSolver):
         if self._dft:
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv = XCIntegrator()
-            #molgrid.partition_grid_points()
-            #molgrid.distribute_counts_and_displacements(self.rank,
+            # molgrid.partition_grid_points()
+            # molgrid.distribute_counts_and_displacements(self.rank,
             #                                    self.nodes, self.comm)
-            xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis, 
+            xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
                                       perturbed_dm_ao_list, zero_dm_ao_list,
                                       gs_density, molgrid,
                                       self.xcfun.get_func_label(), "qrf")
 
             for idx in range(len(fock_gxc_ao)):
-                fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx], root=mpi_master())
+                fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx],
+                                                    root=mpi_master())
 
         profiler.stop_timer('Kxc')
 
@@ -414,39 +412,37 @@ class TddftOrbitalResponse(CphfSolver):
         # Transform to MO basis:
         for i in range(dof):
             if self.rank == mpi_master():
-                fmo_rhs_1pdm = 0.5 * np.linalg.multi_dot([mo_occ.T,
-                                                          fock_ao_rhs_1pdm[i], 
-                                                          mo_vir])
+                fmo_rhs_1pdm = 0.5 * np.linalg.multi_dot(
+                    [mo_occ.T, fock_ao_rhs_1pdm[i], mo_vir])
 
                 sdp_pds = 0.25 * (
-                    np.linalg.multi_dot([ovlp, x_plus_y_ao[i],
-                                         fock_ao_rhs_x_plus_y[i].T])
-                  + np.linalg.multi_dot([ovlp, x_minus_y_ao[i],
-                                         fock_ao_rhs_x_minus_y[i].T])
-                  - np.linalg.multi_dot([fock_ao_rhs_x_plus_y[i].T,
-                                         x_plus_y_ao[i], ovlp])
-                  - np.linalg.multi_dot([fock_ao_rhs_x_minus_y[i].T,
-                                         x_minus_y_ao[i], ovlp])
-                  - np.linalg.multi_dot([ovlp, x_plus_y_ao[i],
-                                         fock_ao_rhs_x_plus_y[i]])
-                  + np.linalg.multi_dot([ovlp, x_minus_y_ao[i],
-                                         fock_ao_rhs_x_minus_y[i]])
-                  + np.linalg.multi_dot([fock_ao_rhs_x_plus_y[i],
-                                         x_plus_y_ao[i], ovlp])
-                  - np.linalg.multi_dot([fock_ao_rhs_x_minus_y[i],
-                                         x_minus_y_ao[i], ovlp])
-                                  )
+                    np.linalg.multi_dot(
+                        [ovlp, x_plus_y_ao[i], fock_ao_rhs_x_plus_y[i].T]) +
+                    np.linalg.multi_dot(
+                        [ovlp, x_minus_y_ao[i], fock_ao_rhs_x_minus_y[i].T]) -
+                    np.linalg.multi_dot(
+                        [fock_ao_rhs_x_plus_y[i].T, x_plus_y_ao[i], ovlp]) -
+                    np.linalg.multi_dot(
+                        [fock_ao_rhs_x_minus_y[i].T, x_minus_y_ao[i], ovlp]) -
+                    np.linalg.multi_dot(
+                        [ovlp, x_plus_y_ao[i], fock_ao_rhs_x_plus_y[i]]) +
+                    np.linalg.multi_dot(
+                        [ovlp, x_minus_y_ao[i], fock_ao_rhs_x_minus_y[i]]) +
+                    np.linalg.multi_dot(
+                        [fock_ao_rhs_x_plus_y[i], x_plus_y_ao[i], ovlp]) -
+                    np.linalg.multi_dot(
+                        [fock_ao_rhs_x_minus_y[i], x_minus_y_ao[i], ovlp]))
 
-                rhs_mo_i = ( fmo_rhs_1pdm 
-                     + np.linalg.multi_dot([mo_occ.T, sdp_pds, mo_vir])
-                        )
+                rhs_mo_i = (fmo_rhs_1pdm +
+                            np.linalg.multi_dot([mo_occ.T, sdp_pds, mo_vir]))
 
                 # Add DFT E[3] contribution to the RHS:
                 if self._dft:
-                    gxc_mo_i = np.linalg.multi_dot([mo_occ.T, fock_gxc_ao[2*i], mo_vir])
+                    gxc_mo_i = np.linalg.multi_dot(
+                        [mo_occ.T, fock_gxc_ao[2 * i], mo_vir])
                     rhs_mo_i += 0.25 * gxc_mo_i
 
-                rhs_mo_i = rhs_mo_i.reshape(nocc*nvir)
+                rhs_mo_i = rhs_mo_i.reshape(nocc * nvir)
             else:
                 rhs_mo_i = None
             dist_rhs_mo.append(DistributedArray(rhs_mo_i, self.comm))
@@ -456,9 +452,8 @@ class TddftOrbitalResponse(CphfSolver):
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        self.ostream.print_info(
-            "RHS of CPHF/CPKS equations computed in " +
-            f"{time.time() - rhs_t0:.2f} sec.")
+        self.ostream.print_info("RHS of CPHF/CPKS equations computed in " +
+                                f"{time.time() - rhs_t0:.2f} sec.")
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -471,12 +466,12 @@ class TddftOrbitalResponse(CphfSolver):
                 'x_minus_y_ao': x_minus_y_ao,
                 'unrelaxed_density_ao': unrel_dm_ao,
                 'fock_ao_rhs': fock_ao_rhs,
-                'fock_gxc_ao': fock_gxc_ao, # None if not DFT
+                'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
             }
         else:
             return {
                 'dist_cphf_rhs': dist_rhs_mo,
-                }
+            }
 
     def compute_omega(self, molecule, basis, scf_tensors):
         """
@@ -564,8 +559,8 @@ class TddftOrbitalResponse(CphfSolver):
             fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
             fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs[ifock+dof]
-                fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs[ifock+2*dof]
+                fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs[ifock + dof]
+                fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs[ifock + 2 * dof]
 
             Fp1_vv = np.zeros((dof, nao, nao))
             Fm1_vv = np.zeros((dof, nao, nao))
@@ -576,30 +571,22 @@ class TddftOrbitalResponse(CphfSolver):
             Fp2_oo = np.zeros((dof, nao, nao))
             Fm2_oo = np.zeros((dof, nao, nao))
             for s in range(dof):
-                Fp1_vv[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_plus_y[s].T, x_plus_y_ao[s], ovlp.T
-                ])
-                Fm1_vv[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s], ovlp.T
-                ])
-                Fp2_vv[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s], ovlp.T
-                ])
-                Fm2_vv[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s], ovlp.T
-                ])
-                Fp1_oo[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s].T, ovlp.T
-                ])
-                Fm1_oo[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s].T, ovlp.T
-                ])
-                Fp2_oo[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_plus_y[s].T, x_plus_y_ao[s].T, ovlp.T
-                ])
-                Fm2_oo[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T
-                ])
+                Fp1_vv[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[s].T, x_plus_y_ao[s], ovlp.T])
+                Fm1_vv[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s], ovlp.T])
+                Fp2_vv[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s], ovlp.T])
+                Fm2_vv[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s], ovlp.T])
+                Fp1_oo[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s].T, ovlp.T])
+                Fm1_oo[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s].T, ovlp.T])
+                Fp2_oo[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_plus_y[s].T, x_plus_y_ao[s].T, ovlp.T])
+                Fm2_oo[s] = 0.5 * np.linalg.multi_dot(
+                    [fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T])
         else:
             dof = None
         dof = self.comm.bcast(dof, root=mpi_master())
@@ -612,7 +599,10 @@ class TddftOrbitalResponse(CphfSolver):
         for x in range(dof):
             cphf_ov_x = dist_cphf_ov[x].get_full_vector(0)
             if self.rank == mpi_master():
-                lambda_ao_list.append(np.linalg.multi_dot([mo_occ, cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
+                lambda_ao_list.append(
+                    np.linalg.multi_dot(
+                        [mo_occ,
+                         cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
 
         profiler.stop_timer('lambda')
 
@@ -630,36 +620,24 @@ class TddftOrbitalResponse(CphfSolver):
                 fock_ao_lambda_np[ifock] = fock_lambda[ifock]
                 fock_ao_rhs_1pdm[ifock] = fock_ao_rhs[ifock]
 
-            fmat = (fock_ao_lambda_np + fock_ao_lambda_np.transpose(0,2,1)
-                    + 0.5 * fock_ao_rhs_1pdm)
+            fmat = (fock_ao_lambda_np + fock_ao_lambda_np.transpose(0, 2, 1) +
+                    0.5 * fock_ao_rhs_1pdm)
 
             omega_1pdm_2pdm_contribs = np.zeros((dof, nao, nao))
             for s in range(dof):
-                omega_1pdm_2pdm_contribs[s] = 0.5 * (
-                    np.linalg.multi_dot([
-                        D_vir, 
-                        (Fp1_vv[s] + Fm1_vv[s] - Fp2_vv[s] + Fm2_vv[s]),
-                        D_vir
-                    ])
-                    + np.linalg.multi_dot([
-                        D_occ, 
-                        (Fp1_vv[s] + Fm1_vv[s] - Fp2_vv[s] + Fm2_vv[s]),
-                        D_vir
-                    ])
-                    + np.linalg.multi_dot([
-                        D_occ,
-                        (Fp1_vv[s] + Fm1_vv[s] - Fp2_vv[s] + Fm2_vv[s]),
-                        D_vir
-                    ]).T
-                    + np.linalg.multi_dot([
-                        D_occ,
-                        (Fp1_oo[s] + Fm1_oo[s] - Fp2_oo[s] + Fm2_oo[s]),
-                        D_occ
-                    ])
-                    + 2.0 * np.linalg.multi_dot([
-                        D_occ, fmat[s], D_occ
-                    ])
-                )
+                omega_1pdm_2pdm_contribs[s] = 0.5 * (np.linalg.multi_dot([
+                    D_vir,
+                    (Fp1_vv[s] + Fm1_vv[s] - Fp2_vv[s] + Fm2_vv[s]), D_vir
+                ]) + np.linalg.multi_dot([
+                    D_occ,
+                    (Fp1_vv[s] + Fm1_vv[s] - Fp2_vv[s] + Fm2_vv[s]), D_vir
+                ]) + np.linalg.multi_dot([
+                    D_occ,
+                    (Fp1_vv[s] + Fm1_vv[s] - Fp2_vv[s] + Fm2_vv[s]), D_vir
+                ]).T + np.linalg.multi_dot([
+                    D_occ,
+                    (Fp1_oo[s] + Fm1_oo[s] - Fp2_oo[s] + Fm2_oo[s]), D_occ
+                ]) + 2.0 * np.linalg.multi_dot([D_occ, fmat[s], D_occ]))
 
             # Construct the energy-weighted one particle density matrix
             dm_oo = 0.5 * self.cphf_results['density_occ_occ']
@@ -672,31 +650,28 @@ class TddftOrbitalResponse(CphfSolver):
             cphf_ov_s = dist_cphf_ov[s].get_full_vector(0)
 
             if self.rank == mpi_master():
-                epsilon_dm_ao[s] = np.linalg.multi_dot([
-                    mo_occ, eo_diag, dm_oo[s], mo_occ.T
-                ])
-                epsilon_dm_ao[s] += np.linalg.multi_dot([
-                    mo_vir, ev_diag, dm_vv[s], mo_vir.T
-                ])
-                epsilon_lambda_ao[s] = np.linalg.multi_dot([
-                    mo_occ, eo_diag, cphf_ov_s.reshape(nocc, nvir), mo_vir.T 
-                ])
-                epsilon_dm_ao[s] += (epsilon_lambda_ao[s] 
-                                     + epsilon_lambda_ao[s].T)
+                epsilon_dm_ao[s] = np.linalg.multi_dot(
+                    [mo_occ, eo_diag, dm_oo[s], mo_occ.T])
+                epsilon_dm_ao[s] += np.linalg.multi_dot(
+                    [mo_vir, ev_diag, dm_vv[s], mo_vir.T])
+                epsilon_lambda_ao[s] = np.linalg.multi_dot(
+                    [mo_occ, eo_diag,
+                     cphf_ov_s.reshape(nocc, nvir), mo_vir.T])
+                epsilon_dm_ao[s] += (epsilon_lambda_ao[s] +
+                                     epsilon_lambda_ao[s].T)
 
         if self.rank == mpi_master():
 
-            omega = - epsilon_dm_ao - omega_1pdm_2pdm_contribs
+            omega = -epsilon_dm_ao - omega_1pdm_2pdm_contribs
 
             fock_gxc_ao = self.cphf_results['fock_gxc_ao']
 
             if fock_gxc_ao is not None:
                 factor = -0.25
                 for ifock in range(dof):
-                    fock_gxc_ao_np = fock_gxc_ao[2*ifock]
-                    omega[ifock] += factor * np.linalg.multi_dot([
-                        D_occ, fock_gxc_ao_np, D_occ
-                        ])
+                    fock_gxc_ao_np = fock_gxc_ao[2 * ifock]
+                    omega[ifock] += factor * np.linalg.multi_dot(
+                        [D_occ, fock_gxc_ao_np, D_occ])
         else:
             omega = None
 
@@ -705,9 +680,8 @@ class TddftOrbitalResponse(CphfSolver):
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        self.ostream.print_info(
-            "The omega Lagrange multipliers computed in " +
-            f"{time.time() - omega_t0:.2f} sec.")
+        self.ostream.print_info("The omega Lagrange multipliers computed in " +
+                                f"{time.time() - omega_t0:.2f} sec.")
         self.ostream.print_blank()
         self.ostream.flush()
 
