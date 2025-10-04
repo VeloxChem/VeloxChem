@@ -106,6 +106,19 @@ auto integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockP
                                        const double                      screeningThresholdForGTOValues,
                                        const CXCFunctional&              xcFunctional) -> void;
 
+/**
+ Integrates second-order GGA exchange-correlation functional contribution
+ to open-shell AO Fock matrix.
+
+ @param aoFockPointers the pointers to AO Fock matrices.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointers the pointers to perturbed density matrices.
+ @param gsDensityPointers the pointers to ground state density matrices.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ */
 auto integrateFxcFockForGgaOpenShell(const std::vector<double*>&       aoFockPointers,
                                      const CMolecule&                  molecule,
                                      const CMolecularBasis&            basis,
