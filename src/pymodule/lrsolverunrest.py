@@ -217,6 +217,12 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
         # CPCM information
         self._init_cpcm(molecule)
 
+        # TODO: enable PE
+        assert_msg_critical(
+            not self._pe,
+            'LinearResponseUnrestrictedSolver: ' +
+            'not yet implemented for polarizable embedding')
+
         # right-hand side (gradient)
         if self.rank == mpi_master():
             self.has_external_rhs = (v_grad is not None)

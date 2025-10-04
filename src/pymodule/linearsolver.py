@@ -1709,13 +1709,13 @@ class LinearSolver:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
 
         if self._pe:
-            # TODO: unrestricted
             t0 = tm.time()
+
             for idx in range(num_densities):
-                # Note: only closed shell density for now
-                dm = dens[idx] * 2.0
+                dm = dens_a[idx] + dens_b[idx]
                 V_emb = self._embedding_drv.compute_pe_contributions(
                     density_matrix=dm)
+
                 if comm_rank == mpi_master():
                     fock_arrays[idx * 2 + 0] += V_emb
                     fock_arrays[idx * 2 + 1] += V_emb
@@ -1724,14 +1724,12 @@ class LinearSolver:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
 
         if self._cpcm:
-            # TODO: unrestricted
-
             t0 = tm.time()
 
             for idx in range(num_densities):
                 Fock_sol = self.cpcm_drv.compute_response_fock(
-                    molecule, basis, dens[idx] * 2.0, self.cpcm_cg_thresh,
-                    self.non_equilibrium_solv)
+                    molecule, basis, dens_a[idx] + dens_b[idx],
+                    self.cpcm_cg_thresh, self.non_equilibrium_solv)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx * 2 + 0] += Fock_sol
