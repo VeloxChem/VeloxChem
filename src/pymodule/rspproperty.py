@@ -38,6 +38,7 @@ from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .tdacppsolver import ComplexResponseTDA
 from .lrsolver import LinearResponseSolver
+from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .c6driver import C6Driver
@@ -140,7 +141,14 @@ class ResponseProperty:
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['is_complex'] == 'no'):
 
-            self._rsp_driver = LinearResponseSolver(self.comm, self.ostream)
+            if method_type == 'restricted':
+                self._rsp_driver = LinearResponseSolver(self.comm, self.ostream)
+            elif method_type == 'unrestricted':
+                self._rsp_driver = LinearResponseUnrestrictedSolver(
+                    self.comm, self.ostream)
+            else:
+                assert_msg_critical(False,
+                                    'ResponseProperty: invalid method_type')
 
         # Linear response complex solver
         elif (self._rsp_dict['order'] == 'linear' and
