@@ -251,7 +251,9 @@ class DistributedArray:
         if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
                 self.data.size > 0 and dist_array.data.size > 0 and
                 self.data.dtype == np.float64 and
-                dist_array.data.dtype == np.float64):
+                dist_array.data.dtype == np.float64 and
+                float(self.data.size) <= 3e9 and
+                float(dist_array.data.size) <= 3e9):
             mat = matmul_gpu(self.data.T, dist_array.data)
         else:
             mat = np.matmul(self.data.T, dist_array.data)
@@ -279,7 +281,9 @@ class DistributedArray:
         if (self.data.ndim == 2 and dist_array.data.ndim == 2 and
                 self.data.size > 0 and dist_array.data.size > 0 and
                 self.data.dtype == np.float64 and
-                dist_array.data.dtype == np.float64):
+                dist_array.data.dtype == np.float64 and
+                float(self.data.size) <= 3e9 and
+                float(dist_array.data.size) <= 3e9):
             mat = matmul_gpu(self.data.T, dist_array.data)
         else:
             mat = np.matmul(self.data.T, dist_array.data)
@@ -306,7 +310,9 @@ class DistributedArray:
 
         if (self.data.ndim == 2 and array.ndim == 2 and
                 self.data.size > 0 and array.size > 0 and
-                self.data.dtype == np.float64 and array.dtype == np.float64):
+                self.data.dtype == np.float64 and array.dtype == np.float64 and
+                float(self.data.size) <= 3e9 and
+                float(array.size) <= 3e9):
             seg_mat = matmul_gpu(self.data, array)
         else:
             seg_mat = np.matmul(self.data, array)
