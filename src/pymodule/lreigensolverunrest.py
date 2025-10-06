@@ -577,6 +577,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
         profiler.check_memory_usage('End of LR eigensolver')
         profiler.print_memory_usage(self.ostream)
 
+        # for unrestricted
+        sqrt_2 = np.sqrt(2.0)
+        for k in exc_solutions:
+            exc_solutions[k].data /= sqrt_2
+
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None
@@ -600,6 +605,14 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                                            basis, scf_tensors, spin='beta')
             mdip_grad_b = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
                                            basis, scf_tensors, spin='beta')
+
+            # for unrestricted
+            edip_grad_a /= sqrt_2
+            lmom_grad_a /= sqrt_2
+            mdip_grad_a /= sqrt_2
+            edip_grad_b /= sqrt_2
+            lmom_grad_b /= sqrt_2
+            mdip_grad_b /= sqrt_2
 
             eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
@@ -663,12 +676,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                         z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(nocc_b, -1)
                         y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(nocc_b, -1)
 
-                # TODO: enable nto and detach_attach
-                #assert_msg_critical(
-                #    not (self.nto or self.detach_attach),
-                #    'LinearResponseUnrestrictedEigenSolver: ' +
-                #    'not yet implemented for nto or detach_attach')
-
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
                     if self.cube_origin is None or self.cube_stepsize is None:
@@ -729,8 +736,13 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        dens_D, dens_A = self.get_detach_attach_densities(
-                            z_mat, y_mat, mo_occ, mo_vir)
+                        dens_D_alpha, dens_A_alpha = self.get_detach_attach_densities(
+                            z_mat_a, y_mat_a, mo_occ_a, mo_vir_a)
+                        dens_D_beta, dens_A_beta = self.get_detach_attach_densities(
+                            z_mat_b, y_mat_b, mo_occ_b, mo_vir_b)
+
+                        dens_D = dens_D_alpha + dens_D_beta
+                        dens_A = dens_A_alpha + dens_A_beta
 
                         # Add the detachment and attachment density matrices
                         # to the checkpoint file
@@ -754,6 +766,12 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
 
                         if self.rank == mpi_master():
                             dens_cube_files.append(dens_cube_fnames)
+
+                # TODO: enable esa
+                assert_msg_critical(
+                    not self.esa,
+                    'LinearResponseUnrestrictedEigenSolver: ' +
+                    'not yet implemented for excited state absorption')
 
                 if self.esa:
                     if self.esa_from_state is None:
@@ -829,11 +847,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                             lmom_grad_b[ind], eigvec_b) / (-eigvals[s])
                         magn_trans_dipoles[s, ind] += np.vdot(
                             mdip_grad_b[ind], eigvec_b)
-
-                        # TODO: move factor elsewhere
-                        elec_trans_dipoles[s, ind] /= 2.0
-                        velo_trans_dipoles[s, ind] /= 2.0
-                        magn_trans_dipoles[s, ind] /= 2.0
 
                     # write to h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):

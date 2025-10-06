@@ -3073,11 +3073,9 @@ class LinearSolver:
         # SVD
         u_mat_a, s_diag_a, vh_mat_a = np.linalg.svd(t_mat_a, full_matrices=True)
         lam_diag_a = s_diag_a**2
-        lam_diag_a /= 2.0
 
         u_mat_b, s_diag_b, vh_mat_b = np.linalg.svd(t_mat_b, full_matrices=True)
         lam_diag_b = s_diag_b**2
-        lam_diag_b /= 2.0
 
         # holes in increasing order of lambda
         # particles in decreasing order of lambda
@@ -3400,9 +3398,6 @@ class LinearSolver:
         excitations = []
         de_excitations = []
 
-        # TODO: move factor elsewhere
-        factor = 1.0 / np.sqrt(2.0)
-
         for nocc, nvir, eigvec, spin in [(nocc_a, nvir_a, eigvec_a, 'a'), (nocc_b, nvir_b, eigvec_b, 'b')]:
             for i in range(nocc):
                 if getattr(self, 'core_excitation', False):
@@ -3417,7 +3412,7 @@ class LinearSolver:
 
                     ia = i * nvir + a
 
-                    exc_coef = eigvec[ia] * factor
+                    exc_coef = eigvec[ia]
                     if abs(exc_coef) > coef_thresh:
                         excitations.append((
                             abs(exc_coef),
@@ -3425,7 +3420,7 @@ class LinearSolver:
                         ))
 
                     if eigvec.size == nocc * nvir * 2:
-                        de_exc_coef = eigvec[nocc * nvir + ia] * factor
+                        de_exc_coef = eigvec[nocc * nvir + ia]
                         if abs(de_exc_coef) > coef_thresh:
                             de_excitations.append((
                                 abs(de_exc_coef),

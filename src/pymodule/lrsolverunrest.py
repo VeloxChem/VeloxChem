@@ -235,6 +235,8 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
             'LinearResponseUnrestrictedSolver: ' +
             'not implemented for external rhs')
 
+        sqrt_2 = np.sqrt(2.0)
+
         if not self.has_external_rhs:
             b_grad_alpha = self.get_prop_grad(self.b_operator, self.b_components,
                                               molecule, basis, scf_tensors,
@@ -242,6 +244,11 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
             b_grad_beta = self.get_prop_grad(self.b_operator, self.b_components,
                                              molecule, basis, scf_tensors,
                                              spin='beta')
+
+            # for unrestricted
+            b_grad_alpha /= sqrt_2
+            b_grad_beta /= sqrt_2
+
             if self.rank == mpi_master():
                 v_grad = {
                     (op, w): (va, vb)
@@ -421,7 +428,6 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
 
                     xv = (np.dot(x_full_a, v_grad[(op, freq)][0]) +
                           np.dot(x_full_b, v_grad[(op, freq)][1]))
-                    xv /= 2.0
                     xvs.append((op, freq, xv))
 
                 r_norms_2 = r.squared_norm(axis=0)
@@ -539,6 +545,10 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                                              molecule, basis, scf_tensors,
                                              spin='beta')
 
+            # for unrestricted
+            a_grad_alpha /= sqrt_2
+            a_grad_beta /= sqrt_2
+
             if self.is_converged:
                 if self.rank == mpi_master():
                     v_op_a = {op: (va, vb)
@@ -569,7 +579,7 @@ class LinearResponseUnrestrictedSolver(LinearSolver):
                             ))
 
                         for aop in self.a_components:
-                            rsp_funcs[(aop, bop, w)] = -0.5 * (
+                            rsp_funcs[(aop, bop, w)] = (-1.0) * (
                                 np.dot(v_op_a[aop][0], x_alpha) +
                                 np.dot(v_op_a[aop][1], x_beta))
 
