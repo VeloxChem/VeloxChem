@@ -434,20 +434,20 @@ class AtomTypeIdentifier:
 
             if info['AtomicSymbol'] == 'C':
                 atom_type = self.assign_carbon_type(atom_info_dict,
-                                                      using_gaff_220, info,
-                                                      connected_symbols)
+                                                    using_gaff_220, info,
+                                                    connected_symbols)
 
                 for connected_atom_number in info['ConnectedAtomsNumbers']:
                     connected_atom_info, hydrogen_type = self.assign_hydrogen_carbon_type(
-                        atom_info_dict, atom_type, connected_atom_number,
-                        info)
+                        atom_info_dict, atom_type, connected_atom_number, info)
                     if hydrogen_type is not None:
                         H_name = f"H{connected_atom_info['AtomNumber']}"
-                        atom_types_dict.setdefault(H_name, {}).update(hydrogen_type)
+                        atom_types_dict.setdefault(H_name,
+                                                   {}).update(hydrogen_type)
 
             elif info['AtomicSymbol'] == 'O':
                 atom_type = self.assign_oxygen_type(atom_info_dict, info,
-                                                      connected_symbols)
+                                                    connected_symbols)
 
                 # Hydrogen type assignment based on oxygen type
                 for connected_atom_number in info['ConnectedAtomsNumbers']:
@@ -455,13 +455,14 @@ class AtomTypeIdentifier:
                         atom_info_dict, connected_atom_number, atom_type)
                     if hydrogen_type is not None:
                         H_name = f"H{connected_atom_info['AtomNumber']}"
-                        atom_types_dict.setdefault(H_name, {}).update(hydrogen_type)
+                        atom_types_dict.setdefault(H_name,
+                                                   {}).update(hydrogen_type)
 
             elif info['AtomicSymbol'] == 'N':
 
-                atom_type = self.assign_nitrogen_type(
-                    atom_info_dict, info, connected_symbols)
-                
+                atom_type = self.assign_nitrogen_type(atom_info_dict, info,
+                                                      connected_symbols)
+
                 # Hydrogen type assignment based on nitrogen type
                 for connected_atom_number in info['ConnectedAtomsNumbers']:
                     hydrogen_type = None
@@ -470,7 +471,8 @@ class AtomTypeIdentifier:
 
                     if hydrogen_type is not None:
                         H_name = f"H{connected_atom_info['AtomNumber']}"
-                        atom_types_dict.setdefault(H_name, {}).update(hydrogen_type)
+                        atom_types_dict.setdefault(H_name,
+                                                   {}).update(hydrogen_type)
 
             elif info['AtomicSymbol'] == 'P':
 
@@ -487,15 +489,16 @@ class AtomTypeIdentifier:
                         hydrogen_type = None
                         connected_atom_info, hydrogen_type = self.assign_hydrogen_phosphorus_type(
                             atom_info_dict, connected_atom_number)
-                    
+
                         if hydrogen_type is not None:
                             H_name = f"H{connected_atom_info['AtomNumber']}"
-                            atom_types_dict.setdefault(H_name, {}).update(hydrogen_type)
+                            atom_types_dict.setdefault(H_name,
+                                                       {}).update(hydrogen_type)
 
             elif info['AtomicSymbol'] == 'S':
 
                 atom_type = self.assign_sulfur_type(atom_info_dict, info,
-                                                      connected_symbols)
+                                                    connected_symbols)
 
                 # Hydrogen assignment in the case of thiols
                 for connected_atom_number in info['ConnectedAtomsNumbers']:
@@ -504,24 +507,63 @@ class AtomTypeIdentifier:
                         atom_info_dict, connected_atom_number, atom_type)
                     if hydrogen_type is not None:
                         H_name = f"H{connected_atom_info['AtomNumber']}"
-                        atom_types_dict.setdefault(H_name, {}).update(hydrogen_type)
+                        atom_types_dict.setdefault(H_name,
+                                                   {}).update(hydrogen_type)
 
             # Decision for halogens
 
             elif info['AtomicSymbol'] in ['F', 'Cl', 'Br', 'I']:
-                atom_type = {'opls': 'opls_XXX', 'gaff': info['AtomicSymbol'].lower()}
-
+                atom_type = {
+                    'opls': 'opls_XXX',
+                    'gaff': info['AtomicSymbol'].lower()
+                }
 
             uff_type = {'uff': info['AtomicSymbol']}
-            if atom_type is not None: # An atom type was found in the decision tree
+            if atom_type is not None:  # An atom type was found in the decision tree
                 atom_type.update(uff_type)
                 atom_types_dict[name] = atom_type
             else:
                 atom_types_dict.setdefault(name, {}).update(uff_type)
-
-
-
+                
+        # Sort the atom_types_dict into the order matching the input molecule
+        # atomtypeidentifier.identify_equivalences and mmforcefieldgenerator.populate_atoms rely on this ordering
+        atom_types_dict = self.sort_atom_types(atom_types_dict)
         return atom_types_dict
+
+
+    def sort_atom_types(self, atom_types_dict):
+        """Sorts the entries of the atom_types_dict based on the number occurring in the key
+        """
+        new_dict = {}
+        keys = list(atom_types_dict.keys())
+        sorted_keys = sorted(keys, key=self.get_atom_number)
+        for key in sorted_keys:
+            new_dict[key] = atom_types_dict[key]
+
+        return new_dict
+
+    @staticmethod
+    def get_atom_number(atom_type_str):
+        """
+        Extracts the numeric part from an atom type string.
+
+        This static method uses regular expression to find the first sequence
+        of digits in the atom type string, which typically represents the atom
+        number.
+
+        :param atom_type_str:
+            The atom type string containing a numeric suffix.
+
+        :return:
+            The numeric part extracted from the atom type string. Returns 0 if
+            no number is found.
+        """
+
+        at_match = re.search(r'\d+', atom_type_str)
+
+        return (int(at_match.group()) if at_match else 0)
+        
+        
 
     def assign_hydrogen_sulfur_type(self, atom_info_dict, connected_atom_number,
                                     sulfur_type):
@@ -1476,12 +1518,8 @@ class AtomTypeIdentifier:
         # Initialize the list of gaff atom types
         gaff_atom_types = []
 
-        # Sort atom types based on the number after the atomic symbol
-        sorted_atom_types = sorted(atom_types_dict.keys(),
-                                   key=self.get_atom_number)
-
         # Append the gaff atom types to the list
-        for atom_type in sorted_atom_types:
+        for atom_type in atom_types_dict.keys():
             if isinstance(atom_types_dict[atom_type], dict):
                 gaff_type = atom_types_dict[atom_type].get('gaff', None)
                 uff_type = atom_types_dict[atom_type].get('uff', None)
@@ -1595,7 +1633,8 @@ class AtomTypeIdentifier:
 
         self.gaff_atom_types = atom_types
 
-        for atom_key, gaff_type in zip(self.atom_types_dict, self.gaff_atom_types):
+        for atom_key, gaff_type in zip(self.atom_types_dict,
+                                       self.gaff_atom_types):
             self.atom_types_dict[atom_key]['gaff'] = gaff_type
 
     def get_common_cycles(self, i, j, cycle_type='any'):
@@ -1651,12 +1690,6 @@ class AtomTypeIdentifier:
         self.detect_closed_cyclic_structures()
         self.atom_info_dict = self.create_atom_info_dict()
         self.atom_types_dict = self.decide_atom_type(self.atom_info_dict)
-        
-        # populate_atoms in the mmforcefieldgenerator relies on the order of atom_types_dict
-        # TODO fix the dependence on ordering
-        non_decimal = re.compile(r'[^\d.]+')
-        self.atom_types_dict = dict(sorted(self.atom_types_dict.items(), key=lambda x: int(non_decimal.sub('', str(x[0])))))
-        
 
         self.gaff_atom_types = self.extract_gaff_atom_types(
             self.atom_types_dict)
@@ -1701,31 +1734,11 @@ class AtomTypeIdentifier:
                 self.ostream.print_info(
                     f"Cycle size {size}: Pure Aromatic Cycle")
 
-
         self.ostream.flush()
 
         return self.gaff_atom_types
 
-    @staticmethod
-    def get_atom_number(atom_type_str):
-        """
-        Extracts the numeric part from an atom type string.
 
-        This static method uses regular expression to find the first sequence
-        of digits in the atom type string, which typically represents the atom
-        number.
-
-        :param atom_type_str:
-            The atom type string containing a numeric suffix.
-
-        :return:
-            The numeric part extracted from the atom type string. Returns 0 if
-            no number is found.
-        """
-
-        at_match = re.search(r'\d+', atom_type_str)
-
-        return (int(at_match.group()) if at_match else 0)
 
     def identify_equivalences(self, depth=10):
         """
@@ -1777,29 +1790,15 @@ class AtomTypeIdentifier:
             'cq': 'cp',
         }
 
-        
-        # This is to reproduce the same output as the first version
         self.equivalent_atoms = []
         atom_types_for_equil = []
-        print_data = []
         for name, type in self.atom_types_dict.items():
             if 'gaff' in type:
-                self.equivalent_atoms.append(
-                    f'{type["gaff"]}_00')
+                self.equivalent_atoms.append(f'{type["gaff"]}_00')
                 atom_types_for_equil.append(type['gaff'])
             else:
                 self.equivalent_atoms.append(f'{name}_00')
                 atom_types_for_equil.append(name)
-            equil = self.equivalent_atoms[-1]
-            print_data.append(f'{name}: {equil}')
-
-        # self.ostream.unmute()
-
-        # self.ostream.print_info("New")
-        # self.ostream.print_info(str(print_data))
-        # self.ostream.print_info(str(atom_types_for_equil))
-        # self.ostream.flush()
-        # self.ostream.mute()
 
 
         connectivity_matrix = self.connectivity_matrix
