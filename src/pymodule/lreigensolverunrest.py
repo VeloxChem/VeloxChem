@@ -614,8 +614,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                 else:
                     final_h5_fname = None
 
-            nto_lambdas = []
-            nto_cube_files = []
+            nto_lambdas_a = []
+            nto_lambdas_b = []
+            nto_cube_files_a = []
+            nto_cube_files_b = []
             dens_cube_files = []
 
             excitation_details = []
@@ -662,10 +664,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                         y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(nocc_b, -1)
 
                 # TODO: enable nto and detach_attach
-                assert_msg_critical(
-                    not (self.nto or self.detach_attach),
-                    'LinearResponseUnrestrictedEigenSolver: ' +
-                    'not yet implemented for nto or detach_attach')
+                #assert_msg_critical(
+                #    not (self.nto or self.detach_attach),
+                #    'LinearResponseUnrestrictedEigenSolver: ' +
+                #    'not yet implemented for nto or detach_attach')
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -683,13 +685,21 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        nto_mo = self.get_nto(z_mat - y_mat, mo_occ, mo_vir)
+                        nto_mo = self.get_nto_unrestricted(
+                            (z_mat_a - y_mat_a, z_mat_b - y_mat_b),
+                            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b))
 
-                        nto_lam = nto_mo.occa_to_numpy()
-                        lam_start = mo_occ.shape[1]
-                        lam_end = lam_start + min(mo_occ.shape[1],
-                                                  mo_vir.shape[1])
-                        nto_lambdas.append(nto_lam[lam_start:lam_end])
+                        nto_lam_a = nto_mo.occa_to_numpy()
+                        lam_start_a = mo_occ_a.shape[1]
+                        lam_end_a = lam_start_a + min(mo_occ_a.shape[1],
+                                                      mo_vir_a.shape[1])
+                        nto_lambdas_a.append(nto_lam_a[lam_start_a:lam_end_a])
+
+                        nto_lam_b = nto_mo.occb_to_numpy()
+                        lam_start_b = mo_occ_b.shape[1]
+                        lam_end_b = lam_start_b + min(mo_occ_b.shape[1],
+                                                      mo_vir_b.shape[1])
+                        nto_lambdas_b.append(nto_lam_b[lam_start_b:lam_end_b])
 
                         # Add the NTO to the final checkpoint file.
                         nto_label = f'NTO_S{s + 1}'
@@ -701,12 +711,16 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
 
                     if self.nto_cubes:
-                        lam_diag, nto_cube_fnames = self.write_nto_cubes(
+                        lam_diag_a, nto_cube_fnames_a = self.write_nto_cubes(
                             cubic_grid, molecule, basis, s, nto_mo,
-                            self.nto_pairs)
+                            self.nto_pairs, nto_spin='alpha')
+                        lam_diag_b, nto_cube_fnames_b = self.write_nto_cubes(
+                            cubic_grid, molecule, basis, s, nto_mo,
+                            self.nto_pairs, nto_spin='beta')
 
                         if self.rank == mpi_master():
-                            nto_cube_files.append(nto_cube_fnames)
+                            nto_cube_files_a.append(nto_cube_fnames_a)
+                            nto_cube_files_b.append(nto_cube_fnames_b)
 
                 if self.detach_attach:
                     self.ostream.print_info(
@@ -860,9 +874,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearSolver):
                     }
 
                     if self.nto:
-                        ret_dict['nto_lambdas'] = nto_lambdas
+                        ret_dict['nto_lambdas_a'] = nto_lambdas_a
+                        ret_dict['nto_lambdas_b'] = nto_lambdas_b
                         if self.nto_cubes:
-                            ret_dict['nto_cubes'] = nto_cube_files
+                            ret_dict['nto_cubes_a'] = nto_cube_files_a
+                            ret_dict['nto_cubes_b'] = nto_cube_files_b
 
                     if self.detach_attach_cubes:
                         ret_dict['density_cubes'] = dens_cube_files

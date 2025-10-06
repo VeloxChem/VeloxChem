@@ -3051,6 +3051,64 @@ class LinearSolver:
 
         return nto_mo
 
+    def get_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
+        """
+        Gets the natural transition orbitals.
+
+        :param t_mat:
+            The excitation vector in matrix form (N_occ x N_virt).
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The NTOs as a MolecularOrbitals object.
+        """
+
+        t_mat_a, t_mat_b = t_mat
+        mo_occ_a, mo_occ_b = mo_occ
+        mo_vir_a, mo_vir_b = mo_vir
+
+        # SVD
+        u_mat_a, s_diag_a, vh_mat_a = np.linalg.svd(t_mat_a, full_matrices=True)
+        lam_diag_a = s_diag_a**2
+        lam_diag_a /= 2.0
+
+        u_mat_b, s_diag_b, vh_mat_b = np.linalg.svd(t_mat_b, full_matrices=True)
+        lam_diag_b = s_diag_b**2
+        lam_diag_b /= 2.0
+
+        # holes in increasing order of lambda
+        # particles in decreasing order of lambda
+        nto_occ_a = np.flip(np.matmul(mo_occ_a, u_mat_a), axis=1)
+        nto_vir_a = np.matmul(mo_vir_a, vh_mat_a.T)
+
+        nto_occ_b = np.flip(np.matmul(mo_occ_b, u_mat_b), axis=1)
+        nto_vir_b = np.matmul(mo_vir_b, vh_mat_b.T)
+
+        # NTOs including holes and particles
+        nto_orbs_a = np.concatenate((nto_occ_a, nto_vir_a), axis=1)
+        nto_orbs_b = np.concatenate((nto_occ_b, nto_vir_b), axis=1)
+
+        nto_lam_a = np.zeros(nto_orbs_a.shape[1])
+        nocc_a = nto_occ_a.shape[1]
+        for i_nto in range(lam_diag_a.size):
+            nto_lam_a[nocc_a - 1 - i_nto] = -lam_diag_a[i_nto]
+            nto_lam_a[nocc_a + i_nto] = lam_diag_a[i_nto]
+
+        nto_lam_b = np.zeros(nto_orbs_b.shape[1])
+        nocc_b = nto_occ_b.shape[1]
+        for i_nto in range(lam_diag_b.size):
+            nto_lam_b[nocc_b - 1 - i_nto] = -lam_diag_b[i_nto]
+            nto_lam_b[nocc_b + i_nto] = lam_diag_b[i_nto]
+
+        nto_mo = MolecularOrbitals.create_nto(
+            [nto_orbs_a, nto_orbs_b], [nto_lam_a, nto_lam_b],
+            molorb.unrest)
+
+        return nto_mo
+
     def write_nto_cubes(self,
                         cubic_grid,
                         molecule,
@@ -3058,7 +3116,8 @@ class LinearSolver:
                         root,
                         nto_mo,
                         nto_pairs=None,
-                        nto_thresh=0.1):
+                        nto_thresh=0.1,
+                        nto_spin=''):
         """
         Writes cube files for natural transition orbitals.
 
@@ -3094,9 +3153,20 @@ class LinearSolver:
         if getattr(self, 'core_excitation', False):
             nocc = self.num_core_orbitals
         else:
-            nocc = molecule.number_of_alpha_electrons()
+            if nto_spin == '' or nto_spin == 'alpha':
+                nocc = molecule.number_of_alpha_electrons()
+            elif nto_spin == 'beta':
+                nocc = molecule.number_of_beta_electrons()
         nvir = nto_mo.number_of_mos() - nocc
-        lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
+
+        if nto_spin == '' or nto_spin == 'alpha':
+            lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
+            nto_coefs = nto_mo.alpha_to_numpy()
+            cube_spin_str = 'alpha'
+        elif nto_spin == 'beta':
+            lam_diag = nto_mo.occb_to_numpy()[nocc:nocc + min(nocc, nvir)]
+            nto_coefs = nto_mo.beta_to_numpy()
+            cube_spin_str = 'beta'
 
         for i_nto in range(lam_diag.size):
             if lam_diag[i_nto] < nto_thresh:
@@ -3107,17 +3177,15 @@ class LinearSolver:
 
             self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
 
-            nto_coefs = nto_mo.alpha_to_numpy()
-
             # hole
             ind_occ = nocc - i_nto - 1
             vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_occ)
 
             if self.rank == mpi_master():
-                occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
-                    base_fname, root + 1, i_nto + 1)
+                occ_cube_name = '{:s}_S{:d}_NTO_H{:d}{:s}.cube'.format(
+                    base_fname, root + 1, i_nto + 1, nto_spin[:1])
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
-                                   ind_occ, 'alpha')
+                                   ind_occ, cube_spin_str)
                 filenames.append(occ_cube_name)
 
                 self.ostream.print_info(
@@ -3129,10 +3197,10 @@ class LinearSolver:
             vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_vir)
 
             if self.rank == mpi_master():
-                vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
-                    base_fname, root + 1, i_nto + 1)
+                vir_cube_name = '{:s}_S{:d}_NTO_P{:d}{:s}.cube'.format(
+                    base_fname, root + 1, i_nto + 1, nto_spin[:1])
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
-                                   ind_vir, 'alpha')
+                                   ind_vir, cube_spin_str)
                 filenames.append(vir_cube_name)
 
                 self.ostream.print_info(
