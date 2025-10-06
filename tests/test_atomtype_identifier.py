@@ -12,7 +12,8 @@ class TestAtomTypeIdentifier:
         atomtypeidentifier.ostream.mute()
 
         molecule = Molecule.read_xyz_string(xyz_string)
-        atomtypes = atomtypeidentifier.generate_gaff_atomtypes(molecule)
+        gaff_atomtypes = atomtypeidentifier.generate_gaff_atomtypes(molecule)
+        atom_types_dict = atomtypeidentifier.atom_types_dict
 
         atomtypeidentifier.identify_equivalences()
         equal_charges_list = []
@@ -27,7 +28,7 @@ class TestAtomTypeIdentifier:
 
         assert atomtypeidentifier.equivalent_atoms == expected_equiv_atoms
 
-        assert atomtypes == expected_atomtypes
+        assert atom_types_dict == expected_atomtypes
 
     def test_atomtypeidentifier_1(self):
 
@@ -647,7 +648,7 @@ class TestAtomTypeIdentifier:
             },
             'C7': {
                 'opls': 'opls_508',
-                'gaff': 'cc',
+                'gaff': 'cd',
                 'uff': 'C'
             },
             'C8': {
@@ -972,7 +973,7 @@ class TestAtomTypeIdentifier:
             },
             'C12': {
                 'opls': 'opls_508',
-                'gaff': 'cc',
+                'gaff': 'cd',
                 'uff': 'C'
             },
             'H13': {
@@ -997,7 +998,7 @@ class TestAtomTypeIdentifier:
             },
             'C17': {
                 'opls': 'opls_508',
-                'gaff': 'cc',
+                'gaff': 'cd',
                 'uff': 'C'
             },
             'H18': {
@@ -1007,7 +1008,7 @@ class TestAtomTypeIdentifier:
             },
             'C19': {
                 'opls': 'opls_508',
-                'gaff': 'cc',
+                'gaff': 'cd',
                 'uff': 'C'
             },
             'H20': {
@@ -1027,7 +1028,7 @@ class TestAtomTypeIdentifier:
             },
             'C23': {
                 'opls': 'opls_508',
-                'gaff': 'cc',
+                'gaff': 'cd',
                 'uff': 'C'
             },
             'H24': {
@@ -1037,7 +1038,7 @@ class TestAtomTypeIdentifier:
             },
             'C25': {
                 'opls': 'opls_508',
-                'gaff': 'cc',
+                'gaff': 'cd',
                 'uff': 'C'
             },
             'H26': {
@@ -1156,7 +1157,7 @@ class TestAtomTypeIdentifier:
             },
             'C7': {
                 'opls': 'opls_XXX',
-                'gaff': 'ce',
+                'gaff': 'cf',
                 'uff': 'C'
             },
             'H8': {
@@ -1171,7 +1172,7 @@ class TestAtomTypeIdentifier:
             },
             'C10': {
                 'opls': 'opls_XXX',
-                'gaff': 'ce',
+                'gaff': 'cf',
                 'uff': 'C'
             },
             'C11': {
@@ -1582,12 +1583,12 @@ class TestAtomTypeIdentifier:
             },
             'C10': {
                 'opls': 'opls_521',
-                'gaff': 'cp',
+                'gaff': 'cq',
                 'uff': 'C'
             },
             'C11': {
                 'opls': 'opls_521',
-                'gaff': 'cp',
+                'gaff': 'cq',
                 'uff': 'C'
             },
             'C12': {

@@ -121,7 +121,7 @@ class MMForceFieldGenerator:
         # molecule
         self.molecule_name = 'MOL'
         self.scan_xyz_files = None
-        self.gaff_atom_types = None
+        self.atom_types = None
         self.rotatable_bonds = []
 
         # topology settings
@@ -249,11 +249,11 @@ class MMForceFieldGenerator:
             'MMForceFieldGenerator.compute: scan_xyz_files not defined ')
 
         assert_msg_critical(
-            self.gaff_atom_types is not None,
+            self.atom_types is not None,
             'MMForceFieldGenerator.compute: atom_types not defined ')
 
         assert_msg_critical(
-            len(self.gaff_atom_types) == molecule.number_of_atoms(),
+            len(self.atom_types) == molecule.number_of_atoms(),
             'MMForceFieldGenerator.compute: inconsistent number of atom_types')
 
         # read QM scan
@@ -1133,20 +1133,23 @@ class MMForceFieldGenerator:
         atomtypeidentifier.gaff_version = gaff_version
 
         if self.topology_update_flag:
-            self.atom_types_dict = atomtypeidentifier.generate_gaff_atomtypes(
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
                 self.molecule, self.connectivity_matrix)
             # The partial charges have to be recalculated
             self.partial_charges = None
         else:
-            self.atom_types_dict = atomtypeidentifier.generate_gaff_atomtypes(
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
                 self.molecule)
             self.connectivity_matrix = np.copy(
                 atomtypeidentifier.connectivity_matrix)
 
-        self.gaff_atom_types = atomtypeidentifier.gaff_atom_types
+        # self.gaff_atom_types = atomtypeidentifier.gaff_atom_types
+        self.atom_types_dict = atomtypeidentifier.atom_types_dict
         self.atom_info_dict = atomtypeidentifier.atom_info_dict
 
         atomtypeidentifier.identify_equivalences()
+        self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
+        self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
         ## TODO: change this to skip when water is used
         if not resp:
@@ -1231,12 +1234,12 @@ class MMForceFieldGenerator:
         # preparing atomtypes and atoms
 
         assert_msg_critical(
-            len(self.gaff_atom_types) == n_atoms,
+            len(self.atom_types) == n_atoms,
             'MMForceFieldGenerator: inconsistent atom_types')
 
         for i in range(n_atoms):
-            self.gaff_atom_types[i] = f'{self.gaff_atom_types[i].strip():<2s}'
-        self.unique_atom_types = sorted(list(set(self.gaff_atom_types)))
+            self.atom_types[i] = f'{self.atom_types[i].strip():<2s}'
+        self.unique_atom_types = sorted(list(set(self.atom_types)))
 
         bond_indices, angle_indices, dihedral_indices, self.pairs = self.generate_topology_indices(
             n_atoms)
@@ -1369,9 +1372,9 @@ class MMForceFieldGenerator:
         improper_atom_inds = []
 
         for i, j, k in angle_indices:
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            at_3 = self.gaff_atom_types[k]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
 
             if at_2 not in sp2_atom_types:
                 continue
@@ -1384,7 +1387,7 @@ class MMForceFieldGenerator:
             for l in range(n_atoms):
                 if (l in [i, j, k]) or (self.connectivity_matrix[l, j] != 1):
                     continue
-                at_4 = self.gaff_atom_types[l]
+                at_4 = self.atom_types[l]
 
                 patterns = [
                     re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
@@ -1594,8 +1597,8 @@ class MMForceFieldGenerator:
                 }
         return impropers
 
-    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines,
-                       gaff_version, equivalent_atoms, water_model):
+    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines, gaff_version,
+                       equivalent_atoms, water_model):
 
         use_gaff = False
         use_uff = False
@@ -1639,7 +1642,7 @@ class MMForceFieldGenerator:
                             use_gaff = True
                             atom_type = gafftype
                             break
-                        
+
                 if gafftype in ['ow', 'hw']:
                     assert_msg_critical(
                         water_model is not None,
@@ -1654,8 +1657,8 @@ class MMForceFieldGenerator:
                     epsilon = self.water_parameters[water_model][atom_type][
                         'epsilon']
 
-                    self.partial_charges[i] = self.water_parameters[water_model][
-                        atom_type]['charge']
+                    self.partial_charges[i] = self.water_parameters[
+                        water_model][atom_type]['charge']
 
                     atom_type_found = True
                     use_water_model = True
@@ -1704,7 +1707,7 @@ class MMForceFieldGenerator:
                 'equivalent_atom': equivalent_atoms[i],
                 'comment': comment,
             }
-            
+
         if use_water_model:
             water_bonds = self.water_parameters[water_model]['bonds']
             water_angles = self.water_parameters[water_model]['angles']
@@ -1758,8 +1761,8 @@ class MMForceFieldGenerator:
         for i, j in bond_indices:
             r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
 
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
             patterns = [
                 re.compile(r'\A' + f'{at_1}-{at_2}  '),
                 re.compile(r'\A' + f'{at_2}-{at_1}  '),
@@ -1837,9 +1840,9 @@ class MMForceFieldGenerator:
                 np.dot(a, b) / np.linalg.norm(a) /
                 np.linalg.norm(b)) * 180 / np.pi
 
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            at_3 = self.gaff_atom_types[k]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
             patterns = [
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
                 re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
@@ -1914,10 +1917,10 @@ class MMForceFieldGenerator:
         dihedrals = {}
 
         for i, j, k, l in dihedral_indices:
-            at_1 = self.gaff_atom_types[i]
-            at_2 = self.gaff_atom_types[j]
-            at_3 = self.gaff_atom_types[k]
-            at_4 = self.gaff_atom_types[l]
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
+            at_4 = self.atom_types[l]
 
             patterns = [
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3}-{at_4} '),
@@ -2160,8 +2163,8 @@ class MMForceFieldGenerator:
         for i, j, k, l in dihedrals:
             # Ensure consistent ordering of bond indices
             bond_indices = (min(j, k), max(j, k))
-            bond_types = (self.gaff_atom_types[bond_indices[0]],
-                          self.gaff_atom_types[bond_indices[1]])
+            bond_types = (self.atom_types[bond_indices[0]],
+                          self.atom_types[bond_indices[1]])
             rotatable_bonds_types[bond_indices] = bond_types
 
         # Check if the rotatable bonds are indeed rotatable or not

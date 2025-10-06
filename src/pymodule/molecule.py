@@ -949,7 +949,7 @@ def _Molecule_show(self,
     :param atom_indices:
         The flag for showing atom indices (1-based).
     :param atom_labels:
-        The flag for showing atom labels.
+        The flag for showing atom labels. If provided with a list, will use that list as labels.
     :starting_index:
         The starting index for atom indices.
     :bonds:
@@ -997,10 +997,16 @@ def _Molecule_show(self,
                 sdf = '\n'.join(lines)
 
             viewer.addModel(sdf, 'sdf')
-
+        
         if atom_indices or atom_labels:
             coords = self.get_coordinates_in_angstrom()
-            labels = self.get_labels()
+            if type(atom_labels) == list:
+                labels = atom_labels
+                assert_msg_critical(
+                    len(labels) == coords.shape[0],
+                    'Molecule.show: Inconsistent number of labels')
+            else:
+                labels = self.get_labels()
             for i in range(coords.shape[0]):
                 text = ''
                 if atom_labels:

@@ -1039,7 +1039,8 @@ class EvbSystemBuilder():
             solvent_system_atom_count = 0
             solvent_chain = topology.addChain()
             solvent_ff = MMForceFieldGenerator()
-            solvent_ff.create_topology(vlx_solvent_molecule)
+
+            solvent_ff.create_topology(vlx_solvent_molecule,water_model=self.water_model)
 
             atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
             if 'ow' in atom_types and 'hw' in atom_types and len(

@@ -1488,7 +1488,7 @@ class AtomTypeIdentifier:
                 if gaff_type:
                     gaff_atom_types.append(gaff_type)
                 else:
-                    gaff_atom_types.append(f'unknown_{uff_type}')
+                    gaff_atom_types.append(f'{uff_type}_unknown')
         return gaff_atom_types
 
     def check_alternating_atom_types(self):
@@ -1594,6 +1594,9 @@ class AtomTypeIdentifier:
                         atom_types[j] = atom_types[i]
 
         self.gaff_atom_types = atom_types
+
+        for atom_key, gaff_type in zip(self.atom_types_dict, self.gaff_atom_types):
+            self.atom_types_dict[atom_key]['gaff'] = gaff_type
 
     def get_common_cycles(self, i, j, cycle_type='any'):
         """
@@ -1701,7 +1704,7 @@ class AtomTypeIdentifier:
 
         self.ostream.flush()
 
-        return self.atom_types_dict
+        return self.gaff_atom_types
 
     @staticmethod
     def get_atom_number(atom_type_str):
