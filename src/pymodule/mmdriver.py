@@ -203,54 +203,35 @@ class MMDriver:
         for dihedral_key in ['dihedrals', 'impropers']:
 
             for (i, j, k, l), dih in self.force_field[dihedral_key].items():
-                
+
                 # Assert msg critical if the dihedral potential is not Fourier
                 assert_msg_critical(
                     dih['type'] == 'Fourier',
                     'MMDriver: Only Fourier dihedral potential is supported')
-                
+
                 # Multiple dihedral potentials can be true or false
-                if dih.get('multiple', False):  # Use get method with default value False
-                    # Barrier, phase, and periodicity are in lists
-                    for barrier, phase, periodicity in zip(dih['barrier'],
-                                                           dih['phase'],
-                                                           dih['periodicity']):
-                        
-                        RB_coefs = self.get_RB_coefficients(barrier, phase,
-                                                            periodicity)
-                        (potential_energy, grad_i, grad_j, grad_k,
-                         grad_l) = MMDriver.compute_Ryckaert_Bellemans(
-                             coordinates[i], coordinates[j], coordinates[k],
-                             coordinates[l], RB_coefs)
-                
-                        if dihedral_key == 'dihedrals':
-                            self.torsion_potential += potential_energy
-                        elif dihedral_key == 'impropers':
-                            self.improper_potential += potential_energy
-                
-                        self.gradient[i] += grad_i
-                        self.gradient[j] += grad_j
-                        self.gradient[k] += grad_k
-                        self.gradient[l] += grad_l
-                
+                # Use get method with default value False
+                if dih.get('multiple', False):
+                    RB_coefs = self.get_RB_coefficients_multiple_terms(
+                        dih['barrier'], dih['phase'], dih['periodicity'])
                 else:
-                    RB_coefs = self.get_RB_coefficients(dih['barrier'],
-                                                        dih['phase'],
-                                                        dih['periodicity'])
-                    (potential_energy, grad_i, grad_j, grad_k,
-                    grad_l) = MMDriver.compute_Ryckaert_Bellemans(
-                        coordinates[i], coordinates[j], coordinates[k],
-                        coordinates[l], RB_coefs)
-                
-                    if dihedral_key == 'dihedrals':
-                        self.torsion_potential += potential_energy
-                    elif dihedral_key == 'impropers':
-                        self.improper_potential += potential_energy
-                
-                    self.gradient[i] += grad_i
-                    self.gradient[j] += grad_j
-                    self.gradient[k] += grad_k
-                    self.gradient[l] += grad_l
+                    RB_coefs = self.get_RB_coefficients_single_term(
+                        dih['barrier'], dih['phase'], dih['periodicity'])
+
+                (potential_energy, grad_i, grad_j, grad_k,
+                 grad_l) = self.compute_Ryckaert_Bellemans(
+                     coordinates[i], coordinates[j], coordinates[k],
+                     coordinates[l], RB_coefs)
+
+                if dihedral_key == 'dihedrals':
+                    self.torsion_potential += potential_energy
+                elif dihedral_key == 'impropers':
+                    self.improper_potential += potential_energy
+
+                self.gradient[i] += grad_i
+                self.gradient[j] += grad_j
+                self.gradient[k] += grad_k
+                self.gradient[l] += grad_l
 
                 self.exclusions.append((i, l))
 
@@ -324,8 +305,7 @@ class MMDriver:
                     self.gradient[i] += -g * n_ij
                     self.gradient[j] += g * n_ij
 
-    @staticmethod
-    def get_RB_coefficients(barrier, phase, periodicity):
+    def get_RB_coefficients_single_term(self, barrier, phase, periodicity):
         """
         Get Ryckaert-Bellemans coefficients.
 
@@ -345,10 +325,10 @@ class MMDriver:
             'MMDriver: Invalid phase for dihedral potential')
 
         assert_msg_critical(
-            abs(periodicity) in [1, 2, 3, 4],
+            abs(periodicity) in [1, 2, 3, 4, 5, 6],
             'MMDriver: Invalid periodicity for dihedral potential')
 
-        F_coefs = {x: 0.0 for x in [1, 2, 3, 4]}
+        F_coefs = {x: 0.0 for x in [1, 2, 3, 4, 5, 6]}
         E_shift = 0.0
 
         if abs(phase) < 1.0e-6:
@@ -359,16 +339,46 @@ class MMDriver:
             F_coefs[abs(periodicity)] -= barrier
             E_shift += 2.0 * barrier
 
-        # JPCA 2021, 125, 2673-2681
-        # Note that we also take into account the phases in Fourier series
-        c0 = (F_coefs[1] + F_coefs[3] + 2.0 * F_coefs[4] + E_shift)
-        c1 = -1.0 * F_coefs[1] + 3.0 * F_coefs[3]
-        c2 = 2.0 * F_coefs[2] - 8.0 * F_coefs[4]
-        c3 = -4.0 * F_coefs[3]
-        c4 = 8.0 * F_coefs[4]
-        c5 = 0.0
+        # See e.g. JPCA 2021, 125, 2673-2681 for periodicity 1-4.
+        # F_coefs[5] and F_coefs[6] were added for periodicity up to 6,
+        # based on Chebyshev polynomials of the first kind
+        c0 = (F_coefs[1] + F_coefs[3] + 2.0 * F_coefs[4] + F_coefs[5] + E_shift)
+        c1 = -1.0 * F_coefs[1] + 3.0 * F_coefs[3] - 5.0 * F_coefs[5]
+        c2 = 2.0 * F_coefs[2] - 8.0 * F_coefs[4] + 18.0 * F_coefs[6]
+        c3 = -4.0 * F_coefs[3] + 20.0 * F_coefs[5]
+        c4 = 8.0 * F_coefs[4] - 48.0 * F_coefs[6]
+        c5 = -16.0 * F_coefs[5]
+        c6 = 32.0 * F_coefs[6]
 
-        return (c0, c1, c2, c3, c4, c5)
+        return np.array([c0, c1, c2, c3, c4, c5, c6])
+
+    def get_RB_coefficients_multiple_terms(self, barriers, phases,
+                                           periodicities):
+        """
+        Get Ryckaert-Bellemans coefficients.
+
+        :param barriers:
+            The list of barriers of dihedral potential.
+        :param phases:
+            The list of phases of dihedral potential.
+        :param periodicities:
+            The list of periodicities of dihedral potential.
+
+        :return:
+            The Ryckaert-Bellemans coefficients.
+        """
+
+        sum_coefs = None
+
+        for barrier, phase, periodicity in zip(barriers, phases, periodicities):
+            RB_coefs = self.get_RB_coefficients_single_term(
+                barrier, phase, periodicity)
+            if sum_coefs is None:
+                sum_coefs = np.array(RB_coefs)
+            else:
+                sum_coefs += np.array(RB_coefs)
+
+        return sum_coefs
 
     def compute(self, molecule):
         """
@@ -436,8 +446,7 @@ class MMDriver:
 
         return self.gradient
 
-    @staticmethod
-    def compute_Ryckaert_Bellemans(coord_i, coord_j, coord_k, coord_l,
+    def compute_Ryckaert_Bellemans(self, coord_i, coord_j, coord_k, coord_l,
                                    RB_coefs):
         """
         Compute the dihedral potential and forces using the Ryckaert-Bellemans
@@ -452,7 +461,10 @@ class MMDriver:
         :param coord_l:
             The coordinates of atom l.
         :param RB_coefs:
-            The Ryckaert-Bellemans coefficients.
+            The RB coefficients.
+
+        :return:
+            The dihedral potential energy and gradients.
         """
 
         # J. Comput. Chem. 2000, 21, 553-561
@@ -479,13 +491,15 @@ class MMDriver:
 
         cos_phi = (cos123 * cos234 + cos134) / (sin123 * sin234)
 
-        c0, c1, c2, c3, c4, c5 = RB_coefs
+        c0, c1, c2, c3, c4, c5, c6 = RB_coefs
 
         potential_energy = (c0 - c1 * cos_phi + c2 * cos_phi**2 -
-                            c3 * cos_phi**3 + c4 * cos_phi**4 - c5 * cos_phi**5)
+                            c3 * cos_phi**3 + c4 * cos_phi**4 -
+                            c5 * cos_phi**5 + c6 * cos_phi**6)
 
         g = (-c1 + 2.0 * c2 * cos_phi - 3.0 * c3 * cos_phi**2 +
-             4.0 * c4 * cos_phi**3 - 5.0 * c5 * cos_phi**4)
+             4.0 * c4 * cos_phi**3 - 5.0 * c5 * cos_phi**4 +
+             6.0 * c6 * cos_phi**5)
 
         r_21_32 = np.cross(r21_unit, r32_unit)
         r_43_32 = np.cross(r43_unit, r32_unit)

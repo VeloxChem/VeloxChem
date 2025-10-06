@@ -37,7 +37,7 @@ import numpy as np
 import copy
 
 from .errorhandler import assert_msg_critical
-from .evbsystembuilder import EvbForceGroup
+from .evbsystembuilder import EvbForceGroup, EvbSystemBuilder
 
 try:
     import openmm.app as mmapp
@@ -52,11 +52,12 @@ class EvbReporter():
         self,
         energy_file,
         report_interval,
-        reactant_ff,
-        product_ff,
+        systems,
         topology,
-        Lambda,
+        lambda_val,
         outputstream,
+        forming_bonds=None,
+        breaking_bonds=None,
         forcegroup_file=None,
         force_file=None,
         velocity_file=None,
@@ -76,41 +77,21 @@ class EvbReporter():
         else:
             self.use_tuple = False
 
+        self.out_streams = []
+
         self.E_out = open(energy_file, 'a' if append else 'w')
+        self.out_streams.append(self.E_out)
         self.report_interval = report_interval
 
-        self.Lambda = Lambda
-        self.simulation_dicts = {}
+        self.lambda_val = lambda_val
 
-        self.simulation_dicts.update({
-            'reactant_pes': {
-                "simulation":
-                mmapp.Simulation(topology, reactant_ff, mm.VerletIntegrator(1)),
-                "forcegroups":
-                EvbForceGroup.pes_force_groups(),
-            },
-            'product_pes': {
-                "simulation":
-                mmapp.Simulation(topology, product_ff, mm.VerletIntegrator(1)),
-                "forcegroups":
-                EvbForceGroup.pes_force_groups(),
-            },
-            'reactant_integration': {
-                "simulation":
-                mmapp.Simulation(topology, reactant_ff, mm.VerletIntegrator(1)),
-                "forcegroups":
-                EvbForceGroup.integration_force_groups(),
-            },
-            'product_integration': {
-                "simulation":
-                mmapp.Simulation(topology, product_ff, mm.VerletIntegrator(1)),
-                "forcegroups":
-                EvbForceGroup.integration_force_groups(),
-            },
-        })
+        self.simulations = {}
+        for name, system in systems.items():
+            sim = mmapp.Simulation(topology, system, mm.VerletIntegrator(1))
+            self.simulations.update({name: sim})
 
         if not append:
-            header = "Lambda, reactant PES, product PES, reactant integration, product integration, E_m_pes, E_m_int\n"
+            header = "Lambda, reactant PES, product PES, reactant integration, product integration, Em \n"
             self.E_out.write(header)
 
         if force_file is None:
@@ -118,6 +99,7 @@ class EvbReporter():
         else:
             self.report_forces = True
             self.F_out = open(force_file, 'a' if append else 'w')
+            self.out_streams.append(self.F_out)
             if not append:
                 header = "Lambda, "
                 for j in range(topology.getNumAtoms()):
@@ -130,6 +112,7 @@ class EvbReporter():
         else:
             self.report_velocities = True
             self.v_out = open(velocity_file, 'a' if append else 'w')
+            self.out_streams.append(self.v_out)
             if not append:
                 header = "Lambda, "
                 for j in range(topology.getNumAtoms()):
@@ -149,15 +132,125 @@ class EvbReporter():
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
             self.rea_FG_out = open(rea_fg, 'a' if append else 'w')
             self.pro_FG_out = open(pro_fg, 'a' if append else 'w')
-
+            self.out_streams.append(self.FG_out)
+            self.out_streams.append(self.rea_FG_out)
+            self.out_streams.append(self.pro_FG_out)
             if not append:
-                self.FG_out.write(EvbForceGroup.get_header())
-                self.rea_FG_out.write(EvbForceGroup.get_header())
-                self.pro_FG_out.write(EvbForceGroup.get_header())
+                fg_header = EvbForceGroup.get_header()
+                self.FG_out.write(fg_header)
+                self.rea_FG_out.write(fg_header)
+                self.pro_FG_out.write(fg_header)
 
+        self.decomp_names = [s for s in systems if 'decomp' in str(s)]
+        self.report_nb_decomp = False
+        if len(self.decomp_names)>0:
+            self.report_nb_decomp = True
+            dir = '/'.join(energy_file.split('/')[:-1])
+            filename = dir + '/NB_decompositions.csv'
+            self.decomp_out = open(filename,'a' if append else 'w')
+            self.out_streams.append(self.decomp_out)
+            if not append:
+                header = ", ".join(self.decomp_names)
+                header+='\n'
+                self.decomp_out.write(header)
+        
+        self.report_bonded_decomp = False
+        if 'reactant_bonded' in systems.keys():
+            if forming_bonds is None or breaking_bonds is None:
+                self.ostream.print_warning(
+                    "Formed and broken bonds need to be supplied to do bonded decomposition"
+                )
+                self.ostream.flush()
+                return
+            self.report_bonded_decomp = True
+            active_atoms = []
+            for bond in forming_bonds + breaking_bonds:
+                if bond[0] not in active_atoms:
+                    active_atoms.append(bond[0])
+                if bond[1] not in active_atoms:
+                    active_atoms.append(bond[1])
+
+            self.reactant_params = self._get_bonded_decomp_params(systems['reactant'],active_atoms)
+            self.product_params = self._get_bonded_decomp_params(systems['product'],active_atoms)
+            self.measure_params = set()
+            for force in list(self.reactant_params.values()) + list(self.product_params.values()):
+                for params in force.values():
+                    self.measure_params.add(params[0])
+            # self.measure_params = sorted(self.measure_params)
+            self.measure_params = sorted(self.measure_params, key=lambda x: (len(x), x))
+            dir = '/'.join(energy_file.split('/')[:-1])
+            filename = dir + '/bonded_E1_decomp.csv'
+            self.bonded_E1_decomp_out = open(filename, 'a' if append else 'w')
+            filename = dir + '/bonded_E2_decomp.csv'
+            self.bonded_E2_decomp_out = open(filename, 'a' if append else 'w')
+            filename = dir + '/bonded_params.csv'
+            self.bonded_params_out = open(filename, 'a' if append else 'w')
+            self.out_streams.append(self.bonded_E1_decomp_out)
+            self.out_streams.append(self.bonded_E2_decomp_out)
+            self.out_streams.append(self.bonded_params_out)
+            if not append:
+                rea_header = ""
+                for force in self.reactant_params.values():
+                    for param in force.values():
+                        rea_header += f"{param[0]}, "
+                rea_header = rea_header[:-2] + '\n'
+                self.bonded_E1_decomp_out.write(rea_header)
+                pro_header = ""
+                for force in self.product_params.values():
+                    for param in force.values():
+                        pro_header += f"{param[0]}, "
+                pro_header = pro_header[:-2] + '\n'
+                self.bonded_E2_decomp_out.write(pro_header)
+                params_header = ""
+                for param in self.measure_params:
+                    params_header += str(param) + ", "
+                params_header = params_header[:-2] + '\n'
+                self.bonded_params_out.write(params_header)
+
+        for stream in self.out_streams:
+            stream.flush()
+
+    @staticmethod
+    def _get_bonded_decomp_params(system,active_atoms):
+        params = {}
+        for force in system.getForces():
+            if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
+                morse_params = {}
+                for i in range(force.getNumBonds()):
+                    p1,p2,(D,a,r) = force.getBondParameters(i)
+                    if p1 in active_atoms or p2 in active_atoms:
+                        morse_params[i] = ((p1, p2), (D, a, r))
+                params.update({force.getName(): morse_params})
+
+            if force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_STATIC.value:
+                harm_params = {}
+                for i in range(force.getNumBonds()):
+                    p1,p2,r,k = force.getBondParameters(i)
+                    if p1 in active_atoms or p2 in active_atoms:
+                        harm_params[i] = ((p1, p2), (r,k))
+                params.update({force.getName(): harm_params})
+
+            if force.getForceGroup() == EvbForceGroup.REA_ANGLE.value:
+                angle_params = {}
+                for i in range(force.getNumAngles()):
+                    p1,p2,p3,theta,k = force.getAngleParameters(i)
+                    if p1 in active_atoms or p2 in active_atoms or p3 in active_atoms:
+                        angle_params[i] = ((p1, p2, p3), (theta, k))
+                params.update({force.getName(): angle_params})
+            
+            if force.getForceGroup() == EvbForceGroup.REA_TORSION.value or force.getForceGroup() == EvbForceGroup.REA_IMP.value:
+                torsion_params = {}
+                for i in range(force.getNumTorsions()):
+                    p1,p2,p3,p4,periodicity,phase,k = force.getTorsionParameters(i)
+                    if p1 in active_atoms or p2 in active_atoms or p3 in active_atoms or p4 in active_atoms:
+                        torsion_params[i] = ((p1, p2, p3, p4), (periodicity, phase, k))
+                params.update({force.getName(): torsion_params})
+        return params
 
     def __del__(self):
-        self.E_out.close()
+        for stream in self.out_streams:
+            if not stream.closed:
+                stream.close()
 
     def describeNextReport(self, simulation):
         steps = self.report_interval - simulation.currentStep % self.report_interval
@@ -172,48 +265,60 @@ class EvbReporter():
                 include.append('velocities')
             if self.report_forces:
                 include.append('forces')
+            if self.report_bonded_decomp:
+                include.append('positions')
 
             return {'steps': steps, 'periodic': True, 'include': include}
 
     def report(self, simulation, state):
-        E = []
-        for simulation_dict in self.simulation_dicts.values():
-            e = self._get_potential_energy(simulation_dict['simulation'],simulation_dict['forcegroups'], state)
-            E.append(e)
-        E1_pes = E[0]
-        E2_pes = E[1]
-        E1_int = E[2]
-        E2_int = E[3]
+        E = {}
+        for name, sim in self.simulations.items():
+            if name == 'reactant_bonded' or name == 'product_bonded':
+                # Skip bonded decomposition systems
+                continue
+            e = self._get_potential_energy(
+                sim,
+                state=state,
+            )
+            E.update({name:e})
+        E1_pes = E['reactant']
+        E2_pes = E['product']
+        E1_int = E[0]
+        E2_int = E[1]
 
-        Em_pes = self._get_potential_energy(simulation,'pes')
-        Em_int = self._get_potential_energy(simulation,'int')
-        
-        line = f"{self.Lambda}"
-        for e in E:
-            line += f", {e}"
-        line += f", {Em_pes}, {Em_int}\n"
+
+        Em = E1_pes * (1 - self.lambda_val) + E2_pes * self.lambda_val
+        line = f"{self.lambda_val}, {E1_pes:.10e}, {E2_pes:.10e}, {E1_int:.10e}, {E2_int:.10e}, {Em:.10e} \n"
         self.E_out.write(line)
 
-        
+        # Em_dif = abs(Em_int - E1_int * (1 - self.lambda_val) +
+        #              E2_int * self.lambda_val)
+
+        # if Em_dif > 1e-2:
+        #     self.ostream.print_info(str(Em_dif))
+        #     self.ostream.flush()
+        # assert  <1e-2
+
         Em_fg = []
         E1_fg = []
         E2_fg = []
         if self.report_forcegroups:
             line = ""
-            reasim = self.simulation_dicts['reactant_integration']['simulation']
-            prosim = self.simulation_dicts['product_integration']['simulation']
+            reasim = self.simulations['reactant']
+            prosim = self.simulations['product']
             for fg in EvbForceGroup:
                 em = self._get_potential_energy(simulation, fg)
                 e1 = self._get_potential_energy(reasim, fg)
                 e2 = self._get_potential_energy(prosim, fg)
-                
+
                 Em_fg.append(em)
                 E1_fg.append(e1)
                 E2_fg.append(e2)
-                
-                if em> 1e9:
+
+                if em > 1e9:
                     raise ValueError(
-                        f"Force group {fg.name}({fg.value}) energy is too large: {em}")
+                        f"Force group {fg.name}({fg.value}) energy is too large: {em}"
+                    )
 
             Em_line = ""
             E1_line = ""
@@ -229,100 +334,169 @@ class EvbReporter():
             self.FG_out.write(Em_line)
             self.rea_FG_out.write(E1_line)
             self.pro_FG_out.write(E2_line)
-        
+
+        if self.report_bonded_decomp:
+            reasim = self.simulations['reactant_bonded']
+            E1 = self._get_bonded_decomp_energy(reasim, state,self.reactant_params)
+            line = ", ".join([f"{e:.10e}" for e in E1]) + '\n'
+            self.bonded_E1_decomp_out.write(line)
+            pro_sim = self.simulations['product_bonded']
+            E2 = self._get_bonded_decomp_energy(pro_sim, state,self.product_params)
+            line = ", ".join([f"{e:.10e}" for e in E2]) + '\n'
+            self.bonded_E2_decomp_out.write(line)
+            
+            positions = state.getPositions(asNumpy=True)
+            line = ""
+            for i, param in enumerate(self.measure_params):
+                val = ""
+                if len(param) == 2:
+                    val = EvbSystemBuilder.measure_length(positions[param[0]], positions[param[1]],)
+                elif len(param) == 3:
+                    val = EvbSystemBuilder.measure_angle(
+                        positions[param[0]], positions[param[1]], positions[param[2]],)
+                elif len(param) == 4:
+                    val = EvbSystemBuilder.measure_dihedral(
+                        positions[param[0]], positions[param[1]], positions[param[2]], positions[param[3]],)
+                line += f"{val:.10e}, "
+            line = line[:-2] + '\n'
+            self.bonded_params_out.write(line)
+                
+
         if self.report_forces:
             forces = state.getForces(asNumpy=True)
             norms = np.linalg.norm(forces, axis=1)
-            line = f"{self.Lambda}"
+            line = f"{self.lambda_val}"
             kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
             for i in range(forces.shape[0]):
-                line += f", {forces[i][0].value_in_unit(kjpermolenm)}, {forces[i][1].value_in_unit(kjpermolenm)}, {forces[i][2].value_in_unit(kjpermolenm)}, {norms[i]}"
+                line += f", {forces[i][0].value_in_unit(kjpermolenm):.5e}, {forces[i][1].value_in_unit(kjpermolenm):.5e}, {forces[i][2].value_in_unit(kjpermolenm):.5e}, {norms[i]:.5e}"
             line += '\n'
             self.F_out.write(line)
 
         if self.report_velocities:
             velocities = state.getVelocities(asNumpy=True)
-            line = f"{self.Lambda}"
+            line = f"{self.lambda_val}"
             nmperps = mm.unit.nanometer / mm.unit.picosecond
             for i in range(velocities.shape[0]):
-                line += f", {velocities[i][0].value_in_unit(nmperps)}, {velocities[i][1].value_in_unit(nmperps)}, {velocities[i][2].value_in_unit(nmperps)}"
+                line += f", {velocities[i][0].value_in_unit(nmperps):.5e}, {velocities[i][1].value_in_unit(nmperps):.5e}, {velocities[i][2].value_in_unit(nmperps):.5e}"
             line += '\n'
             self.v_out.write(line)
-
-
-        if self.debug:
-            # em = (1 - l) * E1 + l * E2
-            pes_recalc = (1 - self.Lambda) * E1_pes + self.Lambda * E2_pes
-            int_recalc = (1 - self.Lambda) * E1_int + self.Lambda * E2_int
-            if abs(pes_recalc - Em_pes) > 1e-1:
-                self.ostream.print_info(
-                    f"Em pes recalculation is not consistent: {pes_recalc:.3f}(recalc)!={Em_pes:.3f}(em)")
-
-            if abs(int_recalc - Em_int) > 1e-1:
-                self.ostream.print_info(
-                    f"Em int recalculation is not consistent: {int_recalc:.3f}(recalc)!={Em_int:.3f}(em)")
-            
-            if self.report_forcegroups:
-                Em_pes_fg = 0
-                E1_pes_fg = 0
-                E2_pes_fg = 0
-                Em_int_fg = 0
-                E1_int_fg = 0
-                E2_int_fg = 0
-                for em, e1, e2, fg in zip(Em_fg, E1_fg, E2_fg, EvbForceGroup):
-                    em_rec = (1 - self.Lambda) * e1 + self.Lambda * e2
-                    # em = (1 - l) * E1 + l * E2 per forcegroup
-                    if abs(em_rec - em) > 1e-2:
-                        self.ostream.print_info(
-                            f"em recalculation for force group {fg.name}({fg.value}) is not consistent: {em_rec:.3f}(recalc) != {em:.3f}(em)")
-
-                    if fg.value in EvbForceGroup.pes_force_groups():
-                        Em_pes_fg += em
-                        E1_pes_fg += e1
-                        E2_pes_fg += e2
-                    if fg.value in EvbForceGroup.integration_force_groups():
-                        Em_int_fg += em
-                        E1_int_fg += e1
-                        E2_int_fg += e2
-
-                # check if forcegroups add up to E1, E2 and Em
-                labels = ["Em_pes", "E1_pes", "E2_pes", "Em_int", "E1_int", "E2_int"]
-                fg_recalc = [Em_pes_fg, E1_pes_fg, E2_pes_fg, Em_int_fg, E1_int_fg, E2_int_fg]
-                original = [Em_pes, E1_pes, E2_pes, Em_int, E1_int, E2_int]
-                for label, recalc, orig in zip(labels, fg_recalc, original):
-                    if abs(recalc - orig) > 1e-1:
-                        self.ostream.print_info(
-                            f"Force group summing {label} energy is not consistent: {recalc:.3f}(recalc) != {orig:.3f}(original)")
-            self.ostream.flush()
+        
+        if self.report_nb_decomp:
+            line = ""
+            for name in self.decomp_names:
+                line += f"{E[name]:.10e}, "
+            line= line[:-2]
+            line+= '\n'
+            self.decomp_out.write(line)
+        
+        for stream in self.out_streams:
+            stream.flush()
 
     @staticmethod
-    def _get_potential_energy(simulation,forcegroups=None, state = None):
+    def _get_bonded_decomp_energy(sim,state,parameters):
+        E = []
+        for force, params in zip(sim.system.getForces(),parameters.values()):
+            for i, param in params.items():
+                if force.getForceGroup() == EvbForceGroup.REA_MORSE_BOND.value:
+                    force.setBondParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        param[1],
+                    )
+                    force.updateParametersInContext(sim.context)
+                    e = EvbReporter._get_potential_energy(
+                        sim, state=state,)
+                    force.setBondParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        (0,0,param[1][2]),
+                    )
+                elif force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_DYNAMIC.value or force.getForceGroup() == EvbForceGroup.REA_HARM_BOND_STATIC.value:
+                    force.setBondParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        param[1][0],
+                        param[1][1],
+                    )
+                    force.updateParametersInContext(sim.context)
+                    e = EvbReporter._get_potential_energy(
+                        sim, state=state,)
+                    force.setBondParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        param[1][0], 0,
+                    )
+                elif force.getForceGroup() == EvbForceGroup.REA_ANGLE.value:
+                    force.setAngleParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        param[0][2],
+                        param[1][0],
+                        param[1][1],
+                    )
+                    force.updateParametersInContext(sim.context)
+                    e = EvbReporter._get_potential_energy(
+                        sim, state=state,)
+                    force.setAngleParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        param[0][2],
+                        param[1][0], 0,
+                    )
+                elif force.getForceGroup() == EvbForceGroup.REA_TORSION.value or force.getForceGroup() == EvbForceGroup.REA_IMP.value:
+                    force.setTorsionParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        param[0][2],
+                        param[0][3],
+                        param[1][0],
+                        param[1][1],
+                        param[1][2],
+                    )
+                    force.updateParametersInContext(sim.context)
+                    e = EvbReporter._get_potential_energy(
+                        sim, state=state,)
+                    force.setTorsionParameters(
+                        i,
+                        param[0][0],
+                        param[0][1],
+                        param[0][2],
+                        param[0][3],
+                        param[1][0], 0, 0,
+                    )
+                else:
+                    e = 0
+                force.updateParametersInContext(sim.context)
+                E.append(e)
+        return E
+
+    @staticmethod
+    def _get_potential_energy(simulation, forcegroups=None, state=None):
         """
         Get the potential energy of the system.
         """
         # return 0
         if state is not None:
-            simulation.context.setState(state)
+            try:
+                simulation.context.setState(state)
+            except:
+                # Decomposition systems which have the barostat removed will throw an error on the above case
+                simulation.context.setPositions(state.getPositions())
 
         if forcegroups is None:
             return simulation.context.getState(
-                getEnergy=True,
-            ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+                getEnergy=True, ).getPotentialEnergy().value_in_unit(
+                    mm.unit.kilojoules_per_mole)
         else:
-            if isinstance(forcegroups, str):
-                if forcegroups == 'pes':
-                    forcegroups = EvbForceGroup.pes_force_groups()
-                elif forcegroups == 'int':
-                    forcegroups = EvbForceGroup.integration_force_groups()
-                else:
-                    raise ValueError(
-                        f"Unknown force group: {forcegroups}. Use 'pes' or 'int'."
-                    )
             if isinstance(forcegroups, EvbForceGroup):
-                forcegroups = [forcegroups.value]
-
-            if not isinstance(forcegroups, set):
-                forcegroups = set(forcegroups)
+                forcegroups = set([forcegroups.value] )
 
             return simulation.context.getState(
                 getEnergy=True,

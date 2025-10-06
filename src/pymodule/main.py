@@ -58,8 +58,8 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
+from .rspdoublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
-
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
@@ -181,6 +181,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
+
+    elif prop_type == 'transition dipole moment':
+        rsp_prop = DoubleResTransition(rsp_dict, method_dict)
 
     elif prop_type == '3pa transition':
         rsp_prop = ThreePATransition(rsp_dict, method_dict)
@@ -572,7 +575,9 @@ def main():
 
     # Response
 
-    if task_type == 'response' and scf_drv.scf_type == 'restricted':
+    if (task_type == 'response' and
+            scf_drv.scf_type in ['restricted', 'unrestricted']):
+
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
         rsp_dict['program_end_time'] = program_end_time
@@ -588,7 +593,8 @@ def main():
             #scf_results['C_alpha'] = loc_drv.compute(task.molecule, task.ao_basis, scf_results, mo_list)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream,
+                             method_type=scf_drv.scf_type)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if not rsp_prop.is_converged:

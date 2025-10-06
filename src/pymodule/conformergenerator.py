@@ -52,7 +52,7 @@ try:
     import openmm
     from openmm import LangevinIntegrator, Platform
     from openmm.app import NoCutoff, Simulation, PDBFile, ForceField, GromacsTopFile
-    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond
+    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond,dalton
 except ImportError:
     pass
 
@@ -83,6 +83,8 @@ class ConformerGenerator:
         self.partial_charges = None
         self.resp_charges = True
         self.resp_charges_driver = RespChargesDriver()
+
+        self.freeze_atoms = None  # list of atom indices to freeze during optimization and rotatable bond detection
 
         self.save_xyz_files = False
         self.save_path = None
@@ -211,8 +213,21 @@ class ConformerGenerator:
         rotatable_bonds = deepcopy(mmff_gen.rotatable_bonds)
         dihedrals_dict = deepcopy(mmff_gen.dihedrals)
 
-        rotatable_bonds_zero_based = [(i - 1, j - 1)
-                                      for (i, j) in rotatable_bonds]
+        # remove freeze_atoms from rotatable_bonds
+        if self.freeze_atoms is not None:
+            freeze_set = set(self.freeze_atoms)
+            new_rotatable_bonds = []
+            for (i, j) in rotatable_bonds:
+                if (i not in freeze_set) and (j not in freeze_set):
+                    new_rotatable_bonds.append((i, j))
+            rotatable_bonds = new_rotatable_bonds
+            self.ostream.print_info(
+                f"{len(freeze_set)} atoms are frozen, {len(rotatable_bonds)} rotatable bonds remain."
+            )
+            self.ostream.flush()
+
+        # convert to zero based index
+        rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
 
         def get_max_periodicity(periodicity):
@@ -256,6 +271,8 @@ class ConformerGenerator:
                 dih_angle = [0, 90, 180, 270]
             elif max_periodicity == 5:
                 dih_angle = [36, 54, 84, 144, 324]
+            elif max_periodicity == 6:
+                dih_angle = [0, 60, 120, 180, 240, 300]
             else:
                 continue
 
@@ -384,6 +401,10 @@ class ConformerGenerator:
 
         coords_nm = molecule.get_coordinates_in_angstrom() * 0.1
         simulation.context.setPositions(coords_nm * nanometer)
+        #freeze atoms if specified
+        if self.freeze_atoms is not None:
+            for atom_idx in self.freeze_atoms:
+                simulation.system.setParticleMass(atom_idx, 0.0 * dalton)
 
         simulation.minimizeEnergy(tolerance=em_tolerance)
 

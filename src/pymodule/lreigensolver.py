@@ -34,6 +34,7 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import time as tm
+import h5py
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
@@ -280,6 +281,14 @@ class LinearResponseEigenSolver(LinearSolver):
                                 * (self.num_vir_orbitals),
                 'LinearResponseEigenSolver (RSA): too many excited states')
 
+            if self.core_excitation:
+                assert_msg_critical(
+                    self.num_core_orbitals > 0,
+                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid')
+                assert_msg_critical(
+                    self.num_core_orbitals < nocc,
+                    'LinearResponseEigenSolver: num_core_orbitals too large')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -309,7 +318,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 'LR_eigen_e2bung_half_size',
             ]
 
-        # read initial guess from restart file
+        # check validity of restart file
         if self.restart:
             if self.rank == mpi_master():
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
@@ -320,6 +329,37 @@ class LinearResponseEigenSolver(LinearSolver):
         # read initial guess from restart file
         if self.restart:
             self._read_checkpoint(rsp_vector_labels)
+
+            checkpoint_nstates = self._read_nstates_from_checkpoint()
+
+            # print warning if nstates is not present in the restart file
+            if checkpoint_nstates is None:
+                self.ostream.print_warning(
+                    'Could not find the nstates key in the checkpoint file.')
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that nstates is not changed before and after ' +
+                    'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more states are requested
+            # in a restart calculation
+            elif checkpoint_nstates < self.nstates:
+                self.ostream.print_info(
+                    'Generating initial guesses for ' +
+                    f'{self.nstates - checkpoint_nstates} more states...')
+                self.ostream.print_blank()
+
+                igs = self._initial_excitations(self.nstates, orb_ene, nocc,
+                                                norb, checkpoint_nstates)
+                bger, bung = self._setup_trials(igs, None, self._dist_bger,
+                                                self._dist_bung)
+
+                profiler.set_timing_key('Preparation')
+
+                self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+                                    eri_dict, dft_dict, pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -524,6 +564,7 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.force_checkpoint:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
+                self._add_nstates_to_checkpoint()
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                 scf_tensors, eri_dict, dft_dict, pe_dict,
@@ -537,6 +578,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
+        self._add_nstates_to_checkpoint()
 
         # converged?
         if self.rank == mpi_master():
@@ -858,6 +900,48 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return None
 
+    def _add_nstates_to_checkpoint(self):
+        """
+        Add nstates to checkpoint file.
+        """
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'nstates'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array([self.nstates]))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_nstates_from_checkpoint(self):
+        """
+        Read nstates from checkpoint file.
+
+        :return:
+            The number of states.
+        """
+
+        if self.checkpoint_file is None:
+            return None
+
+        nstates = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'nstates'
+            if key in hf:
+                nstates = np.array(hf.get(key))[0]
+            hf.close()
+
+        nstates = self.comm.bcast(nstates, root=mpi_master())
+
+        return nstates
+
     @staticmethod
     def get_full_solution_vector(solution):
         """
@@ -909,7 +993,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _initial_excitations(self, nstates, ea, nocc, norb):
+    def _initial_excitations(self, nstates, ea, nocc, norb, n_excl_states=0):
         """
         Gets initial guess for excitations.
 
@@ -921,6 +1005,9 @@ class LinearResponseEigenSolver(LinearSolver):
             Number of occupied orbitals.
         :param norb:
             Number of orbitals.
+        :param n_excl_states:
+            Number of states to exclude. Useful for generating initial guess
+            for a restarting calculation that requests more states.
 
         :return:
             A list of initial excitations (excitation energy and distributed
@@ -948,7 +1035,7 @@ class LinearResponseEigenSolver(LinearSolver):
         n_exc = len(excitations)
 
         final = {}
-        for k, (i, a) in enumerate(sorted(w, key=w.get)[:nstates]):
+        for k, (i, a) in enumerate(sorted(w, key=w.get)[n_excl_states:nstates]):
             if self.rank == mpi_master():
                 ia = excitations.index((i, a))
 

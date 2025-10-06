@@ -40,7 +40,7 @@ from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
 from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
-                             get_conformer_data, get_pubchem_reference)
+                             get_conformer_data, get_pubchem_sketcher_reference)
 
 
 @staticmethod
@@ -899,7 +899,10 @@ def _Molecule_get_xyz_string(self, precision=12, comment=''):
         xa, ya, za = coords_in_angstrom[a]
 
         if elem_ids[a] == 0 and atom_basis_labels[a][1]:
-            elem_name = 'Bq_' + atom_basis_labels[a][1].capitalize()
+            if atom_basis_labels[a][1].capitalize() == 'Bq':
+                elem_name = 'Bq'
+            else:
+                elem_name = 'Bq_' + atom_basis_labels[a][1].capitalize()
         else:
             elem_name = labels[a]
 
@@ -928,7 +931,9 @@ def _Molecule_show(self,
                    height=300,
                    atom_indices=False,
                    atom_labels=False,
-                   one_indexed=True):
+                   starting_index=1,
+                   bonds=None,
+                   dashed_bonds=None):
     """
     Creates a 3D view with py3dmol.
 
@@ -940,14 +945,54 @@ def _Molecule_show(self,
         The flag for showing atom indices (1-based).
     :param atom_labels:
         The flag for showing atom labels.
+    :starting_index:
+        The starting index for atom indices.
+    :bonds:
+        A list of tuples with bonds to draw. If None, connectivity is based on
+        proximity.
+    :dashed_bonds:
+        A list of tuples with bonds to draw as dashed lines.
     """
 
     try:
         import py3Dmol
         viewer = py3Dmol.view(width=width, height=height)
-        viewer.addModel(self.get_xyz_string())
-        viewer.setViewStyle({"style": "outline", "width": 0.05})
-        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+
+        if bonds is None:
+            viewer.addModel(self.get_xyz_string())
+        else:
+            from rdkit import Chem
+            import re
+
+            rdmol = Chem.MolFromXYZBlock(self.get_xyz_string())
+            edit_mol = Chem.EditableMol(rdmol)
+
+            for bond in bonds:
+                if dashed_bonds is not None:
+                    if bond in dashed_bonds or (bond[1],
+                                                bond[0]) in dashed_bonds:
+                        continue
+                edit_mol.AddBond(bond[0], bond[1], Chem.BondType.SINGLE)
+
+            sdf = Chem.MolToMolBlock(edit_mol.GetMol())
+
+            if dashed_bonds is not None:
+                lines = sdf.split('\n')
+                last_line = lines[-2]
+                lines = lines[:-2]
+                for key in sorted(dashed_bonds):
+                    line = f" {key[0] + 1:<2} {key[1] + 1:<2} 0.5  0"
+                    lines.append(line)
+                lines.append(last_line)
+
+                splitline = re.split(r'(\s+)', lines[3])
+                splitline[4] = str(int(splitline[4]) + len(dashed_bonds))
+                splitline[3] = " " * (2 - len(splitline[4]))
+                lines[3] = ''.join(splitline)
+                sdf = '\n'.join(lines)
+
+            viewer.addModel(sdf, 'sdf')
+
         if atom_indices or atom_labels:
             coords = self.get_coordinates_in_angstrom()
             labels = self.get_labels()
@@ -956,10 +1001,7 @@ def _Molecule_show(self,
                 if atom_labels:
                     text += f'{labels[i]}'
                 if atom_indices:
-                    if one_indexed:
-                        text += f'{i + 1}'
-                    else:
-                        text += f'{i}'
+                    text += f'{i + starting_index}'
                 viewer.addLabel(
                     text, {
                         'position': {
@@ -972,11 +1014,13 @@ def _Molecule_show(self,
                         'backgroundColor': 0xffffff,
                         'backgroundOpacity': 0.0,
                     })
+        viewer.setViewStyle({"style": "outline", "width": 0.05})
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
         viewer.zoomTo()
         viewer.show()
 
     except ImportError:
-        raise ImportError('Unable to import py3Dmol')
+        raise ImportError('Unable to import py3Dmol or rdkit')
 
 
 @staticmethod
@@ -1324,7 +1368,7 @@ def _Molecule_builder():
               "https://pubchem.ncbi.nlm.nih.gov/edit/ \n")
         print("Documentation for the PubChem Sketcher: " +
               "https://pubchem.ncbi.nlm.nih.gov/docs/sketcher-help \n")
-        print("Reference: " + get_pubchem_reference() + "\n")
+        print("Reference: " + get_pubchem_sketcher_reference() + "\n")
 
         display(
             IFrame('https://pubchem.ncbi.nlm.nih.gov/edit/',

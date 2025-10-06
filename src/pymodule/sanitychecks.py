@@ -41,17 +41,25 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 
-def molecule_sanity_check(mol):
+def molecule_sanity_check(mol, method_type=None):
     """
     Checks molecule for charge/multiplicity combination and geometry.
 
     :param mol:
         The molecule.
+    :param method_type:
+        The method type (restricted, unrestricted or restricted_openshell).
     """
 
     assert_msg_critical(
         mol.check_multiplicity(),
         'Molecule: Incompatible multiplicity and number of electrons')
+
+    if method_type == 'restricted':
+        assert_msg_critical(
+            mol.get_multiplicity() == 1,
+            f'Molecule: Invalid multiplicity for {method_type}')
+
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
 
@@ -241,7 +249,8 @@ def polorbrsp_sanity_check_2(obj, method_flag, lr_results):
         # check that frequencies agree with LR
         response_results = lr_results.get('solutions', None)
         for frequency in obj.frequencies:
-            if (obj.vector_components[0], frequency) not in response_results.keys():
+            if (obj.vector_components[0],
+                    frequency) not in response_results.keys():
                 error_msg = f'Frequency {frequency:2.3f} in '
                 error_msg += method_flag + ' not found in linear response results '
                 error_msg += 'for vector compontent ' + obj.vector_components[0]
@@ -567,14 +576,16 @@ def solvation_model_sanity_check(obj):
             'point charges')
 
         assert_msg_critical(
-            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm', 'smd'],
             type(obj).__name__ +
-            ': Only the C-PCM solvation model is implemented.')
+            ': Only the C-PCM and SMD solvation models are implemented.')
 
         obj._cpcm = True
+        obj._smd = (obj.solvation_model.lower() == 'smd')
 
     else:
         obj._cpcm = False
+        obj._smd = False
 
 
 def write_pe_jsonfile(molecule, potfile):

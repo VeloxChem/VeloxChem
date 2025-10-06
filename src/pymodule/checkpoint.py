@@ -165,8 +165,8 @@ def write_rsp_solution(fname, key, vec, group_label='rsp'):
         The key for the solution vector.
     :param vec:
         The solution vector.
-	:param group_label:
-		The checkpoint file group label.
+    :param group_label:
+        The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
@@ -188,8 +188,8 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec, group_label='rsp'):
         The list of keys for the solution vector.
     :param vec:
         The solution vector.
-	:param group_label:
-		The checkpoint file group label.
+    :param group_label:
+        The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
@@ -217,8 +217,8 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results, group_label='rsp'):
         Name of the HDF5 file.
     :param rsp_results:
         The dictionary containing the linear response results.
-	:param group_label:
-		The checkpoint file group label.
+    :param group_label:
+        The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):
@@ -300,8 +300,8 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, gr
         The detachment density matrix.
     :param dens_attach:
         The attachment density matrix.
-	:param group_label:
-		The checkpoint file group label.
+    :param group_label:
+        The checkpoint file group label.
     """
 
     if fname and isinstance(fname, str):

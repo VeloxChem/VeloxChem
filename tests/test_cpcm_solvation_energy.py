@@ -37,7 +37,7 @@ class TestCpcmSolvation:
         scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
-            assert abs(ref_solv_energy - scf_drv.cpcm_epol) < tol
+            assert abs(ref_solv_energy - scf_drv.cpcm_drv.cpcm_epol) < tol
 
     def test_hf(self):
 

@@ -33,6 +33,7 @@
 import numpy as np
 import time as tm
 import math
+import copy
 
 from .veloxchemlib import OverlapGeom200Driver
 from .veloxchemlib import OverlapGeom101Driver
@@ -98,6 +99,8 @@ class ScfHessianDriver(HessianDriver):
 
         # flag for printing the Hessian
         self.do_print_hessian = False
+
+        self.atom_pairs = None
 
         # TODO: determine _block_size_factor for SCF Hessian driver
         # self._block_size_factor = 4
@@ -178,7 +181,8 @@ class ScfHessianDriver(HessianDriver):
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
         else:
-            self.compute_analytical(molecule, ao_basis, profiler)
+            self.compute_analytical(molecule, ao_basis, profiler,
+                                    self.atom_pairs)
 
         if self.rank == mpi_master():
             # print Hessian
@@ -289,7 +293,7 @@ class ScfHessianDriver(HessianDriver):
                             'ScfHessianDriver: SCF did not converge')
         self.ostream.unmute()
 
-    def compute_analytical(self, molecule, ao_basis, profiler):
+    def compute_analytical(self, molecule, ao_basis, profiler, atom_pairs=None):
         """
         Computes the analytical nuclear Hessian.
 
@@ -299,6 +303,8 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         :param profiler:
             The profiler.
+        :param atom_pairs:
+            The atom pairs to compute the Hessian for.
         """
 
         assert_msg_critical(
@@ -383,7 +389,7 @@ class ScfHessianDriver(HessianDriver):
         for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
 
-        cphf_solver.compute(molecule, ao_basis, scf_tensors)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
@@ -400,11 +406,31 @@ class ScfHessianDriver(HessianDriver):
         # RHS contracted with CPHF coefficients (ov)
         hessian_cphf_coeff_rhs = np.zeros((natm, 3, natm, 3))
 
-        for i in range(natm):
+        atoms = []
+        if atom_pairs is not None:
+            for i, j in atom_pairs:
+                if i not in atoms:
+                    atoms.append(i)
+                if j not in atoms:
+                    atoms.append(j)
+            atoms = sorted(atoms)
+        else:
+            atoms = list(range(natm))
+
+        # TODO: use alternative way to partition atoms
+        local_atoms = atoms[self.rank::self.nodes]
+
+        for i in atoms:
             for x in range(3):
                 dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
 
-                for j in range(i, natm):
+                for j in atoms:
+                    if j < i:
+                        continue
+                    if atom_pairs is not None:
+                        if i != j and (i, j) not in atom_pairs and (
+                                j, i) not in atom_pairs:
+                            continue
                     for y in range(3):
                         hess_ijxy = 4.0 * (np.dot(
                             dist_cphf_ov_ix_data,
@@ -465,12 +491,14 @@ class ScfHessianDriver(HessianDriver):
             exchange_scaling_factor = 1.0
             fock_factor = 1.0
 
-        # TODO: range-separated Fock
-        need_omega = (self._dft and self.scf_driver.xcfun.is_range_separated())
+        need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(
-                False, 'ScfHessianDriver: Not implemented for' +
-                ' range-separated functional')
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
+        else:
+            erf_k_coef, omega = None, None
 
         den_mat_for_fock = make_matrix(ao_basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
@@ -498,9 +526,6 @@ class ScfHessianDriver(HessianDriver):
 
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
-
-        # TODO: use alternative way to partition atoms
-        local_atoms = list(range(natm))[self.rank::self.nodes]
 
         for i in local_atoms:
 
@@ -569,6 +594,13 @@ class ScfHessianDriver(HessianDriver):
                 den_mat_for_fock2, i, fock_type, exchange_scaling_factor, 0.0,
                 thresh_int)
 
+            # for range-separated functionals
+            if need_omega:
+                fock_hess_2000_rs = fock_hess_2000_drv.compute(
+                    ao_basis, screener_atom_i, screener, den_mat_for_fock,
+                    den_mat_for_fock2, i, 'kx_rs', erf_k_coef, omega,
+                    thresh_int)
+
             # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
             xy_pairs_upper_triang = [
                 (x, y) for x in range(3) for y in range(x, 3)
@@ -576,14 +608,24 @@ class ScfHessianDriver(HessianDriver):
 
             for idx, (x, y) in enumerate(xy_pairs_upper_triang):
                 hess_val = fock_factor * fock_hess_2000[idx]
+                if need_omega:
+                    # range-separated functional contribution
+                    hess_val -= fock_hess_2000_rs[idx]
                 hessian_2nd_order_derivatives[i, i, x, y] += hess_val
                 if x != y:
                     hessian_2nd_order_derivatives[i, i, y, x] += hess_val
 
         # do only upper triangular matrix
-        all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
 
         # TODO: use alternative way to partition atom pairs
+        if atom_pairs is None:
+            all_atom_pairs = [
+                (i, j) for i in range(natm) for j in range(i, natm)
+            ]
+        else:
+            all_atom_pairs = copy.copy(atom_pairs)
+            for i in atoms:
+                all_atom_pairs.append((i, i))
         local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
 
         for i, j in local_atom_pairs:
@@ -660,6 +702,13 @@ class ScfHessianDriver(HessianDriver):
                 den_mat_for_fock2, i, j, fock_type, exchange_scaling_factor,
                 0.0, thresh_int)
 
+            # range-separated functionals
+            if need_omega:
+                fock_hess_1100_rs = fock_hess_1100_drv.compute(
+                    ao_basis, screener_atom_pair, screener, den_mat_for_fock,
+                    den_mat_for_fock2, i, j, 'kx_rs', erf_k_coef, omega,
+                    thresh_int)
+
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
 
@@ -672,12 +721,23 @@ class ScfHessianDriver(HessianDriver):
                 den_mat_for_fock2, i, j, fock_type, exchange_scaling_factor,
                 0.0, thresh_int)
 
+            # for range-separated functionals
+            if need_omega:
+                fock_hess_1010_rs = fock_hess_1010_drv.compute(
+                    ao_basis, screener_atom_i, screener_atom_j,
+                    den_mat_for_fock2, den_mat_for_fock2, i, j, 'kx_rs',
+                    erf_k_coef, omega, thresh_int)
+
             # 'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
             xy_pairs = [(x, y) for x in range(3) for y in range(3)]
 
             for idx, (x, y) in enumerate(xy_pairs):
                 hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * (
                     fock_hess_1100[idx] + fock_hess_1010[idx])
+                if need_omega:
+                    # range-separated functional contribution
+                    hessian_2nd_order_derivatives[i, j, x, y] -= (
+                        fock_hess_1100_rs[idx] + fock_hess_1010_rs[idx])
 
             # lower triangle is transpose of the upper part
             if i != j:
@@ -716,6 +776,10 @@ class ScfHessianDriver(HessianDriver):
             nuclear_charges = molecule.get_element_ids()
 
             for i in range(self.rank, natm, self.nodes):
+                if atom_pairs is not None:
+                    if i not in atoms:
+                        continue
+
                 q_i = nuclear_charges[i]
                 xyz_i = qm_coords[i]
 
@@ -734,6 +798,10 @@ class ScfHessianDriver(HessianDriver):
             if self.scf_driver.qm_vdw_params is not None:
 
                 for i in range(self.rank, natm, self.nodes):
+                    if atom_pairs is not None:
+                        if i not in atoms:
+                            continue
+
                     xyz_i = qm_coords[i]
                     sigma_i = self.scf_driver.qm_vdw_params[i, 0]
                     epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
@@ -782,7 +850,18 @@ class ScfHessianDriver(HessianDriver):
             # Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
-            # Sum up the terms and reshape for final Hessian
+            # Doing this post-hoc is much easier to implement, and the cost of
+            # the nuclear nuclear contribution is neglible
+            if atom_pairs is not None:
+                for i in range(natm):
+                    for j in range(natm):
+                        if (i, j) not in all_atom_pairs and (
+                                j, i) not in all_atom_pairs:
+                            hessian_nuclear_nuclear[i, j, :, :] = 0.0
+                            if self._dft:
+                                hessian_dft_xc[i * 3:i * 3 + 3,
+                                               j * 3:j * 3 + 3] = 0.0
+
             self.hessian = (
                 hessian_first_order_derivatives +
                 hessian_2nd_order_derivatives.transpose(0, 2, 1, 3) +

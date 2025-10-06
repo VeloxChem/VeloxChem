@@ -147,7 +147,7 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-    def test_ks_polarizabilitygradient_real(self):
+    def test_b3lyp_polarizabilitygradient_real(self):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -161,7 +161,7 @@ class TestPolgrad:
 
         self.run_polgrad_real(molecule, basis, "b3lyp", "polarizabilitygradient_b3lyp_real")
 
-    def test_ks_polarizabilitygradient_complex(self):
+    def test_b3lyp_polarizabilitygradient_complex(self):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -174,3 +174,32 @@ class TestPolgrad:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         self.run_polgrad_complex(molecule, basis, "b3lyp", "polarizabilitygradient_b3lyp_complex")
+
+    def test_camb3lyp_polarizabilitygradient_real(self):
+        h2o_xyz = """3
+
+        O     0.000000    0.000000    0.000000
+        H     0.000000    0.504284    0.758602
+        H     0.000000   -0.504284    0.758602 
+        """
+        basis_set_label = "sto-3g"
+
+        molecule = Molecule.from_xyz_string(h2o_xyz)
+        basis = MolecularBasis.read(molecule, basis_set_label)
+
+        self.run_polgrad_real(molecule, basis, "cam-b3lyp", "polarizabilitygradient_camb3lyp_real")
+
+    def test_camb3lyp_polarizabilitygradient_complex(self):
+        h2o_xyz = """3
+
+        O     0.000000    0.000000    0.000000
+        H     0.000000    0.504284    0.758602
+        H     0.000000   -0.504284    0.758602 
+        """
+        basis_set_label = "sto-3g"
+
+        molecule = Molecule.from_xyz_string(h2o_xyz)
+        basis = MolecularBasis.read(molecule, basis_set_label)
+
+        self.run_polgrad_complex(molecule, basis, "cam-b3lyp",
+                                 "polarizabilitygradient_camb3lyp_complex")
