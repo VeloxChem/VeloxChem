@@ -276,8 +276,6 @@ class RixsDriver:
 
             self._approach_string = (f'Running RIXS in the two‑shot approach '
                              f'with {num_intermediate_states} intermediate states.')
-            #self.ostream.print_info('Running RIXS in the two-shot approach '\
-            #                        f'with {num_intermediate_states} intermediate states.')
 
         else:
             num_core_orbitals = rsp_tensors['num_core']
@@ -294,10 +292,6 @@ class RixsDriver:
             detuning = rsp_tensors['eigenvalues'] - first_core_ene
             tol = 1e-10
             mask = (detuning >= -tol) & (detuning <= self.core_cutoff)
-            #if self.core_cutoff != np.inf:
-                #self.ostream.print_info(f'Cutoff applied: only core-excited states within '
-                #                        f'{self.core_cutoff:.2f} a.u. = {self.core_cutoff*hartree_in_ev():.2f}'
-                 #                       f' eV above the lowest core-excited state.')
 
             init_core_states = np.where(mask)[0]
             core_states = []
@@ -317,16 +311,12 @@ class RixsDriver:
                 self._approach_string = (f'Running RIXS in the restricted‑subspace approach with '
                                  f'{num_intermediate_states} intermediate states; '
                                  f'{self.num_final_states} final states kept.')
-                #self.ostream.print_info('Running RIXS in the restricted-subspace approximation '
-                #                        f'approach with {num_intermediate_states} intermediate states,'
-                #                        f'restricted to {self.num_final_states} out of possible {num_final_states}.')
+
                 num_final_states = self.num_final_states
                 val_states = val_states[:self.num_final_states]
             else:
                 self._approach_string = (f'Running RIXS in the restricted‑subspace approach with '
                                  f'{num_intermediate_states} intermediate states.')
-                #self.ostream.print_info('Running RIXS in the restricted-subspace #approximation '
-                #                        f'approach with {num_intermediate_states} intermediate states.')
 
             cvs_rsp_tensors = rsp_tensors
             occupied_core = num_core_orbitals + num_val_orbitals
@@ -377,21 +367,9 @@ class RixsDriver:
             for eig, osc in zip(core_eigvals, osc_arr[core_states]):
                 if osc > 1e-3:
                     self.photon_energy = [eig]
-                    #self.ostream.print_info(
-                    #    'Incoming photon energy not set; computing ' 
-                    #    'RIXS for the first core resonance at: ' 
-                    #    f'{self.photon_energy[0]:.4f} a.u. = ' 
-                    #    f'{self.photon_energy[0] * hartree_in_ev():.2f} eV')
                     break
         elif isinstance(self.photon_energy, (float, int, np.floating)):
-            #self.ostream.print_info(
-            #    f'Incoming photon energy: {self.photon_energy:.2f} a.u. = ' 
-            #    f'{self.photon_energy*hartree_in_ev():.2f} eV')
             self.photon_energy = [self.photon_energy]
-        #else:
-            #formatted_au = ', '.join(f'{enes:.2f}' for enes in self.photon_energy)
-            #formatted_ev = ', '.join(f'{enes * hartree_in_ev():.2f}' for enes in self.photon_energy)
-            #self.ostream.print_info(f'Incoming photon energies: ({formatted_au}) a.u. = ({formatted_ev}) eV')
 
         self.ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
         self.emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))

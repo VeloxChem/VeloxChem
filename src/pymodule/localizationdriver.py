@@ -98,11 +98,11 @@ class LocalizationDriver:
                         R = np.array([[cos, -sin], 
                                     [sin,  cos]])
 
-                        C_local[:,[i,j]] = C_local[:,[i,j]] @ R
+                        C_local[:,[i,j]] = C_local[:,[i,j]].copy() @ R
 
                         for x in range(3):
-                            r[x, [i, j], :] = R.T @ r[x, [i, j], :]
-                            r[x, :, [i, j]] = R.T @ r[x, :, [i, j]]
+                            r[x, [i, j], :] = R.T @ r[x, [i, j], :].copy()
+                            r[x, :, [i, j]] = r[x, :, [i, j]].copy() @ R
 
                         max_theta = max(max_theta, abs(theta_opt))
 
