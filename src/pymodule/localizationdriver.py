@@ -78,7 +78,6 @@ class LocalizationDriver:
 
             r = np.array([C_local.T @ x @ C_local for x in dip_mats])
 
-                
             for l in range(self.max_iter):
                 max_theta = 0.0
                 for i in range(m - 1):

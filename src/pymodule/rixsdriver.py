@@ -274,8 +274,10 @@ class RixsDriver:
             core_states = list(range(num_intermediate_states))
             val_states = list(range(num_final_states))
 
-            self.ostream.print_info('Running RIXS in the two-shot approach '\
-                                    f'with {num_intermediate_states} intermediate states.')
+            self._approach_string = (f'Running RIXS in the two‑shot approach '
+                             f'with {num_intermediate_states} intermediate states.')
+            #self.ostream.print_info('Running RIXS in the two-shot approach '\
+            #                        f'with {num_intermediate_states} intermediate states.')
 
         else:
             num_core_orbitals = rsp_tensors['num_core']
@@ -292,10 +294,10 @@ class RixsDriver:
             detuning = rsp_tensors['eigenvalues'] - first_core_ene
             tol = 1e-10
             mask = (detuning >= -tol) & (detuning <= self.core_cutoff)
-            if self.core_cutoff != np.inf:
-                self.ostream.print_info(f'Cutoff applied: only core-excited states within '
-                                        f'{self.core_cutoff:.2f} a.u. = {self.core_cutoff*hartree_in_ev():.2f}'
-                                        f' eV above the lowest core-excited state.')
+            #if self.core_cutoff != np.inf:
+                #self.ostream.print_info(f'Cutoff applied: only core-excited states within '
+                #                        f'{self.core_cutoff:.2f} a.u. = {self.core_cutoff*hartree_in_ev():.2f}'
+                 #                       f' eV above the lowest core-excited state.')
 
             init_core_states = np.where(mask)[0]
             core_states = []
@@ -312,14 +314,19 @@ class RixsDriver:
             val_states = np.where(detuning < 0)[0]
             num_final_states = len(val_states)
             if self.num_final_states is not None:
-                self.ostream.print_info('Running RIXS in the restricted-subspace approximation '
-                                        f'approach with {num_intermediate_states} intermediate states,'
-                                        f'restricted to {self.num_final_states} out of possible {num_final_states}.')
+                self._approach_string = (f'Running RIXS in the restricted‑subspace approach with '
+                                 f'{num_intermediate_states} intermediate states; '
+                                 f'{self.num_final_states} final states kept.')
+                #self.ostream.print_info('Running RIXS in the restricted-subspace approximation '
+                #                        f'approach with {num_intermediate_states} intermediate states,'
+                #                        f'restricted to {self.num_final_states} out of possible {num_final_states}.')
                 num_final_states = self.num_final_states
                 val_states = val_states[:self.num_final_states]
             else:
-                self.ostream.print_info('Running RIXS in the restricted-subspace approximation '
-                                        f'approach with {num_intermediate_states} intermediate states.')
+                self._approach_string = (f'Running RIXS in the restricted‑subspace approach with '
+                                 f'{num_intermediate_states} intermediate states.')
+                #self.ostream.print_info('Running RIXS in the restricted-subspace #approximation '
+                #                        f'approach with {num_intermediate_states} intermediate states.')
 
             cvs_rsp_tensors = rsp_tensors
             occupied_core = num_core_orbitals + num_val_orbitals
@@ -370,21 +377,21 @@ class RixsDriver:
             for eig, osc in zip(core_eigvals, osc_arr[core_states]):
                 if osc > 1e-3:
                     self.photon_energy = [eig]
-                    self.ostream.print_info(
-                        'Incoming photon energy not set; computing ' 
-                        'RIXS for the first core resonance at: ' 
-                        f'{self.photon_energy[0]:.4f} a.u. = ' 
-                        f'{self.photon_energy[0] * hartree_in_ev():.2f} eV')
+                    #self.ostream.print_info(
+                    #    'Incoming photon energy not set; computing ' 
+                    #    'RIXS for the first core resonance at: ' 
+                    #    f'{self.photon_energy[0]:.4f} a.u. = ' 
+                    #    f'{self.photon_energy[0] * hartree_in_ev():.2f} eV')
                     break
         elif isinstance(self.photon_energy, (float, int, np.floating)):
-            self.ostream.print_info(
-                f'Incoming photon energy: {self.photon_energy:.2f} a.u. = ' 
-                f'{self.photon_energy*hartree_in_ev():.2f} eV')
+            #self.ostream.print_info(
+            #    f'Incoming photon energy: {self.photon_energy:.2f} a.u. = ' 
+            #    f'{self.photon_energy*hartree_in_ev():.2f} eV')
             self.photon_energy = [self.photon_energy]
-        else:
-            formatted_au = ', '.join(f'{enes:.2f}' for enes in self.photon_energy)
-            formatted_ev = ', '.join(f'{enes * hartree_in_ev():.2f}' for enes in self.photon_energy)
-            self.ostream.print_info(f'Incoming photon energies: ({formatted_au}) a.u. = ({formatted_ev}) eV')
+        #else:
+            #formatted_au = ', '.join(f'{enes:.2f}' for enes in self.photon_energy)
+            #formatted_ev = ', '.join(f'{enes * hartree_in_ev():.2f}' for enes in self.photon_energy)
+            #self.ostream.print_info(f'Incoming photon energies: ({formatted_au}) a.u. = ({formatted_ev}) eV')
 
         self.ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
         self.emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
@@ -392,6 +399,8 @@ class RixsDriver:
         self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
         self.scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
                                            3, 3), dtype=complex)
+
+        self.print_header()
 
         for w_ind, omega in enumerate(self.photon_energy):
             F_elastic = np.zeros((3,3), dtype=complex)
@@ -425,9 +434,9 @@ class RixsDriver:
             sigma_elastic = self.cross_section(F_elastic)
             self.elastic_cross_sections[w_ind] = sigma_elastic.real
 
-            self.ostream.print_blank()
             self.ostream.print_info(f'Computed RIXS cross-sections for {num_final_states} ' 
                                     f'final states at photon energy: {omega*hartree_in_ev():.2f} eV.')
+            self.ostream.print_blank()
         
         results_dict = {
                     'cross_sections': self.cross_sections,
@@ -440,10 +449,15 @@ class RixsDriver:
                     }
 
         if self.filename is not None:
+            self.ostream.print_info('Writing to files...')
+            self.ostream.print_blank()
             self.write_hdf5(self.filename + '_rixs')
 
         if not init_photon_set:
             self.photon_energy = None
+
+        self.ostream.print_info('...done.')
+        self.ostream.print_blank()
 
         return results_dict
     
@@ -627,15 +641,23 @@ class RixsDriver:
         Writes the Pulsed response vectors to the specified output file in h5
         format. The h5 file saved contains the following datasets:
 
-        - amplitudes
-            The pulse amplitudes for the calculated truncated_freqs
-        - zero_padded
-            Is the dataset zero padded or not
-        - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
-            =>  Amplitudes for all directions
+        - photon_energies
+            The incoming photon energies (w, or omega), at which the RIXS amplitudes
+            are computed and so also the cross-sections.
+        - cross_sections
+            The RIXS cross-sections per photon energy (w, or omega), per final state (f),
+            with shape: (f,w).
+        - emission_energies
+            The outgoing, or scattered, photon energy.
+        - energy_losses
+            The energy (> 0) which the molecule is left with, i.e., incoming - outgoing.
+        - elastic_cross_sections
+            The cross-section for elastic scattering, i.e., energy loss = 0.
+        - scattering_amplitudes
+            The scattering ampltitude tensor, with shape: (f,w,x,y).
 
         :param fname:
-            Name of the checkpoint file.
+            Name of the h5 file.
         """
 
         if not fname:
@@ -650,11 +672,84 @@ class RixsDriver:
             with h5py.File(fname, 'w') as hf:
                 hf.create_dataset('photon_energies', data=self.photon_energy)
                 hf.create_dataset('cross_sections', data=self.cross_sections)
-                hf.create_dataset('energy_losses', data=self.ene_losses)
                 hf.create_dataset('emission_energies', data=self.emission_enes)
+                hf.create_dataset('energy_losses', data=self.ene_losses)
                 hf.create_dataset('elastic_cross_sections', data=self.elastic_cross_sections)
+                hf.create_dataset('scattering_amplitudes', data=self.scattering_amplitudes)
 
         except Exception as e:
             print('Failed to create h5 data file: {}'.format(e),
                   file=sys.stdout)
+
+    def print_header(self):
+        """
+        Prints RIXS calculation setup details to output stream.
+        """
+        
+        def _fmt_indices(lst, max_show=5):
+            """
+            Shring list of indices if too long.
+            """
+            if len(lst) > max_show:
+                return f"[{lst[0]} .. {lst[-1]}]"
+            return str(list(lst))
+
+        label_width = 42
+        str_width   = 90
+
+        self.ostream.print_blank()
+        title = 'Resonant Inelastic X‑ray Scattering (RIXS) Calculation'
+        self.ostream.print_header(f'{title:^{str_width}}')
+        self.ostream.print_header(f'{"=" * len(title):^{str_width}}')
+        self.ostream.print_blank()
+
+        gamma_ev = self.gamma * hartree_in_ev()
+        basic_fields = {
+            'Scattering angle (theta) (rad)'   : f'{self.theta}',
+            'Lifetime broadening (gamma) (eV)'  : f'{gamma_ev:.3g}',
+            'Core‑excited energy cutoff (a.u.)' : f'{self.core_cutoff}',
+        }
+        for label, val in basic_fields.items():
+            self.ostream.print_header(f'{label:<{label_width}} : {val}'.ljust(str_width))
+        self.ostream.print_blank()
+
+        if self.photon_energy:
+            au_str = ', '.join(f'{e:.4f}'        for e in self.photon_energy)
+            ev_str = ', '.join(f'{e*hartree_in_ev():.2f}' for e in self.photon_energy)
+            self.ostream.print_header(f'Incoming photon energies (a.u.)'.ljust(label_width) +
+                                    f': {au_str}'.ljust(str_width-label_width-3))
+            self.ostream.print_header(f'Incoming photon energies (eV) '.ljust(label_width) +
+                                    f': {ev_str}'.ljust(str_width-label_width-3))
+            self.ostream.print_blank()
+
+        if getattr(self, "_approach_string", None):
+            self.ostream.print_header(self._approach_string.ljust(str_width))
+            self.ostream.print_blank()
+
+        if self.orb_and_state_dict:
+            od = self.orb_and_state_dict
+            orb_fields = {
+                'Core orbitals'    : _fmt_indices(od["mo_core_indices"]),
+                'Valence orbitals' : _fmt_indices(od["mo_val_indices"]),
+                'Virtual orbitals' : _fmt_indices(od["mo_vir_indices"]),
+            }
+            self.ostream.print_header('Orbital index ranges:'.center(str_width))
+            for lab, val in orb_fields.items():
+                self.ostream.print_header(f'{lab:<{label_width-2}} : {val}'.ljust(str_width))
+            self.ostream.print_blank()
+
+            state_fields = {
+                'Intermediate/core states' : _fmt_indices(od["core_states"]),
+                'Final/valence states'     : _fmt_indices(od["val_states"]),
+            }
+            self.ostream.print_header('State index sets:'.center(str_width))
+            for lab, val in state_fields.items():
+                self.ostream.print_header(f'{lab:<{label_width-2}} : {val}'.ljust(str_width))
+            self.ostream.print_blank()
+
+            self.ostream.print_header(
+                f'Number of intermediate states : {od["num_intermediate_states"]}'.ljust(str_width))
+            self.ostream.print_header(
+                f'Number of final states        : {od["num_final_states"]}'.ljust(str_width))
+            self.ostream.print_blank()
 
