@@ -69,56 +69,59 @@ class LocalizationDriver:
         """
         Foster-Boys localization.
         """
-        dip_mats = np.array(compute_electric_dipole_integrals(molecule, basis))
-        C = scf_res['C_alpha']
-        C_local = C[:, mo_list].copy()
-        m = C_local.shape[1]
 
-        r = np.array([C_local.T @ x @ C_local for x in dip_mats])
+        if self.rank == mpi_master():
+            dip_mats = np.array(compute_electric_dipole_integrals(molecule, basis))
+            C = scf_res['C_alpha']
+            C_local = C[:, mo_list].copy()
+            m = C_local.shape[1]
 
-            
-        for l in range(self.max_iter):
-            max_theta = 0.0
-            for i in range(m - 1):
-                for j in range(i+1, m):
-                    r_i  = r[:,i,i]
-                    r_j  = r[:,j,j]
-                    d_ij = r[:,i,j]
-                    
-                    r_ij = r_i - r_j
-                    g = 2.0 * np.dot(r_ij, d_ij)
-                    h = np.linalg.norm(r_ij)**2 - 4.0 * np.linalg.norm(d_ij)**2
-                    
-                    theta_opt = 0.25 * np.arctan2(g,h)
-                    if abs(theta_opt) < self.threshold:
-                        continue
-                        
-                    cos, sin = np.cos(theta_opt), np.sin(theta_opt)
-                    R = np.array([[cos, -sin], 
-                                [sin,  cos]])
+            r = np.array([C_local.T @ x @ C_local for x in dip_mats])
 
-                    C_local[:,[i,j]] = C_local[:,[i,j]] @ R
-
-                    for x in range(3):
-                        r[x, [i, j], :] = R.T @ r[x, [i, j], :]
-                        r[x, :, [i, j]] = R.T @ r[x, :, [i, j]]
-
-                    max_theta = max(max_theta, abs(theta_opt))
-
-            if max_theta < self.threshold:
-                #print(f'Total iterations: {l}')
-                break
-        else:
-            self.ostream.print_info(f"Foster–Boys did not converge after {self.max_iter} iterations.")
                 
-        C_loc = C.copy()
-        C_loc[:, mo_list] = C_local
+            for l in range(self.max_iter):
+                max_theta = 0.0
+                for i in range(m - 1):
+                    for j in range(i+1, m):
+                        r_i  = r[:,i,i]
+                        r_j  = r[:,j,j]
+                        d_ij = r[:,i,j]
+                        
+                        r_ij = r_i - r_j
+                        g = 2.0 * np.dot(r_ij, d_ij)
+                        h = np.linalg.norm(r_ij)**2 - 4.0 * np.linalg.norm(d_ij)**2
+                        
+                        theta_opt = 0.25 * np.arctan2(g,h)
+                        if abs(theta_opt) < self.threshold:
+                            continue
+                            
+                        cos, sin = np.cos(theta_opt), np.sin(theta_opt)
+                        R = np.array([[cos, -sin], 
+                                    [sin,  cos]])
 
-        ortho = np.max(np.abs(C_loc.T @ scf_res['S'] @ C_loc - np.eye(C_loc.shape[1])))
-        if ortho > 1e-9:
-            print('[WARNING] Transformed MOs not orthonormal!')
+                        C_local[:,[i,j]] = C_local[:,[i,j]] @ R
 
-        return C_loc
+                        for x in range(3):
+                            r[x, [i, j], :] = R.T @ r[x, [i, j], :]
+                            r[x, :, [i, j]] = R.T @ r[x, :, [i, j]]
 
+                        max_theta = max(max_theta, abs(theta_opt))
+
+                if max_theta < self.threshold:
+                    #print(f'Total iterations: {l}')
+                    break
+            else:
+                self.ostream.print_info(f"Foster–Boys did not converge after {self.max_iter} iterations.")
+                    
+            C_loc = C.copy()
+            C_loc[:, mo_list] = C_local
+
+            ortho = np.max(np.abs(C_loc.T @ scf_res['S'] @ C_loc - np.eye(C_loc.shape[1])))
+            if ortho > 1e-9:
+                print('[WARNING] Transformed MOs not orthonormal!')
+
+            return C_loc
+        else:
+            return None
 
 
