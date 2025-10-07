@@ -47,9 +47,8 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 
 class RixsDriver:
     """
-    Implements the RIXS driver.
-    Note: includes only the inelastic, resonant term in
-    the 2nd order pert. expression.
+    Implements the RIXS driver in a linear-response framework with two 
+    approaches: the two-shot and restricted-subspace approximation.
 
     :param comm:
         The MPI communicator.
@@ -58,7 +57,8 @@ class RixsDriver:
 
     Instance variables:
         - photon_energy: Incoming photon energy; omega (a.u.)
-        - theta: Angle (rad.)
+        - theta: Angle between incident polarization-
+          and outgoing propagation vectors (rad.)
         - gamma: Life-time broadening (FWHM) (a.u.)
     """
 
@@ -98,6 +98,9 @@ class RixsDriver:
 
         # TODO?: define both in terms of either nr. of states or energy
         self.num_final_states = None
+        # TODO: why would this be useful? the rixs-computation will never(?) be the limiting
+        # factor in computing spectra, if i have computed states i'll probably just
+        # use all, why not?
         self.core_cutoff = np.inf
 
         # input keywords
@@ -155,25 +158,23 @@ class RixsDriver:
     def scattering_amplitude_tensor(self, omega, core_eigenvalue, val_eigenvalue,
                                     intermediate_tdens, final_tdens, dipole_integrals):
         """
-        The RIXS scattering amptlitude (sum-over-states) transition amplitude.
+        The RIXS scattering amplitude.
         
         :param omega:
             Energy of incoming photon.
         :param f: 
-            The final valence state index.
+            The final (valence) state index.
         :param eigenvalue: 
-            Energy of intermediate/core excited state.
+            Energy of intermediate (core) excited state.
         :param intermediate_tdens:
             Transition density from ground to
-            intermediate/core excited state (AO).
+            intermediate (core) excited state (AO).
         :param final_tdens:
             Transition density matrix from 
             intermediate to final excited state (AO).
         :param dipole_integrals:
             Electric dipole integrals (length gauge)
             in AO-basis.
-        :param elastic:
-            Bool to compute the elastic line.
 
         :return: 
             The scattering amplitude tensor: shape = (3,3)
@@ -182,6 +183,7 @@ class RixsDriver:
         e_n = 1 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
 
         if val_eigenvalue is None or intermediate_tdens is None:
+            # elastic line
             core_eigvals2 = core_eigenvalue**2
             gs_exc_tdipole = np.array([
                                 np.sum(intermediate_tdens * dipole_integrals[i])
@@ -190,7 +192,8 @@ class RixsDriver:
             scatt_amp = e_n * core_eigvals2 * outer_product
 
         else:
-            omega_product = (val_eigenvalue - core_eigenvalue) * core_eigenvalue
+            # inelastic line
+            omega_product = (core_eigenvalue - val_eigenvalue) * core_eigenvalue
             gs_exc_tdipole = np.array([
                                 np.sum(intermediate_tdens * dipole_integrals[i])
                                 for i in range(3)])
@@ -276,6 +279,8 @@ class RixsDriver:
 
             num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
             num_final_states = len(rsp_tensors['eigenvalues'])
+            if self.num_final_states is not None:
+                num_final_states = self.num_final_states
 
             occupied_core = num_core_orbitals
             core_states = list(range(num_intermediate_states))
@@ -297,8 +302,10 @@ class RixsDriver:
                     break
 
             detuning = rsp_tensors['eigenvalues'] - first_core_ene
-            tol = 1e-10
+            tol = 1e-8
+            # -tol to make sure the first_core_ene-state is included
             mask = (detuning >= -tol) & (detuning <= self.core_cutoff)
+            #mask = (detuning <= self.core_cutoff) & ((detuning >= 0) | np.isclose(detuning, 0, atol=tol))
 
             init_core_states = np.where(mask)[0]
             core_states = []
@@ -673,7 +680,7 @@ class RixsDriver:
         
         def _fmt_indices(lst, max_show=5):
             """
-            Shring list of indices if too long.
+            Shrink list of indices if too long.
             """
             if len(lst) > max_show:
                 return f"[{lst[0]} .. {lst[-1]}]"
@@ -690,7 +697,7 @@ class RixsDriver:
 
         gamma_ev = self.gamma * hartree_in_ev()
         basic_fields = {
-            'Scattering angle (theta) (rad)'   : f'{self.theta}',
+            'Scattering angle (theta) (rad)'   : f'{self.theta:.3g}',
             'Lifetime broadening (gamma) (eV)'  : f'{gamma_ev:.3g}',
             'Core‑excited energy cutoff (a.u.)' : f'{self.core_cutoff}',
         }
