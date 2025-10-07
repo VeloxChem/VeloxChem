@@ -1244,6 +1244,9 @@ class AtomTypeIdentifier:
                 else:
                     carbon_type = {'opls': 'opls_141', 'gaff': 'c2'}
 
+            elif info['NumConnectedAtoms'] == 2:
+                carbon_type = {'opls': 'opls_235', 'gaff': 'c1'}
+
                 # Non-cyclic
 
         elif info.get('CyclicStructure') == 'none':
