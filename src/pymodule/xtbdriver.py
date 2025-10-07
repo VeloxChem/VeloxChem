@@ -77,7 +77,7 @@ class XtbDriver:
         self.nodes = self.comm.Get_size()
 
         self.ostream = ostream
-
+        self.roots = 0
         self.xtb_method = 'gfn2'
 
         self._xtb_calc = None

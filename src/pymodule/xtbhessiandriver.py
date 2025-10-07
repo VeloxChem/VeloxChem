@@ -56,7 +56,7 @@ class XtbHessianDriver(HessianDriver):
         """
 
         super().__init__(xtb_drv.comm, xtb_drv.ostream)
-
+        self.roots_to_follow = 0
         self.xtb_driver = xtb_drv
         self.flag = 'XTB Hessian Driver'
         self.numerical = True

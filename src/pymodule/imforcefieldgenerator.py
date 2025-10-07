@@ -213,6 +213,11 @@ class IMForceFieldGenerator:
             qm_hess_driver = ExternalHessianDriver(ground_state_driver)
             self.drivers['gs'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
         
+        if isinstance(ground_state_driver, XtbDriver):
+            qm_grad_driver = XtbGradientDriver(ground_state_driver)
+            qm_hess_driver = XtbHessianDriver(ground_state_driver)
+            self.drivers['gs'] = (ground_state_driver, qm_grad_driver, qm_hess_driver)
+
         if isinstance(excited_state_driver, ExternalExcitedStatesScfDriver):
             
             excited_state_gradient_driver = ExternalExcitedStatesGradientDriver(excited_state_driver)
@@ -578,7 +583,7 @@ class IMForceFieldGenerator:
 
                     self.atom_transfer_reaction_path = {entry['root']: []}
                 self.atom_transfer_reaction_path[entry['root']].append(self.determine_atom_transfer_reaction_path(entry['reactants'], entry['products']))
-            
+
         if self.add_conformal_structures:
 
             rotatable_dihedrals_dict = {}
@@ -1104,7 +1109,7 @@ class IMForceFieldGenerator:
                         self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
             
             elif not self.add_conformal_structures and not os.path.exists(imforcefieldfile):
-                
+                molecules_to_add_info = []
                 if self.use_minimized_structures[0]:       
                     optimized_molecule = None
                     if self.roots_to_follow[0] == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
@@ -1157,18 +1162,16 @@ class IMForceFieldGenerator:
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
 
                         current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
-                        self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
-                        print(molecule.get_xyz_string())
-                        if self.z_matrix is None:
-                            self.z_matrix = self.define_z_matrix(optimized_molecule, self.reaction_coordinates)
-                        print('Molecule added to the database',  self.density_of_datapoints)
+                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                        
+                    self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+
+
                 else:
                     current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
-                    self.add_point(molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
-                    print(molecule.get_xyz_string())
-                    if self.z_matrix is None:
-                        self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
-                    print('Molecule added to the database',  self.density_of_datapoints)
+                    molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                    self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
+
 
 
             self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
@@ -1177,10 +1180,11 @@ class IMForceFieldGenerator:
             
             if self.add_structures_along_rcs:
                 
-                for counter, (state, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
+                for counter, (states, dihedral_dict) in enumerate(self.molecules_along_rp.items()):
                     for key, mol_info in dihedral_dict.items():
                         molecules, start = mol_info
-                        print(f"State: {state}, Dihedral: {key}, Molecules: {molecules}, Start: {start}")
+                        molecules_to_add = []
+                        print(f"State: {states}, Dihedral: {key}, Molecules: {molecules}, Start: {start}")
                         # Do your processing here
                         for i, mol in enumerate(molecules):
                             optimized_molecule = mol
@@ -2791,7 +2795,8 @@ class IMForceFieldGenerator:
 
         # XTB
         if isinstance(qm_driver, XtbDriver):
-
+            
+            qm_driver.ostream.mute()
             qm_driver.compute(molecule)
             qm_energy = qm_driver.get_energy()
             qm_energy = np.array([qm_energy])

@@ -53,6 +53,7 @@ class XtbGradientDriver(GradientDriver):
         super().__init__(xtb_drv.comm, xtb_drv.ostream)
 
         self.xtb_driver = xtb_drv
+        self.roots_to_follow = 0
 
         self.flag = 'XTB Gradient Driver'
 

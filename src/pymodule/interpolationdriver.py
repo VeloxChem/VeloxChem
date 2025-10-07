@@ -1425,10 +1425,10 @@ class InterpolationDriver():
                     internal_coord_elem_distance.append(0.0)
                     org_interal_coord_elem_distance.append(0.0)
                 
-                elif len(element) == 4 and tuple(sorted(element)) in self.symmetry_information[7][2]: 
-                    # internal_coord_elem_distance.append(0.5 * ( 1.0 + np.cos(2.0 * (self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]) + np.pi)))                
-                    internal_coord_elem_distance.append(0.0)
-                    org_interal_coord_elem_distance.append(0.0)
+                # elif len(element) == 4 and tuple(sorted(element)) in self.symmetry_information[7][2]: 
+                #     # internal_coord_elem_distance.append(0.5 * ( 1.0 + np.cos(2.0 * (self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]) + np.pi)))                
+                #     internal_coord_elem_distance.append(0.0)
+                #     org_interal_coord_elem_distance.append(0.0)
                 elif len(element) == 4:
                     
                     internal_coord_elem_distance.append(np.sin(self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]))
@@ -1582,7 +1582,7 @@ class InterpolationDriver():
                     constraints.append(tuple(int(x) for x in coord))
                 elif len(coord) == 3 and ind_weight > max(weights) * 0.7:
                     constraints.append(tuple(int(x) for x in coord))
-                elif len(coord) == 4 and ind_weight > max(weights) * 0.7 and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
+                elif len(coord) == 4 and ind_weight > max(weights) * 0.7: #and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
                     constraints.append(tuple(int(x) for x in coord))
                 print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error} kcal/mol')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
             print('Sum of Weights', sum(weights), sum(single_energy_error))
@@ -1693,12 +1693,73 @@ class InterpolationDriver():
             internal_coordinates.append(q)
 
 
-        for q in internal_coordinates:
+        for element, q in enumerate(internal_coordinates):
             if (isinstance(q, geometric.internal.Distance)):
                 int_coords.append(1.0 / q.value(coords))
+            elif len(self.z_matrix[element]) == 4:
+                int_coords.append(np.sin(q.value(coords)))
             else:
                 int_coords.append(q.value(coords))
 
+        
+                
+
         X = np.array(int_coords)
+
         return X
+    
+    def compute_ic_and_groups(self, coordinates):
+        """
+        Returns:
+        X : np.ndarray shape (D,) feature vector
+        groups : dict[str, np.ndarray] index arrays for feature groups
+                keys: 'bond', 'angle', 'torsion' (torsion contains both sin/cos indices)
+        types : list[str] parallel to features, e.g. 'bond','angle','torsion_sin','torsion_cos'
+        """
+        cart = np.asarray(coordinates, dtype=np.float64)
+        n_atoms = cart.shape[0]
+        coords = cart.reshape(n_atoms * 3)
+
+        # Build geometric objects only once
+        internal_coordinates = []
+        for z in self.z_matrix:
+            if len(z) == 2:
+                internal_coordinates.append(('bond',     geometric.internal.Distance(*z)))
+            elif len(z) == 3:
+                internal_coordinates.append(('angle',    geometric.internal.Angle(*z)))
+            elif len(z) == 4:
+                internal_coordinates.append(('torsion',  geometric.internal.Dihedral(*z)))
+            else:
+                assert_msg_critical(False, 'Invalid entry size in Z-matrix.')
+
+        X = []
+        types = []
+        bond_idx, angle_idx, torsion_idx = [], [], []
+        k = 0
+
+        for kind, q in internal_coordinates:
+            val = q.value(coords)  # distances in Å, angles/torsions in rad (assuming)
+
+            if kind == 'bond':
+                # choose ONE: r or 1/r or log r ; avoid 1/r if you expect very short bonds
+                feat = 1.0 / val                                # or: feat = val; or feat = np.log(val)
+                X.append(feat); types.append('bond'); bond_idx.append(k); k += 1
+
+            elif kind == 'angle':
+                X.append(val); types.append('angle'); angle_idx.append(k); k += 1
+
+            elif kind == 'torsion':
+                # continuous encoding: add *two* features that should share a lengthscale
+                X.append(np.sin(val)); types.append('torsion_sin'); torsion_idx.append(k); k += 1
+                X.append(np.cos(val)); types.append('torsion_cos'); torsion_idx.append(k); k += 1
+
+        X = np.asarray(X, dtype=np.float64)
+
+        groups = {
+            'bond':    np.asarray(bond_idx, dtype=int),
+            'angle':   np.asarray(angle_idx, dtype=int),
+            'torsion': np.asarray(torsion_idx, dtype=int),  # includes both sin & cos indices
+        }
+        return X, groups, types
+
     

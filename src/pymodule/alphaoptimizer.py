@@ -93,7 +93,7 @@ from concurrent.futures import ProcessPoolExecutor
 # ---- global worker state (created once per process) ----
 _W = {}
 
-def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, beta, e_x):
+def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, exponent_p_q, beta, e_x):
     """Runs once per process. Build a private driver & static constants."""
     # Avoid oversubscription when each process calls BLAS:
     os.environ["OMP_NUM_THREADS"] = "1"
@@ -106,7 +106,8 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, beta,
     driver.symmetry_information = sym_dict
     driver.qm_symmetry_data_points = sym_datapoints
     driver.distance_thrsh = 1000
-    driver.exponent_p = 2
+    driver.exponent_p = exponent_p_q[0]
+    driver.exponent_q = exponent_p_q[1]
     driver.print = False
     driver.calc_optim_trust_radius = True
     # Deep copy datapoints so each process can mutate dp.confidence_radius safely:
@@ -197,7 +198,7 @@ def _eval_structure(payload):
 
 
 class AlphaOptimizer:
-    def __init__(self, z_matrix, impes_dict, sym_dict, sym_datapoints, dps, structure_list, qm_e, qm_g, e_x, beta=0.8, n_workers=None):
+    def __init__(self, z_matrix, impes_dict, sym_dict, sym_datapoints, dps, structure_list, qm_e, qm_g, exponent_p_q, e_x, beta=0.8, n_workers=None):
         self.z_matrix       = z_matrix
         self.impes_dict     = impes_dict
         self.sym_dict       = sym_dict
@@ -221,7 +222,7 @@ class AlphaOptimizer:
         self._pool = ProcessPoolExecutor(
             max_workers=(n_workers or os.cpu_count() or 2),
             initializer=_init_worker,
-            initargs=(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, self.idx, self.beta, self.e_x),
+            initargs=(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, self.idx, exponent_p_q, self.beta, self.e_x),
         )
         self._cache_key = None
         self._cache_grad = None
