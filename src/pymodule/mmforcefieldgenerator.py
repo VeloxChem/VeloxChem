@@ -34,7 +34,6 @@ from mpi4py import MPI
 from pathlib import Path, PurePath
 import numpy as np
 import tempfile
-import time
 import sys
 import re
 import json
@@ -383,8 +382,9 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
-                                      for i, j, k, l in dihedral_indices]
+        dihedral_indices_one_based = [
+            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
+        ]
 
         # Print a header
         header = 'VeloxChem Dihedral Scan'
@@ -489,8 +489,8 @@ class MMForceFieldGenerator:
             error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
-        valid_input = ((scan_results is None and scan_file is not None)
-                       or (scan_results is not None and scan_file is None))
+        valid_input = ((scan_results is None and scan_file is not None) or
+                       (scan_results is not None and scan_file is None))
         assert_msg_critical(
             valid_input, 'MMForceFieldGenerator.reparameterize_dihedrals: ' +
             'Please provide either scan_results or scan_file')
@@ -503,8 +503,8 @@ class MMForceFieldGenerator:
                         # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
                         # Extract the dihedral indices
                         scanned_dih = [
-                            int(i) for i in line.split('Dihedral')[1].split()
-                            [0].split('-')
+                            int(i) for i in (
+                                line.split('Dihedral')[1].split()[0].split('-'))
                         ]
                         assert_msg_critical(
                             sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
@@ -525,8 +525,9 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
-                                      for i, j, k, l in dihedral_indices]
+        dihedral_indices_one_based = [
+            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
+        ]
 
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
@@ -738,9 +739,9 @@ class MMForceFieldGenerator:
         # Extract maxima for QM and MM energies
         if fit_extrema:
             qm_maxima_indices = extract_maxima(barriers, qm_energies)
-            args = (qm_maxima_indices, )
+            args = (qm_maxima_indices,)
         else:
-            args = (None, )
+            args = (None,)
 
         # Set as bound that the barriers should be positive
         bounds = (0, np.inf)
@@ -850,16 +851,14 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
         return {
-            'dihedral_angles':
-            np.array(fitted_dihedral_results['dihedral_angles']),
-            'qm_scan_kJpermol':
-            np.array(fitted_dihedral_results['qm_scan_kJpermol']),
-            'mm_scan_kJpermol':
-            np.array(fitted_dihedral_results['mm_scan_kJpermol']),
-            'maximum_difference':
-            self.fitting_summary['maximum_difference'],
-            'standard_deviation':
-            self.fitting_summary['standard_deviation'],
+            'dihedral_angles': np.array(
+                fitted_dihedral_results['dihedral_angles']),
+            'qm_scan_kJpermol': np.array(
+                fitted_dihedral_results['qm_scan_kJpermol']),
+            'mm_scan_kJpermol': np.array(
+                fitted_dihedral_results['mm_scan_kJpermol']),
+            'maximum_difference': self.fitting_summary['maximum_difference'],
+            'standard_deviation': self.fitting_summary['standard_deviation'],
         }
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
@@ -1357,6 +1356,7 @@ class MMForceFieldGenerator:
         pairs = {}
         for i, j in pairs_14:
             pairs[(i, j)] = {'comment': None}
+
         return bond_indices, angle_indices, dihedral_indices, pairs
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
@@ -1427,11 +1427,10 @@ class MMForceFieldGenerator:
                                                    dihedral_data['class2'],
                                                    dihedral_data['class3'],
                                                    dihedral_data['class4']):
-                                periodicity = int(
-                                    dihedral_data[f'periodicity1'])
-                                barrier = float(dihedral_data[f'k1'])
+                                periodicity = int(dihedral_data['periodicity1'])
+                                barrier = float(dihedral_data['k1'])
                                 phase = float(
-                                    dihedral_data[f'phase1']) / np.pi * 180.0
+                                    dihedral_data['phase1']) / np.pi * 180.0
                                 comment = self.get_dihedral_type_string(
                                     target_dihedral)
                                 improper_ordering = ordering
@@ -1487,10 +1486,10 @@ class MMForceFieldGenerator:
                                                        dihedral_data['class3'],
                                                        dihedral_data['class4']):
                                     periodicity = int(
-                                        dihedral_data[f'periodicity1'])
-                                    barrier = float(dihedral_data[f'k1'])
-                                    phase = float(dihedral_data[f'phase1']
-                                                  ) / np.pi * 180.0
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(
                                         target_dihedral)
                                     improper_ordering = ordering
@@ -1537,10 +1536,10 @@ class MMForceFieldGenerator:
                                                        dihedral_data['class3'],
                                                        dihedral_data['class4']):
                                     periodicity = int(
-                                        dihedral_data[f'periodicity1'])
-                                    barrier = float(dihedral_data[f'k1'])
-                                    phase = float(dihedral_data[f'phase1']
-                                                  ) / np.pi * 180.0
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(
                                         target_dihedral)
                                     improper_ordering = ordering
@@ -1604,10 +1603,13 @@ class MMForceFieldGenerator:
         use_uff = False
         use_tm = False
         use_water_model = False
-        sigmas = []
-        epsilons = []
+
+        # sigmas = []
+        # epsilons = []
+
         water_bonds = None
         water_angles = None
+
         # Atoms analysis
 
         atoms = {}
@@ -1670,7 +1672,7 @@ class MMForceFieldGenerator:
 
                 if element in self.tm_parameters:
                     tmmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
-                    tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.'  ##TODO: rephrase
+                    tmmsg += ' Taking transition metal parameters from literature.'
                     self.ostream.print_info(tmmsg)
                     sigma = self.tm_parameters[element]['sigma']
                     epsilon = self.tm_parameters[element]['epsilon']
@@ -1694,8 +1696,9 @@ class MMForceFieldGenerator:
                         False,
                         f'MMForceFieldGenerator: atom type {atom_type} not found in GAFF or UFF.'
                     )
-            sigmas.append(sigma)
-            epsilons.append(epsilon)
+
+            # sigmas.append(sigma)
+            # epsilons.append(epsilon)
 
             atoms[i] = {
                 'type': atom_type,
@@ -1739,9 +1742,9 @@ class MMForceFieldGenerator:
             self.ostream.flush()
 
         if use_tm:
-            self.ostream.print_info('Using TM parameters.')
+            self.ostream.print_info('Using transition metal parameters.')
             tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
-            tm_ref += 'J. Chem. Theory Comput. 2016 12 (8), 3681-3688.'
+            tm_ref += ' J. Chem. Theory Comput. 2016, 12, 3681-3688.'
             self.ostream.print_reference('Reference: ' + tm_ref)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -2104,7 +2107,7 @@ class MMForceFieldGenerator:
                             dihedral_data[f'periodicity{dih_param_idx}'])
                         barrier = float(dihedral_data[f'k{dih_param_idx}'])
                         phase = float(dihedral_data[f'phase{dih_param_idx}']
-                                      ) / np.pi * 180.0
+                                     ) / np.pi * 180.0
 
                         dihedral_barriers.append(barrier)
                         dihedral_phases.append(phase)
@@ -2273,7 +2276,7 @@ class MMForceFieldGenerator:
             ('nt', 'ns'): 'n ',
             ('nu', 'nv'): 'nh',
             ('n7', 'n8', 'n5', 'n6'): 'n3',
-            ('cs', ): 'c ',
+            ('cs',): 'c ',
         }
         new_at_2, new_at_3 = at_2, at_3
         for key, val in atom_types_mapping.items():
@@ -2466,7 +2469,7 @@ class MMForceFieldGenerator:
 
             # Check if any side atom of the bond is involved in a triple bond
             if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                            ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -2498,11 +2501,11 @@ class MMForceFieldGenerator:
         """
         Determines if the bond between atom_i and atom_j is part of a ring.
 
-        :param atom_i: 
+        :param atom_i:
             Index of the first atom in the bond.
-        :param atom_j: 
+        :param atom_j:
             Index of the second atom in the bond.
-        :return: 
+        :return:
             True if the bond is part of a ring, False otherwise.
         """
 
@@ -2771,12 +2774,13 @@ class MMForceFieldGenerator:
 
             f_top.write('\n#include "' + Path(itp_fname).name + '"\n')
 
-            ##TODO: change this to fit with the self.water_parameters -- e.g., if water_model in self.water_parameters
+            # TODO: change this to fit with the self.water_parameters
+            # e.g., if water_model in self.water_parameters
             if water_model is not None:
                 # very rudimentary check for water model names
                 assert_msg_critical(
-                    water_model.startswith('tip')
-                    or water_model.startswith('spc'),
+                    water_model.startswith('tip') or
+                    water_model.startswith('spc'),
                     'MMForceFieldGenerator.write_top: Invalid water model name')
                 assert_msg_critical(
                     amber_ff is not None, 'MMForceFieldGenerator.write_top: ' +
@@ -3041,12 +3045,11 @@ class MMForceFieldGenerator:
                 # Multiple sets of periodicity, phase, k
                 for i in range(len(dihedral_data['periodicity'])):
                     attributes.update({
-                        f"periodicity{i+1}":
-                        str(abs(dihedral_data['periodicity'][i])),
-                        f"phase{i+1}":
-                        str(dihedral_data['phase'][i] * np.pi / 180),
-                        f"k{i+1}":
-                        str(dihedral_data['barrier'][i])
+                        f"periodicity{i+1}": str(
+                            abs(dihedral_data['periodicity'][i])),
+                        f"phase{i+1}": str(dihedral_data['phase'][i] * np.pi /
+                                           180),
+                        f"k{i+1}": str(dihedral_data['barrier'][i])
                     })
 
                 ET.SubElement(Dihedrals, "Proper", **attributes)
@@ -3631,16 +3634,14 @@ class MMForceFieldGenerator:
             str: The JSON string representation of the forcefield data.
         """
         ff_data = {
-            "atoms":
-            forcefield.atoms,
-            "bonds":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
-            "angles":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
-            "dihedrals":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.dihedrals),
-            "impropers":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.impropers),
+            "atoms": forcefield.atoms,
+            "bonds": MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
+            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles
+                                                             ),
+            "dihedrals": MMForceFieldGenerator._tuple_to_str_key(
+                forcefield.dihedrals),
+            "impropers": MMForceFieldGenerator._tuple_to_str_key(
+                forcefield.impropers),
         }
         return json.dumps(ff_data, indent=4)
 
@@ -3684,7 +3685,7 @@ class MMForceFieldGenerator:
                 item = item.replace("(", "")
                 item = item.replace(")", "")
                 item = item.replace(" ", "")
-                tuple += (int(item), )
+                tuple += (int(item),)
             if len(tuple) == 1:
                 tuple = tuple[0]
             tup_keys.append(tuple)
