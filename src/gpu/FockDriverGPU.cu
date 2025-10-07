@@ -85,9 +85,9 @@
 namespace gpu {  // gpu namespace
 
 __global__ void
-zeroData(double* d_data, const uint32_t n)
+zeroData(double* d_data, const int32_t n)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t i = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (i < n) d_data[i] = 0.0;
 }
@@ -279,7 +279,7 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
@@ -292,7 +292,7 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
@@ -305,7 +305,7 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
@@ -347,50 +347,50 @@ computeQMatrixOnGPU(const CMolecule& molecule,
 
     double *d_mat_Q;
 
-    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
-    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
-    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
-    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
-    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
-    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+    int32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    int32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    int32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    int32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    int32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    int32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
     gpuSafe(gpuMalloc(&d_mat_Q, max_prim_pair_count_local * sizeof(double)));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     gpuSafe(gpuDeviceSynchronize());
 
@@ -411,10 +411,10 @@ computeQMatrixOnGPU(const CMolecule& molecule,
         gpu::computeQMatrixSS<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_ss_first_inds_local,
                            d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           static_cast<int32_t>(ss_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -442,12 +442,12 @@ computeQMatrixOnGPU(const CMolecule& molecule,
         gpu::computeQMatrixSP<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_sp_first_inds_local,
                            d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           static_cast<int32_t>(sp_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -474,12 +474,12 @@ computeQMatrixOnGPU(const CMolecule& molecule,
         gpu::computeQMatrixSD<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_sd_first_inds_local,
                            d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           static_cast<int32_t>(sd_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -506,10 +506,10 @@ computeQMatrixOnGPU(const CMolecule& molecule,
         gpu::computeQMatrixPP<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_pp_first_inds_local,
                            d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           static_cast<int32_t>(pp_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -537,12 +537,12 @@ computeQMatrixOnGPU(const CMolecule& molecule,
         gpu::computeQMatrixPD<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_pd_first_inds_local,
                            d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           static_cast<int32_t>(pd_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -569,10 +569,10 @@ computeQMatrixOnGPU(const CMolecule& molecule,
         gpu::computeQMatrixDD<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_dd_first_inds_local,
                            d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           static_cast<int32_t>(dd_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -730,7 +730,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
@@ -743,7 +743,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
@@ -756,7 +756,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
@@ -799,51 +799,51 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
 
     double *d_mat_S, *d_mat_T;
 
-    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
-    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
-    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
-    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
-    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
-    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+    int32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    int32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    int32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    int32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    int32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    int32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
     gpuSafe(gpuMalloc(&d_mat_S, max_prim_pair_count_local * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_T, max_prim_pair_count_local * sizeof(double)));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     S_matrices[gpu_id].zero();
     T_matrices[gpu_id].zero();
@@ -865,10 +865,10 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_ss_first_inds_local,
                            d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local));
+                           static_cast<int32_t>(ss_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -903,12 +903,12 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_sp_first_inds_local,
                            d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local));
+                           static_cast<int32_t>(sp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -950,12 +950,12 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_S,
                            d_mat_T,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_sd_first_inds_local,
                            d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local));
+                           static_cast<int32_t>(sd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_T.data(), d_mat_T, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -997,10 +997,10 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_S,
                            d_mat_T,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_pp_first_inds_local,
                            d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local));
+                           static_cast<int32_t>(pp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -1051,12 +1051,12 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_S,
                            d_mat_T,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_pd_first_inds_local,
                            d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local));
+                           static_cast<int32_t>(pd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_T.data(), d_mat_T, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -1105,10 +1105,10 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_S,
                            d_mat_T,
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_dd_first_inds_local,
                            d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local));
+                           static_cast<int32_t>(dd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_T.data(), d_mat_T, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -1278,7 +1278,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     EventWrapper copyEvent;
     eventList.reserve(6);
 
-    for (uint32_t i = 0; i < 6; i++)
+    for (int32_t i = 0; i < 6; i++)
     {
         eventList.emplace_back(EventWrapper{});
         eventList.back().createEvent();
@@ -1359,7 +1359,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
@@ -1372,7 +1372,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
@@ -1385,7 +1385,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
@@ -1427,50 +1427,50 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 
     double *d_mat_V;
 
-    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
-    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
-    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
-    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
-    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
-    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+    int32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    int32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    int32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    int32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    int32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    int32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
     gpuSafe(gpuMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     V_matrices[gpu_id].zero();
 
@@ -1495,12 +1495,12 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
         gpu::computeNuclearPotentialSS<<<num_blocks, threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_ss_first_inds_local,
                            d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           static_cast<int32_t>(ss_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(npoints),
+                           static_cast<int32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1531,14 +1531,14 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
         gpu::computeNuclearPotentialSP<<<num_blocks, threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_sp_first_inds_local,
                            d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           static_cast<int32_t>(sp_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(npoints),
+                           static_cast<int32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1577,14 +1577,14 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
         gpu::computeNuclearPotentialSD<<<num_blocks, threads_per_block>>>(
                            d_mat_V,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_sd_first_inds_local,
                            d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           static_cast<int32_t>(sd_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(npoints),
+                           static_cast<int32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1623,12 +1623,12 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
         gpu::computeNuclearPotentialPP<<<num_blocks, threads_per_block>>>(
                            d_mat_V,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_pp_first_inds_local,
                            d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           static_cast<int32_t>(pp_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(npoints),
+                           static_cast<int32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1675,14 +1675,14 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
         gpu::computeNuclearPotentialPD<<<num_blocks, threads_per_block>>>(
                            d_mat_V,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_pd_first_inds_local,
                            d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           static_cast<int32_t>(pd_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(npoints),
+                           static_cast<int32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1728,12 +1728,12 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
         gpu::computeNuclearPotentialDD<<<num_blocks, threads_per_block>>>(
                            d_mat_V,
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_dd_first_inds_local,
                            d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           static_cast<int32_t>(dd_prim_pair_count_local),
                            d_points_info,
-                           static_cast<uint32_t>(npoints),
+                           static_cast<int32_t>(npoints),
                            d_boys_func_table,
                            d_boys_func_ft);
 
@@ -1915,7 +1915,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
@@ -1928,7 +1928,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
@@ -1941,7 +1941,7 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
@@ -1985,52 +1985,52 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
 
     double *d_mat_MX, *d_mat_MY, *d_mat_MZ;
 
-    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
-    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
-    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
-    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
-    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
-    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+    int32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    int32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    int32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    int32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    int32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    int32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
     gpuSafe(gpuMalloc(&d_mat_MX, max_prim_pair_count_local * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_MY, max_prim_pair_count_local * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_MZ, max_prim_pair_count_local * sizeof(double)));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     MX_matrices[gpu_id].zero();
     MY_matrices[gpu_id].zero();
@@ -2058,10 +2058,10 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_ss_first_inds_local,
                            d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local));
+                           static_cast<int32_t>(ss_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2105,12 +2105,12 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_sp_first_inds_local,
                            d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local));
+                           static_cast<int32_t>(sp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2160,12 +2160,12 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_sd_first_inds_local,
                            d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local));
+                           static_cast<int32_t>(sd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2215,10 +2215,10 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_pp_first_inds_local,
                            d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local));
+                           static_cast<int32_t>(pp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2278,12 +2278,12 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_pd_first_inds_local,
                            d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local));
+                           static_cast<int32_t>(pd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2340,10 +2340,10 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_dd_first_inds_local,
                            d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local));
+                           static_cast<int32_t>(dd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2541,7 +2541,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
@@ -2554,7 +2554,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
@@ -2567,7 +2567,7 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
@@ -2611,52 +2611,52 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     double *d_mat_MX, *d_mat_MY, *d_mat_MZ;
 
-    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
-    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
-    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
-    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
-    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
-    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+    int32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    int32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    int32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    int32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    int32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    int32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
     gpuSafe(gpuMalloc(&d_mat_MX, max_prim_pair_count_local * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_MY, max_prim_pair_count_local * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_MZ, max_prim_pair_count_local * sizeof(double)));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     MX_matrices[gpu_id].zero();
     MY_matrices[gpu_id].zero();
@@ -2681,10 +2681,10 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_MY,
                            d_mat_MZ,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_ss_first_inds_local,
                            d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local));
+                           static_cast<int32_t>(ss_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2725,12 +2725,12 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_MY,
                            d_mat_MZ,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_sp_first_inds_local,
                            d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local));
+                           static_cast<int32_t>(sp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2777,12 +2777,12 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_MY,
                            d_mat_MZ,
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_sd_first_inds_local,
                            d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local));
+                           static_cast<int32_t>(sd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2829,10 +2829,10 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_MY,
                            d_mat_MZ,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_pp_first_inds_local,
                            d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local));
+                           static_cast<int32_t>(pp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2889,12 +2889,12 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_MY,
                            d_mat_MZ,
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_pd_first_inds_local,
                            d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local));
+                           static_cast<int32_t>(pd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -2948,10 +2948,10 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
                            d_mat_MY,
                            d_mat_MZ,
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_dd_first_inds_local,
                            d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local));
+                           static_cast<int32_t>(dd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -3150,7 +3150,7 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
@@ -3163,7 +3163,7 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
@@ -3176,7 +3176,7 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
@@ -3220,52 +3220,52 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     double *d_mat_MX, *d_mat_MY, *d_mat_MZ;
 
-    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
-    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
-    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
-    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
-    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
-    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+    int32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    int32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    int32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    int32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    int32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    int32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
     gpuSafe(gpuMalloc(&d_mat_MX, max_prim_pair_count_local * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_MY, max_prim_pair_count_local * sizeof(double)));
     gpuSafe(gpuMalloc(&d_mat_MZ, max_prim_pair_count_local * sizeof(double)));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
+    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(int32_t)));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     MX_matrices[gpu_id].zero();
     MY_matrices[gpu_id].zero();
@@ -3293,10 +3293,10 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_ss_first_inds_local,
                            d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local));
+                           static_cast<int32_t>(ss_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -3340,12 +3340,12 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_sp_first_inds_local,
                            d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local));
+                           static_cast<int32_t>(sp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -3395,12 +3395,12 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_s_prim_info,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_sd_first_inds_local,
                            d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local));
+                           static_cast<int32_t>(sd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -3450,10 +3450,10 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_pp_first_inds_local,
                            d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local));
+                           static_cast<int32_t>(pp_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -3513,12 +3513,12 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_pd_first_inds_local,
                            d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local));
+                           static_cast<int32_t>(pd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -3575,10 +3575,10 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
                            origin[1],
                            origin[2],
                            d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            d_dd_first_inds_local,
                            d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local));
+                           static_cast<int32_t>(dd_prim_pair_count_local));
 
         gpuSafe(gpuMemcpy(mat_MX.data(), d_mat_MX, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
         gpuSafe(gpuMemcpy(mat_MY.data(), d_mat_MY, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
@@ -3862,21 +3862,21 @@ computeFockOnGPU(const              CMolecule& molecule,
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
     // P gto block
 
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
     // D gto block
 
     std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
@@ -4093,7 +4093,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     std::vector<EventWrapper> eventListExchange;
     eventListCoulomb.reserve(6);
     eventListExchange.reserve(6);
-    for (uint32_t i = 0; i < 6; i++)
+    for (int32_t i = 0; i < 6; i++)
     {
         eventListCoulomb.emplace_back(EventWrapper{});
         eventListCoulomb.back().createEvent();
@@ -4154,9 +4154,9 @@ computeFockOnGPU(const              CMolecule& molecule,
     std::vector<double>   p_prim_info(5 * p_prim_count);
     std::vector<double>   d_prim_info(5 * d_prim_count);
 
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    std::vector<int32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<int32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<int32_t> d_prim_aoinds(6 * d_prim_count);
 
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
@@ -4165,24 +4165,24 @@ computeFockOnGPU(const              CMolecule& molecule,
     double*   d_data_spd_prim_info;
     gpuSafe(gpuMalloc(&d_data_spd_prim_info, (s_prim_info.size() + p_prim_info.size() + d_prim_info.size()) * sizeof(double)));
 
-    uint32_t* d_data_spd_prim_aoinds;
-    gpuSafe(gpuMalloc(&d_data_spd_prim_aoinds, (s_prim_aoinds.size() + p_prim_aoinds.size() + d_prim_aoinds.size())* sizeof(uint32_t)));
+    int32_t* d_data_spd_prim_aoinds;
+    gpuSafe(gpuMalloc(&d_data_spd_prim_aoinds, (s_prim_aoinds.size() + p_prim_aoinds.size() + d_prim_aoinds.size())* sizeof(int32_t)));
 
     double*   d_s_prim_info = d_data_spd_prim_info;
     double*   d_p_prim_info = d_s_prim_info + s_prim_info.size();
     double*   d_d_prim_info = d_p_prim_info + p_prim_info.size();
 
-    uint32_t* d_s_prim_aoinds = d_data_spd_prim_aoinds;
-    uint32_t* d_p_prim_aoinds = d_s_prim_aoinds + s_prim_aoinds.size();
-    uint32_t* d_d_prim_aoinds = d_p_prim_aoinds + p_prim_aoinds.size();
+    int32_t* d_s_prim_aoinds = d_data_spd_prim_aoinds;
+    int32_t* d_p_prim_aoinds = d_s_prim_aoinds + s_prim_aoinds.size();
+    int32_t* d_d_prim_aoinds = d_p_prim_aoinds + p_prim_aoinds.size();
 
     gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     omptimers[thread_id].stop("GTO block prep.");
 
@@ -4285,7 +4285,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // sorted Q, D, and indices on device
 
-    const uint32_t numCalculationBlocksCoulomb = 6;
+    const int32_t numCalculationBlocksCoulomb = 6;
 
     double *d_data_mat_D_J;
     gpuSafe(gpuMalloc(&d_data_mat_D_J, (max_prim_pair_count + max_prim_pair_count_local) * sizeof(double) * numCalculationBlocksCoulomb));
@@ -4308,7 +4308,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_pd_mat_Q = d_pp_mat_Q + pp_prim_pair_count;
     double *d_dd_mat_Q = d_pd_mat_Q + pd_prim_pair_count;
 
-    uint32_t *d_data_first_second_inds;
+    int32_t *d_data_first_second_inds;
     gpuSafe(gpuMalloc(&d_data_first_second_inds, (ss_prim_pair_count +
                                                   ss_prim_pair_count +
                                                   sp_prim_pair_count +
@@ -4320,20 +4320,20 @@ computeFockOnGPU(const              CMolecule& molecule,
                                                   pd_prim_pair_count +
                                                   pd_prim_pair_count +
                                                   dd_prim_pair_count +
-                                                  dd_prim_pair_count) * sizeof(uint32_t)));
+                                                  dd_prim_pair_count) * sizeof(int32_t)));
 
-    uint32_t *d_ss_first_inds  = d_data_first_second_inds;
-    uint32_t *d_ss_second_inds = d_ss_first_inds  + ss_prim_pair_count;
-    uint32_t *d_sp_first_inds  = d_ss_second_inds + ss_prim_pair_count;
-    uint32_t *d_sp_second_inds = d_sp_first_inds  + sp_prim_pair_count;
-    uint32_t *d_sd_first_inds  = d_sp_second_inds + sp_prim_pair_count;
-    uint32_t *d_sd_second_inds = d_sd_first_inds  + sd_prim_pair_count;
-    uint32_t *d_pp_first_inds  = d_sd_second_inds + sd_prim_pair_count;
-    uint32_t *d_pp_second_inds = d_pp_first_inds  + pp_prim_pair_count;
-    uint32_t *d_pd_first_inds  = d_pp_second_inds + pp_prim_pair_count;
-    uint32_t *d_pd_second_inds = d_pd_first_inds  + pd_prim_pair_count;
-    uint32_t *d_dd_first_inds  = d_pd_second_inds + pd_prim_pair_count;
-    uint32_t *d_dd_second_inds = d_dd_first_inds  + dd_prim_pair_count;
+    int32_t *d_ss_first_inds  = d_data_first_second_inds;
+    int32_t *d_ss_second_inds = d_ss_first_inds  + ss_prim_pair_count;
+    int32_t *d_sp_first_inds  = d_ss_second_inds + ss_prim_pair_count;
+    int32_t *d_sp_second_inds = d_sp_first_inds  + sp_prim_pair_count;
+    int32_t *d_sd_first_inds  = d_sp_second_inds + sp_prim_pair_count;
+    int32_t *d_sd_second_inds = d_sd_first_inds  + sd_prim_pair_count;
+    int32_t *d_pp_first_inds  = d_sd_second_inds + sd_prim_pair_count;
+    int32_t *d_pp_second_inds = d_pp_first_inds  + pp_prim_pair_count;
+    int32_t *d_pd_first_inds  = d_pp_second_inds + pp_prim_pair_count;
+    int32_t *d_pd_second_inds = d_pd_first_inds  + pd_prim_pair_count;
+    int32_t *d_dd_first_inds  = d_pd_second_inds + pd_prim_pair_count;
+    int32_t *d_dd_second_inds = d_dd_first_inds  + dd_prim_pair_count;
 
     double *d_data_pair_data;
     gpuSafe(gpuMalloc(&d_data_pair_data, (ss_pair_data.size() +
@@ -4365,7 +4365,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_pd_mat_Q_local = d_pp_mat_Q_local + pp_prim_pair_count_local;
     double *d_dd_mat_Q_local = d_pd_mat_Q_local + pd_prim_pair_count_local;
 
-    uint32_t *d_data_first_second_inds_local;
+    int32_t *d_data_first_second_inds_local;
     gpuSafe(gpuMalloc(&d_data_first_second_inds_local, (ss_prim_pair_count_local +
                                                         ss_prim_pair_count_local +
                                                         sp_prim_pair_count_local +
@@ -4377,20 +4377,20 @@ computeFockOnGPU(const              CMolecule& molecule,
                                                         pd_prim_pair_count_local +
                                                         pd_prim_pair_count_local +
                                                         dd_prim_pair_count_local +
-                                                        dd_prim_pair_count_local) * sizeof(uint32_t)));
+                                                        dd_prim_pair_count_local) * sizeof(int32_t)));
 
-    uint32_t *d_ss_first_inds_local  = d_data_first_second_inds_local;
-    uint32_t *d_ss_second_inds_local = d_ss_first_inds_local  + ss_prim_pair_count_local;
-    uint32_t *d_sp_first_inds_local  = d_ss_second_inds_local + ss_prim_pair_count_local;
-    uint32_t *d_sp_second_inds_local = d_sp_first_inds_local  + sp_prim_pair_count_local;
-    uint32_t *d_sd_first_inds_local  = d_sp_second_inds_local + sp_prim_pair_count_local;
-    uint32_t *d_sd_second_inds_local = d_sd_first_inds_local  + sd_prim_pair_count_local;
-    uint32_t *d_pp_first_inds_local  = d_sd_second_inds_local + sd_prim_pair_count_local;
-    uint32_t *d_pp_second_inds_local = d_pp_first_inds_local  + pp_prim_pair_count_local;
-    uint32_t *d_pd_first_inds_local  = d_pp_second_inds_local + pp_prim_pair_count_local;
-    uint32_t *d_pd_second_inds_local = d_pd_first_inds_local  + pd_prim_pair_count_local;
-    uint32_t *d_dd_first_inds_local  = d_pd_second_inds_local + pd_prim_pair_count_local;
-    uint32_t *d_dd_second_inds_local = d_dd_first_inds_local  + dd_prim_pair_count_local;
+    int32_t *d_ss_first_inds_local  = d_data_first_second_inds_local;
+    int32_t *d_ss_second_inds_local = d_ss_first_inds_local  + ss_prim_pair_count_local;
+    int32_t *d_sp_first_inds_local  = d_ss_second_inds_local + ss_prim_pair_count_local;
+    int32_t *d_sp_second_inds_local = d_sp_first_inds_local  + sp_prim_pair_count_local;
+    int32_t *d_sd_first_inds_local  = d_sp_second_inds_local + sp_prim_pair_count_local;
+    int32_t *d_sd_second_inds_local = d_sd_first_inds_local  + sd_prim_pair_count_local;
+    int32_t *d_pp_first_inds_local  = d_sd_second_inds_local + sd_prim_pair_count_local;
+    int32_t *d_pp_second_inds_local = d_pp_first_inds_local  + pp_prim_pair_count_local;
+    int32_t *d_pd_first_inds_local  = d_pp_second_inds_local + pp_prim_pair_count_local;
+    int32_t *d_pd_second_inds_local = d_pd_first_inds_local  + pd_prim_pair_count_local;
+    int32_t *d_dd_first_inds_local  = d_pd_second_inds_local + pd_prim_pair_count_local;
+    int32_t *d_dd_second_inds_local = d_dd_first_inds_local  + dd_prim_pair_count_local;
 
     double *d_data_pair_data_local;
     gpuSafe(gpuMalloc(&d_data_pair_data_local, (ss_pair_data_local.size() +
@@ -4408,27 +4408,27 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_dd_pair_data_local = d_pd_pair_data_local + pd_pair_data_local.size();
 
     {
-        const uint32_t offset = max_prim_pair_count * 0;
+        const int32_t offset = max_prim_pair_count * 0;
         gpuSafe(gpuMemcpy(d_mat_D + offset, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
     }
     {
-        const uint32_t offset = max_prim_pair_count * 1;
+        const int32_t offset = max_prim_pair_count * 1;
         gpuSafe(gpuMemcpy(d_mat_D + offset, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
     }
     {
-        const uint32_t offset = max_prim_pair_count * 2;
+        const int32_t offset = max_prim_pair_count * 2;
         gpuSafe(gpuMemcpy(d_mat_D + offset, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
     }
     {
-        const uint32_t offset = max_prim_pair_count * 3;
+        const int32_t offset = max_prim_pair_count * 3;
         gpuSafe(gpuMemcpy(d_mat_D + offset, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
     }
     {
-        const uint32_t offset = max_prim_pair_count * 4;
+        const int32_t offset = max_prim_pair_count * 4;
         gpuSafe(gpuMemcpy(d_mat_D + offset, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
     }
     {
-        const uint32_t offset = max_prim_pair_count * 5;
+        const int32_t offset = max_prim_pair_count * 5;
         gpuSafe(gpuMemcpy(d_mat_D + offset, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
     }
 
@@ -4439,18 +4439,18 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMemcpy(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     gpuSafe(gpuMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
@@ -4466,18 +4466,18 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMemcpy(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size()  * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     gpuSafe(gpuMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
@@ -4574,24 +4574,24 @@ computeFockOnGPU(const              CMolecule& molecule,
     const auto& pair_inds_i_for_K_dd = screening.get_local_pair_inds_i_for_K_dd(gpu_id);
     const auto& pair_inds_k_for_K_dd = screening.get_local_pair_inds_k_for_K_dd(gpu_id);
 
-    auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
-    auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
-    auto pair_inds_count_for_K_sd = static_cast<uint32_t>(pair_inds_i_for_K_sd.size());
-    auto pair_inds_count_for_K_pp = static_cast<uint32_t>(pair_inds_i_for_K_pp.size());
-    auto pair_inds_count_for_K_pd = static_cast<uint32_t>(pair_inds_i_for_K_pd.size());
-    auto pair_inds_count_for_K_dd = static_cast<uint32_t>(pair_inds_i_for_K_dd.size());
+    auto pair_inds_count_for_K_ss = static_cast<int32_t>(pair_inds_i_for_K_ss.size());
+    auto pair_inds_count_for_K_sp = static_cast<int32_t>(pair_inds_i_for_K_sp.size());
+    auto pair_inds_count_for_K_sd = static_cast<int32_t>(pair_inds_i_for_K_sd.size());
+    auto pair_inds_count_for_K_pp = static_cast<int32_t>(pair_inds_i_for_K_pp.size());
+    auto pair_inds_count_for_K_pd = static_cast<int32_t>(pair_inds_i_for_K_pd.size());
+    auto pair_inds_count_for_K_dd = static_cast<int32_t>(pair_inds_i_for_K_dd.size());
 
     const auto max_pair_inds_count = std::max({pair_inds_count_for_K_ss, pair_inds_count_for_K_sp, pair_inds_count_for_K_pp,
                                                pair_inds_count_for_K_sd, pair_inds_count_for_K_pd, pair_inds_count_for_K_dd});
 
     VeloxHostVector<double> mat_K(max_pair_inds_count);
 
-    const uint32_t numCalculationBlocksExchange = 6;
+    const int32_t numCalculationBlocksExchange = 6;
 
     double*   d_mat_K;
     gpuSafe(gpuMalloc(&d_mat_K, max_pair_inds_count * sizeof(double) * numCalculationBlocksExchange));
 
-    uint32_t *d_data_pair_inds_for_K;
+    int32_t *d_data_pair_inds_for_K;
     gpuSafe(gpuMalloc(&d_data_pair_inds_for_K, (pair_inds_count_for_K_ss +
                                                 pair_inds_count_for_K_ss +
                                                 pair_inds_count_for_K_sp +
@@ -4603,33 +4603,33 @@ computeFockOnGPU(const              CMolecule& molecule,
                                                 pair_inds_count_for_K_pd +
                                                 pair_inds_count_for_K_pd +
                                                 pair_inds_count_for_K_dd +
-                                                pair_inds_count_for_K_dd) * sizeof(uint32_t)));
+                                                pair_inds_count_for_K_dd) * sizeof(int32_t)));
 
-    uint32_t *d_pair_inds_i_for_K_ss = d_data_pair_inds_for_K;
-    uint32_t *d_pair_inds_k_for_K_ss = d_pair_inds_i_for_K_ss + pair_inds_count_for_K_ss;
-    uint32_t *d_pair_inds_i_for_K_sp = d_pair_inds_k_for_K_ss + pair_inds_count_for_K_ss;
-    uint32_t *d_pair_inds_k_for_K_sp = d_pair_inds_i_for_K_sp + pair_inds_count_for_K_sp;
-    uint32_t *d_pair_inds_i_for_K_sd = d_pair_inds_k_for_K_sp + pair_inds_count_for_K_sp;
-    uint32_t *d_pair_inds_k_for_K_sd = d_pair_inds_i_for_K_sd + pair_inds_count_for_K_sd;
-    uint32_t *d_pair_inds_i_for_K_pp = d_pair_inds_k_for_K_sd + pair_inds_count_for_K_sd;
-    uint32_t *d_pair_inds_k_for_K_pp = d_pair_inds_i_for_K_pp + pair_inds_count_for_K_pp;
-    uint32_t *d_pair_inds_i_for_K_pd = d_pair_inds_k_for_K_pp + pair_inds_count_for_K_pp;
-    uint32_t *d_pair_inds_k_for_K_pd = d_pair_inds_i_for_K_pd + pair_inds_count_for_K_pd;
-    uint32_t *d_pair_inds_i_for_K_dd = d_pair_inds_k_for_K_pd + pair_inds_count_for_K_pd;
-    uint32_t *d_pair_inds_k_for_K_dd = d_pair_inds_i_for_K_dd + pair_inds_count_for_K_dd;
+    int32_t *d_pair_inds_i_for_K_ss = d_data_pair_inds_for_K;
+    int32_t *d_pair_inds_k_for_K_ss = d_pair_inds_i_for_K_ss + pair_inds_count_for_K_ss;
+    int32_t *d_pair_inds_i_for_K_sp = d_pair_inds_k_for_K_ss + pair_inds_count_for_K_ss;
+    int32_t *d_pair_inds_k_for_K_sp = d_pair_inds_i_for_K_sp + pair_inds_count_for_K_sp;
+    int32_t *d_pair_inds_i_for_K_sd = d_pair_inds_k_for_K_sp + pair_inds_count_for_K_sp;
+    int32_t *d_pair_inds_k_for_K_sd = d_pair_inds_i_for_K_sd + pair_inds_count_for_K_sd;
+    int32_t *d_pair_inds_i_for_K_pp = d_pair_inds_k_for_K_sd + pair_inds_count_for_K_sd;
+    int32_t *d_pair_inds_k_for_K_pp = d_pair_inds_i_for_K_pp + pair_inds_count_for_K_pp;
+    int32_t *d_pair_inds_i_for_K_pd = d_pair_inds_k_for_K_pp + pair_inds_count_for_K_pp;
+    int32_t *d_pair_inds_k_for_K_pd = d_pair_inds_i_for_K_pd + pair_inds_count_for_K_pd;
+    int32_t *d_pair_inds_i_for_K_dd = d_pair_inds_k_for_K_pd + pair_inds_count_for_K_pd;
+    int32_t *d_pair_inds_k_for_K_dd = d_pair_inds_i_for_K_dd + pair_inds_count_for_K_dd;
 
-    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_ss, pair_inds_i_for_K_ss.data(), pair_inds_i_for_K_ss.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_ss, pair_inds_k_for_K_ss.data(), pair_inds_k_for_K_ss.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_sp, pair_inds_i_for_K_sp.data(), pair_inds_i_for_K_sp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_k_for_K_sp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_sd, pair_inds_i_for_K_sd.data(), pair_inds_i_for_K_sd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_sd, pair_inds_k_for_K_sd.data(), pair_inds_k_for_K_sd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_pp, pair_inds_i_for_K_pp.data(), pair_inds_i_for_K_pp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_pp, pair_inds_k_for_K_pp.data(), pair_inds_k_for_K_pp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_pd, pair_inds_i_for_K_pd.data(), pair_inds_i_for_K_pd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_pd, pair_inds_k_for_K_pd.data(), pair_inds_k_for_K_pd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_i_for_K_dd, pair_inds_i_for_K_dd.data(), pair_inds_i_for_K_dd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_inds_k_for_K_dd, pair_inds_k_for_K_dd.data(), pair_inds_k_for_K_dd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     double* d_mat_D_full_AO;
     gpuSafe(gpuMalloc(&d_mat_D_full_AO, cart_naos * cart_naos * sizeof(double)));
@@ -4655,7 +4655,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_Q_K_dp = d_Q_K_pd + Q_K_pd.size();
     double *d_Q_K_dd = d_Q_K_dp + Q_K_dp.size();
 
-    uint32_t *d_data_D_inds_K;
+    int32_t *d_data_D_inds_K;
     gpuSafe(gpuMalloc(&d_data_D_inds_K, (D_inds_K_ss.size() +
                                          D_inds_K_sp.size() +
                                          D_inds_K_ps.size() +
@@ -4664,19 +4664,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                                          D_inds_K_pp.size() +
                                          D_inds_K_pd.size() +
                                          D_inds_K_dp.size() +
-                                         D_inds_K_dd.size()) * sizeof(uint32_t)));
+                                         D_inds_K_dd.size()) * sizeof(int32_t)));
 
-    uint32_t *d_D_inds_K_ss = d_data_D_inds_K;
-    uint32_t *d_D_inds_K_sp = d_D_inds_K_ss + D_inds_K_ss.size();
-    uint32_t *d_D_inds_K_ps = d_D_inds_K_sp + D_inds_K_sp.size();
-    uint32_t *d_D_inds_K_sd = d_D_inds_K_ps + D_inds_K_ps.size();
-    uint32_t *d_D_inds_K_ds = d_D_inds_K_sd + D_inds_K_sd.size();
-    uint32_t *d_D_inds_K_pp = d_D_inds_K_ds + D_inds_K_ds.size();
-    uint32_t *d_D_inds_K_pd = d_D_inds_K_pp + D_inds_K_pp.size();
-    uint32_t *d_D_inds_K_dp = d_D_inds_K_pd + D_inds_K_pd.size();
-    uint32_t *d_D_inds_K_dd = d_D_inds_K_dp + D_inds_K_dp.size();
+    int32_t *d_D_inds_K_ss = d_data_D_inds_K;
+    int32_t *d_D_inds_K_sp = d_D_inds_K_ss + D_inds_K_ss.size();
+    int32_t *d_D_inds_K_ps = d_D_inds_K_sp + D_inds_K_sp.size();
+    int32_t *d_D_inds_K_sd = d_D_inds_K_ps + D_inds_K_ps.size();
+    int32_t *d_D_inds_K_ds = d_D_inds_K_sd + D_inds_K_sd.size();
+    int32_t *d_D_inds_K_pp = d_D_inds_K_ds + D_inds_K_ds.size();
+    int32_t *d_D_inds_K_pd = d_D_inds_K_pp + D_inds_K_pp.size();
+    int32_t *d_D_inds_K_dp = d_D_inds_K_pd + D_inds_K_pd.size();
+    int32_t *d_D_inds_K_dd = d_D_inds_K_dp + D_inds_K_dp.size();
 
-    uint32_t *d_data_pair_counts_displs_K;
+    int32_t *d_data_pair_counts_displs_K;
     gpuSafe(gpuMalloc(&d_data_pair_counts_displs_K, (pair_counts_K_ss.size() +
                                                      pair_counts_K_sp.size() +
                                                      pair_counts_K_ps.size() +
@@ -4694,26 +4694,26 @@ computeFockOnGPU(const              CMolecule& molecule,
                                                      pair_displs_K_pp.size() +
                                                      pair_displs_K_pd.size() +
                                                      pair_displs_K_dp.size() +
-                                                     pair_displs_K_dd.size()) * sizeof(uint32_t)));
+                                                     pair_displs_K_dd.size()) * sizeof(int32_t)));
 
-    uint32_t *d_pair_counts_K_ss = d_data_pair_counts_displs_K;
-    uint32_t *d_pair_counts_K_sp = d_pair_counts_K_ss + pair_counts_K_ss.size();
-    uint32_t *d_pair_counts_K_ps = d_pair_counts_K_sp + pair_counts_K_sp.size();
-    uint32_t *d_pair_counts_K_sd = d_pair_counts_K_ps + pair_counts_K_ps.size();
-    uint32_t *d_pair_counts_K_ds = d_pair_counts_K_sd + pair_counts_K_sd.size();
-    uint32_t *d_pair_counts_K_pp = d_pair_counts_K_ds + pair_counts_K_ds.size();
-    uint32_t *d_pair_counts_K_pd = d_pair_counts_K_pp + pair_counts_K_pp.size();
-    uint32_t *d_pair_counts_K_dp = d_pair_counts_K_pd + pair_counts_K_pd.size();
-    uint32_t *d_pair_counts_K_dd = d_pair_counts_K_dp + pair_counts_K_dp.size();
-    uint32_t *d_pair_displs_K_ss = d_pair_counts_K_dd + pair_counts_K_dd.size();
-    uint32_t *d_pair_displs_K_sp = d_pair_displs_K_ss + pair_displs_K_ss.size();
-    uint32_t *d_pair_displs_K_ps = d_pair_displs_K_sp + pair_displs_K_sp.size();
-    uint32_t *d_pair_displs_K_sd = d_pair_displs_K_ps + pair_displs_K_ps.size();
-    uint32_t *d_pair_displs_K_ds = d_pair_displs_K_sd + pair_displs_K_sd.size();
-    uint32_t *d_pair_displs_K_pp = d_pair_displs_K_ds + pair_displs_K_ds.size();
-    uint32_t *d_pair_displs_K_pd = d_pair_displs_K_pp + pair_displs_K_pp.size();
-    uint32_t *d_pair_displs_K_dp = d_pair_displs_K_pd + pair_displs_K_pd.size();
-    uint32_t *d_pair_displs_K_dd = d_pair_displs_K_dp + pair_displs_K_dp.size();
+    int32_t *d_pair_counts_K_ss = d_data_pair_counts_displs_K;
+    int32_t *d_pair_counts_K_sp = d_pair_counts_K_ss + pair_counts_K_ss.size();
+    int32_t *d_pair_counts_K_ps = d_pair_counts_K_sp + pair_counts_K_sp.size();
+    int32_t *d_pair_counts_K_sd = d_pair_counts_K_ps + pair_counts_K_ps.size();
+    int32_t *d_pair_counts_K_ds = d_pair_counts_K_sd + pair_counts_K_sd.size();
+    int32_t *d_pair_counts_K_pp = d_pair_counts_K_ds + pair_counts_K_ds.size();
+    int32_t *d_pair_counts_K_pd = d_pair_counts_K_pp + pair_counts_K_pp.size();
+    int32_t *d_pair_counts_K_dp = d_pair_counts_K_pd + pair_counts_K_pd.size();
+    int32_t *d_pair_counts_K_dd = d_pair_counts_K_dp + pair_counts_K_dp.size();
+    int32_t *d_pair_displs_K_ss = d_pair_counts_K_dd + pair_counts_K_dd.size();
+    int32_t *d_pair_displs_K_sp = d_pair_displs_K_ss + pair_displs_K_ss.size();
+    int32_t *d_pair_displs_K_ps = d_pair_displs_K_sp + pair_displs_K_sp.size();
+    int32_t *d_pair_displs_K_sd = d_pair_displs_K_ps + pair_displs_K_ps.size();
+    int32_t *d_pair_displs_K_ds = d_pair_displs_K_sd + pair_displs_K_sd.size();
+    int32_t *d_pair_displs_K_pp = d_pair_displs_K_ds + pair_displs_K_ds.size();
+    int32_t *d_pair_displs_K_pd = d_pair_displs_K_pp + pair_displs_K_pp.size();
+    int32_t *d_pair_displs_K_dp = d_pair_displs_K_pd + pair_displs_K_pd.size();
+    int32_t *d_pair_displs_K_dd = d_pair_displs_K_dp + pair_displs_K_dp.size();
 
     double *d_data_pair_data_K;
     gpuSafe(gpuMalloc(&d_data_pair_data_K, (pair_data_K_ss.size() +
@@ -4748,35 +4748,35 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuMemcpy(d_Q_K_dp, Q_K_dp.data(), Q_K_dp.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_Q_K_dd, Q_K_dd.data(), Q_K_dd.size() * sizeof(double), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_ss, D_inds_K_ss.data(), D_inds_K_ss.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_sp, D_inds_K_sp.data(), D_inds_K_sp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_ps, D_inds_K_ps.data(), D_inds_K_ps.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_sd, D_inds_K_sd.data(), D_inds_K_sd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_ds, D_inds_K_ds.data(), D_inds_K_ds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_pp, D_inds_K_pp.data(), D_inds_K_pp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_pd, D_inds_K_pd.data(), D_inds_K_pd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_dp, D_inds_K_dp.data(), D_inds_K_dp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_D_inds_K_dd, D_inds_K_dd.data(), D_inds_K_dd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_ss, pair_displs_K_ss.data(), pair_displs_K_ss.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_sp, pair_displs_K_sp.data(), pair_displs_K_sp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_ps, pair_displs_K_ps.data(), pair_displs_K_ps.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_sd, pair_displs_K_sd.data(), pair_displs_K_sd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_ds, pair_displs_K_ds.data(), pair_displs_K_ds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_pp, pair_displs_K_pp.data(), pair_displs_K_pp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_pd, pair_displs_K_pd.data(), pair_displs_K_pd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_dp, pair_displs_K_dp.data(), pair_displs_K_dp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_displs_K_dd, pair_displs_K_dd.data(), pair_displs_K_dd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_ss, pair_counts_K_ss.data(), pair_counts_K_ss.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_sp, pair_counts_K_sp.data(), pair_counts_K_sp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_ps, pair_counts_K_ps.data(), pair_counts_K_ps.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_sd, pair_counts_K_sd.data(), pair_counts_K_sd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_ds, pair_counts_K_ds.data(), pair_counts_K_ds.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_pp, pair_counts_K_pp.data(), pair_counts_K_pp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_pd, pair_counts_K_pd.data(), pair_counts_K_pd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_dp, pair_counts_K_dp.data(), pair_counts_K_dp.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pair_counts_K_dd, pair_counts_K_dd.data(), pair_counts_K_dd.size() * sizeof(int32_t), gpuMemcpyHostToDevice));
 
     gpuSafe(gpuMemcpy(d_pair_data_K_ss, pair_data_K_ss.data(), pair_data_K_ss.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_pair_data_K_sp, pair_data_K_sp.data(), pair_data_K_sp.size() * sizeof(double), gpuMemcpyHostToDevice));
@@ -4812,7 +4812,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         const dim3 num_blocks(((max_prim_pair_count_local * numCalculationBlocksCoulomb) + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(d_mat_J, static_cast<uint32_t>(max_prim_pair_count_local * numCalculationBlocksCoulomb));
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(d_mat_J, static_cast<int32_t>(max_prim_pair_count_local * numCalculationBlocksCoulomb));
     }
 
     // J: S-S block
@@ -4821,7 +4821,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         timer.start("  J block SS");
 
-        const uint32_t offsetJ = 0 * max_prim_pair_count_local;
+        const int32_t offsetJ = 0 * max_prim_pair_count_local;
 
         // set up thread blocks for J
 
@@ -4834,25 +4834,25 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 0 * max_prim_pair_count;
+            const int32_t offsetD = 0 * max_prim_pair_count;
 
             //omptimers[thread_id].start("    J block SSSS");
 
             gpu::computeCoulombFockSSSS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_mat_D + offsetD,
                                d_ss_mat_Q_local,
                                d_ss_mat_Q,
                                d_ss_first_inds_local,
                                d_ss_second_inds_local,
                                d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               static_cast<int32_t>(ss_prim_pair_count_local),
                                d_ss_first_inds,
                                d_ss_second_inds,
                                d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
+                               static_cast<int32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -4865,25 +4865,25 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 1 * max_prim_pair_count;
+            const int32_t offsetD = 1 * max_prim_pair_count;
 
             gpu::computeCoulombFockSSSP<<<num_blocks, threads_per_block,0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_ss_mat_Q_local,
                                d_sp_mat_Q,
                                d_ss_first_inds_local,
                                d_ss_second_inds_local,
                                d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               static_cast<int32_t>(ss_prim_pair_count_local),
                                d_sp_first_inds,
                                d_sp_second_inds,
                                d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
+                               static_cast<int32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -4894,25 +4894,25 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 2 * max_prim_pair_count;
+            const int32_t offsetD = 2 * max_prim_pair_count;
 
             gpu::computeCoulombFockSSSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_ss_mat_Q_local,
                                d_sd_mat_Q,
                                d_ss_first_inds_local,
                                d_ss_second_inds_local,
                                d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               static_cast<int32_t>(ss_prim_pair_count_local),
                                d_sd_first_inds,
                                d_sd_second_inds,
                                d_sd_pair_data,
-                               static_cast<uint32_t>(sd_prim_pair_count),
+                               static_cast<int32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -4923,25 +4923,25 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 3 * max_prim_pair_count;
+            const int32_t offsetD = 3 * max_prim_pair_count;
 
             gpu::computeCoulombFockSSPP<<<num_blocks, threads_per_block,0 , streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_ss_mat_Q_local,
                                d_pp_mat_Q,
                                d_ss_first_inds_local,
                                d_ss_second_inds_local,
                                d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               static_cast<int32_t>(ss_prim_pair_count_local),
                                d_pp_first_inds,
                                d_pp_second_inds,
                                d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
+                               static_cast<int32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -4952,27 +4952,27 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 4 * max_prim_pair_count;
+            const int32_t offsetD = 4 * max_prim_pair_count;
 
             gpu::computeCoulombFockSSPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_ss_mat_Q_local,
                                d_pd_mat_Q,
                                d_ss_first_inds_local,
                                d_ss_second_inds_local,
                                d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               static_cast<int32_t>(ss_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -4983,25 +4983,25 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 5 * max_prim_pair_count;
+            const int32_t offsetD = 5 * max_prim_pair_count;
 
             gpu::computeCoulombFockSSDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_ss_mat_Q_local,
                                d_dd_mat_Q,
                                d_ss_first_inds_local,
                                d_ss_second_inds_local,
                                d_ss_pair_data_local,
-                               static_cast<uint32_t>(ss_prim_pair_count_local),
+                               static_cast<int32_t>(ss_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5018,7 +5018,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  J block SP");
 
-        const uint32_t offsetJ = 1 * max_prim_pair_count_local;
+        const int32_t offsetJ = 1 * max_prim_pair_count_local;
 
         // set up thread blocks for J
 
@@ -5031,24 +5031,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 0 * max_prim_pair_count;
+            const int32_t offsetD = 0 * max_prim_pair_count;
             gpu::computeCoulombFockSPSS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_sp_mat_Q_local,
                                d_ss_mat_Q,
                                d_sp_first_inds_local,
                                d_sp_second_inds_local,
                                d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               static_cast<int32_t>(sp_prim_pair_count_local),
                                d_ss_first_inds,
                                d_ss_second_inds,
                                d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
+                               static_cast<int32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5059,24 +5059,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 1 * max_prim_pair_count;
+            const int32_t offsetD = 1 * max_prim_pair_count;
             gpu::computeCoulombFockSPSP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_sp_mat_Q_local,
                                d_sp_mat_Q,
                                d_sp_first_inds_local,
                                d_sp_second_inds_local,
                                d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               static_cast<int32_t>(sp_prim_pair_count_local),
                                d_sp_first_inds,
                                d_sp_second_inds,
                                d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
+                               static_cast<int32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5087,26 +5087,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 2 * max_prim_pair_count;
+            const int32_t offsetD = 2 * max_prim_pair_count;
             gpu::computeCoulombFockSPSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sp_mat_Q_local,
                                d_sd_mat_Q,
                                d_sp_first_inds_local,
                                d_sp_second_inds_local,
                                d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               static_cast<int32_t>(sp_prim_pair_count_local),
                                d_sd_first_inds,
                                d_sd_second_inds,
                                d_sd_pair_data,
-                               static_cast<uint32_t>(sd_prim_pair_count),
+                               static_cast<int32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5117,24 +5117,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 3 * max_prim_pair_count;
+            const int32_t offsetD = 3 * max_prim_pair_count;
             gpu::computeCoulombFockSPPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_sp_mat_Q_local,
                                d_pp_mat_Q,
                                d_sp_first_inds_local,
                                d_sp_second_inds_local,
                                d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               static_cast<int32_t>(sp_prim_pair_count_local),
                                d_pp_first_inds,
                                d_pp_second_inds,
                                d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
+                               static_cast<int32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5145,26 +5145,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 4 * max_prim_pair_count;
+            const int32_t offsetD = 4 * max_prim_pair_count;
             gpu::computeCoulombFockSPPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sp_mat_Q_local,
                                d_pd_mat_Q,
                                d_sp_first_inds_local,
                                d_sp_second_inds_local,
                                d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               static_cast<int32_t>(sp_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5175,26 +5175,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 5 * max_prim_pair_count;
+            const int32_t offsetD = 5 * max_prim_pair_count;
             gpu::computeCoulombFockSPDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sp_mat_Q_local,
                                d_dd_mat_Q,
                                d_sp_first_inds_local,
                                d_sp_second_inds_local,
                                d_sp_pair_data_local,
-                               static_cast<uint32_t>(sp_prim_pair_count_local),
+                               static_cast<int32_t>(sp_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5211,7 +5211,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  J block PP");
 
-        const uint32_t offsetJ = 2 * max_prim_pair_count_local;
+        const int32_t offsetJ = 2 * max_prim_pair_count_local;
 
         // set up thread blocks for J
 
@@ -5224,24 +5224,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 0 * max_prim_pair_count;
+            const int32_t offsetD = 0 * max_prim_pair_count;
             gpu::computeCoulombFockPPSS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_pp_mat_Q_local,
                                d_ss_mat_Q,
                                d_pp_first_inds_local,
                                d_pp_second_inds_local,
                                d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               static_cast<int32_t>(pp_prim_pair_count_local),
                                d_ss_first_inds,
                                d_ss_second_inds,
                                d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
+                               static_cast<int32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5252,24 +5252,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 1 * max_prim_pair_count;
+            const int32_t offsetD = 1 * max_prim_pair_count;
             gpu::computeCoulombFockPPSP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_pp_mat_Q_local,
                                d_sp_mat_Q,
                                d_pp_first_inds_local,
                                d_pp_second_inds_local,
                                d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               static_cast<int32_t>(pp_prim_pair_count_local),
                                d_sp_first_inds,
                                d_sp_second_inds,
                                d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
+                               static_cast<int32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5280,26 +5280,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 2 * max_prim_pair_count;
+            const int32_t offsetD = 2 * max_prim_pair_count;
             gpu::computeCoulombFockPPSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pp_mat_Q_local,
                                d_sd_mat_Q,
                                d_pp_first_inds_local,
                                d_pp_second_inds_local,
                                d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               static_cast<int32_t>(pp_prim_pair_count_local),
                                d_sd_first_inds,
                                d_sd_second_inds,
                                d_sd_pair_data,
-                               static_cast<uint32_t>(sd_prim_pair_count),
+                               static_cast<int32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5310,22 +5310,22 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 3 * max_prim_pair_count;
+            const int32_t offsetD = 3 * max_prim_pair_count;
             gpu::computeCoulombFockPPPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_mat_D + offsetD,
                                d_pp_mat_Q_local,
                                d_pp_mat_Q,
                                d_pp_first_inds_local,
                                d_pp_second_inds_local,
                                d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               static_cast<int32_t>(pp_prim_pair_count_local),
                                d_pp_first_inds,
                                d_pp_second_inds,
                                d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
+                               static_cast<int32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5336,24 +5336,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 4 * max_prim_pair_count;
+            const int32_t offsetD = 4 * max_prim_pair_count;
         gpu::computeCoulombFockPPPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pp_mat_Q_local,
                                d_pd_mat_Q,
                                d_pp_first_inds_local,
                                d_pp_second_inds_local,
                                d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               static_cast<int32_t>(pp_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5364,26 +5364,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 5 * max_prim_pair_count;
+            const int32_t offsetD = 5 * max_prim_pair_count;
             omptimers[thread_id].start("    J block PPDD");
 
             gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pp_mat_Q_local,
                                d_dd_mat_Q,
                                d_pp_first_inds_local,
                                d_pp_second_inds_local,
                                d_pp_pair_data_local,
-                               static_cast<uint32_t>(pp_prim_pair_count_local),
+                               static_cast<int32_t>(pp_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5402,7 +5402,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  J block SD");
 
-        const uint32_t offsetJ = 3 * max_prim_pair_count_local;
+        const int32_t offsetJ = 3 * max_prim_pair_count_local;
 
         // set up thread blocks for J
 
@@ -5415,24 +5415,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 0 * max_prim_pair_count;
+            const int32_t offsetD = 0 * max_prim_pair_count;
             gpu::computeCoulombFockSDSS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sd_mat_Q_local,
                                d_ss_mat_Q,
                                d_sd_first_inds_local,
                                d_sd_second_inds_local,
                                d_sd_pair_data_local,
-                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               static_cast<int32_t>(sd_prim_pair_count_local),
                                d_ss_first_inds,
                                d_ss_second_inds,
                                d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
+                               static_cast<int32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5443,26 +5443,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 1 * max_prim_pair_count;
+            const int32_t offsetD = 1 * max_prim_pair_count;
             gpu::computeCoulombFockSDSP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sd_mat_Q_local,
                                d_sp_mat_Q,
                                d_sd_first_inds_local,
                                d_sd_second_inds_local,
                                d_sd_pair_data_local,
-                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               static_cast<int32_t>(sd_prim_pair_count_local),
                                d_sp_first_inds,
                                d_sp_second_inds,
                                d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
+                               static_cast<int32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5473,24 +5473,24 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 2 * max_prim_pair_count;
+            const int32_t offsetD = 2 * max_prim_pair_count;
             gpu::computeCoulombFockSDSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sd_mat_Q_local,
                                d_sd_mat_Q,
                                d_sd_first_inds_local,
                                d_sd_second_inds_local,
                                d_sd_pair_data_local,
-                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               static_cast<int32_t>(sd_prim_pair_count_local),
                                d_sd_first_inds,
                                d_sd_second_inds,
                                d_sd_pair_data,
-                               static_cast<uint32_t>(sd_prim_pair_count),
+                               static_cast<int32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5501,26 +5501,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 3 * max_prim_pair_count;
+            const int32_t offsetD = 3 * max_prim_pair_count;
             gpu::computeCoulombFockSDPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sd_mat_Q_local,
                                d_pp_mat_Q,
                                d_sd_first_inds_local,
                                d_sd_second_inds_local,
                                d_sd_pair_data_local,
-                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               static_cast<int32_t>(sd_prim_pair_count_local),
                                d_pp_first_inds,
                                d_pp_second_inds,
                                d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
+                               static_cast<int32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5531,26 +5531,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 4 * max_prim_pair_count;
+            const int32_t offsetD = 4 * max_prim_pair_count;
             gpu::computeCoulombFockSDPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sd_mat_Q_local,
                                d_pd_mat_Q,
                                d_sd_first_inds_local,
                                d_sd_second_inds_local,
                                d_sd_pair_data_local,
-                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               static_cast<int32_t>(sd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5561,26 +5561,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 5 * max_prim_pair_count;
+            const int32_t offsetD = 5 * max_prim_pair_count;
             omptimers[thread_id].start("    J block SDDD");
 
             gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_sd_mat_Q_local,
                                d_dd_mat_Q,
                                d_sd_first_inds_local,
                                d_sd_second_inds_local,
                                d_sd_pair_data_local,
-                               static_cast<uint32_t>(sd_prim_pair_count_local),
+                               static_cast<int32_t>(sd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5599,7 +5599,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  J block PD");
 
-        const uint32_t offsetJ = 4 * max_prim_pair_count_local;
+        const int32_t offsetJ = 4 * max_prim_pair_count_local;
 
         // set up thread blocks for J
 
@@ -5612,26 +5612,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 0 * max_prim_pair_count;
+            const int32_t offsetD = 0 * max_prim_pair_count;
             gpu::computeCoulombFockPDSS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_ss_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_ss_first_inds,
                                d_ss_second_inds,
                                d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
+                               static_cast<int32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5642,26 +5642,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 1 * max_prim_pair_count;
+            const int32_t offsetD = 1 * max_prim_pair_count;
             gpu::computeCoulombFockPDSP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_sp_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_sp_first_inds,
                                d_sp_second_inds,
                                d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
+                               static_cast<int32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5672,28 +5672,28 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 2 * max_prim_pair_count;
+            const int32_t offsetD = 2 * max_prim_pair_count;
             omptimers[thread_id].start("    J block PDSD");
 
             gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_sd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_sd_first_inds,
                                d_sd_second_inds,
                                d_sd_pair_data,
-                               static_cast<uint32_t>(sd_prim_pair_count),
+                               static_cast<int32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5706,26 +5706,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 3 * max_prim_pair_count;
+            const int32_t offsetD = 3 * max_prim_pair_count;
             omptimers[thread_id].start("    J block PDPP");
 
             gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_pp_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_pp_first_inds,
                                d_pp_second_inds,
                                d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
+                               static_cast<int32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5738,26 +5738,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 4 * max_prim_pair_count;
+            const int32_t offsetD = 4 * max_prim_pair_count;
             omptimers[thread_id].start("    J block PDPD");
 
             gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_pd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5770,26 +5770,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 5 * max_prim_pair_count;
+            const int32_t offsetD = 5 * max_prim_pair_count;
             omptimers[thread_id].start("    J block PDDD");
 
             gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_dd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5797,20 +5797,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockPDDD1<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_dd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5818,20 +5818,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockPDDD2<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_dd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5839,20 +5839,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockPDDD3<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_dd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5860,20 +5860,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockPDDD4<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_dd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5881,20 +5881,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockPDDD5<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_dd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5902,20 +5902,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockPDDD6<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_pd_mat_Q_local,
                                d_dd_mat_Q,
                                d_pd_first_inds_local,
                                d_pd_second_inds_local,
                                d_pd_pair_data_local,
-                               static_cast<uint32_t>(pd_prim_pair_count_local),
+                               static_cast<int32_t>(pd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5934,7 +5934,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  J block DD");
 
-        const uint32_t offsetJ = 5 * max_prim_pair_count_local;
+        const int32_t offsetJ = 5 * max_prim_pair_count_local;
 
         // set up thread blocks for J
 
@@ -5947,26 +5947,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 0 * max_prim_pair_count;
+            const int32_t offsetD = 0 * max_prim_pair_count;
             omptimers[thread_id].start("    J block DDSS");
 
             gpu::computeCoulombFockDDSS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_ss_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_ss_first_inds,
                                d_ss_second_inds,
                                d_ss_pair_data,
-                               static_cast<uint32_t>(ss_prim_pair_count),
+                               static_cast<int32_t>(ss_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -5979,28 +5979,28 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 1 * max_prim_pair_count;
+            const int32_t offsetD = 1 * max_prim_pair_count;
             omptimers[thread_id].start("    J block DDSP");
 
             gpu::computeCoulombFockDDSP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_sp_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_sp_first_inds,
                                d_sp_second_inds,
                                d_sp_pair_data,
-                               static_cast<uint32_t>(sp_prim_pair_count),
+                               static_cast<int32_t>(sp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6013,26 +6013,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 2 * max_prim_pair_count;
+            const int32_t offsetD = 2 * max_prim_pair_count;
             omptimers[thread_id].start("    J block DDSD");
 
             gpu::computeCoulombFockDDSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_s_prim_info,
-                               static_cast<uint32_t>(s_prim_count),
+                               static_cast<int32_t>(s_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_sd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_sd_first_inds,
                                d_sd_second_inds,
                                d_sd_pair_data,
-                               static_cast<uint32_t>(sd_prim_pair_count),
+                               static_cast<int32_t>(sd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6045,26 +6045,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 3 * max_prim_pair_count;
+            const int32_t offsetD = 3 * max_prim_pair_count;
             omptimers[thread_id].start("    J block DDPP");
 
             gpu::computeCoulombFockDDPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pp_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pp_first_inds,
                                d_pp_second_inds,
                                d_pp_pair_data,
-                               static_cast<uint32_t>(pp_prim_pair_count),
+                               static_cast<int32_t>(pp_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6077,26 +6077,26 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 4 * max_prim_pair_count;
+            const int32_t offsetD = 4 * max_prim_pair_count;
             omptimers[thread_id].start("    J block DDPD");
 
             gpu::computeCoulombFockDDPD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J +offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6104,20 +6104,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD1<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6125,20 +6125,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD2<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6146,20 +6146,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD3<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6167,20 +6167,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD4<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6188,20 +6188,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD5<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6209,20 +6209,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD6<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6230,20 +6230,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD7<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6251,20 +6251,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD8<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6272,20 +6272,20 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDPD9<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_p_prim_info,
-                               static_cast<uint32_t>(p_prim_count),
+                               static_cast<int32_t>(p_prim_count),
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_pd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_pd_first_inds,
                                d_pd_second_inds,
                                d_pd_pair_data,
-                               static_cast<uint32_t>(pd_prim_pair_count),
+                               static_cast<int32_t>(pd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6298,7 +6298,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            const uint32_t offsetD = 5 * max_prim_pair_count;
+            const int32_t offsetD = 5 * max_prim_pair_count;
             omptimers[thread_id].start("    J block DDDD");
 
             gpuSafe(gpuMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
@@ -6310,18 +6310,18 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDDD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6329,18 +6329,18 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpu::computeCoulombFockDDDD1<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6348,18 +6348,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD2<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6367,18 +6367,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD3<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6386,18 +6386,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD4<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6405,18 +6405,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD5<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6424,18 +6424,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD6<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6443,18 +6443,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD7<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6462,18 +6462,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD8<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6481,18 +6481,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD9<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6500,18 +6500,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD10<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6519,18 +6519,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD11<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6538,18 +6538,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD12<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6557,18 +6557,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD13<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6576,18 +6576,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD14<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6595,18 +6595,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD15<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6614,18 +6614,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD16<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6633,18 +6633,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD17<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6652,18 +6652,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD18<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6671,18 +6671,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD19<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6690,18 +6690,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD20<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6709,18 +6709,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD21<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6728,18 +6728,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD22<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6747,18 +6747,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD23<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6766,18 +6766,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD24<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6785,18 +6785,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD25<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6804,18 +6804,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD26<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6823,18 +6823,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD27<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6842,18 +6842,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD28<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6861,18 +6861,18 @@ computeFockOnGPU(const              CMolecule& molecule,
         gpu::computeCoulombFockDDDD29<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
                                d_d_prim_info,
-                               static_cast<uint32_t>(d_prim_count),
+                               static_cast<int32_t>(d_prim_count),
                                d_mat_D + offsetD,
                                d_dd_mat_Q_local,
                                d_dd_mat_Q,
                                d_dd_first_inds_local,
                                d_dd_second_inds_local,
                                d_dd_pair_data_local,
-                               static_cast<uint32_t>(dd_prim_pair_count_local),
+                               static_cast<int32_t>(dd_prim_pair_count_local),
                                d_dd_first_inds,
                                d_dd_second_inds,
                                d_dd_pair_data,
-                               static_cast<uint32_t>(dd_prim_pair_count),
+                               static_cast<int32_t>(dd_prim_pair_count),
                                d_boys_func_table,
                                d_boys_func_ft,
                                eri_threshold);
@@ -6908,7 +6908,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         const dim3 num_blocks(((max_pair_inds_count * numCalculationBlocksExchange) + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::zeroData<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(d_mat_K, static_cast<uint32_t>(max_pair_inds_count) * numCalculationBlocksExchange);
+        gpu::zeroData<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(d_mat_K, static_cast<int32_t>(max_pair_inds_count) * numCalculationBlocksExchange);
     }
 
     // K: S-S block
@@ -6917,7 +6917,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  K block SS");
 
-        const uint32_t offset = 0 * max_pair_inds_count;
+        const int32_t offset = 0 * max_pair_inds_count;
 
         // set up thread blocks for K
 
@@ -6932,13 +6932,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            ss_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_D_inds_K_ss,
                            d_pair_displs_K_ss,
@@ -6956,16 +6956,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            sp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_sp,
                            d_D_inds_K_ss,
@@ -6988,16 +6988,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            ps_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_ss,
                            d_D_inds_K_sp,
@@ -7020,16 +7020,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            pp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_D_inds_K_sp,
                            d_pair_displs_K_sp,
@@ -7047,16 +7047,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_sd,
                            d_D_inds_K_ss,
@@ -7079,16 +7079,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ds_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_ss,
                            d_D_inds_K_sd,
@@ -7111,19 +7111,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_sd,
                            d_D_inds_K_sp,
@@ -7146,19 +7146,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_sp,
                            d_D_inds_K_sd,
@@ -7181,16 +7181,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_ss,
                            d_pair_inds_k_for_K_ss,
-                           static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                           static_cast<int32_t>(pair_inds_count_for_K_ss),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_D_inds_K_sd,
                            d_pair_displs_K_sd,
@@ -7210,7 +7210,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  K block SP");
 
-        const uint32_t offset = 1 * max_pair_inds_count;
+        const int32_t offset = 1 * max_pair_inds_count;
 
         // set up thread blocks for K
 
@@ -7225,16 +7225,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            ss_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_ps,
                            d_D_inds_K_ss,
@@ -7257,16 +7257,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            sp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_pp,
                            d_D_inds_K_ss,
@@ -7289,16 +7289,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            ps_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_ps,
                            d_D_inds_K_sp,
@@ -7321,16 +7321,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            pp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_pp,
                            d_D_inds_K_sp,
@@ -7353,19 +7353,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_pd,
                            d_D_inds_K_ss,
@@ -7388,19 +7388,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ds_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_ps,
                            d_D_inds_K_sd,
@@ -7423,19 +7423,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_pd,
                            d_D_inds_K_sp,
@@ -7458,19 +7458,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_pp,
                            d_D_inds_K_sd,
@@ -7493,19 +7493,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sp,
                            d_pair_inds_k_for_K_sp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                           static_cast<int32_t>(pair_inds_count_for_K_sp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_pd,
                            d_D_inds_K_sd,
@@ -7528,7 +7528,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pair_inds_count_for_K_pp > 0)
     {
         omptimers[thread_id].start("  K block PP");
-        const uint32_t offset = 2 * max_pair_inds_count;
+        const int32_t offset = 2 * max_pair_inds_count;
 
         // set up thread blocks for K
 
@@ -7545,16 +7545,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            ss_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ps,
                            d_D_inds_K_ps,
                            d_pair_displs_K_ps,
@@ -7576,16 +7576,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            sp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ps,
                            d_Q_K_pp,
                            d_D_inds_K_ps,
@@ -7612,16 +7612,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            ps_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pp,
                            d_Q_K_ps,
                            d_D_inds_K_pp,
@@ -7648,13 +7648,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            pp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pp,
                            d_D_inds_K_pp,
                            d_pair_displs_K_pp,
@@ -7676,19 +7676,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ps,
                            d_Q_K_pd,
                            d_D_inds_K_ps,
@@ -7715,19 +7715,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ds_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_ps,
                            d_D_inds_K_pd,
@@ -7754,16 +7754,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pp,
                            d_Q_K_pd,
                            d_D_inds_K_pp,
@@ -7790,16 +7790,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_pp,
                            d_D_inds_K_pd,
@@ -7826,16 +7826,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pp,
                            d_pair_inds_k_for_K_pp,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pp),
+                           static_cast<int32_t>(pair_inds_count_for_K_pp),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_D_inds_K_pd,
                            d_pair_displs_K_pd,
@@ -7861,7 +7861,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks = dim3(pair_inds_count_for_K_sd, 1);
 
-        const uint32_t offset = 3 * max_pair_inds_count;
+        const int32_t offset = 3 * max_pair_inds_count;
 
         // K: (SS|DS)
         //     *  *
@@ -7870,16 +7870,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ss_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_ds,
                            d_D_inds_K_ss,
@@ -7902,19 +7902,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_dp,
                            d_D_inds_K_ss,
@@ -7937,19 +7937,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ps_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_ds,
                            d_D_inds_K_sp,
@@ -7974,19 +7974,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_dp,
                            d_D_inds_K_sp,
@@ -8013,16 +8013,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ss,
                            d_Q_K_dd,
                            d_D_inds_K_ss,
@@ -8049,16 +8049,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ds_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_ds,
                            d_D_inds_K_sd,
@@ -8085,19 +8085,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sp,
                            d_Q_K_dd,
                            d_D_inds_K_sp,
@@ -8124,19 +8124,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_dp,
                            d_D_inds_K_sd,
@@ -8163,16 +8163,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_sd,
                            d_pair_inds_k_for_K_sd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_sd),
+                           static_cast<int32_t>(pair_inds_count_for_K_sd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_sd,
                            d_Q_K_dd,
                            d_D_inds_K_sd,
@@ -8203,7 +8203,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         dim3 num_blocks = dim3(pair_inds_count_for_K_pd, 1);
 
-        const uint32_t offset = 4 * max_pair_inds_count;
+        const int32_t offset = 4 * max_pair_inds_count;
 
         // K: (PS|DS)
         //     *  *
@@ -8214,19 +8214,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ss_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ps,
                            d_Q_K_ds,
                            d_D_inds_K_ps,
@@ -8253,19 +8253,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ps,
                            d_Q_K_dp,
                            d_D_inds_K_ps,
@@ -8292,19 +8292,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ps_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pp,
                            d_Q_K_ds,
                            d_D_inds_K_pp,
@@ -8331,19 +8331,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ps,
                            d_Q_K_dd,
                            d_D_inds_K_ps,
@@ -8370,19 +8370,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ds_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_ds,
                            d_D_inds_K_pd,
@@ -8409,16 +8409,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pp,
                            d_Q_K_dp,
                            d_D_inds_K_pp,
@@ -8445,16 +8445,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pp,
                            d_Q_K_dd,
                            d_D_inds_K_pp,
@@ -8481,16 +8481,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dp,
                            d_D_inds_K_pd,
@@ -8517,16 +8517,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8546,16 +8546,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8575,16 +8575,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8604,16 +8604,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8633,16 +8633,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8662,16 +8662,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8691,16 +8691,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8720,16 +8720,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_pd,
                            d_pair_inds_k_for_K_pd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_pd),
+                           static_cast<int32_t>(pair_inds_count_for_K_pd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_pd,
                            d_Q_K_dd,
                            d_D_inds_K_pd,
@@ -8754,7 +8754,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
         omptimers[thread_id].start("  K block DD");
 
-        const uint32_t offset = 5 * max_pair_inds_count;
+        const int32_t offset = 5 * max_pair_inds_count;
 
         // set up thread blocks for K
 
@@ -8769,16 +8769,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ss_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ds,
                            d_D_inds_K_ds,
                            d_pair_displs_K_ds,
@@ -8796,19 +8796,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ds,
                            d_Q_K_dp,
                            d_D_inds_K_ds,
@@ -8831,19 +8831,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ps_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_ds,
                            d_D_inds_K_dp,
@@ -8868,16 +8868,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            sd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_ds,
                            d_Q_K_dd,
                            d_D_inds_K_ds,
@@ -8904,16 +8904,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_s_prim_info,
                            d_s_prim_aoinds,
-                           static_cast<uint32_t>(s_prim_count),
+                           static_cast<int32_t>(s_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            ds_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_ds,
                            d_D_inds_K_dd,
@@ -8940,16 +8940,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_D_inds_K_dp,
                            d_pair_displs_K_dp,
@@ -8971,16 +8971,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_dd,
                            d_D_inds_K_dp,
@@ -9000,16 +9000,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_dd,
                            d_D_inds_K_dp,
@@ -9029,16 +9029,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_dd,
                            d_D_inds_K_dp,
@@ -9058,16 +9058,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_dd,
                            d_D_inds_K_dp,
@@ -9087,16 +9087,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_dd,
                            d_D_inds_K_dp,
@@ -9116,16 +9116,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_dd,
                            d_D_inds_K_dp,
@@ -9145,16 +9145,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            pd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dp,
                            d_Q_K_dd,
                            d_D_inds_K_dp,
@@ -9181,16 +9181,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_dp,
                            d_D_inds_K_dd,
@@ -9210,16 +9210,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_dp,
                            d_D_inds_K_dd,
@@ -9239,16 +9239,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_dp,
                            d_D_inds_K_dd,
@@ -9268,16 +9268,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_dp,
                            d_D_inds_K_dd,
@@ -9297,16 +9297,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_dp,
                            d_D_inds_K_dd,
@@ -9326,16 +9326,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_dp,
                            d_D_inds_K_dd,
@@ -9355,16 +9355,16 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_p_prim_info,
                            d_p_prim_aoinds,
-                           static_cast<uint32_t>(p_prim_count),
+                           static_cast<int32_t>(p_prim_count),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dp_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_Q_K_dp,
                            d_D_inds_K_dd,
@@ -9391,13 +9391,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9412,13 +9412,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9433,13 +9433,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9454,13 +9454,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9475,13 +9475,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9496,13 +9496,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9517,13 +9517,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9538,13 +9538,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9559,13 +9559,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9580,13 +9580,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9601,13 +9601,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9622,13 +9622,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9643,13 +9643,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9664,13 +9664,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9685,13 +9685,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9706,13 +9706,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9727,13 +9727,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9748,13 +9748,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9769,13 +9769,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_mat_K + offset,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
-                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<int32_t>(pair_inds_count_for_K_dd),
                            d_d_prim_info,
                            d_d_prim_aoinds,
-                           static_cast<uint32_t>(d_prim_count),
+                           static_cast<int32_t>(d_prim_count),
                            dd_max_D,
                            d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
+                           static_cast<int32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -9799,7 +9799,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (ss_prim_pair_count_local > 0)
     {
         eventListCoulomb[0].waitForCompletion();
-        const uint32_t offset = 0 * max_prim_pair_count_local;
+        const int32_t offset = 0 * max_prim_pair_count_local;
         gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J + offset, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
 
@@ -9820,7 +9820,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (sp_prim_pair_count_local > 0)
     {
         eventListCoulomb[1].waitForCompletion();
-        const uint32_t offset = 1 * max_prim_pair_count_local;
+        const int32_t offset = 1 * max_prim_pair_count_local;
         gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J + offset, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
 
@@ -9849,7 +9849,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pp_prim_pair_count_local > 0)
     {
         eventListCoulomb[2].waitForCompletion();
-        const uint32_t offset = 2 * max_prim_pair_count_local;
+        const int32_t offset = 2 * max_prim_pair_count_local;
         gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J + offset, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
 
@@ -9886,7 +9886,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (sd_prim_pair_count_local > 0)
     {
         eventListCoulomb[3].waitForCompletion();
-        const uint32_t offset = 3 * max_prim_pair_count_local;
+        const int32_t offset = 3 * max_prim_pair_count_local;
         gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J + offset, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
 
@@ -9915,7 +9915,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pd_prim_pair_count_local > 0)
     {
         eventListCoulomb[4].waitForCompletion();
-        const uint32_t offset = 4 * max_prim_pair_count_local;
+        const int32_t offset = 4 * max_prim_pair_count_local;
         gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J + offset, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
 
@@ -9951,7 +9951,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (dd_prim_pair_count_local > 0)
     {
         eventListCoulomb[5].waitForCompletion();
-        const uint32_t offset = 5 * max_prim_pair_count_local;
+        const int32_t offset = 5 * max_prim_pair_count_local;
         gpuSafe(gpuMemcpyAsync(mat_J.data(), d_mat_J + offset, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
 
@@ -9993,7 +9993,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pair_inds_count_for_K_ss > 0)
     {
         eventListExchange[0].waitForCompletion();
-        const uint32_t offset = 0 * max_pair_inds_count;
+        const int32_t offset = 0 * max_pair_inds_count;
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_ss * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
@@ -10017,7 +10017,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pair_inds_count_for_K_sp > 0)
     {
         eventListExchange[1].waitForCompletion();
-        const uint32_t offset = 1 * max_pair_inds_count;
+        const int32_t offset = 1 * max_pair_inds_count;
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_sp * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
@@ -10050,7 +10050,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pair_inds_count_for_K_pp > 0)
     {
         eventListExchange[2].waitForCompletion();
-        const uint32_t offset = 2 * max_pair_inds_count;
+        const int32_t offset = 2 * max_pair_inds_count;
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
@@ -10090,7 +10090,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pair_inds_count_for_K_sd > 0)
     {
         eventListExchange[3].waitForCompletion();
-        const uint32_t offset = 3 * max_pair_inds_count;
+        const int32_t offset = 3 * max_pair_inds_count;
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_sd * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
@@ -10123,7 +10123,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pair_inds_count_for_K_pd > 0)
     {
         eventListExchange[4].waitForCompletion();
-        const uint32_t offset = 4 * max_pair_inds_count;
+        const int32_t offset = 4 * max_pair_inds_count;
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_pd * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
@@ -10163,7 +10163,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (pair_inds_count_for_K_dd > 0)
     {
         eventListExchange[5].waitForCompletion();
-        const uint32_t offset = 5 * max_pair_inds_count;
+        const int32_t offset = 5 * max_pair_inds_count;
 
         gpuSafe(gpuMemcpyAsync(mat_K.data(), d_mat_K + offset, pair_inds_count_for_K_dd * sizeof(double), gpuMemcpyDeviceToHost, streamList[2].stream));
         copyEvent.markStreamEventAndWait(streamList[2].stream);
@@ -10202,7 +10202,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     }  // end of compute K post processing
 
-    for (uint32_t i = 0; i < 6; i++)
+    for (int32_t i = 0; i < 6; i++)
     {
         eventListExchange[i].destroyEvent();
         eventListCoulomb[i].destroyEvent();

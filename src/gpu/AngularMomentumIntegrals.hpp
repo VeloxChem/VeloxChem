@@ -45,10 +45,10 @@ computeAngularMomentumSS(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   s_prim_info,
-                        const uint32_t  s_prim_count,
-                        const uint32_t* first_inds_local,
-                        const uint32_t* second_inds_local,
-                        const uint32_t  ss_prim_pair_count_local);
+                        const int32_t  s_prim_count,
+                        const int32_t* first_inds_local,
+                        const int32_t* second_inds_local,
+                        const int32_t  ss_prim_pair_count_local);
 
 __global__ void
 computeAngularMomentumSP(double*         mat_mu_X,
@@ -58,12 +58,12 @@ computeAngularMomentumSP(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   s_prim_info,
-                        const uint32_t  s_prim_count,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t  p_prim_count,
-                        const uint32_t* sp_first_inds_local,
-                        const uint32_t* sp_second_inds_local,
-                        const uint32_t  sp_prim_pair_count_local);
+                        const int32_t  p_prim_count,
+                        const int32_t* sp_first_inds_local,
+                        const int32_t* sp_second_inds_local,
+                        const int32_t  sp_prim_pair_count_local);
 
 __global__ void
 computeAngularMomentumSD(double*         mat_mu_X,
@@ -73,12 +73,12 @@ computeAngularMomentumSD(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   s_prim_info,
-                        const uint32_t  s_prim_count,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t  d_prim_count,
-                        const uint32_t* sd_first_inds_local,
-                        const uint32_t* sd_second_inds_local,
-                        const uint32_t  sd_prim_pair_count_local);
+                        const int32_t  d_prim_count,
+                        const int32_t* sd_first_inds_local,
+                        const int32_t* sd_second_inds_local,
+                        const int32_t  sd_prim_pair_count_local);
 
 __global__ void
 computeAngularMomentumPP(double*         mat_mu_X,
@@ -88,10 +88,10 @@ computeAngularMomentumPP(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   p_prim_info,
-                        const uint32_t  p_prim_count,
-                        const uint32_t* pp_first_inds_local,
-                        const uint32_t* pp_second_inds_local,
-                        const uint32_t  pp_prim_pair_count_local);
+                        const int32_t  p_prim_count,
+                        const int32_t* pp_first_inds_local,
+                        const int32_t* pp_second_inds_local,
+                        const int32_t  pp_prim_pair_count_local);
 
 __global__ void
 computeAngularMomentumPD(double*         mat_mu_X,
@@ -101,12 +101,12 @@ computeAngularMomentumPD(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   p_prim_info,
-                        const uint32_t  p_prim_count,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t  d_prim_count,
-                        const uint32_t* pd_first_inds_local,
-                        const uint32_t* pd_second_inds_local,
-                        const uint32_t  pd_prim_pair_count_local);
+                        const int32_t  d_prim_count,
+                        const int32_t* pd_first_inds_local,
+                        const int32_t* pd_second_inds_local,
+                        const int32_t  pd_prim_pair_count_local);
 
 __global__ void
 computeAngularMomentumDD(double*         mat_mu_X,
@@ -116,10 +116,10 @@ computeAngularMomentumDD(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   d_prim_info,
-                        const uint32_t  d_prim_count,
-                        const uint32_t* dd_first_inds_local,
-                        const uint32_t* dd_second_inds_local,
-                        const uint32_t  dd_prim_pair_count_local);
+                        const int32_t  d_prim_count,
+                        const int32_t* dd_first_inds_local,
+                        const int32_t* dd_second_inds_local,
+                        const int32_t  dd_prim_pair_count_local);
 
 }  // namespace gpu
 

@@ -39,80 +39,80 @@ namespace gpu {  // gpu namespace
 
 __global__ void
 computeKineticEnergyGradientSS(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   s_prim_info,
-                         const uint32_t  s_prim_count,
+                         const int32_t  s_prim_count,
                          const double*   ss_mat_D_local,
-                         const uint32_t* first_inds_local,
-                         const uint32_t* second_inds_local,
-                         const uint32_t  ss_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds);
+                         const int32_t* first_inds_local,
+                         const int32_t* second_inds_local,
+                         const int32_t  ss_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds);
 
 __global__ void
 computeKineticEnergyGradientSP(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   s_prim_info,
-                         const uint32_t  s_prim_count,
+                         const int32_t  s_prim_count,
                          const double*   p_prim_info,
-                         const uint32_t  p_prim_count,
+                         const int32_t  p_prim_count,
                          const double*   ss_mat_D_local,
-                         const uint32_t* sp_first_inds_local,
-                         const uint32_t* sp_second_inds_local,
-                         const uint32_t  sp_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds);
+                         const int32_t* sp_first_inds_local,
+                         const int32_t* sp_second_inds_local,
+                         const int32_t  sp_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds);
 
 __global__ void
 computeKineticEnergyGradientSD(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   s_prim_info,
-                         const uint32_t  s_prim_count,
+                         const int32_t  s_prim_count,
                          const double*   d_prim_info,
-                         const uint32_t  d_prim_count,
+                         const int32_t  d_prim_count,
                          const double*   sd_mat_D_local,
-                         const uint32_t* sd_first_inds_local,
-                         const uint32_t* sd_second_inds_local,
-                         const uint32_t  sd_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  p_prim_count);
+                         const int32_t* sd_first_inds_local,
+                         const int32_t* sd_second_inds_local,
+                         const int32_t  sd_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  p_prim_count);
 
 __global__ void
 computeKineticEnergyGradientPP(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   p_prim_info,
-                         const uint32_t  p_prim_count,
+                         const int32_t  p_prim_count,
                          const double*   pp_mat_D_local,
-                         const uint32_t* pp_first_inds_local,
-                         const uint32_t* pp_second_inds_local,
-                         const uint32_t  pp_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  s_prim_count);
+                         const int32_t* pp_first_inds_local,
+                         const int32_t* pp_second_inds_local,
+                         const int32_t  pp_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  s_prim_count);
 
 __global__ void
 computeKineticEnergyGradientPD(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   p_prim_info,
-                         const uint32_t  p_prim_count,
+                         const int32_t  p_prim_count,
                          const double*   d_prim_info,
-                         const uint32_t  d_prim_count,
+                         const int32_t  d_prim_count,
                          const double*   pd_mat_D_local,
-                         const uint32_t* pd_first_inds_local,
-                         const uint32_t* pd_second_inds_local,
-                         const uint32_t  pd_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  s_prim_count);
+                         const int32_t* pd_first_inds_local,
+                         const int32_t* pd_second_inds_local,
+                         const int32_t  pd_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  s_prim_count);
 
 __global__ void
 computeKineticEnergyGradientDD(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   d_prim_info,
-                         const uint32_t  d_prim_count,
+                         const int32_t  d_prim_count,
                          const double*   dd_mat_D_local,
-                         const uint32_t* dd_first_inds_local,
-                         const uint32_t* dd_second_inds_local,
-                         const uint32_t  dd_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  s_prim_count,
-                         const uint32_t  p_prim_count);
+                         const int32_t* dd_first_inds_local,
+                         const int32_t* dd_second_inds_local,
+                         const int32_t  dd_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  s_prim_count,
+                         const int32_t  p_prim_count);
 
 }  // namespace gpu
 

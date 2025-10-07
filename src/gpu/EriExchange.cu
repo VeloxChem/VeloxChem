@@ -40,19 +40,19 @@ namespace gpu {  // gpu namespace
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double    ss_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_counts_K_ss,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_counts_K_ss,
                         const double*   pair_data_K_ss,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -63,64 +63,64 @@ computeExchangeFockSSSS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_ss[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_ss, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_ss[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_ss, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -128,27 +128,27 @@ computeExchangeFockSSSS(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ss[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ss_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ss, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ss, displ_k + l) * ss_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ss[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ss, displ_k + l);
 
-            const auto l_prim = D_inds_K_ss[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ss, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
@@ -192,7 +192,7 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -202,9 +202,9 @@ computeExchangeFockSSSS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -216,26 +216,26 @@ computeExchangeFockSSSS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    sp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_sp,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_sp,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_sp,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_sp,
                         const double*   boys_func_table,
@@ -247,64 +247,64 @@ computeExchangeFockSSSP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_sp[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_sp, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_sp[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_sp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -312,27 +312,27 @@ computeExchangeFockSSSP(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_sp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * sp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_sp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_sp, displ_k + l) * sp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_sp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_sp, displ_k + l);
 
-            const auto l_prim = D_inds_K_sp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_sp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_sp[displ_k + l];
 
@@ -392,7 +392,7 @@ computeExchangeFockSSSP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -402,9 +402,9 @@ computeExchangeFockSSSP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -416,26 +416,26 @@ computeExchangeFockSSSP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_sd,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_sd,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_sd,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_sd,
                         const double*   boys_func_table,
@@ -447,12 +447,12 @@ computeExchangeFockSSSD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
@@ -469,55 +469,55 @@ computeExchangeFockSSSD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_sd[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_sd, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_sd[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_sd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -525,27 +525,27 @@ computeExchangeFockSSSD(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_sd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * sd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_sd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_sd, displ_k + l) * sd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_sd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_sd, displ_k + l);
 
-            const auto l_prim = D_inds_K_sd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_sd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_sd[displ_k + l];
 
@@ -625,7 +625,7 @@ computeExchangeFockSSSD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -635,9 +635,9 @@ computeExchangeFockSSSD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -649,26 +649,26 @@ computeExchangeFockSSSD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    ps_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_ss,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_ss,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_ss,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_ss,
                         const double*   boys_func_table,
@@ -680,64 +680,64 @@ computeExchangeFockSPSS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_ss[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_ss, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_ss[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_ss, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -745,27 +745,27 @@ computeExchangeFockSPSS(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ss[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ps_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ss, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ss, displ_k + l) * ps_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ss[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ss, displ_k + l);
 
-            const auto l_prim = D_inds_K_ss[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ss, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
@@ -825,7 +825,7 @@ computeExchangeFockSPSS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -835,9 +835,9 @@ computeExchangeFockSPSS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -849,22 +849,22 @@ computeExchangeFockSPSS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    pp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_counts_K_sp,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_counts_K_sp,
                         const double*   pair_data_K_sp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -875,11 +875,11 @@ computeExchangeFockSPSP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
@@ -889,55 +889,55 @@ computeExchangeFockSPSP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_sp[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_sp, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_sp[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_sp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -945,27 +945,27 @@ computeExchangeFockSPSP(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_sp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * pp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_sp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_sp, displ_k + l) * pp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_sp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_sp, displ_k + l);
 
-            const auto l_prim = D_inds_K_sp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_sp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_sp[displ_k + l];
 
@@ -1046,7 +1046,7 @@ computeExchangeFockSPSP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -1056,9 +1056,9 @@ computeExchangeFockSPSP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -1070,29 +1070,29 @@ computeExchangeFockSPSP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPSD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_sd,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_sd,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_sd,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_sd,
                         const double*   boys_func_table,
@@ -1104,12 +1104,12 @@ computeExchangeFockSPSD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
@@ -1126,55 +1126,55 @@ computeExchangeFockSPSD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_sd[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_sd, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_sd[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_sd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -1182,27 +1182,27 @@ computeExchangeFockSPSD(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_sd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_sd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_sd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_sd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_sd, displ_k + l);
 
-            const auto l_prim = D_inds_K_sd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_sd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_sd[displ_k + l];
 
@@ -1317,7 +1317,7 @@ computeExchangeFockSPSD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -1327,9 +1327,9 @@ computeExchangeFockSPSD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -1341,26 +1341,26 @@ computeExchangeFockSPSD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ds_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_ss,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_ss,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_ss,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_ss,
                         const double*   boys_func_table,
@@ -1372,12 +1372,12 @@ computeExchangeFockSDSS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
@@ -1394,55 +1394,55 @@ computeExchangeFockSDSS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_ss[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_ss, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_ss[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_ss, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -1450,27 +1450,27 @@ computeExchangeFockSDSS(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ss[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ss[displ_k + l] * ds_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ss, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ss, displ_k + l) * ds_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ss[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ss, displ_k + l);
 
-            const auto l_prim = D_inds_K_ss[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ss, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ss[displ_k + l];
 
@@ -1550,7 +1550,7 @@ computeExchangeFockSDSS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -1560,9 +1560,9 @@ computeExchangeFockSDSS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -1574,29 +1574,29 @@ computeExchangeFockSDSS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_sp,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_sp,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_sp,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_sp,
                         const double*   boys_func_table,
@@ -1608,12 +1608,12 @@ computeExchangeFockSDSP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
@@ -1630,55 +1630,55 @@ computeExchangeFockSDSP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_sp[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_sp, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_sp[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_sp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -1686,27 +1686,27 @@ computeExchangeFockSDSP(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_sp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_sp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_sp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_sp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_sp, displ_k + l);
 
-            const auto l_prim = D_inds_K_sp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_sp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_sp[displ_k + l];
 
@@ -1821,7 +1821,7 @@ computeExchangeFockSDSP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -1831,9 +1831,9 @@ computeExchangeFockSDSP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -1845,22 +1845,22 @@ computeExchangeFockSDSP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDSD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
-                        const uint32_t  pair_inds_count_for_K_ss,
+                        const int32_t* pair_inds_i_for_K_ss,
+                        const int32_t* pair_inds_k_for_K_ss,
+                        const int32_t  pair_inds_count_for_K_ss,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_counts_K_sd,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_counts_K_sd,
                         const double*   pair_data_K_sd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -1871,12 +1871,12 @@ computeExchangeFockSDSD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_ss when calling the kernel
 
@@ -1893,55 +1893,55 @@ computeExchangeFockSDSD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_ss[ik];
-        k = pair_inds_k_for_K_ss[ik];
+        i = rawValue(pair_inds_i_for_K_ss, ik);
+        k = rawValue(pair_inds_k_for_K_ss, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_sd[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_sd, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_sd[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_sd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = s_prim_info[k + s_prim_count * 0];
+        a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        r_k[0] = s_prim_info[k + s_prim_count * 2];
-        r_k[1] = s_prim_info[k + s_prim_count * 3];
-        r_k[2] = s_prim_info[k + s_prim_count * 4];
+        r_k[0] = rawValue(s_prim_info, k + s_prim_count * 2);
+        r_k[1] = rawValue(s_prim_info, k + s_prim_count * 3);
+        r_k[2] = rawValue(s_prim_info, k + s_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -1949,27 +1949,27 @@ computeExchangeFockSDSD(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_sd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_sd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_sd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_sd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_sd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_sd, displ_k + l);
 
-            const auto l_prim = D_inds_K_sd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_sd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_sd[displ_k + l];
 
@@ -2159,7 +2159,7 @@ computeExchangeFockSDSD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -2169,9 +2169,9 @@ computeExchangeFockSDSD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -2183,26 +2183,26 @@ computeExchangeFockSDSD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    ss_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_ps,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_ps,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
@@ -2214,64 +2214,64 @@ computeExchangeFockSSPS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_ps[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_ps, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_ps[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_ps, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -2279,27 +2279,27 @@ computeExchangeFockSSPS(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ps[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ps[displ_k + l] * ss_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ps, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ps, displ_k + l) * ss_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ps, displ_k + l);
 
-            const auto l_prim = D_inds_K_ps[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ps, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
@@ -2358,7 +2358,7 @@ computeExchangeFockSSPS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -2368,9 +2368,9 @@ computeExchangeFockSSPS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -2382,26 +2382,26 @@ computeExchangeFockSSPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    sp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_pp,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_pp,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
@@ -2413,11 +2413,11 @@ computeExchangeFockSSPP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -2427,55 +2427,55 @@ computeExchangeFockSSPP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_pp[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_pp, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_pp[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_pp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -2483,27 +2483,27 @@ computeExchangeFockSSPP(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pp[displ_k + l] * sp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pp, displ_k + l) * sp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pp, displ_k + l);
 
-            const auto l_prim = D_inds_K_pp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
@@ -2584,7 +2584,7 @@ computeExchangeFockSSPP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -2594,9 +2594,9 @@ computeExchangeFockSSPP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -2608,29 +2608,29 @@ computeExchangeFockSSPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSPD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_pd,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_pd,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_pd,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
@@ -2642,12 +2642,12 @@ computeExchangeFockSSPD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -2664,55 +2664,55 @@ computeExchangeFockSSPD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_pd[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_pd, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_pd[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_pd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -2720,27 +2720,27 @@ computeExchangeFockSSPD(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pd[displ_k + l] * sd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pd, displ_k + l) * sd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pd, displ_k + l);
 
-            const auto l_prim = D_inds_K_pd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
@@ -2845,7 +2845,7 @@ computeExchangeFockSSPD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -2855,9 +2855,9 @@ computeExchangeFockSSPD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -2869,26 +2869,26 @@ computeExchangeFockSSPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    ps_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_ps,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_ps,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
@@ -2900,11 +2900,11 @@ computeExchangeFockSPPS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -2914,55 +2914,55 @@ computeExchangeFockSPPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_ps[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_ps, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_ps[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_ps, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -2970,27 +2970,27 @@ computeExchangeFockSPPS(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ps[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ps[displ_k + l] * ps_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ps, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ps, displ_k + l) * ps_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ps, displ_k + l);
 
-            const auto l_prim = D_inds_K_ps[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ps, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
@@ -3070,7 +3070,7 @@ computeExchangeFockSPPS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -3080,9 +3080,9 @@ computeExchangeFockSPPS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -3094,26 +3094,26 @@ computeExchangeFockSPPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    pp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_pp,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_pp,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
@@ -3125,11 +3125,11 @@ computeExchangeFockSPPP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -3139,55 +3139,55 @@ computeExchangeFockSPPP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_pp[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_pp, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_pp[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_pp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -3195,27 +3195,27 @@ computeExchangeFockSPPP(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pp[displ_k + l] * pp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pp, displ_k + l) * pp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pp, displ_k + l);
 
-            const auto l_prim = D_inds_K_pp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
@@ -3331,7 +3331,7 @@ computeExchangeFockSPPP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -3341,9 +3341,9 @@ computeExchangeFockSPPP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -3355,29 +3355,29 @@ computeExchangeFockSPPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPPD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_pd,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_pd,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_pd,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
@@ -3389,12 +3389,12 @@ computeExchangeFockSPPD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -3411,55 +3411,55 @@ computeExchangeFockSPPD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_pd[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_pd, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_pd[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_pd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -3467,27 +3467,27 @@ computeExchangeFockSPPD(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pd, displ_k + l);
 
-            const auto l_prim = D_inds_K_pd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
@@ -3658,7 +3658,7 @@ computeExchangeFockSPPD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -3668,9 +3668,9 @@ computeExchangeFockSPPD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -3682,29 +3682,29 @@ computeExchangeFockSPPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ds_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_ps,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_ps,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
@@ -3716,12 +3716,12 @@ computeExchangeFockSDPS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -3738,55 +3738,55 @@ computeExchangeFockSDPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_ps[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_ps, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_ps[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_ps, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -3794,27 +3794,27 @@ computeExchangeFockSDPS(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ps[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ps[displ_k + l] * ds_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ps, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ps, displ_k + l) * ds_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ps, displ_k + l);
 
-            const auto l_prim = D_inds_K_ps[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ps, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
@@ -3928,7 +3928,7 @@ computeExchangeFockSDPS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -3938,9 +3938,9 @@ computeExchangeFockSDPS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -3952,29 +3952,29 @@ computeExchangeFockSDPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_pp,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_pp,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
@@ -3986,12 +3986,12 @@ computeExchangeFockSDPP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -4008,55 +4008,55 @@ computeExchangeFockSDPP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_pp[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_pp, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_pp[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_pp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -4064,27 +4064,27 @@ computeExchangeFockSDPP(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pp, displ_k + l);
 
-            const auto l_prim = D_inds_K_pp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
@@ -4274,7 +4274,7 @@ computeExchangeFockSDPP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -4284,9 +4284,9 @@ computeExchangeFockSDPP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -4298,29 +4298,29 @@ computeExchangeFockSDPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDPD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
-                        const uint32_t  pair_inds_count_for_K_sp,
+                        const int32_t* pair_inds_i_for_K_sp,
+                        const int32_t* pair_inds_k_for_K_sp,
+                        const int32_t  pair_inds_count_for_K_sp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_pd,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_pd,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_pd,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
@@ -4332,12 +4332,12 @@ computeExchangeFockSDPD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sp when calling the kernel
 
@@ -4354,55 +4354,55 @@ computeExchangeFockSDPD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sp[ik];
-        k = pair_inds_k_for_K_sp[ik];
+        i = rawValue(pair_inds_i_for_K_sp, ik);
+        k = rawValue(pair_inds_k_for_K_sp, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_pd[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_pd, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_pd[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_pd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -4410,27 +4410,27 @@ computeExchangeFockSDPD(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pd, displ_k + l);
 
-            const auto l_prim = D_inds_K_pd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
@@ -4738,7 +4738,7 @@ computeExchangeFockSDPD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -4748,9 +4748,9 @@ computeExchangeFockSDPD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -4762,26 +4762,26 @@ computeExchangeFockSDPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ss_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -4793,12 +4793,12 @@ computeExchangeFockSSDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -4815,55 +4815,55 @@ computeExchangeFockSSDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -4871,27 +4871,27 @@ computeExchangeFockSSDS(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ss_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ss_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -4969,7 +4969,7 @@ computeExchangeFockSSDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -4979,9 +4979,9 @@ computeExchangeFockSSDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -4993,29 +4993,29 @@ computeExchangeFockSSDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -5027,12 +5027,12 @@ computeExchangeFockSSDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -5049,55 +5049,55 @@ computeExchangeFockSSDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -5105,27 +5105,27 @@ computeExchangeFockSSDP(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * sp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * sp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -5230,7 +5230,7 @@ computeExchangeFockSSDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -5240,9 +5240,9 @@ computeExchangeFockSSDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -5254,26 +5254,26 @@ computeExchangeFockSSDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSDD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ss,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_ss,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_ss,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_ss,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_ss,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -5285,12 +5285,12 @@ computeExchangeFockSSDD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -5307,55 +5307,55 @@ computeExchangeFockSSDD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_ss[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_ss, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_ss[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_ss, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ss[displ_i + j];
+            Q_ij   = rawValue(Q_K_ss, displ_i + j);
 
-            j_prim = D_inds_K_ss[displ_i + j];
+            j_prim = rawValue(D_inds_K_ss, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -5363,27 +5363,27 @@ computeExchangeFockSSDD(double*         mat_K,
             S_ij_00 = pair_data_K_ss[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * sd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * sd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -5537,7 +5537,7 @@ computeExchangeFockSSDD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -5547,9 +5547,9 @@ computeExchangeFockSSDD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -5561,29 +5561,29 @@ computeExchangeFockSSDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ps_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -5595,12 +5595,12 @@ computeExchangeFockSPDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -5617,55 +5617,55 @@ computeExchangeFockSPDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -5673,27 +5673,27 @@ computeExchangeFockSPDS(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ps_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ps_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -5806,7 +5806,7 @@ computeExchangeFockSPDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -5816,9 +5816,9 @@ computeExchangeFockSPDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -5830,29 +5830,29 @@ computeExchangeFockSPDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -5864,12 +5864,12 @@ computeExchangeFockSPDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -5886,55 +5886,55 @@ computeExchangeFockSPDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -5942,27 +5942,27 @@ computeExchangeFockSPDP(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * pp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * pp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -6133,7 +6133,7 @@ computeExchangeFockSPDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -6143,9 +6143,9 @@ computeExchangeFockSPDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -6157,29 +6157,29 @@ computeExchangeFockSPDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSPDD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_sp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_sp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_sp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_sp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -6191,12 +6191,12 @@ computeExchangeFockSPDD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -6213,55 +6213,55 @@ computeExchangeFockSPDD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_sp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_sp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_sp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_sp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sp[displ_i + j];
+            Q_ij   = rawValue(Q_K_sp, displ_i + j);
 
-            j_prim = D_inds_K_sp[displ_i + j];
+            j_prim = rawValue(D_inds_K_sp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -6269,27 +6269,27 @@ computeExchangeFockSPDD(double*         mat_K,
             S_ij_00 = pair_data_K_sp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -6562,7 +6562,7 @@ computeExchangeFockSPDD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -6572,9 +6572,9 @@ computeExchangeFockSPDD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -6586,26 +6586,26 @@ computeExchangeFockSPDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ds_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -6617,12 +6617,12 @@ computeExchangeFockSDDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -6639,55 +6639,55 @@ computeExchangeFockSDDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -6695,27 +6695,27 @@ computeExchangeFockSDDS(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ds_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ds_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -6903,7 +6903,7 @@ computeExchangeFockSDDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -6913,9 +6913,9 @@ computeExchangeFockSDDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -6927,29 +6927,29 @@ computeExchangeFockSDDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -6961,12 +6961,12 @@ computeExchangeFockSDDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -6983,55 +6983,55 @@ computeExchangeFockSDDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -7039,27 +7039,27 @@ computeExchangeFockSDDP(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -7367,7 +7367,7 @@ computeExchangeFockSDDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -7377,9 +7377,9 @@ computeExchangeFockSDDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -7391,26 +7391,26 @@ computeExchangeFockSDDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSDDD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sd,
-                        const uint32_t* pair_inds_k_for_K_sd,
-                        const uint32_t  pair_inds_count_for_K_sd,
+                        const int32_t* pair_inds_i_for_K_sd,
+                        const int32_t* pair_inds_k_for_K_sd,
+                        const int32_t  pair_inds_count_for_K_sd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_sd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_sd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_sd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_sd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_sd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_sd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_sd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_sd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -7422,12 +7422,12 @@ computeExchangeFockSDDD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_sd when calling the kernel
 
@@ -7444,55 +7444,55 @@ computeExchangeFockSDDD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_sd[ik];
-        k = pair_inds_k_for_K_sd[ik];
+        i = rawValue(pair_inds_i_for_K_sd, ik);
+        k = rawValue(pair_inds_k_for_K_sd, ik);
 
-        count_i = pair_counts_K_sd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_sd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_sd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_sd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_sd[displ_i + j];
+            Q_ij   = rawValue(Q_K_sd, displ_i + j);
 
-            j_prim = D_inds_K_sd[displ_i + j];
+            j_prim = rawValue(D_inds_K_sd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -7500,27 +7500,27 @@ computeExchangeFockSDDD(double*         mat_K,
             S_ij_00 = pair_data_K_sd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -8091,7 +8091,7 @@ computeExchangeFockSDDD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -8101,9 +8101,9 @@ computeExchangeFockSDDD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -8115,22 +8115,22 @@ computeExchangeFockSDDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    ss_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_ps,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_counts_K_ps,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -8141,11 +8141,11 @@ computeExchangeFockPSPS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -8155,55 +8155,55 @@ computeExchangeFockPSPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_ps[i];
-        count_k = pair_counts_K_ps[k];
+        count_i = rawValue(pair_counts_K_ps, i);
+        count_k = rawValue(pair_counts_K_ps, k);
 
-        displ_i = pair_displs_K_ps[i];
-        displ_k = pair_displs_K_ps[k];
+        displ_i = rawValue(pair_displs_K_ps, i);
+        displ_k = rawValue(pair_displs_K_ps, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ps[displ_i + j];
+            Q_ij   = rawValue(Q_K_ps, displ_i + j);
 
-            j_prim = D_inds_K_ps[displ_i + j];
+            j_prim = rawValue(D_inds_K_ps, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -8211,27 +8211,27 @@ computeExchangeFockPSPS(double*         mat_K,
             S_ij_00 = pair_data_K_ps[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ps[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ps[displ_k + l] * ss_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ps, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ps, displ_k + l) * ss_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ps, displ_k + l);
 
-            const auto l_prim = D_inds_K_ps[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ps, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
@@ -8309,7 +8309,7 @@ computeExchangeFockPSPS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -8319,9 +8319,9 @@ computeExchangeFockPSPS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -8333,26 +8333,26 @@ computeExchangeFockPSPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    sp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ps,
                         const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_ps,
-                        const uint32_t* pair_counts_K_pp,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_counts_K_ps,
+                        const int32_t* pair_counts_K_pp,
                         const double*   pair_data_K_ps,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
@@ -8364,11 +8364,11 @@ computeExchangeFockPSPP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -8378,55 +8378,55 @@ computeExchangeFockPSPP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_ps[i];
-        count_k = pair_counts_K_pp[k];
+        count_i = rawValue(pair_counts_K_ps, i);
+        count_k = rawValue(pair_counts_K_pp, k);
 
-        displ_i = pair_displs_K_ps[i];
-        displ_k = pair_displs_K_pp[k];
+        displ_i = rawValue(pair_displs_K_ps, i);
+        displ_k = rawValue(pair_displs_K_pp, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ps[displ_i + j];
+            Q_ij   = rawValue(Q_K_ps, displ_i + j);
 
-            j_prim = D_inds_K_ps[displ_i + j];
+            j_prim = rawValue(D_inds_K_ps, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -8434,27 +8434,27 @@ computeExchangeFockPSPP(double*         mat_K,
             S_ij_00 = pair_data_K_ps[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pp[displ_k + l] * sp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pp, displ_k + l) * sp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pp, displ_k + l);
 
-            const auto l_prim = D_inds_K_pp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
@@ -8569,7 +8569,7 @@ computeExchangeFockPSPP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -8579,9 +8579,9 @@ computeExchangeFockPSPP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -8593,29 +8593,29 @@ computeExchangeFockPSPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSPD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ps,
                         const double*   Q_K_pd,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_counts_K_ps,
-                        const uint32_t* pair_counts_K_pd,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_counts_K_ps,
+                        const int32_t* pair_counts_K_pd,
                         const double*   pair_data_K_ps,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
@@ -8627,12 +8627,12 @@ computeExchangeFockPSPD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -8649,55 +8649,55 @@ computeExchangeFockPSPD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_ps[i];
-        count_k = pair_counts_K_pd[k];
+        count_i = rawValue(pair_counts_K_ps, i);
+        count_k = rawValue(pair_counts_K_pd, k);
 
-        displ_i = pair_displs_K_ps[i];
-        displ_k = pair_displs_K_pd[k];
+        displ_i = rawValue(pair_displs_K_ps, i);
+        displ_k = rawValue(pair_displs_K_pd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ps[displ_i + j];
+            Q_ij   = rawValue(Q_K_ps, displ_i + j);
 
-            j_prim = D_inds_K_ps[displ_i + j];
+            j_prim = rawValue(D_inds_K_ps, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -8705,27 +8705,27 @@ computeExchangeFockPSPD(double*         mat_K,
             S_ij_00 = pair_data_K_ps[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pd[displ_k + l] * sd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pd, displ_k + l) * sd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pd, displ_k + l);
 
-            const auto l_prim = D_inds_K_pd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
@@ -8895,7 +8895,7 @@ computeExchangeFockPSPD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -8905,9 +8905,9 @@ computeExchangeFockPSPD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -8919,26 +8919,26 @@ computeExchangeFockPSPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    ps_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pp,
                         const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_pp,
-                        const uint32_t* pair_counts_K_ps,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_counts_K_pp,
+                        const int32_t* pair_counts_K_ps,
                         const double*   pair_data_K_pp,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
@@ -8950,11 +8950,11 @@ computeExchangeFockPPPS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -8964,55 +8964,55 @@ computeExchangeFockPPPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_pp[i];
-        count_k = pair_counts_K_ps[k];
+        count_i = rawValue(pair_counts_K_pp, i);
+        count_k = rawValue(pair_counts_K_ps, k);
 
-        displ_i = pair_displs_K_pp[i];
-        displ_k = pair_displs_K_ps[k];
+        displ_i = rawValue(pair_displs_K_pp, i);
+        displ_k = rawValue(pair_displs_K_ps, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pp[displ_i + j];
+            Q_ij   = rawValue(Q_K_pp, displ_i + j);
 
-            j_prim = D_inds_K_pp[displ_i + j];
+            j_prim = rawValue(D_inds_K_pp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -9020,27 +9020,27 @@ computeExchangeFockPPPS(double*         mat_K,
             S_ij_00 = pair_data_K_pp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ps[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ps[displ_k + l] * ps_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ps, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ps, displ_k + l) * ps_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ps, displ_k + l);
 
-            const auto l_prim = D_inds_K_ps[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ps, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
@@ -9154,7 +9154,7 @@ computeExchangeFockPPPS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -9164,9 +9164,9 @@ computeExchangeFockPPPS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -9178,19 +9178,19 @@ computeExchangeFockPPPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double    pp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_pp,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_counts_K_pp,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -9201,11 +9201,11 @@ computeExchangeFockPPPP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -9215,55 +9215,55 @@ computeExchangeFockPPPP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_pp[i];
-        count_k = pair_counts_K_pp[k];
+        count_i = rawValue(pair_counts_K_pp, i);
+        count_k = rawValue(pair_counts_K_pp, k);
 
-        displ_i = pair_displs_K_pp[i];
-        displ_k = pair_displs_K_pp[k];
+        displ_i = rawValue(pair_displs_K_pp, i);
+        displ_k = rawValue(pair_displs_K_pp, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pp[displ_i + j];
+            Q_ij   = rawValue(Q_K_pp, displ_i + j);
 
-            j_prim = D_inds_K_pp[displ_i + j];
+            j_prim = rawValue(D_inds_K_pp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -9271,27 +9271,27 @@ computeExchangeFockPPPP(double*         mat_K,
             S_ij_00 = pair_data_K_pp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pp[displ_k + l] * pp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pp, displ_k + l) * pp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pp, displ_k + l);
 
-            const auto l_prim = D_inds_K_pp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
@@ -9482,7 +9482,7 @@ computeExchangeFockPPPP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -9492,9 +9492,9 @@ computeExchangeFockPPPP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -9506,26 +9506,26 @@ computeExchangeFockPPPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPPD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pp,
                         const double*   Q_K_pd,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_counts_K_pp,
-                        const uint32_t* pair_counts_K_pd,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_counts_K_pp,
+                        const int32_t* pair_counts_K_pd,
                         const double*   pair_data_K_pp,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
@@ -9537,12 +9537,12 @@ computeExchangeFockPPPD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -9559,55 +9559,55 @@ computeExchangeFockPPPD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_pp[i];
-        count_k = pair_counts_K_pd[k];
+        count_i = rawValue(pair_counts_K_pp, i);
+        count_k = rawValue(pair_counts_K_pd, k);
 
-        displ_i = pair_displs_K_pp[i];
-        displ_k = pair_displs_K_pd[k];
+        displ_i = rawValue(pair_displs_K_pp, i);
+        displ_k = rawValue(pair_displs_K_pd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pp[displ_i + j];
+            Q_ij   = rawValue(Q_K_pp, displ_i + j);
 
-            j_prim = D_inds_K_pp[displ_i + j];
+            j_prim = rawValue(D_inds_K_pp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -9615,27 +9615,27 @@ computeExchangeFockPPPD(double*         mat_K,
             S_ij_00 = pair_data_K_pp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pd, displ_k + l);
 
-            const auto l_prim = D_inds_K_pd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
@@ -9942,7 +9942,7 @@ computeExchangeFockPPPD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -9952,9 +9952,9 @@ computeExchangeFockPPPD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -9966,29 +9966,29 @@ computeExchangeFockPPPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ds_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_ps,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_ps,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_ps,
                         const double*   boys_func_table,
@@ -10000,12 +10000,12 @@ computeExchangeFockPDPS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -10022,55 +10022,55 @@ computeExchangeFockPDPS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_ps[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_ps, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_ps[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_ps, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -10078,27 +10078,27 @@ computeExchangeFockPDPS(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ps[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ps[displ_k + l] * ds_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ps, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ps, displ_k + l) * ds_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ps[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ps, displ_k + l);
 
-            const auto l_prim = D_inds_K_ps[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ps, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ps[displ_k + l];
 
@@ -10267,7 +10267,7 @@ computeExchangeFockPDPS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -10277,9 +10277,9 @@ computeExchangeFockPDPS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -10291,26 +10291,26 @@ computeExchangeFockPDPS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_pp,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_pp,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_pp,
                         const double*   boys_func_table,
@@ -10322,12 +10322,12 @@ computeExchangeFockPDPP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -10344,55 +10344,55 @@ computeExchangeFockPDPP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_pp[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_pp, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_pp[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_pp, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -10400,27 +10400,27 @@ computeExchangeFockPDPP(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pp, displ_k + l);
 
-            const auto l_prim = D_inds_K_pp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pp[displ_k + l];
 
@@ -10728,7 +10728,7 @@ computeExchangeFockPDPP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -10738,9 +10738,9 @@ computeExchangeFockPDPP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -10752,22 +10752,22 @@ computeExchangeFockPDPP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDPD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
-                        const uint32_t  pair_inds_count_for_K_pp,
+                        const int32_t* pair_inds_i_for_K_pp,
+                        const int32_t* pair_inds_k_for_K_pp,
+                        const int32_t  pair_inds_count_for_K_pp,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_counts_K_pd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_counts_K_pd,
                         const double*   pair_data_K_pd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -10778,12 +10778,12 @@ computeExchangeFockPDPD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pp when calling the kernel
 
@@ -10800,55 +10800,55 @@ computeExchangeFockPDPD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pp[ik];
-        k = pair_inds_k_for_K_pp[ik];
+        i = rawValue(pair_inds_i_for_K_pp, ik);
+        k = rawValue(pair_inds_k_for_K_pp, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_pd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_pd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_pd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_pd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        r_k[0] = p_prim_info[k / 3 + p_prim_count * 2];
-        r_k[1] = p_prim_info[k / 3 + p_prim_count * 3];
-        r_k[2] = p_prim_info[k / 3 + p_prim_count * 4];
+        r_k[0] = rawValue(p_prim_info, k / 3 + p_prim_count * 2);
+        r_k[1] = rawValue(p_prim_info, k / 3 + p_prim_count * 3);
+        r_k[2] = rawValue(p_prim_info, k / 3 + p_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -10856,27 +10856,27 @@ computeExchangeFockPDPD(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_pd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_pd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_pd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_pd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_pd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_pd, displ_k + l);
 
-            const auto l_prim = D_inds_K_pd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_pd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_pd[displ_k + l];
 
@@ -11472,7 +11472,7 @@ computeExchangeFockPDPD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -11482,9 +11482,9 @@ computeExchangeFockPDPD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -11496,29 +11496,29 @@ computeExchangeFockPDPD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ss_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ps,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_ps,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_ps,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_ps,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -11530,12 +11530,12 @@ computeExchangeFockPSDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -11552,55 +11552,55 @@ computeExchangeFockPSDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_ps[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_ps, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_ps[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_ps, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ps[displ_i + j];
+            Q_ij   = rawValue(Q_K_ps, displ_i + j);
 
-            j_prim = D_inds_K_ps[displ_i + j];
+            j_prim = rawValue(D_inds_K_ps, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -11608,27 +11608,27 @@ computeExchangeFockPSDS(double*         mat_K,
             S_ij_00 = pair_data_K_ps[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ss_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ss_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -11738,7 +11738,7 @@ computeExchangeFockPSDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -11748,9 +11748,9 @@ computeExchangeFockPSDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -11762,29 +11762,29 @@ computeExchangeFockPSDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ps,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_ps,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_ps,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_ps,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -11796,12 +11796,12 @@ computeExchangeFockPSDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -11818,55 +11818,55 @@ computeExchangeFockPSDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_ps[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_ps, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_ps[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_ps, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ps[displ_i + j];
+            Q_ij   = rawValue(Q_K_ps, displ_i + j);
 
-            j_prim = D_inds_K_ps[displ_i + j];
+            j_prim = rawValue(D_inds_K_ps, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -11874,27 +11874,27 @@ computeExchangeFockPSDP(double*         mat_K,
             S_ij_00 = pair_data_K_ps[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * sp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * sp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -12064,7 +12064,7 @@ computeExchangeFockPSDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -12074,9 +12074,9 @@ computeExchangeFockPSDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -12088,29 +12088,29 @@ computeExchangeFockPSDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPSDD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ps,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_ps,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_ps,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_ps,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_ps,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_ps,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -12122,12 +12122,12 @@ computeExchangeFockPSDD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -12144,55 +12144,55 @@ computeExchangeFockPSDD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_ps[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_ps, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_ps[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_ps, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ps[displ_i + j];
+            Q_ij   = rawValue(Q_K_ps, displ_i + j);
 
-            j_prim = D_inds_K_ps[displ_i + j];
+            j_prim = rawValue(D_inds_K_ps, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -12200,27 +12200,27 @@ computeExchangeFockPSDD(double*         mat_K,
             S_ij_00 = pair_data_K_ps[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * sd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * sd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -12492,7 +12492,7 @@ computeExchangeFockPSDD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -12502,9 +12502,9 @@ computeExchangeFockPSDD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -12516,29 +12516,29 @@ computeExchangeFockPSDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ps_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pp,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_pp,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_pp,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_pp,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -12550,12 +12550,12 @@ computeExchangeFockPPDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -12572,55 +12572,55 @@ computeExchangeFockPPDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pp[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_pp, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_pp[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_pp, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pp[displ_i + j];
+            Q_ij   = rawValue(Q_K_pp, displ_i + j);
 
-            j_prim = D_inds_K_pp[displ_i + j];
+            j_prim = rawValue(D_inds_K_pp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -12628,27 +12628,27 @@ computeExchangeFockPPDS(double*         mat_K,
             S_ij_00 = pair_data_K_pp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ps_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ps_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -12835,7 +12835,7 @@ computeExchangeFockPPDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -12845,9 +12845,9 @@ computeExchangeFockPPDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -12859,26 +12859,26 @@ computeExchangeFockPPDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pp,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_pp,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_pp,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_pp,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -12890,12 +12890,12 @@ computeExchangeFockPPDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -12912,55 +12912,55 @@ computeExchangeFockPPDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pp[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_pp, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_pp[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_pp, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pp[displ_i + j];
+            Q_ij   = rawValue(Q_K_pp, displ_i + j);
 
-            j_prim = D_inds_K_pp[displ_i + j];
+            j_prim = rawValue(D_inds_K_pp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -12968,27 +12968,27 @@ computeExchangeFockPPDP(double*         mat_K,
             S_ij_00 = pair_data_K_pp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * pp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * pp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -13295,7 +13295,7 @@ computeExchangeFockPPDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -13305,9 +13305,9 @@ computeExchangeFockPPDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -13319,26 +13319,26 @@ computeExchangeFockPPDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPPDD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -13350,12 +13350,12 @@ computeExchangeFockPPDD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -13372,55 +13372,55 @@ computeExchangeFockPPDD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pp[displ_i + j];
+            Q_ij   = rawValue(Q_K_pp, displ_i + j);
 
-            j_prim = D_inds_K_pp[displ_i + j];
+            j_prim = rawValue(D_inds_K_pp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -13428,27 +13428,27 @@ computeExchangeFockPPDD(double*         mat_K,
             S_ij_00 = pair_data_K_pp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -14019,7 +14019,7 @@ computeExchangeFockPPDD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -14029,9 +14029,9 @@ computeExchangeFockPPDD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -14043,29 +14043,29 @@ computeExchangeFockPPDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ds_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -14077,12 +14077,12 @@ computeExchangeFockPDDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -14099,55 +14099,55 @@ computeExchangeFockPDDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -14155,27 +14155,27 @@ computeExchangeFockPDDS(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ds_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ds_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -14480,7 +14480,7 @@ computeExchangeFockPDDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -14490,9 +14490,9 @@ computeExchangeFockPDDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -14504,26 +14504,26 @@ computeExchangeFockPDDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -14535,12 +14535,12 @@ computeExchangeFockPDDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -14557,55 +14557,55 @@ computeExchangeFockPDDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -14613,27 +14613,27 @@ computeExchangeFockPDDP(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -15229,7 +15229,7 @@ computeExchangeFockPDDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -15239,9 +15239,9 @@ computeExchangeFockPDDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -15253,26 +15253,26 @@ computeExchangeFockPDDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD0(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -15284,12 +15284,12 @@ computeExchangeFockPDDD0(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -15306,55 +15306,55 @@ computeExchangeFockPDDD0(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -15362,27 +15362,27 @@ computeExchangeFockPDDD0(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -15575,7 +15575,7 @@ computeExchangeFockPDDD0(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -15585,9 +15585,9 @@ computeExchangeFockPDDD0(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -15599,26 +15599,26 @@ computeExchangeFockPDDD0(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD1(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -15630,12 +15630,12 @@ computeExchangeFockPDDD1(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -15652,55 +15652,55 @@ computeExchangeFockPDDD1(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -15708,27 +15708,27 @@ computeExchangeFockPDDD1(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -15975,7 +15975,7 @@ computeExchangeFockPDDD1(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -15985,9 +15985,9 @@ computeExchangeFockPDDD1(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -15999,26 +15999,26 @@ computeExchangeFockPDDD1(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD2(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -16030,12 +16030,12 @@ computeExchangeFockPDDD2(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -16052,55 +16052,55 @@ computeExchangeFockPDDD2(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -16108,27 +16108,27 @@ computeExchangeFockPDDD2(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -16463,7 +16463,7 @@ computeExchangeFockPDDD2(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -16473,9 +16473,9 @@ computeExchangeFockPDDD2(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -16487,26 +16487,26 @@ computeExchangeFockPDDD2(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD3(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -16518,12 +16518,12 @@ computeExchangeFockPDDD3(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -16540,55 +16540,55 @@ computeExchangeFockPDDD3(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -16596,27 +16596,27 @@ computeExchangeFockPDDD3(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -16788,7 +16788,7 @@ computeExchangeFockPDDD3(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -16798,9 +16798,9 @@ computeExchangeFockPDDD3(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -16812,26 +16812,26 @@ computeExchangeFockPDDD3(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD4(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -16843,12 +16843,12 @@ computeExchangeFockPDDD4(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -16865,55 +16865,55 @@ computeExchangeFockPDDD4(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -16921,27 +16921,27 @@ computeExchangeFockPDDD4(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -17173,7 +17173,7 @@ computeExchangeFockPDDD4(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -17183,9 +17183,9 @@ computeExchangeFockPDDD4(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -17197,26 +17197,26 @@ computeExchangeFockPDDD4(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD5(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -17228,12 +17228,12 @@ computeExchangeFockPDDD5(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -17250,55 +17250,55 @@ computeExchangeFockPDDD5(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -17306,27 +17306,27 @@ computeExchangeFockPDDD5(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -17427,7 +17427,7 @@ computeExchangeFockPDDD5(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -17437,9 +17437,9 @@ computeExchangeFockPDDD5(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -17451,26 +17451,26 @@ computeExchangeFockPDDD5(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD6(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -17482,12 +17482,12 @@ computeExchangeFockPDDD6(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -17504,55 +17504,55 @@ computeExchangeFockPDDD6(double*         mat_K,
         //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -17560,27 +17560,27 @@ computeExchangeFockPDDD6(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -17659,7 +17659,7 @@ computeExchangeFockPDDD6(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -17669,9 +17669,9 @@ computeExchangeFockPDDD6(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -17683,26 +17683,26 @@ computeExchangeFockPDDD6(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockPDDD7(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pd,
-                        const uint32_t* pair_inds_k_for_K_pd,
-                        const uint32_t  pair_inds_count_for_K_pd,
+                        const int32_t* pair_inds_i_for_K_pd,
+                        const int32_t* pair_inds_k_for_K_pd,
+                        const int32_t  pair_inds_count_for_K_pd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_pd,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_pd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_pd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_pd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_pd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_pd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_pd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_pd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -17714,12 +17714,12 @@ computeExchangeFockPDDD7(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_pd when calling the kernel
 
@@ -17736,55 +17736,55 @@ computeExchangeFockPDDD7(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_pd[ik];
-        k = pair_inds_k_for_K_pd[ik];
+        i = rawValue(pair_inds_i_for_K_pd, ik);
+        k = rawValue(pair_inds_k_for_K_pd, ik);
 
-        count_i = pair_counts_K_pd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_pd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_pd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_pd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -17792,27 +17792,27 @@ computeExchangeFockPDDD7(double*         mat_K,
             S_ij_00 = pair_data_K_pd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -18037,7 +18037,7 @@ computeExchangeFockPDDD7(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -18047,9 +18047,9 @@ computeExchangeFockPDDD7(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -18061,22 +18061,22 @@ computeExchangeFockPDDD7(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ss_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -18087,12 +18087,12 @@ computeExchangeFockDSDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -18109,55 +18109,55 @@ computeExchangeFockDSDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_ds[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_ds, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_ds[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_ds, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ds[displ_i + j];
+            Q_ij   = rawValue(Q_K_ds, displ_i + j);
 
-            j_prim = D_inds_K_ds[displ_i + j];
+            j_prim = rawValue(D_inds_K_ds, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -18165,27 +18165,27 @@ computeExchangeFockDSDS(double*         mat_K,
             S_ij_00 = pair_data_K_ds[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ss_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ss_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -18367,7 +18367,7 @@ computeExchangeFockDSDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -18377,9 +18377,9 @@ computeExchangeFockDSDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -18391,29 +18391,29 @@ computeExchangeFockDSDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ds,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_ds,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_ds,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_ds,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -18425,12 +18425,12 @@ computeExchangeFockDSDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -18447,55 +18447,55 @@ computeExchangeFockDSDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_ds[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_ds, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_ds[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_ds, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ds[displ_i + j];
+            Q_ij   = rawValue(Q_K_ds, displ_i + j);
 
-            j_prim = D_inds_K_ds[displ_i + j];
+            j_prim = rawValue(D_inds_K_ds, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -18503,27 +18503,27 @@ computeExchangeFockDSDP(double*         mat_K,
             S_ij_00 = pair_data_K_ds[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * sp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * sp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -18829,7 +18829,7 @@ computeExchangeFockDSDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -18839,9 +18839,9 @@ computeExchangeFockDSDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -18853,26 +18853,26 @@ computeExchangeFockDSDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDSDD(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    sd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_ds,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_ds,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_ds,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_ds,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -18884,12 +18884,12 @@ computeExchangeFockDSDD(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -18906,55 +18906,55 @@ computeExchangeFockDSDD(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_ds[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_ds, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_ds[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_ds, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_ds[displ_i + j];
+            Q_ij   = rawValue(Q_K_ds, displ_i + j);
 
-            j_prim = D_inds_K_ds[displ_i + j];
+            j_prim = rawValue(D_inds_K_ds, displ_i + j);
 
-            j_cgto = s_prim_aoinds[j_prim];
+            j_cgto = rawValue(s_prim_aoinds, j_prim);
 
-            a_j = s_prim_info[j_prim + s_prim_count * 0];
+            a_j = rawValue(s_prim_info, j_prim + s_prim_count * 0);
 
-            r_j[0] = s_prim_info[j_prim + s_prim_count * 2];
-            r_j[1] = s_prim_info[j_prim + s_prim_count * 3];
-            r_j[2] = s_prim_info[j_prim + s_prim_count * 4];
+            r_j[0] = rawValue(s_prim_info, j_prim + s_prim_count * 2);
+            r_j[1] = rawValue(s_prim_info, j_prim + s_prim_count * 3);
+            r_j[2] = rawValue(s_prim_info, j_prim + s_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -18962,27 +18962,27 @@ computeExchangeFockDSDD(double*         mat_K,
             S_ij_00 = pair_data_K_ds[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * sd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * sd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -19551,7 +19551,7 @@ computeExchangeFockDSDD(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -19561,9 +19561,9 @@ computeExchangeFockDSDD(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -19575,29 +19575,29 @@ computeExchangeFockDSDD(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ps_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -19609,12 +19609,12 @@ computeExchangeFockDPDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -19631,55 +19631,55 @@ computeExchangeFockDPDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -19687,27 +19687,27 @@ computeExchangeFockDPDS(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ps_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ps_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -20011,7 +20011,7 @@ computeExchangeFockDPDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -20021,9 +20021,9 @@ computeExchangeFockDPDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -20035,22 +20035,22 @@ computeExchangeFockDPDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -20061,12 +20061,12 @@ computeExchangeFockDPDP(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -20083,55 +20083,55 @@ computeExchangeFockDPDP(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -20139,27 +20139,27 @@ computeExchangeFockDPDP(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * pp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * pp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -20754,7 +20754,7 @@ computeExchangeFockDPDP(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -20764,9 +20764,9 @@ computeExchangeFockDPDP(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -20778,26 +20778,26 @@ computeExchangeFockDPDP(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
-                        const uint32_t  s_prim_count,
+                        const int32_t* s_prim_aoinds,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    ds_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_ds,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_ds,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_ds,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_ds,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_ds,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_ds,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_ds,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_ds,
                         const double*   boys_func_table,
@@ -20809,12 +20809,12 @@ computeExchangeFockDDDS(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -20831,55 +20831,55 @@ computeExchangeFockDDDS(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_ds[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_ds, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_ds[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_ds, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -20887,27 +20887,27 @@ computeExchangeFockDDDS(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_ds[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_ds[displ_k + l] * ds_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_ds, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_ds, displ_k + l) * ds_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_ds[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_ds, displ_k + l);
 
-            const auto l_prim = D_inds_K_ds[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_ds, displ_k + l);
 
-            const auto l_cgto = s_prim_aoinds[l_prim];
+            const auto l_cgto = rawValue(s_prim_aoinds, l_prim);
 
-            const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+            const auto a_l = rawValue(s_prim_info, l_prim + s_prim_count * 0);
 
-            const double r_l[3] = {s_prim_info[l_prim + s_prim_count * 2],
-                                   s_prim_info[l_prim + s_prim_count * 3],
-                                   s_prim_info[l_prim + s_prim_count * 4]};
+            const double r_l[3] = {rawValue(s_prim_info, l_prim + s_prim_count * 2),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 3),
+                                   rawValue(s_prim_info, l_prim + s_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_ds[displ_k + l];
 
@@ -21474,7 +21474,7 @@ computeExchangeFockDDDS(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -21484,9 +21484,9 @@ computeExchangeFockDDDS(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -21498,26 +21498,26 @@ computeExchangeFockDDDS(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD0(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -21529,12 +21529,12 @@ computeExchangeFockDPDD0(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -21551,55 +21551,55 @@ computeExchangeFockDPDD0(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -21607,27 +21607,27 @@ computeExchangeFockDPDD0(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -21820,7 +21820,7 @@ computeExchangeFockDPDD0(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -21830,9 +21830,9 @@ computeExchangeFockDPDD0(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -21844,26 +21844,26 @@ computeExchangeFockDPDD0(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD1(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -21875,12 +21875,12 @@ computeExchangeFockDPDD1(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -21897,55 +21897,55 @@ computeExchangeFockDPDD1(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -21953,27 +21953,27 @@ computeExchangeFockDPDD1(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -22220,7 +22220,7 @@ computeExchangeFockDPDD1(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -22230,9 +22230,9 @@ computeExchangeFockDPDD1(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -22244,26 +22244,26 @@ computeExchangeFockDPDD1(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD2(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -22275,12 +22275,12 @@ computeExchangeFockDPDD2(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -22297,55 +22297,55 @@ computeExchangeFockDPDD2(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -22353,27 +22353,27 @@ computeExchangeFockDPDD2(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -22522,7 +22522,7 @@ computeExchangeFockDPDD2(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -22532,9 +22532,9 @@ computeExchangeFockDPDD2(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -22546,26 +22546,26 @@ computeExchangeFockDPDD2(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD3(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -22577,12 +22577,12 @@ computeExchangeFockDPDD3(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -22599,55 +22599,55 @@ computeExchangeFockDPDD3(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -22655,27 +22655,27 @@ computeExchangeFockDPDD3(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -23032,7 +23032,7 @@ computeExchangeFockDPDD3(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -23042,9 +23042,9 @@ computeExchangeFockDPDD3(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -23056,26 +23056,26 @@ computeExchangeFockDPDD3(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD4(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -23087,12 +23087,12 @@ computeExchangeFockDPDD4(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -23109,55 +23109,55 @@ computeExchangeFockDPDD4(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -23165,27 +23165,27 @@ computeExchangeFockDPDD4(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -23441,7 +23441,7 @@ computeExchangeFockDPDD4(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -23451,9 +23451,9 @@ computeExchangeFockDPDD4(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -23465,26 +23465,26 @@ computeExchangeFockDPDD4(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD5(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -23496,12 +23496,12 @@ computeExchangeFockDPDD5(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -23518,55 +23518,55 @@ computeExchangeFockDPDD5(double*         mat_K,
         //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -23574,27 +23574,27 @@ computeExchangeFockDPDD5(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -23692,7 +23692,7 @@ computeExchangeFockDPDD5(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -23702,9 +23702,9 @@ computeExchangeFockDPDD5(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -23716,26 +23716,26 @@ computeExchangeFockDPDD5(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDD6(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    pd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dp,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dp,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dp,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
@@ -23747,12 +23747,12 @@ computeExchangeFockDPDD6(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -23769,55 +23769,55 @@ computeExchangeFockDPDD6(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dp[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dp, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dp[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dp, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dp[displ_i + j];
+            Q_ij   = rawValue(Q_K_dp, displ_i + j);
 
-            j_prim = D_inds_K_dp[displ_i + j];
+            j_prim = rawValue(D_inds_K_dp, displ_i + j);
 
-            j_cgto = p_prim_aoinds[(j_prim / 3) + p_prim_count * (j_prim % 3)];
+            j_cgto = rawValue(p_prim_aoinds, (j_prim / 3) + p_prim_count * (j_prim % 3));
 
-            a_j = p_prim_info[j_prim / 3 + p_prim_count * 0];
+            a_j = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 0);
 
-            r_j[0] = p_prim_info[j_prim / 3 + p_prim_count * 2];
-            r_j[1] = p_prim_info[j_prim / 3 + p_prim_count * 3];
-            r_j[2] = p_prim_info[j_prim / 3 + p_prim_count * 4];
+            r_j[0] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 2);
+            r_j[1] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 3);
+            r_j[2] = rawValue(p_prim_info, j_prim / 3 + p_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -23825,27 +23825,27 @@ computeExchangeFockDPDD6(double*         mat_K,
             S_ij_00 = pair_data_K_dp[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * pd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * pd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -24070,7 +24070,7 @@ computeExchangeFockDPDD6(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -24080,9 +24080,9 @@ computeExchangeFockDPDD6(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -24094,26 +24094,26 @@ computeExchangeFockDPDD6(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP0(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -24125,12 +24125,12 @@ computeExchangeFockDDDP0(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -24147,55 +24147,55 @@ computeExchangeFockDDDP0(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -24203,27 +24203,27 @@ computeExchangeFockDDDP0(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -24348,7 +24348,7 @@ computeExchangeFockDDDP0(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -24358,9 +24358,9 @@ computeExchangeFockDDDP0(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -24372,26 +24372,26 @@ computeExchangeFockDDDP0(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP1(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -24403,12 +24403,12 @@ computeExchangeFockDDDP1(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -24425,55 +24425,55 @@ computeExchangeFockDDDP1(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -24481,27 +24481,27 @@ computeExchangeFockDDDP1(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -24722,7 +24722,7 @@ computeExchangeFockDDDP1(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -24732,9 +24732,9 @@ computeExchangeFockDDDP1(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -24746,26 +24746,26 @@ computeExchangeFockDDDP1(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP2(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -24777,12 +24777,12 @@ computeExchangeFockDDDP2(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -24799,55 +24799,55 @@ computeExchangeFockDDDP2(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -24855,27 +24855,27 @@ computeExchangeFockDDDP2(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -25118,7 +25118,7 @@ computeExchangeFockDDDP2(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -25128,9 +25128,9 @@ computeExchangeFockDDDP2(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -25142,26 +25142,26 @@ computeExchangeFockDDDP2(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP3(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -25173,12 +25173,12 @@ computeExchangeFockDDDP3(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -25195,55 +25195,55 @@ computeExchangeFockDDDP3(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -25251,27 +25251,27 @@ computeExchangeFockDDDP3(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -25589,7 +25589,7 @@ computeExchangeFockDDDP3(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -25599,9 +25599,9 @@ computeExchangeFockDDDP3(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -25613,26 +25613,26 @@ computeExchangeFockDDDP3(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP4(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -25644,12 +25644,12 @@ computeExchangeFockDDDP4(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -25666,55 +25666,55 @@ computeExchangeFockDDDP4(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -25722,27 +25722,27 @@ computeExchangeFockDDDP4(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -25955,7 +25955,7 @@ computeExchangeFockDDDP4(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -25965,9 +25965,9 @@ computeExchangeFockDDDP4(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -25979,26 +25979,26 @@ computeExchangeFockDDDP4(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP5(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -26010,12 +26010,12 @@ computeExchangeFockDDDP5(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -26032,55 +26032,55 @@ computeExchangeFockDDDP5(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -26088,27 +26088,27 @@ computeExchangeFockDDDP5(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -26295,7 +26295,7 @@ computeExchangeFockDDDP5(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -26305,9 +26305,9 @@ computeExchangeFockDDDP5(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -26319,26 +26319,26 @@ computeExchangeFockDDDP5(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDP6(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
-                        const uint32_t  p_prim_count,
+                        const int32_t* p_prim_aoinds,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dp_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
                         const double*   Q_K_dp,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* D_inds_K_dp,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_displs_K_dp,
-                        const uint32_t* pair_counts_K_dd,
-                        const uint32_t* pair_counts_K_dp,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* D_inds_K_dp,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_displs_K_dp,
+                        const int32_t* pair_counts_K_dd,
+                        const int32_t* pair_counts_K_dp,
                         const double*   pair_data_K_dd,
                         const double*   pair_data_K_dp,
                         const double*   boys_func_table,
@@ -26350,12 +26350,12 @@ computeExchangeFockDDDP6(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -26372,55 +26372,55 @@ computeExchangeFockDDDP6(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dp[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dp, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dp[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dp, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -26428,27 +26428,27 @@ computeExchangeFockDDDP6(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dp[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dp[displ_k + l] * dp_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dp, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dp, displ_k + l) * dp_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dp[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dp, displ_k + l);
 
-            const auto l_prim = D_inds_K_dp[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dp, displ_k + l);
 
-            const auto l_cgto = p_prim_aoinds[(l_prim / 3) + p_prim_count * (l_prim % 3)];
+            const auto l_cgto = rawValue(p_prim_aoinds, (l_prim / 3) + p_prim_count * (l_prim % 3));
 
-            const auto a_l = p_prim_info[l_prim / 3 + p_prim_count * 0];
+            const auto a_l = rawValue(p_prim_info, l_prim / 3 + p_prim_count * 0);
 
-            const double r_l[3] = {p_prim_info[l_prim / 3 + p_prim_count * 2],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 3],
-                                   p_prim_info[l_prim / 3 + p_prim_count * 4]};
+            const double r_l[3] = {rawValue(p_prim_info, l_prim / 3 + p_prim_count * 2),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 3),
+                                   rawValue(p_prim_info, l_prim / 3 + p_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dp[displ_k + l];
 
@@ -26666,7 +26666,7 @@ computeExchangeFockDDDP6(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -26676,9 +26676,9 @@ computeExchangeFockDDDP6(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -26690,19 +26690,19 @@ computeExchangeFockDDDP6(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD0(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -26713,12 +26713,12 @@ computeExchangeFockDDDD0(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -26735,55 +26735,55 @@ computeExchangeFockDDDD0(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -26791,27 +26791,27 @@ computeExchangeFockDDDD0(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -26976,7 +26976,7 @@ computeExchangeFockDDDD0(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -26986,9 +26986,9 @@ computeExchangeFockDDDD0(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -27000,19 +27000,19 @@ computeExchangeFockDDDD0(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD1(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -27023,12 +27023,12 @@ computeExchangeFockDDDD1(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -27045,55 +27045,55 @@ computeExchangeFockDDDD1(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -27101,27 +27101,27 @@ computeExchangeFockDDDD1(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -27356,7 +27356,7 @@ computeExchangeFockDDDD1(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -27366,9 +27366,9 @@ computeExchangeFockDDDD1(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -27380,19 +27380,19 @@ computeExchangeFockDDDD1(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD2(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -27403,12 +27403,12 @@ computeExchangeFockDDDD2(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -27425,55 +27425,55 @@ computeExchangeFockDDDD2(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -27481,27 +27481,27 @@ computeExchangeFockDDDD2(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -27760,7 +27760,7 @@ computeExchangeFockDDDD2(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -27770,9 +27770,9 @@ computeExchangeFockDDDD2(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -27784,19 +27784,19 @@ computeExchangeFockDDDD2(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD3(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -27807,12 +27807,12 @@ computeExchangeFockDDDD3(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -27829,55 +27829,55 @@ computeExchangeFockDDDD3(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -27885,27 +27885,27 @@ computeExchangeFockDDDD3(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -28236,7 +28236,7 @@ computeExchangeFockDDDD3(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -28246,9 +28246,9 @@ computeExchangeFockDDDD3(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -28260,19 +28260,19 @@ computeExchangeFockDDDD3(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD4(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -28283,12 +28283,12 @@ computeExchangeFockDDDD4(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -28305,55 +28305,55 @@ computeExchangeFockDDDD4(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -28361,27 +28361,27 @@ computeExchangeFockDDDD4(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -28472,7 +28472,7 @@ computeExchangeFockDDDD4(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -28482,9 +28482,9 @@ computeExchangeFockDDDD4(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -28496,19 +28496,19 @@ computeExchangeFockDDDD4(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD5(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -28519,12 +28519,12 @@ computeExchangeFockDDDD5(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -28541,55 +28541,55 @@ computeExchangeFockDDDD5(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -28597,27 +28597,27 @@ computeExchangeFockDDDD5(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -28809,7 +28809,7 @@ computeExchangeFockDDDD5(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -28819,9 +28819,9 @@ computeExchangeFockDDDD5(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -28833,19 +28833,19 @@ computeExchangeFockDDDD5(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD6(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -28856,12 +28856,12 @@ computeExchangeFockDDDD6(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -28878,55 +28878,55 @@ computeExchangeFockDDDD6(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -28934,27 +28934,27 @@ computeExchangeFockDDDD6(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -29234,7 +29234,7 @@ computeExchangeFockDDDD6(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -29244,9 +29244,9 @@ computeExchangeFockDDDD6(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -29258,19 +29258,19 @@ computeExchangeFockDDDD6(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD7(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -29281,12 +29281,12 @@ computeExchangeFockDDDD7(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -29303,55 +29303,55 @@ computeExchangeFockDDDD7(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -29359,27 +29359,27 @@ computeExchangeFockDDDD7(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -29556,7 +29556,7 @@ computeExchangeFockDDDD7(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -29566,9 +29566,9 @@ computeExchangeFockDDDD7(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -29580,19 +29580,19 @@ computeExchangeFockDDDD7(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD8(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -29603,12 +29603,12 @@ computeExchangeFockDDDD8(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -29625,55 +29625,55 @@ computeExchangeFockDDDD8(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -29681,27 +29681,27 @@ computeExchangeFockDDDD8(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -29862,7 +29862,7 @@ computeExchangeFockDDDD8(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -29872,9 +29872,9 @@ computeExchangeFockDDDD8(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -29886,19 +29886,19 @@ computeExchangeFockDDDD8(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD9(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -29909,12 +29909,12 @@ computeExchangeFockDDDD9(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -29931,55 +29931,55 @@ computeExchangeFockDDDD9(double*         mat_K,
         //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -29987,27 +29987,27 @@ computeExchangeFockDDDD9(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -30127,7 +30127,7 @@ computeExchangeFockDDDD9(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -30137,9 +30137,9 @@ computeExchangeFockDDDD9(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -30151,19 +30151,19 @@ computeExchangeFockDDDD9(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD10(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -30174,12 +30174,12 @@ computeExchangeFockDDDD10(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -30196,55 +30196,55 @@ computeExchangeFockDDDD10(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -30252,27 +30252,27 @@ computeExchangeFockDDDD10(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -30566,7 +30566,7 @@ computeExchangeFockDDDD10(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -30576,9 +30576,9 @@ computeExchangeFockDDDD10(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -30590,19 +30590,19 @@ computeExchangeFockDDDD10(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD11(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -30613,12 +30613,12 @@ computeExchangeFockDDDD11(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -30635,55 +30635,55 @@ computeExchangeFockDDDD11(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -30691,27 +30691,27 @@ computeExchangeFockDDDD11(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -31020,7 +31020,7 @@ computeExchangeFockDDDD11(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -31030,9 +31030,9 @@ computeExchangeFockDDDD11(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -31044,19 +31044,19 @@ computeExchangeFockDDDD11(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD12(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -31067,12 +31067,12 @@ computeExchangeFockDDDD12(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -31089,55 +31089,55 @@ computeExchangeFockDDDD12(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -31145,27 +31145,27 @@ computeExchangeFockDDDD12(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -31256,7 +31256,7 @@ computeExchangeFockDDDD12(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -31266,9 +31266,9 @@ computeExchangeFockDDDD12(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -31280,19 +31280,19 @@ computeExchangeFockDDDD12(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD13(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -31303,12 +31303,12 @@ computeExchangeFockDDDD13(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -31325,55 +31325,55 @@ computeExchangeFockDDDD13(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -31381,27 +31381,27 @@ computeExchangeFockDDDD13(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -31527,7 +31527,7 @@ computeExchangeFockDDDD13(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -31537,9 +31537,9 @@ computeExchangeFockDDDD13(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -31551,19 +31551,19 @@ computeExchangeFockDDDD13(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD14(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -31574,12 +31574,12 @@ computeExchangeFockDDDD14(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -31596,55 +31596,55 @@ computeExchangeFockDDDD14(double*         mat_K,
         //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -31652,27 +31652,27 @@ computeExchangeFockDDDD14(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -31813,7 +31813,7 @@ computeExchangeFockDDDD14(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -31823,9 +31823,9 @@ computeExchangeFockDDDD14(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -31837,19 +31837,19 @@ computeExchangeFockDDDD14(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD15(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -31860,12 +31860,12 @@ computeExchangeFockDDDD15(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -31882,55 +31882,55 @@ computeExchangeFockDDDD15(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -31938,27 +31938,27 @@ computeExchangeFockDDDD15(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -32163,7 +32163,7 @@ computeExchangeFockDDDD15(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -32173,9 +32173,9 @@ computeExchangeFockDDDD15(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -32187,19 +32187,19 @@ computeExchangeFockDDDD15(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD16(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -32210,12 +32210,12 @@ computeExchangeFockDDDD16(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -32232,55 +32232,55 @@ computeExchangeFockDDDD16(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -32288,27 +32288,27 @@ computeExchangeFockDDDD16(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -32540,7 +32540,7 @@ computeExchangeFockDDDD16(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -32550,9 +32550,9 @@ computeExchangeFockDDDD16(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -32564,19 +32564,19 @@ computeExchangeFockDDDD16(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD17(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -32587,12 +32587,12 @@ computeExchangeFockDDDD17(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -32609,55 +32609,55 @@ computeExchangeFockDDDD17(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -32665,27 +32665,27 @@ computeExchangeFockDDDD17(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -32838,7 +32838,7 @@ computeExchangeFockDDDD17(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -32848,9 +32848,9 @@ computeExchangeFockDDDD17(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }
@@ -32862,19 +32862,19 @@ computeExchangeFockDDDD17(double*         mat_K,
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDDDD18(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_dd,
-                        const uint32_t* pair_inds_k_for_K_dd,
-                        const uint32_t  pair_inds_count_for_K_dd,
+                        const int32_t* pair_inds_i_for_K_dd,
+                        const int32_t* pair_inds_k_for_K_dd,
+                        const int32_t  pair_inds_count_for_K_dd,
                         const double*   d_prim_info,
-                        const uint32_t* d_prim_aoinds,
-                        const uint32_t  d_prim_count,
+                        const int32_t* d_prim_aoinds,
+                        const int32_t  d_prim_count,
                         const double    dd_max_D,
                         const double*   mat_D_full_AO,
-                        const uint32_t  naos,
+                        const int32_t  naos,
                         const double*   Q_K_dd,
-                        const uint32_t* D_inds_K_dd,
-                        const uint32_t* pair_displs_K_dd,
-                        const uint32_t* pair_counts_K_dd,
+                        const int32_t* D_inds_K_dd,
+                        const int32_t* pair_displs_K_dd,
+                        const int32_t* pair_counts_K_dd,
                         const double*   pair_data_K_dd,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
@@ -32885,12 +32885,12 @@ computeExchangeFockDDDD18(double*         mat_K,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     // we make sure that ik < pair_inds_count_for_K_dd when calling the kernel
 
@@ -32907,55 +32907,55 @@ computeExchangeFockDDDD18(double*         mat_K,
         delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
         delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
-        i = pair_inds_i_for_K_dd[ik];
-        k = pair_inds_k_for_K_dd[ik];
+        i = rawValue(pair_inds_i_for_K_dd, ik);
+        k = rawValue(pair_inds_k_for_K_dd, ik);
 
-        count_i = pair_counts_K_dd[i];
-        count_k = pair_counts_K_dd[k];
+        count_i = rawValue(pair_counts_K_dd, i);
+        count_k = rawValue(pair_counts_K_dd, k);
 
-        displ_i = pair_displs_K_dd[i];
-        displ_k = pair_displs_K_dd[k];
+        displ_i = rawValue(pair_displs_K_dd, i);
+        displ_k = rawValue(pair_displs_K_dd, k);
 
-        a_i = d_prim_info[i / 6 + d_prim_count * 0];
+        a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-        r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-        r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-        r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+        r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-        r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-        r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+        r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+        r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+        r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
     }
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        uint32_t j_prim, j_cgto;
+        int32_t j_prim, j_cgto;
 
         if (j < count_i)
         {
-            Q_ij   = Q_K_dd[displ_i + j];
+            Q_ij   = rawValue(Q_K_dd, displ_i + j);
 
-            j_prim = D_inds_K_dd[displ_i + j];
+            j_prim = rawValue(D_inds_K_dd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
@@ -32963,27 +32963,27 @@ computeExchangeFockDDDD18(double*         mat_K,
             S_ij_00 = pair_data_K_dd[displ_i + j];
         }
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            // Q_kl == Q_K_dd[displ_k + l]
-            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            // Q_kl == rawValue(Q_K_dd, displ_k + l)
+            if ((j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            // const auto Q_kl = Q_K_dd[displ_k + l];
+            // const auto Q_kl = rawValue(Q_K_dd, displ_k + l);
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
             const auto S_kl_00 = pair_data_K_dd[displ_k + l];
 
@@ -33275,7 +33275,7 @@ computeExchangeFockDDDD18(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
         }
     }
 
@@ -33285,9 +33285,9 @@ computeExchangeFockDDDD18(double*         mat_K,
     {
         double K_ik = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 K_ik += ERIs[y][x];
             }

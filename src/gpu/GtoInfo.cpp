@@ -37,7 +37,7 @@
 namespace gtoinfo {  // gtoinfo namespace
 
 auto
-updatePrimitiveInfoForS(double* s_prim_info, uint32_t* s_prim_aoinds, const int64_t s_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
+updatePrimitiveInfoForS(double* s_prim_info, int32_t* s_prim_aoinds, const int64_t s_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
 {
     int64_t s_prim_offset = 0;
 
@@ -66,7 +66,7 @@ updatePrimitiveInfoForS(double* s_prim_info, uint32_t* s_prim_aoinds, const int6
                     s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 3] = gto_coords[i][1];
                     s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 4] = gto_coords[i][2];
 
-                    s_prim_aoinds[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds[i]);
+                    s_prim_aoinds[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = static_cast<int32_t>(gto_ao_inds[i]);
                 }
             }
 
@@ -76,7 +76,7 @@ updatePrimitiveInfoForS(double* s_prim_info, uint32_t* s_prim_aoinds, const int6
 }
 
 auto
-updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int64_t p_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
+updatePrimitiveInfoForP(double* p_prim_info, int32_t* p_prim_aoinds, const int64_t p_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
 {
     int64_t p_prim_offset = 0;
 
@@ -105,9 +105,9 @@ updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int6
                     p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 3] = gto_coords[i][1];
                     p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 4] = gto_coords[i][2];
 
-                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 0]);
-                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 1] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 1]);
-                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 2] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 2]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 0] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 0]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 1] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 1]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 2] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 2]);
                 }
             }
 
@@ -117,7 +117,7 @@ updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int6
 }
 
 auto
-updatePrimitiveInfoForD(double* d_prim_info, uint32_t* d_prim_aoinds, const int64_t d_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
+updatePrimitiveInfoForD(double* d_prim_info, int32_t* d_prim_aoinds, const int64_t d_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
 {
     int64_t d_prim_offset = 0;
 
@@ -146,12 +146,12 @@ updatePrimitiveInfoForD(double* d_prim_info, uint32_t* d_prim_aoinds, const int6
                     d_prim_info[d_prim_offset + i + j * ncgtos + d_prim_count * 3] = gto_coords[i][1];
                     d_prim_info[d_prim_offset + i + j * ncgtos + d_prim_count * 4] = gto_coords[i][2];
 
-                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 0]);
-                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 1] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 1]);
-                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 2] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 2]);
-                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 3] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 3]);
-                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 4] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 4]);
-                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 5] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 5]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 0] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 0]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 1] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 1]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 2] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 2]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 3] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 3]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 4] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 4]);
+                    d_prim_aoinds[d_prim_offset + i + j * ncgtos + d_prim_count * 5] = static_cast<int32_t>(gto_ao_inds_cart[i + ncgtos * 5]);
                 }
             }
 

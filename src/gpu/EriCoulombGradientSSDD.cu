@@ -40,25 +40,25 @@ namespace gpu {  // gpu namespace
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombGradientSSDD_I_0(double*         grad_x,
-                               const uint32_t  grad_cart_ind,
+                               const int32_t  grad_cart_ind,
                                const double    prefac_coulomb,
                                const double*   s_prim_info,
-                               const uint32_t  s_prim_count,
+                               const int32_t  s_prim_count,
                                const double*   d_prim_info,
-                               const uint32_t  d_prim_count,
+                               const int32_t  d_prim_count,
                                const double*   ss_mat_D_local,
                                const double*   dd_mat_D,
                                const double*   ss_mat_Q_local,
                                const double*   dd_mat_Q,
-                               const uint32_t* ss_first_inds_local,
-                               const uint32_t* ss_second_inds_local,
+                               const int32_t* ss_first_inds_local,
+                               const int32_t* ss_second_inds_local,
                                const double*   ss_pair_data_local,
-                               const uint32_t  ss_prim_pair_count_local,
-                               const uint32_t* dd_first_inds,
-                               const uint32_t* dd_second_inds,
+                               const int32_t  ss_prim_pair_count_local,
+                               const int32_t* dd_first_inds,
+                               const int32_t* dd_second_inds,
                                const double*   dd_pair_data,
-                               const uint32_t  dd_prim_pair_count,
-                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const int32_t  dd_prim_pair_count,
+                               const int32_t* prim_cart_ao_to_atom_inds,
                                const double*   boys_func_table,
                                const double*   boys_func_ft,
                                const double    eri_threshold)
@@ -67,14 +67,14 @@ computeCoulombGradientSSDD_I_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
     double PA_x, PB_x;
-    uint32_t i, j;
+    int32_t i, j;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
@@ -98,27 +98,27 @@ computeCoulombGradientSSDD_I_0(double*         grad_x,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * ss_mat_D_local[ij];
+        ij_factor_D = (static_cast<double>(i != j) + 1.0) * rawValue(ss_mat_D_local, ij);
 
         PA_x = (a_j  * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
         PB_x = (-a_i * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
@@ -128,31 +128,31 @@ computeCoulombGradientSSDD_I_0(double*         grad_x,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl >= dd_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(ss_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((kl >= dd_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
 
-        const auto k = dd_first_inds[kl];
-        const auto l = dd_second_inds[kl];
+        const auto k = rawValue(dd_first_inds, kl);
+        const auto l = rawValue(dd_second_inds, kl);
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -378,7 +378,7 @@ computeCoulombGradientSSDD_I_0(double*         grad_x,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * kl_factor;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * kl_factor;
 
     }
 
@@ -389,36 +389,36 @@ computeCoulombGradientSSDD_I_0(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             grad_i_x += ERIs[n][threadIdx.x];
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[i], grad_i_x * ij_factor_D * 2.0 * prefac_coulomb);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, i), grad_i_x * ij_factor_D * 2.0 * prefac_coulomb);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombGradientSSDD_J_0(double*         grad_x,
-                               const uint32_t  grad_cart_ind,
+                               const int32_t  grad_cart_ind,
                                const double    prefac_coulomb,
                                const double*   s_prim_info,
-                               const uint32_t  s_prim_count,
+                               const int32_t  s_prim_count,
                                const double*   d_prim_info,
-                               const uint32_t  d_prim_count,
+                               const int32_t  d_prim_count,
                                const double*   ss_mat_D_local,
                                const double*   dd_mat_D,
                                const double*   ss_mat_Q_local,
                                const double*   dd_mat_Q,
-                               const uint32_t* ss_first_inds_local,
-                               const uint32_t* ss_second_inds_local,
+                               const int32_t* ss_first_inds_local,
+                               const int32_t* ss_second_inds_local,
                                const double*   ss_pair_data_local,
-                               const uint32_t  ss_prim_pair_count_local,
-                               const uint32_t* dd_first_inds,
-                               const uint32_t* dd_second_inds,
+                               const int32_t  ss_prim_pair_count_local,
+                               const int32_t* dd_first_inds,
+                               const int32_t* dd_second_inds,
                                const double*   dd_pair_data,
-                               const uint32_t  dd_prim_pair_count,
-                               const uint32_t* prim_cart_ao_to_atom_inds,
+                               const int32_t  dd_prim_pair_count,
+                               const int32_t* prim_cart_ao_to_atom_inds,
                                const double*   boys_func_table,
                                const double*   boys_func_ft,
                                const double    eri_threshold)
@@ -427,14 +427,14 @@ computeCoulombGradientSSDD_J_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
     double PA_x, PB_x;
-    uint32_t i, j;
+    int32_t i, j;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
@@ -458,27 +458,27 @@ computeCoulombGradientSSDD_J_0(double*         grad_x,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
-        ij_factor_D = (static_cast<double>(i != j) + 1.0) * ss_mat_D_local[ij];
+        ij_factor_D = (static_cast<double>(i != j) + 1.0) * rawValue(ss_mat_D_local, ij);
 
         PA_x = (a_j  * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
         PB_x = (-a_i * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
@@ -488,31 +488,31 @@ computeCoulombGradientSSDD_J_0(double*         grad_x,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl >= dd_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(ss_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((kl >= dd_prim_pair_count) || (ij >= ss_prim_pair_count_local) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
 
-        const auto k = dd_first_inds[kl];
-        const auto l = dd_second_inds[kl];
+        const auto k = rawValue(dd_first_inds, kl);
+        const auto l = rawValue(dd_second_inds, kl);
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -739,7 +739,7 @@ computeCoulombGradientSSDD_J_0(double*         grad_x,
 
                 );
 
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * kl_factor;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * kl_factor;
     }
 
 
@@ -749,12 +749,12 @@ computeCoulombGradientSSDD_J_0(double*         grad_x,
     {
         double grad_j_x = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             grad_j_x += ERIs[n][threadIdx.x];
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[j], grad_j_x * ij_factor_D * 2.0 * prefac_coulomb);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, j), grad_j_x * ij_factor_D * 2.0 * prefac_coulomb);
     }
 }
 

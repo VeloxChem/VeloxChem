@@ -57,6 +57,12 @@ static inline __device__ __attribute__((always_inline)) PointerType indexedAddre
                                          + calculateOffset<std::remove_pointer_t<PointerType>>(idx));
 }
 
+template<typename ValueType, typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value, bool> = true>
+static inline __device__ __attribute__((always_inline)) ValueType& rawValue(ValueType* buffer, IndexType idx)
+{
+    return *indexedAddress(buffer, idx);
+}
+
 template<typename ValueType>
 class AmdFastBuffer
 {
@@ -68,24 +74,22 @@ public:
     template<typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value && std::is_const_v<std::remove_pointer_t<ValueType>>, bool> = true>
     inline __device__ __attribute__((always_inline)) const ValueType& operator[](IndexType idx) const
     {
-        return *indexedAddress(buffer, idx);
+        return rawValue(buffer, idx);
     }
     template<typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value && !std::is_const_v<std::remove_pointer_t<ValueType>>, bool> = true>
     inline __device__ __attribute__((always_inline)) ValueType& operator[](IndexType idx)
     {
-        return *indexedAddress(buffer, idx);
+        return rawValue(buffer, idx);
     }
 };
 
 __device__ __attribute__((always_inline)) static void
-computeBoysFunction(double* values_in, const double fa, const uint32_t N, const double* bf_table, const double* ft_in)
+computeBoysFunction(double* values, const double fa, const int32_t N, const double* bf_table, const double* ft)
 {
     // Note: 847 = 121 * 7
-    AmdFastBuffer<const double> bf_data{bf_table + N * 847};
-    AmdFastBuffer<const double> ft{ft_in};
-    AmdFastBuffer<double> values{values_in};
+    const double* bf_data = bf_table + N * 847;
 
-    uint32_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<uint32_t>(10.0 * fa + 0.5);
+    int32_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<int32_t>(10.0 * fa + 0.5);
 
     if (pnt < 121)
     {
@@ -95,17 +99,17 @@ computeBoysFunction(double* values_in, const double fa, const uint32_t N, const 
 
         const double w4 = w2 * w2;
 
-        values[N] = bf_data[pnt * 7 + 0] + bf_data[pnt * 7 + 1] * w + bf_data[pnt * 7 + 2] * w2 + bf_data[pnt * 7 + 3] * w2 * w
+        rawValue(values, N) = rawValue(bf_data, pnt * 7 + 0) + rawValue(bf_data, pnt * 7 + 1) * w + rawValue(bf_data, pnt * 7 + 2) * w2 + rawValue(bf_data, pnt * 7 + 3) * w2 * w
 
-                    + bf_data[pnt * 7 + 4] * w4 + bf_data[pnt * 7 + 5] * w4 * w + bf_data[pnt * 7 + 6] * w4 * w2;
+                    + rawValue(bf_data, pnt * 7 + 4) * w4 + rawValue(bf_data, pnt * 7 + 5) * w4 * w + rawValue(bf_data, pnt * 7 + 6) * w4 * w2;
 
         const double f2a = fa + fa;
 
         const double fx = exp(-fa);
 
-        for (uint32_t j = 0; j < N; j++)
+        for (int32_t j = 0; j < N; j++)
         {
-            values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j]+ fx);
+            rawValue(values, N - j - 1) = rawValue(ft, N - j - 1) * (f2a * rawValue(values, N - j)+ fx);
         }
     }
     else
@@ -114,7 +118,7 @@ computeBoysFunction(double* values_in, const double fa, const uint32_t N, const 
 
         double pf = 0.5 * fia;
 
-        values[0] = MATH_CONST_HALF_SQRT_PI * sqrt(fia);
+        rawValue(values, 0) = MATH_CONST_HALF_SQRT_PI * sqrt(fia);
 
         if (pnt < 921)
         {
@@ -124,22 +128,22 @@ computeBoysFunction(double* values_in, const double fa, const uint32_t N, const 
 
             const double fx = exp(-fa);
 
-            values[0] -= f * fx;
+            rawValue(values, 0) -= f * fx;
 
             const double rterm = pf * fx;
 
-            for (uint32_t j = 1; j <= N; j++)
+            for (int32_t j = 1; j <= N; j++)
             {
-                values[j] = pf * values[j - 1] - rterm;
+                rawValue(values, j) = pf * rawValue(values, j - 1) - rterm;
 
                 pf += fia;
             }
         }
         else
         {
-            for (uint32_t j = 1; j <= N; j++)
+            for (int32_t j = 1; j <= N; j++)
             {
-                values[j] = pf * values[j - 1];
+                rawValue(values, j) = pf * rawValue(values, j - 1);
 
                 pf += fia;
             }
