@@ -1807,12 +1807,7 @@ class MMForceFieldGenerator:
 
             if not bond_found:
                 # Default value for bonds
-                labels = self.molecule.get_labels()
-                if labels[i] == 'H' or labels[j] == 'H':
-                    k_r = 1e+5
-                else:
-                    k_r = 2.5e+5
-                r, comment = r_eq, 'Guessed'
+                r, k_r, comment = r_eq, 2.5e+5, 'Guessed'
 
             if self.eq_param:
                 if abs(r - r_eq) > self.r_thresh:
