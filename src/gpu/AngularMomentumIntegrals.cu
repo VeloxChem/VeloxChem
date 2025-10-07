@@ -42,6 +42,7 @@
 #include <vector>
 
 #include "AngularMomentumIntegrals.hpp"
+#include "BoysFuncGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
 #include "GpuSafeChecks.hpp"
@@ -63,16 +64,16 @@ computeAngularMomentumSS(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   s_prim_info,
-                        const uint32_t  s_prim_count,
-                        const uint32_t* first_inds_local,
-                        const uint32_t* second_inds_local,
-                        const uint32_t  ss_prim_pair_count_local)
+                        const int32_t  s_prim_count,
+                        const int32_t* first_inds_local,
+                        const int32_t* second_inds_local,
+                        const int32_t  ss_prim_pair_count_local)
 {
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -88,17 +89,17 @@ computeAngularMomentumSS(double*         mat_mu_X,
         const auto i = first_inds_local[ij];
         const auto j = second_inds_local[ij];
 
-        const auto a_i = s_prim_info[i + s_prim_count * 0];
-        const auto c_i = s_prim_info[i + s_prim_count * 1];
-        const auto x_i = s_prim_info[i + s_prim_count * 2];
-        const auto y_i = s_prim_info[i + s_prim_count * 3];
-        const auto z_i = s_prim_info[i + s_prim_count * 4];
+        const auto a_i = rawValue(s_prim_info, i + s_prim_count * 0);
+        const auto c_i = rawValue(s_prim_info, i + s_prim_count * 1);
+        const auto x_i = rawValue(s_prim_info, i + s_prim_count * 2);
+        const auto y_i = rawValue(s_prim_info, i + s_prim_count * 3);
+        const auto z_i = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        const auto a_j = s_prim_info[j + s_prim_count * 0];
-        const auto c_j = s_prim_info[j + s_prim_count * 1];
-        const auto x_j = s_prim_info[j + s_prim_count * 2];
-        const auto y_j = s_prim_info[j + s_prim_count * 3];
-        const auto z_j = s_prim_info[j + s_prim_count * 4];
+        const auto a_j = rawValue(s_prim_info, j + s_prim_count * 0);
+        const auto c_j = rawValue(s_prim_info, j + s_prim_count * 1);
+        const auto x_j = rawValue(s_prim_info, j + s_prim_count * 2);
+        const auto y_j = rawValue(s_prim_info, j + s_prim_count * 3);
+        const auto z_j = rawValue(s_prim_info, j + s_prim_count * 4);
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -114,7 +115,7 @@ computeAngularMomentumSS(double*         mat_mu_X,
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
-        for (uint32_t m = 0; m < 3; m++)
+        for (int32_t m = 0; m < 3; m++)
         {
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
@@ -141,18 +142,18 @@ computeAngularMomentumSP(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   s_prim_info,
-                        const uint32_t  s_prim_count,
+                        const int32_t  s_prim_count,
                         const double*   p_prim_info,
-                        const uint32_t  p_prim_count,
-                        const uint32_t* sp_first_inds_local,
-                        const uint32_t* sp_second_inds_local,
-                        const uint32_t  sp_prim_pair_count_local)
+                        const int32_t  p_prim_count,
+                        const int32_t* sp_first_inds_local,
+                        const int32_t* sp_second_inds_local,
+                        const int32_t  sp_prim_pair_count_local)
 {
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -165,20 +166,20 @@ computeAngularMomentumSP(double*         mat_mu_X,
 
     if (ij < sp_prim_pair_count_local)
     {
-        const auto i = sp_first_inds_local[ij];
-        const auto j = sp_second_inds_local[ij];
+        const auto i = rawValue(sp_first_inds_local, ij);
+        const auto j = rawValue(sp_second_inds_local, ij);
 
-        const auto a_i = s_prim_info[i + s_prim_count * 0];
-        const auto c_i = s_prim_info[i + s_prim_count * 1];
-        const auto x_i = s_prim_info[i + s_prim_count * 2];
-        const auto y_i = s_prim_info[i + s_prim_count * 3];
-        const auto z_i = s_prim_info[i + s_prim_count * 4];
+        const auto a_i = rawValue(s_prim_info, i + s_prim_count * 0);
+        const auto c_i = rawValue(s_prim_info, i + s_prim_count * 1);
+        const auto x_i = rawValue(s_prim_info, i + s_prim_count * 2);
+        const auto y_i = rawValue(s_prim_info, i + s_prim_count * 3);
+        const auto z_i = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
-        const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
-        const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
-        const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
-        const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+        const auto a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
+        const auto c_j = rawValue(p_prim_info, j / 3 + p_prim_count * 1);
+        const auto x_j = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        const auto y_j = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        const auto z_j = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         const auto b0 = j % 3;
 
@@ -198,7 +199,7 @@ computeAngularMomentumSP(double*         mat_mu_X,
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
-        for (uint32_t m = 0; m < 3; m++)
+        for (int32_t m = 0; m < 3; m++)
         {
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
@@ -253,19 +254,19 @@ computeAngularMomentumSD(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   s_prim_info,
-                        const uint32_t  s_prim_count,
+                        const int32_t  s_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t  d_prim_count,
-                        const uint32_t* sd_first_inds_local,
-                        const uint32_t* sd_second_inds_local,
-                        const uint32_t  sd_prim_pair_count_local)
+                        const int32_t  d_prim_count,
+                        const int32_t* sd_first_inds_local,
+                        const int32_t* sd_second_inds_local,
+                        const int32_t  sd_prim_pair_count_local)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -285,20 +286,20 @@ computeAngularMomentumSD(double*         mat_mu_X,
 
     if (ij < sd_prim_pair_count_local)
     {
-        const auto i = sd_first_inds_local[ij];
-        const auto j = sd_second_inds_local[ij];
+        const auto i = rawValue(sd_first_inds_local, ij);
+        const auto j = rawValue(sd_second_inds_local, ij);
 
-        const auto a_i = s_prim_info[i + s_prim_count * 0];
-        const auto c_i = s_prim_info[i + s_prim_count * 1];
-        const auto x_i = s_prim_info[i + s_prim_count * 2];
-        const auto y_i = s_prim_info[i + s_prim_count * 3];
-        const auto z_i = s_prim_info[i + s_prim_count * 4];
+        const auto a_i = rawValue(s_prim_info, i + s_prim_count * 0);
+        const auto c_i = rawValue(s_prim_info, i + s_prim_count * 1);
+        const auto x_i = rawValue(s_prim_info, i + s_prim_count * 2);
+        const auto y_i = rawValue(s_prim_info, i + s_prim_count * 3);
+        const auto z_i = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
-        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
-        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+        const auto a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
+        const auto c_j = rawValue(d_prim_info, j / 6 + d_prim_count * 1);
+        const auto x_j = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        const auto y_j = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        const auto z_j = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         const auto b0 = d_cart_inds[j % 6][0];
         const auto b1 = d_cart_inds[j % 6][1];
@@ -320,7 +321,7 @@ computeAngularMomentumSD(double*         mat_mu_X,
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
-        for (uint32_t m = 0; m < 3; m++)
+        for (int32_t m = 0; m < 3; m++)
         {
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
@@ -395,16 +396,16 @@ computeAngularMomentumPP(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   p_prim_info,
-                        const uint32_t  p_prim_count,
-                        const uint32_t* pp_first_inds_local,
-                        const uint32_t* pp_second_inds_local,
-                        const uint32_t  pp_prim_pair_count_local)
+                        const int32_t  p_prim_count,
+                        const int32_t* pp_first_inds_local,
+                        const int32_t* pp_second_inds_local,
+                        const int32_t  pp_prim_pair_count_local)
 {
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -417,20 +418,20 @@ computeAngularMomentumPP(double*         mat_mu_X,
 
     if (ij < pp_prim_pair_count_local)
     {
-        const auto i = pp_first_inds_local[ij];
-        const auto j = pp_second_inds_local[ij];
+        const auto i = rawValue(pp_first_inds_local, ij);
+        const auto j = rawValue(pp_second_inds_local, ij);
 
-        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
-        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
-        const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
-        const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
-        const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+        const auto a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
+        const auto c_i = rawValue(p_prim_info, i / 3 + p_prim_count * 1);
+        const auto x_i = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        const auto y_i = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        const auto z_i = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
-        const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
-        const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
-        const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
-        const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+        const auto a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
+        const auto c_j = rawValue(p_prim_info, j / 3 + p_prim_count * 1);
+        const auto x_j = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        const auto y_j = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        const auto z_j = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         const auto a0 = i % 3;
         const auto b0 = j % 3;
@@ -453,7 +454,7 @@ computeAngularMomentumPP(double*         mat_mu_X,
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
-        for (uint32_t m = 0; m < 3; m++)
+        for (int32_t m = 0; m < 3; m++)
         {
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
@@ -537,19 +538,19 @@ computeAngularMomentumPD(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   p_prim_info,
-                        const uint32_t  p_prim_count,
+                        const int32_t  p_prim_count,
                         const double*   d_prim_info,
-                        const uint32_t  d_prim_count,
-                        const uint32_t* pd_first_inds_local,
-                        const uint32_t* pd_second_inds_local,
-                        const uint32_t  pd_prim_pair_count_local)
+                        const int32_t  d_prim_count,
+                        const int32_t* pd_first_inds_local,
+                        const int32_t* pd_second_inds_local,
+                        const int32_t  pd_prim_pair_count_local)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -569,20 +570,20 @@ computeAngularMomentumPD(double*         mat_mu_X,
 
     if (ij < pd_prim_pair_count_local)
     {
-        const auto i = pd_first_inds_local[ij];
-        const auto j = pd_second_inds_local[ij];
+        const auto i = rawValue(pd_first_inds_local, ij);
+        const auto j = rawValue(pd_second_inds_local, ij);
 
-        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
-        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
-        const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
-        const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
-        const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+        const auto a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
+        const auto c_i = rawValue(p_prim_info, i / 3 + p_prim_count * 1);
+        const auto x_i = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        const auto y_i = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        const auto z_i = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
-        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
-        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+        const auto a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
+        const auto c_j = rawValue(d_prim_info, j / 6 + d_prim_count * 1);
+        const auto x_j = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        const auto y_j = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        const auto z_j = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         const auto a0 = i % 3;
 
@@ -608,7 +609,7 @@ computeAngularMomentumPD(double*         mat_mu_X,
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
-        for (uint32_t m = 0; m < 3; m++)
+        for (int32_t m = 0; m < 3; m++)
         {
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
@@ -738,17 +739,17 @@ computeAngularMomentumDD(double*         mat_mu_X,
                         const double    origin_Y,
                         const double    origin_Z,
                         const double*   d_prim_info,
-                        const uint32_t  d_prim_count,
-                        const uint32_t* dd_first_inds_local,
-                        const uint32_t* dd_second_inds_local,
-                        const uint32_t  dd_prim_pair_count_local)
+                        const int32_t  d_prim_count,
+                        const int32_t* dd_first_inds_local,
+                        const int32_t* dd_second_inds_local,
+                        const int32_t  dd_prim_pair_count_local)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -768,20 +769,20 @@ computeAngularMomentumDD(double*         mat_mu_X,
 
     if (ij < dd_prim_pair_count_local)
     {
-        const auto i = dd_first_inds_local[ij];
-        const auto j = dd_second_inds_local[ij];
+        const auto i = rawValue(dd_first_inds_local, ij);
+        const auto j = rawValue(dd_second_inds_local, ij);
 
-        const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
-        const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
-        const auto x_i = d_prim_info[i / 6 + d_prim_count * 2];
-        const auto y_i = d_prim_info[i / 6 + d_prim_count * 3];
-        const auto z_i = d_prim_info[i / 6 + d_prim_count * 4];
+        const auto a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
+        const auto c_i = rawValue(d_prim_info, i / 6 + d_prim_count * 1);
+        const auto x_i = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+        const auto y_i = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+        const auto z_i = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-        const auto x_j = d_prim_info[j / 6 + d_prim_count * 2];
-        const auto y_j = d_prim_info[j / 6 + d_prim_count * 3];
-        const auto z_j = d_prim_info[j / 6 + d_prim_count * 4];
+        const auto a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
+        const auto c_j = rawValue(d_prim_info, j / 6 + d_prim_count * 1);
+        const auto x_j = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        const auto y_j = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        const auto z_j = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         const auto a0 = d_cart_inds[i % 6][0];
         const auto a1 = d_cart_inds[i % 6][1];
@@ -811,7 +812,7 @@ computeAngularMomentumDD(double*         mat_mu_X,
 
         double* mat_mu[3] = {mat_mu_X, mat_mu_Y, mat_mu_Z};
 
-        for (uint32_t m = 0; m < 3; m++)
+        for (int32_t m = 0; m < 3; m++)
         {
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;

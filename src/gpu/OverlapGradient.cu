@@ -41,6 +41,7 @@
 #include <tuple>
 #include <vector>
 
+#include "BoysFuncGPU.hpp"
 #include "OverlapGradient.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
@@ -57,35 +58,35 @@ namespace gpu {  // gpu namespace
 
 __global__ void
 computeOverlapGradientSS(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   s_prim_info,
-                         const uint32_t  s_prim_count,
+                         const int32_t  s_prim_count,
                          const double*   ss_mat_W_local,
-                         const uint32_t* first_inds_local,
-                         const uint32_t* second_inds_local,
-                         const uint32_t  ss_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds)
+                         const int32_t* first_inds_local,
+                         const int32_t* second_inds_local,
+                         const int32_t  ss_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds)
 {
     // each thread computes a primitive S matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (ij < ss_prim_pair_count_local)
     {
         const auto i = first_inds_local[ij];
         const auto j = second_inds_local[ij];
 
-        const auto a_i = s_prim_info[i + s_prim_count * 0];
-        const auto c_i = s_prim_info[i + s_prim_count * 1];
-        const double r_i[3] = {s_prim_info[i + s_prim_count * 2],
-                               s_prim_info[i + s_prim_count * 3],
-                               s_prim_info[i + s_prim_count * 4]};
+        const auto a_i = rawValue(s_prim_info, i + s_prim_count * 0);
+        const auto c_i = rawValue(s_prim_info, i + s_prim_count * 1);
+        const double r_i[3] = {rawValue(s_prim_info, i + s_prim_count * 2),
+                               rawValue(s_prim_info, i + s_prim_count * 3),
+                               rawValue(s_prim_info, i + s_prim_count * 4)};
 
-        const auto a_j = s_prim_info[j + s_prim_count * 0];
-        const auto c_j = s_prim_info[j + s_prim_count * 1];
-        const double r_j[3] = {s_prim_info[j + s_prim_count * 2],
-                               s_prim_info[j + s_prim_count * 3],
-                               s_prim_info[j + s_prim_count * 4]};
+        const auto a_j = rawValue(s_prim_info, j + s_prim_count * 0);
+        const auto c_j = rawValue(s_prim_info, j + s_prim_count * 1);
+        const double r_j[3] = {rawValue(s_prim_info, j + s_prim_count * 2),
+                               rawValue(s_prim_info, j + s_prim_count * 3),
+                               rawValue(s_prim_info, j + s_prim_count * 4)};
 
         const auto r2_ij = (r_j[0] - r_i[0]) * (r_j[0] - r_i[0]) +
                            (r_j[1] - r_i[1]) * (r_j[1] - r_i[1]) +
@@ -114,29 +115,29 @@ computeOverlapGradientSS(double*         grad_x,
 
         );
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[i], grad_i * ss_mat_W_local[ij] * ij_factor);
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[j], -grad_i * ss_mat_W_local[ij] * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, i), grad_i * rawValue(ss_mat_W_local, ij) * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, j), -grad_i * rawValue(ss_mat_W_local, ij) * ij_factor);
     }
 }
 
 __global__ void
 computeOverlapGradientSP(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   s_prim_info,
-                         const uint32_t  s_prim_count,
+                         const int32_t  s_prim_count,
                          const double*   p_prim_info,
-                         const uint32_t  p_prim_count,
+                         const int32_t  p_prim_count,
                          const double*   sp_mat_W_local,
-                         const uint32_t* sp_first_inds_local,
-                         const uint32_t* sp_second_inds_local,
-                         const uint32_t  sp_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds)
+                         const int32_t* sp_first_inds_local,
+                         const int32_t* sp_second_inds_local,
+                         const int32_t  sp_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds)
 {
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive S matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -149,20 +150,20 @@ computeOverlapGradientSP(double*         grad_x,
 
     if (ij < sp_prim_pair_count_local)
     {
-        const auto i = sp_first_inds_local[ij];
-        const auto j = sp_second_inds_local[ij];
+        const auto i = rawValue(sp_first_inds_local, ij);
+        const auto j = rawValue(sp_second_inds_local, ij);
 
-        const auto a_i = s_prim_info[i + s_prim_count * 0];
-        const auto c_i = s_prim_info[i + s_prim_count * 1];
-        const double r_i[3] = {s_prim_info[i + s_prim_count * 2],
-                               s_prim_info[i + s_prim_count * 3],
-                               s_prim_info[i + s_prim_count * 4]};
+        const auto a_i = rawValue(s_prim_info, i + s_prim_count * 0);
+        const auto c_i = rawValue(s_prim_info, i + s_prim_count * 1);
+        const double r_i[3] = {rawValue(s_prim_info, i + s_prim_count * 2),
+                               rawValue(s_prim_info, i + s_prim_count * 3),
+                               rawValue(s_prim_info, i + s_prim_count * 4)};
 
-        const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
-        const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
-        const double r_j[3] = {p_prim_info[j / 3 + p_prim_count * 2],
-                               p_prim_info[j / 3 + p_prim_count * 3],
-                               p_prim_info[j / 3 + p_prim_count * 4]};
+        const auto a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
+        const auto c_j = rawValue(p_prim_info, j / 3 + p_prim_count * 1);
+        const double r_j[3] = {rawValue(p_prim_info, j / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, j / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, j / 3 + p_prim_count * 4)};
 
         const auto b0 = j % 3;
 
@@ -198,31 +199,31 @@ computeOverlapGradientSP(double*         grad_x,
 
         );
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[i], grad_i * sp_mat_W_local[ij] * ij_factor);
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + j], -grad_i * sp_mat_W_local[ij] * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, i), grad_i * rawValue(sp_mat_W_local, ij) * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + j), -grad_i * rawValue(sp_mat_W_local, ij) * ij_factor);
     }
 }
 
 __global__ void
 computeOverlapGradientSD(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   s_prim_info,
-                         const uint32_t  s_prim_count,
+                         const int32_t  s_prim_count,
                          const double*   d_prim_info,
-                         const uint32_t  d_prim_count,
+                         const int32_t  d_prim_count,
                          const double*   sd_mat_W_local,
-                         const uint32_t* sd_first_inds_local,
-                         const uint32_t* sd_second_inds_local,
-                         const uint32_t  sd_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  p_prim_count)
+                         const int32_t* sd_first_inds_local,
+                         const int32_t* sd_second_inds_local,
+                         const int32_t  sd_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  p_prim_count)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive S/T matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -242,20 +243,20 @@ computeOverlapGradientSD(double*         grad_x,
 
     if (ij < sd_prim_pair_count_local)
     {
-        const auto i = sd_first_inds_local[ij];
-        const auto j = sd_second_inds_local[ij];
+        const auto i = rawValue(sd_first_inds_local, ij);
+        const auto j = rawValue(sd_second_inds_local, ij);
 
-        const auto a_i = s_prim_info[i + s_prim_count * 0];
-        const auto c_i = s_prim_info[i + s_prim_count * 1];
-        const double r_i[3] = {s_prim_info[i + s_prim_count * 2],
-                               s_prim_info[i + s_prim_count * 3],
-                               s_prim_info[i + s_prim_count * 4]};
+        const auto a_i = rawValue(s_prim_info, i + s_prim_count * 0);
+        const auto c_i = rawValue(s_prim_info, i + s_prim_count * 1);
+        const double r_i[3] = {rawValue(s_prim_info, i + s_prim_count * 2),
+                               rawValue(s_prim_info, i + s_prim_count * 3),
+                               rawValue(s_prim_info, i + s_prim_count * 4)};
 
-        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-        const double r_j[3] = {d_prim_info[j / 6 + d_prim_count * 2],
-                               d_prim_info[j / 6 + d_prim_count * 3],
-                               d_prim_info[j / 6 + d_prim_count * 4]};
+        const auto a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
+        const auto c_j = rawValue(d_prim_info, j / 6 + d_prim_count * 1);
+        const double r_j[3] = {rawValue(d_prim_info, j / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, j / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, j / 6 + d_prim_count * 4)};
 
         const auto b0 = d_cart_inds[j % 6][0];
         const auto b1 = d_cart_inds[j % 6][1];
@@ -295,28 +296,28 @@ computeOverlapGradientSD(double*         grad_x,
 
         );
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[i], grad_i * sd_mat_W_local[ij] * ij_factor);
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], -grad_i * sd_mat_W_local[ij] * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, i), grad_i * rawValue(sd_mat_W_local, ij) * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + j), -grad_i * rawValue(sd_mat_W_local, ij) * ij_factor);
     }
 }
 
 __global__ void
 computeOverlapGradientPP(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   p_prim_info,
-                         const uint32_t  p_prim_count,
+                         const int32_t  p_prim_count,
                          const double*   pp_mat_W_local,
-                         const uint32_t* pp_first_inds_local,
-                         const uint32_t* pp_second_inds_local,
-                         const uint32_t  pp_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  s_prim_count)
+                         const int32_t* pp_first_inds_local,
+                         const int32_t* pp_second_inds_local,
+                         const int32_t  pp_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  s_prim_count)
 {
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive S matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -329,20 +330,20 @@ computeOverlapGradientPP(double*         grad_x,
 
     if (ij < pp_prim_pair_count_local)
     {
-        const auto i = pp_first_inds_local[ij];
-        const auto j = pp_second_inds_local[ij];
+        const auto i = rawValue(pp_first_inds_local, ij);
+        const auto j = rawValue(pp_second_inds_local, ij);
 
-        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
-        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
-        const double r_i[3] = {p_prim_info[i / 3 + p_prim_count * 2],
-                               p_prim_info[i / 3 + p_prim_count * 3],
-                               p_prim_info[i / 3 + p_prim_count * 4]};
+        const auto a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
+        const auto c_i = rawValue(p_prim_info, i / 3 + p_prim_count * 1);
+        const double r_i[3] = {rawValue(p_prim_info, i / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, i / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, i / 3 + p_prim_count * 4)};
 
-        const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
-        const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
-        const double r_j[3] = {p_prim_info[j / 3 + p_prim_count * 2],
-                               p_prim_info[j / 3 + p_prim_count * 3],
-                               p_prim_info[j / 3 + p_prim_count * 4]};
+        const auto a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
+        const auto c_j = rawValue(p_prim_info, j / 3 + p_prim_count * 1);
+        const double r_j[3] = {rawValue(p_prim_info, j / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, j / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, j / 3 + p_prim_count * 4)};
 
         const auto a0 = i % 3;
         const auto b0 = j % 3;
@@ -387,31 +388,31 @@ computeOverlapGradientPP(double*         grad_x,
 
         );
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i * pp_mat_W_local[ij] * ij_factor);
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + j], -grad_i * pp_mat_W_local[ij] * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i * rawValue(pp_mat_W_local, ij) * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + j), -grad_i * rawValue(pp_mat_W_local, ij) * ij_factor);
     }
 }
 
 __global__ void
 computeOverlapGradientPD(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   p_prim_info,
-                         const uint32_t  p_prim_count,
+                         const int32_t  p_prim_count,
                          const double*   d_prim_info,
-                         const uint32_t  d_prim_count,
+                         const int32_t  d_prim_count,
                          const double*   pd_mat_W_local,
-                         const uint32_t* pd_first_inds_local,
-                         const uint32_t* pd_second_inds_local,
-                         const uint32_t  pd_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  s_prim_count)
+                         const int32_t* pd_first_inds_local,
+                         const int32_t* pd_second_inds_local,
+                         const int32_t  pd_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  s_prim_count)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive S/T matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -431,20 +432,20 @@ computeOverlapGradientPD(double*         grad_x,
 
     if (ij < pd_prim_pair_count_local)
     {
-        const auto i = pd_first_inds_local[ij];
-        const auto j = pd_second_inds_local[ij];
+        const auto i = rawValue(pd_first_inds_local, ij);
+        const auto j = rawValue(pd_second_inds_local, ij);
 
-        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
-        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
-        const double r_i[3] = {p_prim_info[i / 3 + p_prim_count * 2],
-                               p_prim_info[i / 3 + p_prim_count * 3],
-                               p_prim_info[i / 3 + p_prim_count * 4]};
+        const auto a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
+        const auto c_i = rawValue(p_prim_info, i / 3 + p_prim_count * 1);
+        const double r_i[3] = {rawValue(p_prim_info, i / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, i / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, i / 3 + p_prim_count * 4)};
 
-        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-        const double r_j[3] = {d_prim_info[j / 6 + d_prim_count * 2],
-                               d_prim_info[j / 6 + d_prim_count * 3],
-                               d_prim_info[j / 6 + d_prim_count * 4]};
+        const auto a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
+        const auto c_j = rawValue(d_prim_info, j / 6 + d_prim_count * 1);
+        const double r_j[3] = {rawValue(d_prim_info, j / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, j / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, j / 6 + d_prim_count * 4)};
 
         const auto a0 = i % 3;
 
@@ -503,30 +504,30 @@ computeOverlapGradientPD(double*         grad_x,
 
         );
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i * pd_mat_W_local[ij] * ij_factor);
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], -grad_i * pd_mat_W_local[ij] * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i * rawValue(pd_mat_W_local, ij) * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + j), -grad_i * rawValue(pd_mat_W_local, ij) * ij_factor);
     }
 }
 
 __global__ void
 computeOverlapGradientDD(double*         grad_x,
-                         const uint32_t  grad_cart_ind,
+                         const int32_t  grad_cart_ind,
                          const double*   d_prim_info,
-                         const uint32_t  d_prim_count,
+                         const int32_t  d_prim_count,
                          const double*   dd_mat_W_local,
-                         const uint32_t* dd_first_inds_local,
-                         const uint32_t* dd_second_inds_local,
-                         const uint32_t  dd_prim_pair_count_local,
-                         const uint32_t* prim_cart_ao_to_atom_inds,
-                         const uint32_t  s_prim_count,
-                         const uint32_t  p_prim_count)
+                         const int32_t* dd_first_inds_local,
+                         const int32_t* dd_second_inds_local,
+                         const int32_t  dd_prim_pair_count_local,
+                         const int32_t* prim_cart_ao_to_atom_inds,
+                         const int32_t  s_prim_count,
+                         const int32_t  p_prim_count)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     // each thread computes a primitive S/T matrix element
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if (threadIdx.x == 0)
     {
@@ -546,20 +547,20 @@ computeOverlapGradientDD(double*         grad_x,
 
     if (ij < dd_prim_pair_count_local)
     {
-        const auto i = dd_first_inds_local[ij];
-        const auto j = dd_second_inds_local[ij];
+        const auto i = rawValue(dd_first_inds_local, ij);
+        const auto j = rawValue(dd_second_inds_local, ij);
 
-        const auto a_i = d_prim_info[i / 6 + d_prim_count * 0];
-        const auto c_i = d_prim_info[i / 6 + d_prim_count * 1];
-        const double r_i[3] = {d_prim_info[i / 6 + d_prim_count * 2],
-                               d_prim_info[i / 6 + d_prim_count * 3],
-                               d_prim_info[i / 6 + d_prim_count * 4]};
+        const auto a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
+        const auto c_i = rawValue(d_prim_info, i / 6 + d_prim_count * 1);
+        const double r_i[3] = {rawValue(d_prim_info, i / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, i / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, i / 6 + d_prim_count * 4)};
 
-        const auto a_j = d_prim_info[j / 6 + d_prim_count * 0];
-        const auto c_j = d_prim_info[j / 6 + d_prim_count * 1];
-        const double r_j[3] = {d_prim_info[j / 6 + d_prim_count * 2],
-                               d_prim_info[j / 6 + d_prim_count * 3],
-                               d_prim_info[j / 6 + d_prim_count * 4]};
+        const auto a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
+        const auto c_j = rawValue(d_prim_info, j / 6 + d_prim_count * 1);
+        const double r_j[3] = {rawValue(d_prim_info, j / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, j / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, j / 6 + d_prim_count * 4)};
 
         const auto a0 = d_cart_inds[i % 6][0];
         const auto a1 = d_cart_inds[i % 6][1];
@@ -632,8 +633,8 @@ computeOverlapGradientDD(double*         grad_x,
 
         );
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + i], grad_i * dd_mat_W_local[ij] * ij_factor);
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + j], -grad_i * dd_mat_W_local[ij] * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + i), grad_i * rawValue(dd_mat_W_local, ij) * ij_factor);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + j), -grad_i * rawValue(dd_mat_W_local, ij) * ij_factor);
     }
 }
 

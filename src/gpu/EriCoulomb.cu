@@ -41,18 +41,18 @@ namespace gpu {  // gpu namespace
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSSS(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   ss_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const int32_t* ss_first_inds_local,
+                       const int32_t* ss_second_inds_local,
                        const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const int32_t  ss_prim_pair_count_local,
+                       const int32_t* ss_first_inds,
+                       const int32_t* ss_second_inds,
                        const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
+                       const int32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -62,10 +62,10 @@ computeCoulombFockSSSS(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    uint32_t i, j;
+    int32_t i, j;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
@@ -73,35 +73,35 @@ computeCoulombFockSSSS(double*         mat_J,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
 
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= ss_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(ss_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
+        if ((ij >= ss_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(ss_mat_Q, kl) * rawValue(ss_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -109,19 +109,19 @@ computeCoulombFockSSSS(double*         mat_J,
         const auto k = ss_first_inds[kl];
         const auto l = ss_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = rawValue(s_prim_info, l + s_prim_count * 0);
 
-        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                               s_prim_info[l + s_prim_count * 3],
-                               s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {rawValue(s_prim_info, l + s_prim_count * 2),
+                               rawValue(s_prim_info, l + s_prim_count * 3),
+                               rawValue(s_prim_info, l + s_prim_count * 4)};
 
-        const auto S_kl_00 = ss_pair_data[kl];
+        const auto S_kl_00 = rawValue(ss_pair_data, kl);
 
 
         // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
@@ -159,7 +159,7 @@ computeCoulombFockSSSS(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(ss_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -169,7 +169,7 @@ computeCoulombFockSSSS(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -181,20 +181,20 @@ computeCoulombFockSSSS(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSSP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   sp_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   sp_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const int32_t* ss_first_inds_local,
+                       const int32_t* ss_second_inds_local,
                        const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
+                       const int32_t  ss_prim_pair_count_local,
+                       const int32_t* sp_first_inds,
+                       const int32_t* sp_second_inds,
                        const double*   sp_pair_data,
-                       const uint32_t  sp_prim_pair_count,
+                       const int32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -204,10 +204,10 @@ computeCoulombFockSSSP(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    uint32_t i, j;
+    int32_t i, j;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
@@ -215,35 +215,35 @@ computeCoulombFockSSSP(double*         mat_J,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
 
 
     }
 
-    for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= ss_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(ss_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= ss_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(sp_mat_Q, kl) * rawValue(sp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -251,19 +251,19 @@ computeCoulombFockSSSP(double*         mat_J,
         const auto k = sp_first_inds[kl];
         const auto l = sp_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = rawValue(sp_pair_data, kl);
 
         const auto d0 = l % 3;
 
@@ -311,7 +311,7 @@ computeCoulombFockSSSP(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sp_mat_D, kl) * 2.0;
 
     }
 
@@ -321,7 +321,7 @@ computeCoulombFockSSSP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -333,20 +333,20 @@ computeCoulombFockSSSP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSSD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sd_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   sd_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const int32_t* ss_first_inds_local,
+                       const int32_t* ss_second_inds_local,
                        const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* sd_first_inds,
-                       const uint32_t* sd_second_inds,
+                       const int32_t  ss_prim_pair_count_local,
+                       const int32_t* sd_first_inds,
+                       const int32_t* sd_second_inds,
                        const double*   sd_pair_data,
-                       const uint32_t  sd_prim_pair_count,
+                       const int32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -355,13 +355,13 @@ computeCoulombFockSSSD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    uint32_t i, j;
+    int32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -384,35 +384,35 @@ computeCoulombFockSSSD(double*         mat_J,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
 
 
     }
 
-    for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= ss_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(ss_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= ss_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(sd_mat_Q, kl) * rawValue(sd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -420,19 +420,19 @@ computeCoulombFockSSSD(double*         mat_J,
         const auto k = sd_first_inds[kl];
         const auto l = sd_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = sd_pair_data[kl];
+        const auto S_kl_00 = rawValue(sd_pair_data, kl);
 
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
@@ -499,7 +499,7 @@ computeCoulombFockSSSD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sd_mat_D, kl) * 2.0;
 
     }
 
@@ -509,7 +509,7 @@ computeCoulombFockSSSD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -521,20 +521,20 @@ computeCoulombFockSSSD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSPP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   pp_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const int32_t* ss_first_inds_local,
+                       const int32_t* ss_second_inds_local,
                        const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
+                       const int32_t  ss_prim_pair_count_local,
+                       const int32_t* pp_first_inds,
+                       const int32_t* pp_second_inds,
                        const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
+                       const int32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -545,10 +545,10 @@ computeCoulombFockSSPP(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    uint32_t i, j;
+    int32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -564,35 +564,35 @@ computeCoulombFockSSPP(double*         mat_J,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
 
 
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= ss_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(ss_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= ss_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(pp_mat_Q, kl) * rawValue(pp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -600,19 +600,19 @@ computeCoulombFockSSPP(double*         mat_J,
         const auto k = pp_first_inds[kl];
         const auto l = pp_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = pp_pair_data[kl];
+        const auto S_kl_00 = rawValue(pp_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = l % 3;
@@ -681,7 +681,7 @@ computeCoulombFockSSPP(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pp_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -691,7 +691,7 @@ computeCoulombFockSSPP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -703,22 +703,22 @@ computeCoulombFockSSPP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSPD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const int32_t* ss_first_inds_local,
+                       const int32_t* ss_second_inds_local,
                        const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  ss_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -727,13 +727,13 @@ computeCoulombFockSSPD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    uint32_t i, j;
+    int32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -756,35 +756,35 @@ computeCoulombFockSSPD(double*         mat_J,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
 
 
     }
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= ss_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(ss_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= ss_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -792,19 +792,19 @@ computeCoulombFockSSPD(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -895,7 +895,7 @@ computeCoulombFockSSPD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
 
     }
 
@@ -905,7 +905,7 @@ computeCoulombFockSSPD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -917,20 +917,20 @@ computeCoulombFockSSPD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSSDD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   ss_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* ss_first_inds_local,
-                       const uint32_t* ss_second_inds_local,
+                       const int32_t* ss_first_inds_local,
+                       const int32_t* ss_second_inds_local,
                        const double*   ss_pair_data_local,
-                       const uint32_t  ss_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  ss_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -939,13 +939,13 @@ computeCoulombFockSSDD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    uint32_t i, j;
+    int32_t i, j;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -968,35 +968,35 @@ computeCoulombFockSSDD(double*         mat_J,
 
     if (ij < ss_prim_pair_count_local)
     {
-        i = ss_first_inds_local[ij];
-        j = ss_second_inds_local[ij];
+        i = rawValue(ss_first_inds_local, ij);
+        j = rawValue(ss_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = s_prim_info[j + s_prim_count * 0];
+        a_j = rawValue(s_prim_info, j + s_prim_count * 0);
 
-        r_j[0] = s_prim_info[j + s_prim_count * 2];
-        r_j[1] = s_prim_info[j + s_prim_count * 3];
-        r_j[2] = s_prim_info[j + s_prim_count * 4];
+        r_j[0] = rawValue(s_prim_info, j + s_prim_count * 2);
+        r_j[1] = rawValue(s_prim_info, j + s_prim_count * 3);
+        r_j[2] = rawValue(s_prim_info, j + s_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = ss_pair_data_local[ij];
+        S_ij_00 = rawValue(ss_pair_data_local, ij);
 
 
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= ss_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(ss_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= ss_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(ss_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -1004,19 +1004,19 @@ computeCoulombFockSSDD(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -1156,7 +1156,7 @@ computeCoulombFockSSDD(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -1166,7 +1166,7 @@ computeCoulombFockSSDD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -1178,20 +1178,20 @@ computeCoulombFockSSDD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPSS(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   ss_mat_D,
                        const double*   sp_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* sp_first_inds_local,
-                       const uint32_t* sp_second_inds_local,
+                       const int32_t* sp_first_inds_local,
+                       const int32_t* sp_second_inds_local,
                        const double*   sp_pair_data_local,
-                       const uint32_t  sp_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const int32_t  sp_prim_pair_count_local,
+                       const int32_t* ss_first_inds,
+                       const int32_t* ss_second_inds,
                        const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
+                       const int32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -1201,11 +1201,11 @@ computeCoulombFockSPSS(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0;
-    uint32_t i, j, b0;
+    int32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
@@ -1213,25 +1213,25 @@ computeCoulombFockSPSS(double*         mat_J,
 
     if (ij < sp_prim_pair_count_local)
     {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
+        i = rawValue(sp_first_inds_local, ij);
+        j = rawValue(sp_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sp_pair_data_local[ij];
+        S_ij_00 = rawValue(sp_pair_data_local, ij);
 
         b0 = j % 3;
 
@@ -1239,11 +1239,11 @@ computeCoulombFockSPSS(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sp_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(sp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sp_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(rawValue(sp_mat_Q_local, ij) * rawValue(ss_mat_Q, kl) * rawValue(ss_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -1251,19 +1251,19 @@ computeCoulombFockSPSS(double*         mat_J,
         const auto k = ss_first_inds[kl];
         const auto l = ss_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = rawValue(s_prim_info, l + s_prim_count * 0);
 
-        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                               s_prim_info[l + s_prim_count * 3],
-                               s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {rawValue(s_prim_info, l + s_prim_count * 2),
+                               rawValue(s_prim_info, l + s_prim_count * 3),
+                               rawValue(s_prim_info, l + s_prim_count * 4)};
 
-        const auto S_kl_00 = ss_pair_data[kl];
+        const auto S_kl_00 = rawValue(ss_pair_data, kl);
 
 
         // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
@@ -1310,7 +1310,7 @@ computeCoulombFockSPSS(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(ss_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -1320,7 +1320,7 @@ computeCoulombFockSPSS(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -1332,20 +1332,20 @@ computeCoulombFockSPSS(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPSP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   sp_mat_D,
                        const double*   sp_mat_Q_local,
                        const double*   sp_mat_Q,
-                       const uint32_t* sp_first_inds_local,
-                       const uint32_t* sp_second_inds_local,
+                       const int32_t* sp_first_inds_local,
+                       const int32_t* sp_second_inds_local,
                        const double*   sp_pair_data_local,
-                       const uint32_t  sp_prim_pair_count_local,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
+                       const int32_t  sp_prim_pair_count_local,
+                       const int32_t* sp_first_inds,
+                       const int32_t* sp_second_inds,
                        const double*   sp_pair_data,
-                       const uint32_t  sp_prim_pair_count,
+                       const int32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -1356,11 +1356,11 @@ computeCoulombFockSPSP(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0;
-    uint32_t i, j, b0;
+    int32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1376,25 +1376,25 @@ computeCoulombFockSPSP(double*         mat_J,
 
     if (ij < sp_prim_pair_count_local)
     {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
+        i = rawValue(sp_first_inds_local, ij);
+        j = rawValue(sp_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sp_pair_data_local[ij];
+        S_ij_00 = rawValue(sp_pair_data_local, ij);
 
         b0 = j % 3;
 
@@ -1402,11 +1402,11 @@ computeCoulombFockSPSP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sp_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(sp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sp_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(rawValue(sp_mat_Q_local, ij) * rawValue(sp_mat_Q, kl) * rawValue(sp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -1414,19 +1414,19 @@ computeCoulombFockSPSP(double*         mat_J,
         const auto k = sp_first_inds[kl];
         const auto l = sp_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = rawValue(sp_pair_data, kl);
 
         const auto d0 = l % 3;
 
@@ -1492,7 +1492,7 @@ computeCoulombFockSPSP(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sp_mat_D, kl) * 2.0;
 
     }
 
@@ -1502,7 +1502,7 @@ computeCoulombFockSPSP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -1514,22 +1514,22 @@ computeCoulombFockSPSP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPSD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sd_mat_D,
                        const double*   sp_mat_Q_local,
                        const double*   sd_mat_Q,
-                       const uint32_t* sp_first_inds_local,
-                       const uint32_t* sp_second_inds_local,
+                       const int32_t* sp_first_inds_local,
+                       const int32_t* sp_second_inds_local,
                        const double*   sp_pair_data_local,
-                       const uint32_t  sp_prim_pair_count_local,
-                       const uint32_t* sd_first_inds,
-                       const uint32_t* sd_second_inds,
+                       const int32_t  sp_prim_pair_count_local,
+                       const int32_t* sd_first_inds,
+                       const int32_t* sd_second_inds,
                        const double*   sd_pair_data,
-                       const uint32_t  sd_prim_pair_count,
+                       const int32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -1538,14 +1538,14 @@ computeCoulombFockSPSD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0;
-    uint32_t i, j, b0;
+    int32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1568,25 +1568,25 @@ computeCoulombFockSPSD(double*         mat_J,
 
     if (ij < sp_prim_pair_count_local)
     {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
+        i = rawValue(sp_first_inds_local, ij);
+        j = rawValue(sp_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sp_pair_data_local[ij];
+        S_ij_00 = rawValue(sp_pair_data_local, ij);
 
         b0 = j % 3;
 
@@ -1594,11 +1594,11 @@ computeCoulombFockSPSD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sp_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(sp_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sp_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(rawValue(sp_mat_Q_local, ij) * rawValue(sd_mat_Q, kl) * rawValue(sd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -1606,19 +1606,19 @@ computeCoulombFockSPSD(double*         mat_J,
         const auto k = sd_first_inds[kl];
         const auto l = sd_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = sd_pair_data[kl];
+        const auto S_kl_00 = rawValue(sd_pair_data, kl);
 
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
@@ -1717,7 +1717,7 @@ computeCoulombFockSPSD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sd_mat_D, kl) * 2.0;
 
     }
 
@@ -1727,7 +1727,7 @@ computeCoulombFockSPSD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -1739,20 +1739,20 @@ computeCoulombFockSPSD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPPP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   pp_mat_D,
                        const double*   sp_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* sp_first_inds_local,
-                       const uint32_t* sp_second_inds_local,
+                       const int32_t* sp_first_inds_local,
+                       const int32_t* sp_second_inds_local,
                        const double*   sp_pair_data_local,
-                       const uint32_t  sp_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
+                       const int32_t  sp_prim_pair_count_local,
+                       const int32_t* pp_first_inds,
+                       const int32_t* pp_second_inds,
                        const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
+                       const int32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -1763,11 +1763,11 @@ computeCoulombFockSPPP(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0;
-    uint32_t i, j, b0;
+    int32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1783,25 +1783,25 @@ computeCoulombFockSPPP(double*         mat_J,
 
     if (ij < sp_prim_pair_count_local)
     {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
+        i = rawValue(sp_first_inds_local, ij);
+        j = rawValue(sp_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sp_pair_data_local[ij];
+        S_ij_00 = rawValue(sp_pair_data_local, ij);
 
         b0 = j % 3;
 
@@ -1809,11 +1809,11 @@ computeCoulombFockSPPP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(sp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(rawValue(sp_mat_Q_local, ij) * rawValue(pp_mat_Q, kl) * rawValue(pp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -1821,19 +1821,19 @@ computeCoulombFockSPPP(double*         mat_J,
         const auto k = pp_first_inds[kl];
         const auto l = pp_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = pp_pair_data[kl];
+        const auto S_kl_00 = rawValue(pp_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = l % 3;
@@ -1934,7 +1934,7 @@ computeCoulombFockSPPP(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pp_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -1944,7 +1944,7 @@ computeCoulombFockSPPP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -1956,22 +1956,22 @@ computeCoulombFockSPPP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPPD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   sp_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* sp_first_inds_local,
-                       const uint32_t* sp_second_inds_local,
+                       const int32_t* sp_first_inds_local,
+                       const int32_t* sp_second_inds_local,
                        const double*   sp_pair_data_local,
-                       const uint32_t  sp_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  sp_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -1980,14 +1980,14 @@ computeCoulombFockSPPD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0;
-    uint32_t i, j, b0;
+    int32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2010,25 +2010,25 @@ computeCoulombFockSPPD(double*         mat_J,
 
     if (ij < sp_prim_pair_count_local)
     {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
+        i = rawValue(sp_first_inds_local, ij);
+        j = rawValue(sp_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sp_pair_data_local[ij];
+        S_ij_00 = rawValue(sp_pair_data_local, ij);
 
         b0 = j % 3;
 
@@ -2036,11 +2036,11 @@ computeCoulombFockSPPD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sp_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(sp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sp_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(sp_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -2048,19 +2048,19 @@ computeCoulombFockSPPD(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -2214,7 +2214,7 @@ computeCoulombFockSPPD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
 
     }
 
@@ -2224,7 +2224,7 @@ computeCoulombFockSPPD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -2236,22 +2236,22 @@ computeCoulombFockSPPD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSPDD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   sp_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* sp_first_inds_local,
-                       const uint32_t* sp_second_inds_local,
+                       const int32_t* sp_first_inds_local,
+                       const int32_t* sp_second_inds_local,
                        const double*   sp_pair_data_local,
-                       const uint32_t  sp_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  sp_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -2260,14 +2260,14 @@ computeCoulombFockSPDD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0;
-    uint32_t i, j, b0;
+    int32_t i, j, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2290,25 +2290,25 @@ computeCoulombFockSPDD(double*         mat_J,
 
     if (ij < sp_prim_pair_count_local)
     {
-        i = sp_first_inds_local[ij];
-        j = sp_second_inds_local[ij];
+        i = rawValue(sp_first_inds_local, ij);
+        j = rawValue(sp_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sp_pair_data_local[ij];
+        S_ij_00 = rawValue(sp_pair_data_local, ij);
 
         b0 = j % 3;
 
@@ -2316,11 +2316,11 @@ computeCoulombFockSPDD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sp_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(sp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sp_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(sp_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -2328,19 +2328,19 @@ computeCoulombFockSPDD(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -2596,7 +2596,7 @@ computeCoulombFockSPDD(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -2606,7 +2606,7 @@ computeCoulombFockSPDD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -2618,20 +2618,20 @@ computeCoulombFockSPDD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPSS(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   ss_mat_D,
                        const double*   pp_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
+                       const int32_t* pp_first_inds_local,
+                       const int32_t* pp_second_inds_local,
                        const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const int32_t  pp_prim_pair_count_local,
+                       const int32_t* ss_first_inds,
+                       const int32_t* ss_second_inds,
                        const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
+                       const int32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -2642,11 +2642,11 @@ computeCoulombFockPPSS(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0;
-    uint32_t i, j, a0, b0;
+    int32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2662,25 +2662,25 @@ computeCoulombFockPPSS(double*         mat_J,
 
     if (ij < pp_prim_pair_count_local)
     {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
+        i = rawValue(pp_first_inds_local, ij);
+        j = rawValue(pp_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pp_pair_data_local[ij];
+        S_ij_00 = rawValue(pp_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = j % 3;
@@ -2690,11 +2690,11 @@ computeCoulombFockPPSS(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pp_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pp_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(rawValue(pp_mat_Q_local, ij) * rawValue(ss_mat_Q, kl) * rawValue(ss_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -2702,19 +2702,19 @@ computeCoulombFockPPSS(double*         mat_J,
         const auto k = ss_first_inds[kl];
         const auto l = ss_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = rawValue(s_prim_info, l + s_prim_count * 0);
 
-        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                               s_prim_info[l + s_prim_count * 3],
-                               s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {rawValue(s_prim_info, l + s_prim_count * 2),
+                               rawValue(s_prim_info, l + s_prim_count * 3),
+                               rawValue(s_prim_info, l + s_prim_count * 4)};
 
-        const auto S_kl_00 = ss_pair_data[kl];
+        const auto S_kl_00 = rawValue(ss_pair_data, kl);
 
 
         // Electron. J. Theor. Chem., Vol. 2, 66-70 (1997)
@@ -2779,7 +2779,7 @@ computeCoulombFockPPSS(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(ss_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -2789,7 +2789,7 @@ computeCoulombFockPPSS(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -2801,20 +2801,20 @@ computeCoulombFockPPSS(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPSP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   sp_mat_D,
                        const double*   pp_mat_Q_local,
                        const double*   sp_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
+                       const int32_t* pp_first_inds_local,
+                       const int32_t* pp_second_inds_local,
                        const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
+                       const int32_t  pp_prim_pair_count_local,
+                       const int32_t* sp_first_inds,
+                       const int32_t* sp_second_inds,
                        const double*   sp_pair_data,
-                       const uint32_t  sp_prim_pair_count,
+                       const int32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -2825,11 +2825,11 @@ computeCoulombFockPPSP(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0;
-    uint32_t i, j, a0, b0;
+    int32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2845,25 +2845,25 @@ computeCoulombFockPPSP(double*         mat_J,
 
     if (ij < pp_prim_pair_count_local)
     {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
+        i = rawValue(pp_first_inds_local, ij);
+        j = rawValue(pp_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pp_pair_data_local[ij];
+        S_ij_00 = rawValue(pp_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = j % 3;
@@ -2873,11 +2873,11 @@ computeCoulombFockPPSP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pp_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pp_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(rawValue(pp_mat_Q_local, ij) * rawValue(sp_mat_Q, kl) * rawValue(sp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -2885,19 +2885,19 @@ computeCoulombFockPPSP(double*         mat_J,
         const auto k = sp_first_inds[kl];
         const auto l = sp_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = rawValue(sp_pair_data, kl);
 
         const auto d0 = l % 3;
 
@@ -2994,7 +2994,7 @@ computeCoulombFockPPSP(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sp_mat_D, kl) * 2.0;
 
     }
 
@@ -3004,7 +3004,7 @@ computeCoulombFockPPSP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -3016,22 +3016,22 @@ computeCoulombFockPPSP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPSD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sd_mat_D,
                        const double*   pp_mat_Q_local,
                        const double*   sd_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
+                       const int32_t* pp_first_inds_local,
+                       const int32_t* pp_second_inds_local,
                        const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* sd_first_inds,
-                       const uint32_t* sd_second_inds,
+                       const int32_t  pp_prim_pair_count_local,
+                       const int32_t* sd_first_inds,
+                       const int32_t* sd_second_inds,
                        const double*   sd_pair_data,
-                       const uint32_t  sd_prim_pair_count,
+                       const int32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -3040,14 +3040,14 @@ computeCoulombFockPPSD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0;
-    uint32_t i, j, a0, b0;
+    int32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3070,25 +3070,25 @@ computeCoulombFockPPSD(double*         mat_J,
 
     if (ij < pp_prim_pair_count_local)
     {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
+        i = rawValue(pp_first_inds_local, ij);
+        j = rawValue(pp_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pp_pair_data_local[ij];
+        S_ij_00 = rawValue(pp_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = j % 3;
@@ -3098,11 +3098,11 @@ computeCoulombFockPPSD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pp_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pp_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(rawValue(pp_mat_Q_local, ij) * rawValue(sd_mat_Q, kl) * rawValue(sd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -3110,19 +3110,19 @@ computeCoulombFockPPSD(double*         mat_J,
         const auto k = sd_first_inds[kl];
         const auto l = sd_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = sd_pair_data[kl];
+        const auto S_kl_00 = rawValue(sd_pair_data, kl);
 
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
@@ -3293,7 +3293,7 @@ computeCoulombFockPPSD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sd_mat_D, kl) * 2.0;
 
     }
 
@@ -3303,7 +3303,7 @@ computeCoulombFockPPSD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -3315,18 +3315,18 @@ computeCoulombFockPPSD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPP(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   pp_mat_D,
                        const double*   pp_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
+                       const int32_t* pp_first_inds_local,
+                       const int32_t* pp_second_inds_local,
                        const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
+                       const int32_t  pp_prim_pair_count_local,
+                       const int32_t* pp_first_inds,
+                       const int32_t* pp_second_inds,
                        const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
+                       const int32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -3337,11 +3337,11 @@ computeCoulombFockPPPP(double*         mat_J,
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0;
-    uint32_t i, j, a0, b0;
+    int32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3357,25 +3357,25 @@ computeCoulombFockPPPP(double*         mat_J,
 
     if (ij < pp_prim_pair_count_local)
     {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
+        i = rawValue(pp_first_inds_local, ij);
+        j = rawValue(pp_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pp_pair_data_local[ij];
+        S_ij_00 = rawValue(pp_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = j % 3;
@@ -3385,11 +3385,11 @@ computeCoulombFockPPPP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(rawValue(pp_mat_Q_local, ij) * rawValue(pp_mat_Q, kl) * rawValue(pp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -3397,19 +3397,19 @@ computeCoulombFockPPPP(double*         mat_J,
         const auto k = pp_first_inds[kl];
         const auto l = pp_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = pp_pair_data[kl];
+        const auto S_kl_00 = rawValue(pp_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = l % 3;
@@ -3582,7 +3582,7 @@ computeCoulombFockPPPP(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pp_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -3592,7 +3592,7 @@ computeCoulombFockPPPP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -3604,20 +3604,20 @@ computeCoulombFockPPPP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPD(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   pp_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
+                       const int32_t* pp_first_inds_local,
+                       const int32_t* pp_second_inds_local,
                        const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  pp_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -3626,14 +3626,14 @@ computeCoulombFockPPPD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0;
-    uint32_t i, j, a0, b0;
+    int32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -3656,25 +3656,25 @@ computeCoulombFockPPPD(double*         mat_J,
 
     if (ij < pp_prim_pair_count_local)
     {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
+        i = rawValue(pp_first_inds_local, ij);
+        j = rawValue(pp_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pp_pair_data_local[ij];
+        S_ij_00 = rawValue(pp_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = j % 3;
@@ -3684,11 +3684,11 @@ computeCoulombFockPPPD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pp_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pp_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(pp_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -3696,19 +3696,19 @@ computeCoulombFockPPPD(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -3995,7 +3995,7 @@ computeCoulombFockPPPD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
 
     }
 
@@ -4005,7 +4005,7 @@ computeCoulombFockPPPD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -4017,20 +4017,20 @@ computeCoulombFockPPPD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPDD(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pp_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
+                       const int32_t* pp_first_inds_local,
+                       const int32_t* pp_second_inds_local,
                        const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pp_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -4039,14 +4039,14 @@ computeCoulombFockPPDD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0;
-    uint32_t i, j, a0, b0;
+    int32_t i, j, a0, b0;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4069,25 +4069,25 @@ computeCoulombFockPPDD(double*         mat_J,
 
     if (ij < pp_prim_pair_count_local)
     {
-        i = pp_first_inds_local[ij];
-        j = pp_second_inds_local[ij];
+        i = rawValue(pp_first_inds_local, ij);
+        j = rawValue(pp_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        a_j = rawValue(p_prim_info, j / 3 + p_prim_count * 0);
 
-        r_j[0] = p_prim_info[j / 3 + p_prim_count * 2];
-        r_j[1] = p_prim_info[j / 3 + p_prim_count * 3];
-        r_j[2] = p_prim_info[j / 3 + p_prim_count * 4];
+        r_j[0] = rawValue(p_prim_info, j / 3 + p_prim_count * 2);
+        r_j[1] = rawValue(p_prim_info, j / 3 + p_prim_count * 3);
+        r_j[2] = rawValue(p_prim_info, j / 3 + p_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pp_pair_data_local[ij];
+        S_ij_00 = rawValue(pp_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = j % 3;
@@ -4097,11 +4097,11 @@ computeCoulombFockPPDD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pp_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pp_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pp_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pp_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -4109,19 +4109,19 @@ computeCoulombFockPPDD(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -4672,7 +4672,7 @@ computeCoulombFockPPDD(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -4682,7 +4682,7 @@ computeCoulombFockPPDD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -4694,20 +4694,20 @@ computeCoulombFockPPDD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDSS(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   ss_mat_D,
                        const double*   sd_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* sd_first_inds_local,
-                       const uint32_t* sd_second_inds_local,
+                       const int32_t* sd_first_inds_local,
+                       const int32_t* sd_second_inds_local,
                        const double*   sd_pair_data_local,
-                       const uint32_t  sd_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const int32_t  sd_prim_pair_count_local,
+                       const int32_t* ss_first_inds,
+                       const int32_t* ss_second_inds,
                        const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
+                       const int32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -4716,14 +4716,14 @@ computeCoulombFockSDSS(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0, PB_1;
-    uint32_t i, j, b0, b1;
+    int32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4746,25 +4746,25 @@ computeCoulombFockSDSS(double*         mat_J,
 
     if (ij < sd_prim_pair_count_local)
     {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
+        i = rawValue(sd_first_inds_local, ij);
+        j = rawValue(sd_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sd_pair_data_local[ij];
+        S_ij_00 = rawValue(sd_pair_data_local, ij);
 
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
@@ -4774,11 +4774,11 @@ computeCoulombFockSDSS(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(sd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(rawValue(sd_mat_Q_local, ij) * rawValue(ss_mat_Q, kl) * rawValue(ss_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -4786,19 +4786,19 @@ computeCoulombFockSDSS(double*         mat_J,
         const auto k = ss_first_inds[kl];
         const auto l = ss_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = rawValue(s_prim_info, l + s_prim_count * 0);
 
-        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                               s_prim_info[l + s_prim_count * 3],
-                               s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {rawValue(s_prim_info, l + s_prim_count * 2),
+                               rawValue(s_prim_info, l + s_prim_count * 3),
+                               rawValue(s_prim_info, l + s_prim_count * 4)};
 
-        const auto S_kl_00 = ss_pair_data[kl];
+        const auto S_kl_00 = rawValue(ss_pair_data, kl);
 
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -4862,7 +4862,7 @@ computeCoulombFockSDSS(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(ss_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -4872,7 +4872,7 @@ computeCoulombFockSDSS(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -4884,22 +4884,22 @@ computeCoulombFockSDSS(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDSP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sp_mat_D,
                        const double*   sd_mat_Q_local,
                        const double*   sp_mat_Q,
-                       const uint32_t* sd_first_inds_local,
-                       const uint32_t* sd_second_inds_local,
+                       const int32_t* sd_first_inds_local,
+                       const int32_t* sd_second_inds_local,
                        const double*   sd_pair_data_local,
-                       const uint32_t  sd_prim_pair_count_local,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
+                       const int32_t  sd_prim_pair_count_local,
+                       const int32_t* sp_first_inds,
+                       const int32_t* sp_second_inds,
                        const double*   sp_pair_data,
-                       const uint32_t  sp_prim_pair_count,
+                       const int32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -4908,14 +4908,14 @@ computeCoulombFockSDSP(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0, PB_1;
-    uint32_t i, j, b0, b1;
+    int32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -4938,25 +4938,25 @@ computeCoulombFockSDSP(double*         mat_J,
 
     if (ij < sd_prim_pair_count_local)
     {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
+        i = rawValue(sd_first_inds_local, ij);
+        j = rawValue(sd_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sd_pair_data_local[ij];
+        S_ij_00 = rawValue(sd_pair_data_local, ij);
 
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
@@ -4966,11 +4966,11 @@ computeCoulombFockSDSP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sd_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(sd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sd_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(rawValue(sd_mat_Q_local, ij) * rawValue(sp_mat_Q, kl) * rawValue(sp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -4978,19 +4978,19 @@ computeCoulombFockSDSP(double*         mat_J,
         const auto k = sp_first_inds[kl];
         const auto l = sp_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = rawValue(sp_pair_data, kl);
 
         const auto d0 = l % 3;
 
@@ -5087,7 +5087,7 @@ computeCoulombFockSDSP(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sp_mat_D, kl) * 2.0;
 
     }
 
@@ -5097,7 +5097,7 @@ computeCoulombFockSDSP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -5109,20 +5109,20 @@ computeCoulombFockSDSP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDSD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sd_mat_D,
                        const double*   sd_mat_Q_local,
                        const double*   sd_mat_Q,
-                       const uint32_t* sd_first_inds_local,
-                       const uint32_t* sd_second_inds_local,
+                       const int32_t* sd_first_inds_local,
+                       const int32_t* sd_second_inds_local,
                        const double*   sd_pair_data_local,
-                       const uint32_t  sd_prim_pair_count_local,
-                       const uint32_t* sd_first_inds,
-                       const uint32_t* sd_second_inds,
+                       const int32_t  sd_prim_pair_count_local,
+                       const int32_t* sd_first_inds,
+                       const int32_t* sd_second_inds,
                        const double*   sd_pair_data,
-                       const uint32_t  sd_prim_pair_count,
+                       const int32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -5131,14 +5131,14 @@ computeCoulombFockSDSD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0, PB_1;
-    uint32_t i, j, b0, b1;
+    int32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5161,25 +5161,25 @@ computeCoulombFockSDSD(double*         mat_J,
 
     if (ij < sd_prim_pair_count_local)
     {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
+        i = rawValue(sd_first_inds_local, ij);
+        j = rawValue(sd_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sd_pair_data_local[ij];
+        S_ij_00 = rawValue(sd_pair_data_local, ij);
 
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
@@ -5189,11 +5189,11 @@ computeCoulombFockSDSD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sd_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(sd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sd_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(rawValue(sd_mat_Q_local, ij) * rawValue(sd_mat_Q, kl) * rawValue(sd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -5201,19 +5201,19 @@ computeCoulombFockSDSD(double*         mat_J,
         const auto k = sd_first_inds[kl];
         const auto l = sd_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = sd_pair_data[kl];
+        const auto S_kl_00 = rawValue(sd_pair_data, kl);
 
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
@@ -5384,7 +5384,7 @@ computeCoulombFockSDSD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sd_mat_D, kl) * 2.0;
 
     }
 
@@ -5394,7 +5394,7 @@ computeCoulombFockSDSD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -5406,22 +5406,22 @@ computeCoulombFockSDSD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDPP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pp_mat_D,
                        const double*   sd_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* sd_first_inds_local,
-                       const uint32_t* sd_second_inds_local,
+                       const int32_t* sd_first_inds_local,
+                       const int32_t* sd_second_inds_local,
                        const double*   sd_pair_data_local,
-                       const uint32_t  sd_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
+                       const int32_t  sd_prim_pair_count_local,
+                       const int32_t* pp_first_inds,
+                       const int32_t* pp_second_inds,
                        const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
+                       const int32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -5430,14 +5430,14 @@ computeCoulombFockSDPP(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0, PB_1;
-    uint32_t i, j, b0, b1;
+    int32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5460,25 +5460,25 @@ computeCoulombFockSDPP(double*         mat_J,
 
     if (ij < sd_prim_pair_count_local)
     {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
+        i = rawValue(sd_first_inds_local, ij);
+        j = rawValue(sd_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sd_pair_data_local[ij];
+        S_ij_00 = rawValue(sd_pair_data_local, ij);
 
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
@@ -5488,11 +5488,11 @@ computeCoulombFockSDPP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(sd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(rawValue(sd_mat_Q_local, ij) * rawValue(pp_mat_Q, kl) * rawValue(pp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -5500,19 +5500,19 @@ computeCoulombFockSDPP(double*         mat_J,
         const auto k = pp_first_inds[kl];
         const auto l = pp_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = pp_pair_data[kl];
+        const auto S_kl_00 = rawValue(pp_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = l % 3;
@@ -5684,7 +5684,7 @@ computeCoulombFockSDPP(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pp_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -5694,7 +5694,7 @@ computeCoulombFockSDPP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -5706,22 +5706,22 @@ computeCoulombFockSDPP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDPD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   sd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* sd_first_inds_local,
-                       const uint32_t* sd_second_inds_local,
+                       const int32_t* sd_first_inds_local,
+                       const int32_t* sd_second_inds_local,
                        const double*   sd_pair_data_local,
-                       const uint32_t  sd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  sd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -5730,14 +5730,14 @@ computeCoulombFockSDPD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0, PB_1;
-    uint32_t i, j, b0, b1;
+    int32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -5760,25 +5760,25 @@ computeCoulombFockSDPD(double*         mat_J,
 
     if (ij < sd_prim_pair_count_local)
     {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
+        i = rawValue(sd_first_inds_local, ij);
+        j = rawValue(sd_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sd_pair_data_local[ij];
+        S_ij_00 = rawValue(sd_pair_data_local, ij);
 
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
@@ -5788,11 +5788,11 @@ computeCoulombFockSDPD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(sd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(sd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -5800,19 +5800,19 @@ computeCoulombFockSDPD(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -6100,7 +6100,7 @@ computeCoulombFockSDPD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
 
     }
 
@@ -6110,7 +6110,7 @@ computeCoulombFockSDPD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -6122,20 +6122,20 @@ computeCoulombFockSDPD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockSDDD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   sd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* sd_first_inds_local,
-                       const uint32_t* sd_second_inds_local,
+                       const int32_t* sd_first_inds_local,
+                       const int32_t* sd_second_inds_local,
                        const double*   sd_pair_data_local,
-                       const uint32_t  sd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  sd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -6144,14 +6144,14 @@ computeCoulombFockSDDD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PB_0, PB_1;
-    uint32_t i, j, b0, b1;
+    int32_t i, j, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -6174,25 +6174,25 @@ computeCoulombFockSDDD(double*         mat_J,
 
     if (ij < sd_prim_pair_count_local)
     {
-        i = sd_first_inds_local[ij];
-        j = sd_second_inds_local[ij];
+        i = rawValue(sd_first_inds_local, ij);
+        j = rawValue(sd_second_inds_local, ij);
 
-        a_i = s_prim_info[i + s_prim_count * 0];
+        a_i = rawValue(s_prim_info, i + s_prim_count * 0);
 
-        r_i[0] = s_prim_info[i + s_prim_count * 2];
-        r_i[1] = s_prim_info[i + s_prim_count * 3];
-        r_i[2] = s_prim_info[i + s_prim_count * 4];
+        r_i[0] = rawValue(s_prim_info, i + s_prim_count * 2);
+        r_i[1] = rawValue(s_prim_info, i + s_prim_count * 3);
+        r_i[2] = rawValue(s_prim_info, i + s_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = sd_pair_data_local[ij];
+        S_ij_00 = rawValue(sd_pair_data_local, ij);
 
         b0 = d_cart_inds[j % 6][0];
         b1 = d_cart_inds[j % 6][1];
@@ -6202,11 +6202,11 @@ computeCoulombFockSDDD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= sd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(sd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= sd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(sd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -6214,19 +6214,19 @@ computeCoulombFockSDDD(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -6777,7 +6777,7 @@ computeCoulombFockSDDD(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -6787,7 +6787,7 @@ computeCoulombFockSDDD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -6799,22 +6799,22 @@ computeCoulombFockSDDD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDSS(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   ss_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* ss_first_inds,
+                       const int32_t* ss_second_inds,
                        const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
+                       const int32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -6823,14 +6823,14 @@ computeCoulombFockPDSS(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -6853,25 +6853,25 @@ computeCoulombFockPDSS(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -6883,11 +6883,11 @@ computeCoulombFockPDSS(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(ss_mat_Q, kl) * rawValue(ss_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -6895,19 +6895,19 @@ computeCoulombFockPDSS(double*         mat_J,
         const auto k = ss_first_inds[kl];
         const auto l = ss_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = rawValue(s_prim_info, l + s_prim_count * 0);
 
-        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                               s_prim_info[l + s_prim_count * 3],
-                               s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {rawValue(s_prim_info, l + s_prim_count * 2),
+                               rawValue(s_prim_info, l + s_prim_count * 3),
+                               rawValue(s_prim_info, l + s_prim_count * 4)};
 
-        const auto S_kl_00 = ss_pair_data[kl];
+        const auto S_kl_00 = rawValue(ss_pair_data, kl);
 
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -6993,7 +6993,7 @@ computeCoulombFockPDSS(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(ss_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -7003,7 +7003,7 @@ computeCoulombFockPDSS(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -7015,22 +7015,22 @@ computeCoulombFockPDSS(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDSP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sp_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   sp_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* sp_first_inds,
+                       const int32_t* sp_second_inds,
                        const double*   sp_pair_data,
-                       const uint32_t  sp_prim_pair_count,
+                       const int32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -7039,14 +7039,14 @@ computeCoulombFockPDSP(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -7069,25 +7069,25 @@ computeCoulombFockPDSP(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -7099,11 +7099,11 @@ computeCoulombFockPDSP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(sp_mat_Q, kl) * rawValue(sp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -7111,19 +7111,19 @@ computeCoulombFockPDSP(double*         mat_J,
         const auto k = sp_first_inds[kl];
         const auto l = sp_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = rawValue(sp_pair_data, kl);
 
         const auto d0 = l % 3;
 
@@ -7272,7 +7272,7 @@ computeCoulombFockPDSP(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sp_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sp_mat_D, kl) * 2.0;
 
     }
 
@@ -7282,7 +7282,7 @@ computeCoulombFockPDSP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -7294,22 +7294,22 @@ computeCoulombFockPDSP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDSD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   sd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* sd_first_inds,
-                       const uint32_t* sd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* sd_first_inds,
+                       const int32_t* sd_second_inds,
                        const double*   sd_pair_data,
-                       const uint32_t  sd_prim_pair_count,
+                       const int32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -7318,14 +7318,14 @@ computeCoulombFockPDSD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -7348,25 +7348,25 @@ computeCoulombFockPDSD(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -7378,11 +7378,11 @@ computeCoulombFockPDSD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (sd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(sd_mat_Q, kl) * rawValue(sd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -7390,19 +7390,19 @@ computeCoulombFockPDSD(double*         mat_J,
         const auto k = sd_first_inds[kl];
         const auto l = sd_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = sd_pair_data[kl];
+        const auto S_kl_00 = rawValue(sd_pair_data, kl);
 
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
@@ -7688,7 +7688,7 @@ computeCoulombFockPDSD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * sd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(sd_mat_D, kl) * 2.0;
 
     }
 
@@ -7698,7 +7698,7 @@ computeCoulombFockPDSD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -7710,20 +7710,20 @@ computeCoulombFockPDSD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDPP(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pp_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* pp_first_inds,
+                       const int32_t* pp_second_inds,
                        const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
+                       const int32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -7732,14 +7732,14 @@ computeCoulombFockPDPP(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -7762,25 +7762,25 @@ computeCoulombFockPDPP(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -7792,11 +7792,11 @@ computeCoulombFockPDPP(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(pp_mat_Q, kl) * rawValue(pp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -7804,19 +7804,19 @@ computeCoulombFockPDPP(double*         mat_J,
         const auto k = pp_first_inds[kl];
         const auto l = pp_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = pp_pair_data[kl];
+        const auto S_kl_00 = rawValue(pp_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = l % 3;
@@ -8103,7 +8103,7 @@ computeCoulombFockPDPP(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pp_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -8113,7 +8113,7 @@ computeCoulombFockPDPP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -8125,20 +8125,20 @@ computeCoulombFockPDPP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDPD(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -8147,14 +8147,14 @@ computeCoulombFockPDPD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -8177,25 +8177,25 @@ computeCoulombFockPDPD(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -8207,11 +8207,11 @@ computeCoulombFockPDPD(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -8219,19 +8219,19 @@ computeCoulombFockPDPD(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -8804,7 +8804,7 @@ computeCoulombFockPDPD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
 
     }
 
@@ -8814,7 +8814,7 @@ computeCoulombFockPDPD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -8826,20 +8826,20 @@ computeCoulombFockPDPD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD0(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -8848,14 +8848,14 @@ computeCoulombFockPDDD0(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -8878,25 +8878,25 @@ computeCoulombFockPDDD0(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -8908,11 +8908,11 @@ computeCoulombFockPDDD0(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -8920,19 +8920,19 @@ computeCoulombFockPDDD0(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -9099,7 +9099,7 @@ computeCoulombFockPDDD0(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -9109,7 +9109,7 @@ computeCoulombFockPDDD0(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -9121,20 +9121,20 @@ computeCoulombFockPDDD0(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD1(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -9143,14 +9143,14 @@ computeCoulombFockPDDD1(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9173,25 +9173,25 @@ computeCoulombFockPDDD1(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -9203,11 +9203,11 @@ computeCoulombFockPDDD1(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -9215,19 +9215,19 @@ computeCoulombFockPDDD1(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -9409,7 +9409,7 @@ computeCoulombFockPDDD1(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -9419,7 +9419,7 @@ computeCoulombFockPDDD1(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -9431,20 +9431,20 @@ computeCoulombFockPDDD1(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD2(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -9453,14 +9453,14 @@ computeCoulombFockPDDD2(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9483,25 +9483,25 @@ computeCoulombFockPDDD2(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -9513,11 +9513,11 @@ computeCoulombFockPDDD2(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -9525,19 +9525,19 @@ computeCoulombFockPDDD2(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -9718,7 +9718,7 @@ computeCoulombFockPDDD2(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -9728,7 +9728,7 @@ computeCoulombFockPDDD2(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -9740,20 +9740,20 @@ computeCoulombFockPDDD2(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD3(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -9762,14 +9762,14 @@ computeCoulombFockPDDD3(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -9792,25 +9792,25 @@ computeCoulombFockPDDD3(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -9822,11 +9822,11 @@ computeCoulombFockPDDD3(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -9834,19 +9834,19 @@ computeCoulombFockPDDD3(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -10066,7 +10066,7 @@ computeCoulombFockPDDD3(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -10076,7 +10076,7 @@ computeCoulombFockPDDD3(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -10088,20 +10088,20 @@ computeCoulombFockPDDD3(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD4(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -10110,14 +10110,14 @@ computeCoulombFockPDDD4(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -10140,25 +10140,25 @@ computeCoulombFockPDDD4(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -10170,11 +10170,11 @@ computeCoulombFockPDDD4(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -10182,19 +10182,19 @@ computeCoulombFockPDDD4(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -10341,7 +10341,7 @@ computeCoulombFockPDDD4(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -10351,7 +10351,7 @@ computeCoulombFockPDDD4(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -10363,20 +10363,20 @@ computeCoulombFockPDDD4(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD5(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -10385,14 +10385,14 @@ computeCoulombFockPDDD5(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -10415,25 +10415,25 @@ computeCoulombFockPDDD5(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -10445,11 +10445,11 @@ computeCoulombFockPDDD5(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -10457,19 +10457,19 @@ computeCoulombFockPDDD5(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -10760,7 +10760,7 @@ computeCoulombFockPDDD5(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -10770,7 +10770,7 @@ computeCoulombFockPDDD5(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -10782,20 +10782,20 @@ computeCoulombFockPDDD5(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPDDD6(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   pd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* pd_first_inds_local,
-                       const uint32_t* pd_second_inds_local,
+                       const int32_t* pd_first_inds_local,
+                       const int32_t* pd_second_inds_local,
                        const double*   pd_pair_data_local,
-                       const uint32_t  pd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  pd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -10804,14 +10804,14 @@ computeCoulombFockPDDD6(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     double PA_0, PB_0, PB_1;
-    uint32_t i, j, a0, b0, b1;
+    int32_t i, j, a0, b0, b1;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -10834,25 +10834,25 @@ computeCoulombFockPDDD6(double*         mat_J,
 
     if (ij < pd_prim_pair_count_local)
     {
-        i = pd_first_inds_local[ij];
-        j = pd_second_inds_local[ij];
+        i = rawValue(pd_first_inds_local, ij);
+        j = rawValue(pd_second_inds_local, ij);
 
-        a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-        r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-        r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-        r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+        r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+        r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+        r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-        a_j = d_prim_info[j / 6 + d_prim_count * 0];
+        a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-        r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-        r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-        r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+        r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+        r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+        r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
         S1 = a_i + a_j;
         inv_S1 = 1.0 / S1;
 
-        S_ij_00 = pd_pair_data_local[ij];
+        S_ij_00 = rawValue(pd_pair_data_local, ij);
 
         a0 = i % 3;
         b0 = d_cart_inds[j % 6][0];
@@ -10864,11 +10864,11 @@ computeCoulombFockPDDD6(double*         mat_J,
 
     }
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+        const int32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(pd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= pd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(pd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -10876,19 +10876,19 @@ computeCoulombFockPDDD6(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -11090,7 +11090,7 @@ computeCoulombFockPDDD6(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y][threadIdx.x] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
 
     }
 
@@ -11100,7 +11100,7 @@ computeCoulombFockPDDD6(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM; n++)
+        for (int32_t n = 0; n < TILE_DIM; n++)
         {
             J_ij += ERIs[n][threadIdx.x];
         }
@@ -11112,20 +11112,20 @@ computeCoulombFockPDDD6(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDSS(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   ss_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   ss_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* ss_first_inds,
+                       const int32_t* ss_second_inds,
                        const double*   ss_pair_data,
-                       const uint32_t  ss_prim_pair_count,
+                       const int32_t  ss_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -11134,14 +11134,14 @@ computeCoulombFockDDSS(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -11159,25 +11159,25 @@ computeCoulombFockDDSS(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -11197,11 +11197,11 @@ computeCoulombFockDDSS(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (ss_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= ss_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(ss_mat_Q, kl) * rawValue(ss_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -11209,19 +11209,19 @@ computeCoulombFockDDSS(double*         mat_J,
         const auto k = ss_first_inds[kl];
         const auto l = ss_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = s_prim_info[l + s_prim_count * 0];
+        const auto a_l = rawValue(s_prim_info, l + s_prim_count * 0);
 
-        const double r_l[3] = {s_prim_info[l + s_prim_count * 2],
-                               s_prim_info[l + s_prim_count * 3],
-                               s_prim_info[l + s_prim_count * 4]};
+        const double r_l[3] = {rawValue(s_prim_info, l + s_prim_count * 2),
+                               rawValue(s_prim_info, l + s_prim_count * 3),
+                               rawValue(s_prim_info, l + s_prim_count * 4)};
 
-        const auto S_kl_00 = ss_pair_data[kl];
+        const auto S_kl_00 = rawValue(ss_pair_data, kl);
 
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
@@ -11353,7 +11353,7 @@ computeCoulombFockDDSS(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * ss_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(ss_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -11362,7 +11362,7 @@ computeCoulombFockDDSS(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -11374,22 +11374,22 @@ computeCoulombFockDDSS(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDSP(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sp_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   sp_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* sp_first_inds,
+                       const int32_t* sp_second_inds,
                        const double*   sp_pair_data,
-                       const uint32_t  sp_prim_pair_count,
+                       const int32_t  sp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -11398,14 +11398,14 @@ computeCoulombFockDDSP(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -11423,25 +11423,25 @@ computeCoulombFockDDSP(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -11461,11 +11461,11 @@ computeCoulombFockDDSP(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (sp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (sp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= sp_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(sp_mat_Q, kl) * rawValue(sp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -11473,19 +11473,19 @@ computeCoulombFockDDSP(double*         mat_J,
         const auto k = sp_first_inds[kl];
         const auto l = sp_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = sp_pair_data[kl];
+        const auto S_kl_00 = rawValue(sp_pair_data, kl);
 
         const auto d0 = l % 3;
 
@@ -11732,7 +11732,7 @@ computeCoulombFockDDSP(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * sp_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(sp_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -11741,7 +11741,7 @@ computeCoulombFockDDSP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -11753,20 +11753,20 @@ computeCoulombFockDDSP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDSD(double*         mat_J,
                        const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
+                       const int32_t  s_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   sd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   sd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* sd_first_inds,
-                       const uint32_t* sd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* sd_first_inds,
+                       const int32_t* sd_second_inds,
                        const double*   sd_pair_data,
-                       const uint32_t  sd_prim_pair_count,
+                       const int32_t  sd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -11775,14 +11775,14 @@ computeCoulombFockDDSD(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -11800,25 +11800,25 @@ computeCoulombFockDDSD(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -11838,11 +11838,11 @@ computeCoulombFockDDSD(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (sd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (sd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * sd_mat_Q[kl] * sd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= sd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(sd_mat_Q, kl) * rawValue(sd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -11850,19 +11850,19 @@ computeCoulombFockDDSD(double*         mat_J,
         const auto k = sd_first_inds[kl];
         const auto l = sd_second_inds[kl];
 
-        const auto a_k = s_prim_info[k + s_prim_count * 0];
+        const auto a_k = rawValue(s_prim_info, k + s_prim_count * 0);
 
-        const double r_k[3] = {s_prim_info[k + s_prim_count * 2],
-                               s_prim_info[k + s_prim_count * 3],
-                               s_prim_info[k + s_prim_count * 4]};
+        const double r_k[3] = {rawValue(s_prim_info, k + s_prim_count * 2),
+                               rawValue(s_prim_info, k + s_prim_count * 3),
+                               rawValue(s_prim_info, k + s_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = sd_pair_data[kl];
+        const auto S_kl_00 = rawValue(sd_pair_data, kl);
 
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
@@ -12408,7 +12408,7 @@ computeCoulombFockDDSD(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * sd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(sd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -12417,7 +12417,7 @@ computeCoulombFockDDSD(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -12429,20 +12429,20 @@ computeCoulombFockDDSD(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPP(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pp_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pp_first_inds,
+                       const int32_t* pp_second_inds,
                        const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
+                       const int32_t  pp_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -12451,14 +12451,14 @@ computeCoulombFockDDPP(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -12476,25 +12476,25 @@ computeCoulombFockDDPP(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -12514,11 +12514,11 @@ computeCoulombFockDDPP(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pp_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pp_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pp_mat_Q, kl) * rawValue(pp_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -12526,19 +12526,19 @@ computeCoulombFockDDPP(double*         mat_J,
         const auto k = pp_first_inds[kl];
         const auto l = pp_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+        const auto a_l = rawValue(p_prim_info, l / 3 + p_prim_count * 0);
 
-        const double r_l[3] = {p_prim_info[l / 3 + p_prim_count * 2],
-                               p_prim_info[l / 3 + p_prim_count * 3],
-                               p_prim_info[l / 3 + p_prim_count * 4]};
+        const double r_l[3] = {rawValue(p_prim_info, l / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, l / 3 + p_prim_count * 4)};
 
-        const auto S_kl_00 = pp_pair_data[kl];
+        const auto S_kl_00 = rawValue(pp_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = l % 3;
@@ -13085,7 +13085,7 @@ computeCoulombFockDDPP(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * pp_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pp_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -13094,7 +13094,7 @@ computeCoulombFockDDPP(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -13106,20 +13106,20 @@ computeCoulombFockDDPP(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD0(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -13128,14 +13128,14 @@ computeCoulombFockDDPD0(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13153,25 +13153,25 @@ computeCoulombFockDDPD0(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -13191,11 +13191,11 @@ computeCoulombFockDDPD0(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -13203,19 +13203,19 @@ computeCoulombFockDDPD0(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -13320,7 +13320,7 @@ computeCoulombFockDDPD0(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -13329,7 +13329,7 @@ computeCoulombFockDDPD0(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -13341,20 +13341,20 @@ computeCoulombFockDDPD0(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD1(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -13363,14 +13363,14 @@ computeCoulombFockDDPD1(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13388,25 +13388,25 @@ computeCoulombFockDDPD1(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -13426,11 +13426,11 @@ computeCoulombFockDDPD1(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -13438,19 +13438,19 @@ computeCoulombFockDDPD1(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -13650,7 +13650,7 @@ computeCoulombFockDDPD1(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -13659,7 +13659,7 @@ computeCoulombFockDDPD1(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -13671,20 +13671,20 @@ computeCoulombFockDDPD1(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD2(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -13693,14 +13693,14 @@ computeCoulombFockDDPD2(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     //__shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13718,25 +13718,25 @@ computeCoulombFockDDPD2(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -13756,11 +13756,11 @@ computeCoulombFockDDPD2(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -13768,19 +13768,19 @@ computeCoulombFockDDPD2(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -13819,7 +13819,7 @@ computeCoulombFockDDPD2(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -13828,7 +13828,7 @@ computeCoulombFockDDPD2(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -13840,20 +13840,20 @@ computeCoulombFockDDPD2(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD3(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -13862,14 +13862,14 @@ computeCoulombFockDDPD3(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -13887,25 +13887,25 @@ computeCoulombFockDDPD3(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -13925,11 +13925,11 @@ computeCoulombFockDDPD3(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -13937,19 +13937,19 @@ computeCoulombFockDDPD3(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -14143,7 +14143,7 @@ computeCoulombFockDDPD3(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -14152,7 +14152,7 @@ computeCoulombFockDDPD3(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -14164,20 +14164,20 @@ computeCoulombFockDDPD3(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD4(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -14186,14 +14186,14 @@ computeCoulombFockDDPD4(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -14211,25 +14211,25 @@ computeCoulombFockDDPD4(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -14249,11 +14249,11 @@ computeCoulombFockDDPD4(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -14261,19 +14261,19 @@ computeCoulombFockDDPD4(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -14593,7 +14593,7 @@ computeCoulombFockDDPD4(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -14602,7 +14602,7 @@ computeCoulombFockDDPD4(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -14614,20 +14614,20 @@ computeCoulombFockDDPD4(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD5(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -14636,14 +14636,14 @@ computeCoulombFockDDPD5(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -14661,25 +14661,25 @@ computeCoulombFockDDPD5(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -14699,11 +14699,11 @@ computeCoulombFockDDPD5(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -14711,19 +14711,19 @@ computeCoulombFockDDPD5(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -14937,7 +14937,7 @@ computeCoulombFockDDPD5(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -14946,7 +14946,7 @@ computeCoulombFockDDPD5(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -14958,20 +14958,20 @@ computeCoulombFockDDPD5(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD6(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -14980,14 +14980,14 @@ computeCoulombFockDDPD6(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15005,25 +15005,25 @@ computeCoulombFockDDPD6(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -15043,11 +15043,11 @@ computeCoulombFockDDPD6(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -15055,19 +15055,19 @@ computeCoulombFockDDPD6(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -15150,7 +15150,7 @@ computeCoulombFockDDPD6(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -15159,7 +15159,7 @@ computeCoulombFockDDPD6(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -15171,20 +15171,20 @@ computeCoulombFockDDPD6(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD7(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -15193,14 +15193,14 @@ computeCoulombFockDDPD7(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15218,25 +15218,25 @@ computeCoulombFockDDPD7(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -15256,11 +15256,11 @@ computeCoulombFockDDPD7(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -15268,19 +15268,19 @@ computeCoulombFockDDPD7(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -15362,7 +15362,7 @@ computeCoulombFockDDPD7(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -15371,7 +15371,7 @@ computeCoulombFockDDPD7(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -15383,20 +15383,20 @@ computeCoulombFockDDPD7(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD8(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -15405,14 +15405,14 @@ computeCoulombFockDDPD8(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     //__shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15430,25 +15430,25 @@ computeCoulombFockDDPD8(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -15468,11 +15468,11 @@ computeCoulombFockDDPD8(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -15480,19 +15480,19 @@ computeCoulombFockDDPD8(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -15537,7 +15537,7 @@ computeCoulombFockDDPD8(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -15546,7 +15546,7 @@ computeCoulombFockDDPD8(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -15558,20 +15558,20 @@ computeCoulombFockDDPD8(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDPD9(double*         mat_J,
                        const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
+                       const int32_t  p_prim_count,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   pd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   pd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* pd_first_inds,
-                       const uint32_t* pd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* pd_first_inds,
+                       const int32_t* pd_second_inds,
                        const double*   pd_pair_data,
-                       const uint32_t  pd_prim_pair_count,
+                       const int32_t  pd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -15580,14 +15580,14 @@ computeCoulombFockDDPD9(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15605,25 +15605,25 @@ computeCoulombFockDDPD9(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -15643,11 +15643,11 @@ computeCoulombFockDDPD9(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (pd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * pd_mat_Q[kl] * pd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= pd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(pd_mat_Q, kl) * rawValue(pd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -15655,19 +15655,19 @@ computeCoulombFockDDPD9(double*         mat_J,
         const auto k = pd_first_inds[kl];
         const auto l = pd_second_inds[kl];
 
-        const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+        const auto a_k = rawValue(p_prim_info, k / 3 + p_prim_count * 0);
 
-        const double r_k[3] = {p_prim_info[k / 3 + p_prim_count * 2],
-                               p_prim_info[k / 3 + p_prim_count * 3],
-                               p_prim_info[k / 3 + p_prim_count * 4]};
+        const double r_k[3] = {rawValue(p_prim_info, k / 3 + p_prim_count * 2),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 3),
+                               rawValue(p_prim_info, k / 3 + p_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = pd_pair_data[kl];
+        const auto S_kl_00 = rawValue(pd_pair_data, kl);
 
         const auto c0 = k % 3;
         const auto d0 = d_cart_inds[l % 6][0];
@@ -15859,7 +15859,7 @@ computeCoulombFockDDPD9(double*         mat_J,
                 );
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-        ERIs[threadIdx.y] += eri_ijkl * pd_mat_D[kl] * 2.0;
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(pd_mat_D, kl) * 2.0;
     }
 
     __syncthreads();
@@ -15868,7 +15868,7 @@ computeCoulombFockDDPD9(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -15880,18 +15880,18 @@ computeCoulombFockDDPD9(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD0(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -15900,14 +15900,14 @@ computeCoulombFockDDDD0(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -15925,25 +15925,25 @@ computeCoulombFockDDDD0(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -15963,11 +15963,11 @@ computeCoulombFockDDDD0(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -15975,19 +15975,19 @@ computeCoulombFockDDDD0(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -16120,7 +16120,7 @@ computeCoulombFockDDDD0(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -16129,7 +16129,7 @@ computeCoulombFockDDDD0(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -16141,18 +16141,18 @@ computeCoulombFockDDDD0(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD1(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -16161,14 +16161,14 @@ computeCoulombFockDDDD1(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16186,25 +16186,25 @@ computeCoulombFockDDDD1(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -16224,11 +16224,11 @@ computeCoulombFockDDDD1(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -16236,19 +16236,19 @@ computeCoulombFockDDDD1(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -16339,7 +16339,7 @@ computeCoulombFockDDDD1(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -16348,7 +16348,7 @@ computeCoulombFockDDDD1(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -16360,18 +16360,18 @@ computeCoulombFockDDDD1(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD2(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -16380,14 +16380,14 @@ computeCoulombFockDDDD2(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16405,25 +16405,25 @@ computeCoulombFockDDDD2(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -16443,11 +16443,11 @@ computeCoulombFockDDDD2(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -16455,19 +16455,19 @@ computeCoulombFockDDDD2(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -16513,7 +16513,7 @@ computeCoulombFockDDDD2(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -16522,7 +16522,7 @@ computeCoulombFockDDDD2(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -16534,18 +16534,18 @@ computeCoulombFockDDDD2(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD3(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -16554,14 +16554,14 @@ computeCoulombFockDDDD3(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16579,25 +16579,25 @@ computeCoulombFockDDDD3(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -16617,11 +16617,11 @@ computeCoulombFockDDDD3(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -16629,19 +16629,19 @@ computeCoulombFockDDDD3(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -16735,7 +16735,7 @@ computeCoulombFockDDDD3(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -16744,7 +16744,7 @@ computeCoulombFockDDDD3(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -16756,18 +16756,18 @@ computeCoulombFockDDDD3(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD4(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -16776,14 +16776,14 @@ computeCoulombFockDDDD4(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -16801,25 +16801,25 @@ computeCoulombFockDDDD4(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -16839,11 +16839,11 @@ computeCoulombFockDDDD4(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -16851,19 +16851,19 @@ computeCoulombFockDDDD4(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -16966,7 +16966,7 @@ computeCoulombFockDDDD4(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -16975,7 +16975,7 @@ computeCoulombFockDDDD4(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -16987,18 +16987,18 @@ computeCoulombFockDDDD4(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD5(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -17007,14 +17007,14 @@ computeCoulombFockDDDD5(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17032,25 +17032,25 @@ computeCoulombFockDDDD5(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -17070,11 +17070,11 @@ computeCoulombFockDDDD5(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -17082,19 +17082,19 @@ computeCoulombFockDDDD5(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -17195,7 +17195,7 @@ computeCoulombFockDDDD5(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -17204,7 +17204,7 @@ computeCoulombFockDDDD5(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -17216,18 +17216,18 @@ computeCoulombFockDDDD5(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD6(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -17236,14 +17236,14 @@ computeCoulombFockDDDD6(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17261,25 +17261,25 @@ computeCoulombFockDDDD6(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -17299,11 +17299,11 @@ computeCoulombFockDDDD6(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -17311,19 +17311,19 @@ computeCoulombFockDDDD6(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -17504,7 +17504,7 @@ computeCoulombFockDDDD6(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -17513,7 +17513,7 @@ computeCoulombFockDDDD6(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -17525,18 +17525,18 @@ computeCoulombFockDDDD6(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD7(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -17545,14 +17545,14 @@ computeCoulombFockDDDD7(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17570,25 +17570,25 @@ computeCoulombFockDDDD7(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -17608,11 +17608,11 @@ computeCoulombFockDDDD7(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -17620,19 +17620,19 @@ computeCoulombFockDDDD7(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -17848,7 +17848,7 @@ computeCoulombFockDDDD7(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -17857,7 +17857,7 @@ computeCoulombFockDDDD7(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -17869,18 +17869,18 @@ computeCoulombFockDDDD7(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD8(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -17889,14 +17889,14 @@ computeCoulombFockDDDD8(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -17914,25 +17914,25 @@ computeCoulombFockDDDD8(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -17952,11 +17952,11 @@ computeCoulombFockDDDD8(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -17964,19 +17964,19 @@ computeCoulombFockDDDD8(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -18094,7 +18094,7 @@ computeCoulombFockDDDD8(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -18103,7 +18103,7 @@ computeCoulombFockDDDD8(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -18115,18 +18115,18 @@ computeCoulombFockDDDD8(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD9(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -18135,14 +18135,14 @@ computeCoulombFockDDDD9(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -18160,25 +18160,25 @@ computeCoulombFockDDDD9(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -18198,11 +18198,11 @@ computeCoulombFockDDDD9(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -18210,19 +18210,19 @@ computeCoulombFockDDDD9(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -18301,7 +18301,7 @@ computeCoulombFockDDDD9(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -18310,7 +18310,7 @@ computeCoulombFockDDDD9(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -18322,18 +18322,18 @@ computeCoulombFockDDDD9(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD10(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -18342,14 +18342,14 @@ computeCoulombFockDDDD10(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -18367,25 +18367,25 @@ computeCoulombFockDDDD10(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -18405,11 +18405,11 @@ computeCoulombFockDDDD10(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -18417,19 +18417,19 @@ computeCoulombFockDDDD10(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -18666,7 +18666,7 @@ computeCoulombFockDDDD10(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -18675,7 +18675,7 @@ computeCoulombFockDDDD10(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -18687,18 +18687,18 @@ computeCoulombFockDDDD10(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD11(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -18707,14 +18707,14 @@ computeCoulombFockDDDD11(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -18732,25 +18732,25 @@ computeCoulombFockDDDD11(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -18770,11 +18770,11 @@ computeCoulombFockDDDD11(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -18782,19 +18782,19 @@ computeCoulombFockDDDD11(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -18997,7 +18997,7 @@ computeCoulombFockDDDD11(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -19006,7 +19006,7 @@ computeCoulombFockDDDD11(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -19018,18 +19018,18 @@ computeCoulombFockDDDD11(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD12(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -19038,14 +19038,14 @@ computeCoulombFockDDDD12(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19063,25 +19063,25 @@ computeCoulombFockDDDD12(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -19101,11 +19101,11 @@ computeCoulombFockDDDD12(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -19113,19 +19113,19 @@ computeCoulombFockDDDD12(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -19281,7 +19281,7 @@ computeCoulombFockDDDD12(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -19290,7 +19290,7 @@ computeCoulombFockDDDD12(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -19302,18 +19302,18 @@ computeCoulombFockDDDD12(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD13(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -19322,14 +19322,14 @@ computeCoulombFockDDDD13(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19347,25 +19347,25 @@ computeCoulombFockDDDD13(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -19385,11 +19385,11 @@ computeCoulombFockDDDD13(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -19397,19 +19397,19 @@ computeCoulombFockDDDD13(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -19583,7 +19583,7 @@ computeCoulombFockDDDD13(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -19592,7 +19592,7 @@ computeCoulombFockDDDD13(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -19604,18 +19604,18 @@ computeCoulombFockDDDD13(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD14(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -19624,14 +19624,14 @@ computeCoulombFockDDDD14(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19649,25 +19649,25 @@ computeCoulombFockDDDD14(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -19687,11 +19687,11 @@ computeCoulombFockDDDD14(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -19699,19 +19699,19 @@ computeCoulombFockDDDD14(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -19901,7 +19901,7 @@ computeCoulombFockDDDD14(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -19910,7 +19910,7 @@ computeCoulombFockDDDD14(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -19922,18 +19922,18 @@ computeCoulombFockDDDD14(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD15(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -19942,14 +19942,14 @@ computeCoulombFockDDDD15(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -19967,25 +19967,25 @@ computeCoulombFockDDDD15(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -20005,11 +20005,11 @@ computeCoulombFockDDDD15(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -20017,19 +20017,19 @@ computeCoulombFockDDDD15(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -20176,7 +20176,7 @@ computeCoulombFockDDDD15(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -20185,7 +20185,7 @@ computeCoulombFockDDDD15(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -20197,18 +20197,18 @@ computeCoulombFockDDDD15(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD16(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -20217,14 +20217,14 @@ computeCoulombFockDDDD16(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20242,25 +20242,25 @@ computeCoulombFockDDDD16(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -20280,11 +20280,11 @@ computeCoulombFockDDDD16(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -20292,19 +20292,19 @@ computeCoulombFockDDDD16(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -20451,7 +20451,7 @@ computeCoulombFockDDDD16(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -20460,7 +20460,7 @@ computeCoulombFockDDDD16(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -20472,18 +20472,18 @@ computeCoulombFockDDDD16(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD17(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -20492,14 +20492,14 @@ computeCoulombFockDDDD17(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20517,25 +20517,25 @@ computeCoulombFockDDDD17(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -20555,11 +20555,11 @@ computeCoulombFockDDDD17(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -20567,19 +20567,19 @@ computeCoulombFockDDDD17(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -20757,7 +20757,7 @@ computeCoulombFockDDDD17(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -20766,7 +20766,7 @@ computeCoulombFockDDDD17(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -20778,18 +20778,18 @@ computeCoulombFockDDDD17(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD18(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -20798,14 +20798,14 @@ computeCoulombFockDDDD18(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -20823,25 +20823,25 @@ computeCoulombFockDDDD18(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -20861,11 +20861,11 @@ computeCoulombFockDDDD18(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -20873,19 +20873,19 @@ computeCoulombFockDDDD18(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -20954,7 +20954,7 @@ computeCoulombFockDDDD18(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -20963,7 +20963,7 @@ computeCoulombFockDDDD18(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -20975,18 +20975,18 @@ computeCoulombFockDDDD18(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD19(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -20995,14 +20995,14 @@ computeCoulombFockDDDD19(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21020,25 +21020,25 @@ computeCoulombFockDDDD19(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -21058,11 +21058,11 @@ computeCoulombFockDDDD19(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -21070,19 +21070,19 @@ computeCoulombFockDDDD19(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -21182,7 +21182,7 @@ computeCoulombFockDDDD19(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -21191,7 +21191,7 @@ computeCoulombFockDDDD19(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -21203,18 +21203,18 @@ computeCoulombFockDDDD19(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD20(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -21223,14 +21223,14 @@ computeCoulombFockDDDD20(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21248,25 +21248,25 @@ computeCoulombFockDDDD20(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -21286,11 +21286,11 @@ computeCoulombFockDDDD20(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -21298,19 +21298,19 @@ computeCoulombFockDDDD20(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -21352,7 +21352,7 @@ computeCoulombFockDDDD20(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -21361,7 +21361,7 @@ computeCoulombFockDDDD20(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -21373,18 +21373,18 @@ computeCoulombFockDDDD20(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD21(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -21393,14 +21393,14 @@ computeCoulombFockDDDD21(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21418,25 +21418,25 @@ computeCoulombFockDDDD21(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -21456,11 +21456,11 @@ computeCoulombFockDDDD21(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -21468,19 +21468,19 @@ computeCoulombFockDDDD21(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -21576,7 +21576,7 @@ computeCoulombFockDDDD21(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -21585,7 +21585,7 @@ computeCoulombFockDDDD21(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -21597,18 +21597,18 @@ computeCoulombFockDDDD21(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD22(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -21617,14 +21617,14 @@ computeCoulombFockDDDD22(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21642,25 +21642,25 @@ computeCoulombFockDDDD22(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -21680,11 +21680,11 @@ computeCoulombFockDDDD22(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -21692,19 +21692,19 @@ computeCoulombFockDDDD22(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -21800,7 +21800,7 @@ computeCoulombFockDDDD22(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -21809,7 +21809,7 @@ computeCoulombFockDDDD22(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -21821,18 +21821,18 @@ computeCoulombFockDDDD22(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD23(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -21841,14 +21841,14 @@ computeCoulombFockDDDD23(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -21866,25 +21866,25 @@ computeCoulombFockDDDD23(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -21904,11 +21904,11 @@ computeCoulombFockDDDD23(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -21916,19 +21916,19 @@ computeCoulombFockDDDD23(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -22184,7 +22184,7 @@ computeCoulombFockDDDD23(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -22193,7 +22193,7 @@ computeCoulombFockDDDD23(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -22205,18 +22205,18 @@ computeCoulombFockDDDD23(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD24(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -22225,14 +22225,14 @@ computeCoulombFockDDDD24(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22250,25 +22250,25 @@ computeCoulombFockDDDD24(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -22288,11 +22288,11 @@ computeCoulombFockDDDD24(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -22300,19 +22300,19 @@ computeCoulombFockDDDD24(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -22412,7 +22412,7 @@ computeCoulombFockDDDD24(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -22421,7 +22421,7 @@ computeCoulombFockDDDD24(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -22433,18 +22433,18 @@ computeCoulombFockDDDD24(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD25(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -22453,14 +22453,14 @@ computeCoulombFockDDDD25(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22478,25 +22478,25 @@ computeCoulombFockDDDD25(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -22516,11 +22516,11 @@ computeCoulombFockDDDD25(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -22528,19 +22528,19 @@ computeCoulombFockDDDD25(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -22616,7 +22616,7 @@ computeCoulombFockDDDD25(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -22625,7 +22625,7 @@ computeCoulombFockDDDD25(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -22637,18 +22637,18 @@ computeCoulombFockDDDD25(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD26(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -22657,14 +22657,14 @@ computeCoulombFockDDDD26(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22682,25 +22682,25 @@ computeCoulombFockDDDD26(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -22720,11 +22720,11 @@ computeCoulombFockDDDD26(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -22732,19 +22732,19 @@ computeCoulombFockDDDD26(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -22836,7 +22836,7 @@ computeCoulombFockDDDD26(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -22845,7 +22845,7 @@ computeCoulombFockDDDD26(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -22857,18 +22857,18 @@ computeCoulombFockDDDD26(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD27(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -22877,14 +22877,14 @@ computeCoulombFockDDDD27(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -22902,25 +22902,25 @@ computeCoulombFockDDDD27(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -22940,11 +22940,11 @@ computeCoulombFockDDDD27(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -22952,19 +22952,19 @@ computeCoulombFockDDDD27(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -23071,7 +23071,7 @@ computeCoulombFockDDDD27(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -23080,7 +23080,7 @@ computeCoulombFockDDDD27(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -23092,18 +23092,18 @@ computeCoulombFockDDDD27(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD28(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -23112,14 +23112,14 @@ computeCoulombFockDDDD28(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23137,25 +23137,25 @@ computeCoulombFockDDDD28(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -23175,11 +23175,11 @@ computeCoulombFockDDDD28(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -23187,19 +23187,19 @@ computeCoulombFockDDDD28(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -23265,7 +23265,7 @@ computeCoulombFockDDDD28(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -23274,7 +23274,7 @@ computeCoulombFockDDDD28(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }
@@ -23286,18 +23286,18 @@ computeCoulombFockDDDD28(double*         mat_J,
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD29(double*         mat_J,
                        const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
+                       const int32_t  d_prim_count,
                        const double*   dd_mat_D,
                        const double*   dd_mat_Q_local,
                        const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
+                       const int32_t* dd_first_inds_local,
+                       const int32_t* dd_second_inds_local,
                        const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
+                       const int32_t  dd_prim_pair_count_local,
+                       const int32_t* dd_first_inds,
+                       const int32_t* dd_second_inds,
                        const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
+                       const int32_t  dd_prim_pair_count,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const double    eri_threshold)
@@ -23306,14 +23306,14 @@ computeCoulombFockDDDD29(double*         mat_J,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
-    __shared__ uint32_t i, j, a0, a1, b0, b1;
+    __shared__ int32_t i, j, a0, a1, b0, b1;
 
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+    const int32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -23331,25 +23331,25 @@ computeCoulombFockDDDD29(double*         mat_J,
 
         if (ij < dd_prim_pair_count_local)
         {
-            i = dd_first_inds_local[ij];
-            j = dd_second_inds_local[ij];
+            i = rawValue(dd_first_inds_local, ij);
+            j = rawValue(dd_second_inds_local, ij);
 
-            a_i = d_prim_info[i / 6 + d_prim_count * 0];
+            a_i = rawValue(d_prim_info, i / 6 + d_prim_count * 0);
 
-            r_i[0] = d_prim_info[i / 6 + d_prim_count * 2];
-            r_i[1] = d_prim_info[i / 6 + d_prim_count * 3];
-            r_i[2] = d_prim_info[i / 6 + d_prim_count * 4];
+            r_i[0] = rawValue(d_prim_info, i / 6 + d_prim_count * 2);
+            r_i[1] = rawValue(d_prim_info, i / 6 + d_prim_count * 3);
+            r_i[2] = rawValue(d_prim_info, i / 6 + d_prim_count * 4);
 
-            a_j = d_prim_info[j / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = dd_pair_data_local[ij];
+            S_ij_00 = rawValue(dd_pair_data_local, ij);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -23369,11 +23369,11 @@ computeCoulombFockDDDD29(double*         mat_J,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
+    for (int32_t m = 0; m < (dd_prim_pair_count + TILE_DIM_LARGE - 1) / TILE_DIM_LARGE; m++)
     {
-        const uint32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
+        const int32_t kl = m * TILE_DIM_LARGE + threadIdx.y;
 
-        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(dd_mat_Q_local[ij] * dd_mat_Q[kl] * dd_mat_D[kl]) <= eri_threshold))
+        if ((ij >= dd_prim_pair_count_local) || (kl >= dd_prim_pair_count) || (fabs(rawValue(dd_mat_Q_local, ij) * rawValue(dd_mat_Q, kl) * rawValue(dd_mat_D, kl)) <= eri_threshold))
         {
             break;
         }
@@ -23381,19 +23381,19 @@ computeCoulombFockDDDD29(double*         mat_J,
         const auto k = dd_first_inds[kl];
         const auto l = dd_second_inds[kl];
 
-        const auto a_k = d_prim_info[k / 6 + d_prim_count * 0];
+        const auto a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-        const double r_k[3] = {d_prim_info[k / 6 + d_prim_count * 2],
-                               d_prim_info[k / 6 + d_prim_count * 3],
-                               d_prim_info[k / 6 + d_prim_count * 4]};
+        const double r_k[3] = {rawValue(d_prim_info, k / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, k / 6 + d_prim_count * 4)};
 
-        const auto a_l = d_prim_info[l / 6 + d_prim_count * 0];
+        const auto a_l = rawValue(d_prim_info, l / 6 + d_prim_count * 0);
 
-        const double r_l[3] = {d_prim_info[l / 6 + d_prim_count * 2],
-                               d_prim_info[l / 6 + d_prim_count * 3],
-                               d_prim_info[l / 6 + d_prim_count * 4]};
+        const double r_l[3] = {rawValue(d_prim_info, l / 6 + d_prim_count * 2),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 3),
+                               rawValue(d_prim_info, l / 6 + d_prim_count * 4)};
 
-        const auto S_kl_00 = dd_pair_data[kl];
+        const auto S_kl_00 = rawValue(dd_pair_data, kl);
 
         const auto c0 = d_cart_inds[k % 6][0];
         const auto c1 = d_cart_inds[k % 6][1];
@@ -23562,7 +23562,7 @@ computeCoulombFockDDDD29(double*         mat_J,
 
         // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
         //       (static_cast<double>(k != l) + 1.0) == (k == l ? 1.0 : 2.0)
-        ERIs[threadIdx.y] += eri_ijkl * dd_mat_D[kl] * (static_cast<double>(k != l) + 1.0);
+        ERIs[threadIdx.y] += eri_ijkl * rawValue(dd_mat_D, kl) * (static_cast<double>(k != l) + 1.0);
     }
 
     __syncthreads();
@@ -23571,7 +23571,7 @@ computeCoulombFockDDDD29(double*         mat_J,
     {
         double J_ij = 0.0;
 
-        for (uint32_t n = 0; n < TILE_DIM_LARGE; n++)
+        for (int32_t n = 0; n < TILE_DIM_LARGE; n++)
         {
             J_ij += ERIs[n];
         }

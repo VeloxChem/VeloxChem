@@ -40,33 +40,33 @@ namespace gpu {  // gpu namespace
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_0(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -76,13 +76,13 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -105,28 +105,28 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -137,35 +137,35 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -179,26 +179,26 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -387,7 +387,7 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -399,47 +399,47 @@ computeExchangeGradientPDDD_I_0(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_1(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -449,13 +449,13 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -478,28 +478,28 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -510,35 +510,35 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -552,26 +552,26 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -907,7 +907,7 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -919,47 +919,47 @@ computeExchangeGradientPDDD_I_1(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_2(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -969,13 +969,13 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -998,28 +998,28 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -1030,35 +1030,35 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -1072,26 +1072,26 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -1252,7 +1252,7 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -1264,47 +1264,47 @@ computeExchangeGradientPDDD_I_2(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_3(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -1314,13 +1314,13 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -1343,28 +1343,28 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -1375,35 +1375,35 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -1417,26 +1417,26 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -1570,7 +1570,7 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -1582,47 +1582,47 @@ computeExchangeGradientPDDD_I_3(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_4(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -1632,13 +1632,13 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -1661,28 +1661,28 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -1693,35 +1693,35 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -1735,26 +1735,26 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -2000,7 +2000,7 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -2012,47 +2012,47 @@ computeExchangeGradientPDDD_I_4(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_5(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -2062,13 +2062,13 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -2091,28 +2091,28 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -2123,35 +2123,35 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -2165,26 +2165,26 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -2421,7 +2421,7 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -2433,47 +2433,47 @@ computeExchangeGradientPDDD_I_5(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_6(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -2483,13 +2483,13 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -2512,28 +2512,28 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -2544,35 +2544,35 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -2586,26 +2586,26 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -2787,7 +2787,7 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -2799,47 +2799,47 @@ computeExchangeGradientPDDD_I_6(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_7(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -2849,13 +2849,13 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -2878,28 +2878,28 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -2910,35 +2910,35 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -2952,26 +2952,26 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -3094,7 +3094,7 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -3106,47 +3106,47 @@ computeExchangeGradientPDDD_I_7(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_8(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -3156,13 +3156,13 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -3185,28 +3185,28 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -3217,35 +3217,35 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -3259,26 +3259,26 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -3460,7 +3460,7 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -3472,47 +3472,47 @@ computeExchangeGradientPDDD_I_8(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_9(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -3522,13 +3522,13 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -3551,28 +3551,28 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -3583,35 +3583,35 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -3625,26 +3625,26 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -3858,7 +3858,7 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -3870,47 +3870,47 @@ computeExchangeGradientPDDD_I_9(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_10(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -3920,13 +3920,13 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -3949,28 +3949,28 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -3981,35 +3981,35 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -4023,26 +4023,26 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -4254,7 +4254,7 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -4266,47 +4266,47 @@ computeExchangeGradientPDDD_I_10(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_11(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -4316,13 +4316,13 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -4345,28 +4345,28 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -4377,35 +4377,35 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -4419,26 +4419,26 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -4683,7 +4683,7 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -4695,47 +4695,47 @@ computeExchangeGradientPDDD_I_11(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_12(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -4745,13 +4745,13 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -4774,28 +4774,28 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -4806,35 +4806,35 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -4848,26 +4848,26 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -5044,7 +5044,7 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -5056,47 +5056,47 @@ computeExchangeGradientPDDD_I_12(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_13(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -5106,13 +5106,13 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -5135,28 +5135,28 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -5167,35 +5167,35 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -5209,26 +5209,26 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -5496,7 +5496,7 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -5508,47 +5508,47 @@ computeExchangeGradientPDDD_I_13(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_14(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -5558,13 +5558,13 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -5587,28 +5587,28 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -5619,35 +5619,35 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -5661,26 +5661,26 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -5828,7 +5828,7 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -5840,47 +5840,47 @@ computeExchangeGradientPDDD_I_14(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_15(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -5890,13 +5890,13 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -5919,28 +5919,28 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -5951,35 +5951,35 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -5993,26 +5993,26 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -6217,7 +6217,7 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -6229,47 +6229,47 @@ computeExchangeGradientPDDD_I_15(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_16(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -6279,13 +6279,13 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -6308,28 +6308,28 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -6340,35 +6340,35 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -6382,26 +6382,26 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -6709,7 +6709,7 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -6721,47 +6721,47 @@ computeExchangeGradientPDDD_I_16(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_17(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -6771,13 +6771,13 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -6800,28 +6800,28 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -6832,35 +6832,35 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -6874,26 +6874,26 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -7044,7 +7044,7 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -7056,47 +7056,47 @@ computeExchangeGradientPDDD_I_17(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_I_18(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -7106,13 +7106,13 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -7135,28 +7135,28 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -7167,35 +7167,35 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -7209,26 +7209,26 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -7594,7 +7594,7 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, j_cgto * naos + l_cgto);
 
         }
     }
@@ -7606,47 +7606,47 @@ computeExchangeGradientPDDD_I_18(double*         grad_x,
     {
         double grad_i_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_i_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + i], grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + i), grad_i_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_0(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -7656,13 +7656,13 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -7685,28 +7685,28 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -7717,35 +7717,35 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -7759,26 +7759,26 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -8063,7 +8063,7 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -8074,47 +8074,47 @@ computeExchangeGradientPDDD_K_0(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_1(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -8124,13 +8124,13 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -8153,28 +8153,28 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -8185,35 +8185,35 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -8227,26 +8227,26 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -8474,7 +8474,7 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -8485,47 +8485,47 @@ computeExchangeGradientPDDD_K_1(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_2(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -8535,13 +8535,13 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -8564,28 +8564,28 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -8596,35 +8596,35 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -8638,26 +8638,26 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -8763,7 +8763,7 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -8774,47 +8774,47 @@ computeExchangeGradientPDDD_K_2(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_3(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -8824,13 +8824,13 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -8853,28 +8853,28 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -8885,35 +8885,35 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -8927,26 +8927,26 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -9145,7 +9145,7 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -9156,47 +9156,47 @@ computeExchangeGradientPDDD_K_3(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_4(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -9206,13 +9206,13 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -9235,28 +9235,28 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -9267,35 +9267,35 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -9309,26 +9309,26 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -9556,7 +9556,7 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -9567,47 +9567,47 @@ computeExchangeGradientPDDD_K_4(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_5(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -9617,13 +9617,13 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -9646,28 +9646,28 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -9678,35 +9678,35 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -9720,26 +9720,26 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -9948,7 +9948,7 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -9959,47 +9959,47 @@ computeExchangeGradientPDDD_K_5(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_6(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -10009,13 +10009,13 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -10038,28 +10038,28 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -10070,35 +10070,35 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -10112,26 +10112,26 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -10264,7 +10264,7 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -10275,47 +10275,47 @@ computeExchangeGradientPDDD_K_6(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_7(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -10325,13 +10325,13 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -10354,28 +10354,28 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -10386,35 +10386,35 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -10428,26 +10428,26 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -10624,7 +10624,7 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -10635,47 +10635,47 @@ computeExchangeGradientPDDD_K_7(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_8(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -10685,13 +10685,13 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -10714,28 +10714,28 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -10746,35 +10746,35 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -10788,26 +10788,26 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -11040,7 +11040,7 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -11051,47 +11051,47 @@ computeExchangeGradientPDDD_K_8(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_9(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -11101,13 +11101,13 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -11130,28 +11130,28 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -11162,35 +11162,35 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -11204,26 +11204,26 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -11577,7 +11577,7 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -11588,47 +11588,47 @@ computeExchangeGradientPDDD_K_9(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_10(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -11638,13 +11638,13 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -11667,28 +11667,28 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -11699,35 +11699,35 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -11741,26 +11741,26 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -11948,7 +11948,7 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -11959,47 +11959,47 @@ computeExchangeGradientPDDD_K_10(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_11(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -12009,13 +12009,13 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -12038,28 +12038,28 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -12070,35 +12070,35 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -12112,26 +12112,26 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -12374,7 +12374,7 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -12385,47 +12385,47 @@ computeExchangeGradientPDDD_K_11(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_12(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -12435,13 +12435,13 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -12464,28 +12464,28 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -12496,35 +12496,35 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -12538,26 +12538,26 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -12858,7 +12858,7 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -12869,47 +12869,47 @@ computeExchangeGradientPDDD_K_12(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_13(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -12919,13 +12919,13 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -12948,28 +12948,28 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -12980,35 +12980,35 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -13022,26 +13022,26 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -13210,7 +13210,7 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -13221,47 +13221,47 @@ computeExchangeGradientPDDD_K_13(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_14(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -13271,13 +13271,13 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -13300,28 +13300,28 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -13332,35 +13332,35 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -13374,26 +13374,26 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -13564,7 +13564,7 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -13575,47 +13575,47 @@ computeExchangeGradientPDDD_K_14(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_15(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -13625,13 +13625,13 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -13654,28 +13654,28 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -13686,35 +13686,35 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -13728,26 +13728,26 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -14067,7 +14067,7 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -14078,47 +14078,47 @@ computeExchangeGradientPDDD_K_15(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_16(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -14128,13 +14128,13 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -14157,28 +14157,28 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -14189,35 +14189,35 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -14231,26 +14231,26 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -14383,7 +14383,7 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -14394,47 +14394,47 @@ computeExchangeGradientPDDD_K_16(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeGradientPDDD_K_17(double*         grad_x,
-                                const uint32_t  grad_cart_ind,
+                                const int32_t  grad_cart_ind,
                                 const double    frac_exact_exchange,
-                                const uint32_t* pair_inds_i_for_K_pd,
-                                const uint32_t* pair_inds_k_for_K_pd,
+                                const int32_t* pair_inds_i_for_K_pd,
+                                const int32_t* pair_inds_k_for_K_pd,
                                 const double*   D_ik_for_K_pd,
-                                const uint32_t  pair_inds_count_for_K_pd,
+                                const int32_t  pair_inds_count_for_K_pd,
                                 const double*   p_prim_info,
-                                const uint32_t* p_prim_aoinds,
-                                const uint32_t  p_prim_count,
+                                const int32_t* p_prim_aoinds,
+                                const int32_t  p_prim_count,
                                 const double*   d_prim_info,
-                                const uint32_t* d_prim_aoinds,
-                                const uint32_t  d_prim_count,
+                                const int32_t* d_prim_aoinds,
+                                const int32_t  d_prim_count,
                                 const double    dd_max_D,
                                 const double*   mat_D_full_AO,
-                                const uint32_t  naos,
+                                const int32_t  naos,
                                 const double*   Q_K_pd,
                                 const double*   Q_K_dd,
-                                const uint32_t* D_inds_K_pd,
-                                const uint32_t* D_inds_K_dd,
-                                const uint32_t* pair_displs_K_pd,
-                                const uint32_t* pair_displs_K_dd,
-                                const uint32_t* pair_counts_K_pd,
-                                const uint32_t* pair_counts_K_dd,
+                                const int32_t* D_inds_K_pd,
+                                const int32_t* D_inds_K_dd,
+                                const int32_t* pair_displs_K_pd,
+                                const int32_t* pair_displs_K_dd,
+                                const int32_t* pair_counts_K_pd,
+                                const int32_t* pair_counts_K_dd,
                                 const double*   pair_data_K_pd,
                                 const double*   pair_data_K_dd,
-                                const uint32_t* prim_cart_ao_to_atom_inds,
-                                const uint32_t  s_prim_count,
+                                const int32_t* prim_cart_ao_to_atom_inds,
+                                const int32_t  s_prim_count,
                                 const double*   boys_func_table,
                                 const double*   boys_func_ft,
                                 const double    omega,
@@ -14444,13 +14444,13 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
     __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
-    __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
+    __shared__ int32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3], ik_factor_D;
-    __shared__ uint32_t a0, c0, c1;
-    __shared__ uint32_t d_cart_inds[6][2];
+    __shared__ int32_t a0, c0, c1;
+    __shared__ int32_t d_cart_inds[6][2];
     __shared__ double   delta[3][3];
 
-    const uint32_t ik = blockIdx.x;
+    const int32_t ik = blockIdx.x;
 
     double d2 = 1.0;
 
@@ -14473,28 +14473,28 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
 
         if (ik < pair_inds_count_for_K_pd)
         {
-            i = pair_inds_i_for_K_pd[ik];
-            k = pair_inds_k_for_K_pd[ik];
+            i = rawValue(pair_inds_i_for_K_pd, ik);
+            k = rawValue(pair_inds_k_for_K_pd, ik);
 
-            count_i = pair_counts_K_pd[i];
-            count_k = pair_counts_K_dd[k];
+            count_i = rawValue(pair_counts_K_pd, i);
+            count_k = rawValue(pair_counts_K_dd, k);
 
-            displ_i = pair_displs_K_pd[i];
-            displ_k = pair_displs_K_dd[k];
+            displ_i = rawValue(pair_displs_K_pd, i);
+            displ_k = rawValue(pair_displs_K_dd, k);
 
-            a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            a_i = rawValue(p_prim_info, i / 3 + p_prim_count * 0);
 
-            r_i[0] = p_prim_info[i / 3 + p_prim_count * 2];
-            r_i[1] = p_prim_info[i / 3 + p_prim_count * 3];
-            r_i[2] = p_prim_info[i / 3 + p_prim_count * 4];
+            r_i[0] = rawValue(p_prim_info, i / 3 + p_prim_count * 2);
+            r_i[1] = rawValue(p_prim_info, i / 3 + p_prim_count * 3);
+            r_i[2] = rawValue(p_prim_info, i / 3 + p_prim_count * 4);
 
-            a_k = d_prim_info[k / 6 + d_prim_count * 0];
+            a_k = rawValue(d_prim_info, k / 6 + d_prim_count * 0);
 
-            r_k[0] = d_prim_info[k / 6 + d_prim_count * 2];
-            r_k[1] = d_prim_info[k / 6 + d_prim_count * 3];
-            r_k[2] = d_prim_info[k / 6 + d_prim_count * 4];
+            r_k[0] = rawValue(d_prim_info, k / 6 + d_prim_count * 2);
+            r_k[1] = rawValue(d_prim_info, k / 6 + d_prim_count * 3);
+            r_k[2] = rawValue(d_prim_info, k / 6 + d_prim_count * 4);
 
-            ik_factor_D = 2.0 * D_ik_for_K_pd[ik];
+            ik_factor_D = 2.0 * rawValue(D_ik_for_K_pd, ik);
 
             a0 = i % 3;
             c0 = d_cart_inds[k % 6][0];
@@ -14505,35 +14505,35 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
 
     __syncthreads();
 
-    for (uint32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
+    for (int32_t m = 0; m < (count_i + TILE_DIM_Y_K - 1) / TILE_DIM_Y_K; m++)
     {
-        const uint32_t j = m * TILE_DIM_Y_K + threadIdx.y;
+        const int32_t j = m * TILE_DIM_Y_K + threadIdx.y;
 
         // sync threads before starting a new scan
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
         double PA_0, PB_0, PB_1, PA_x;
-        uint32_t j_prim, j_cgto, b0, b1;
+        int32_t j_prim, j_cgto, b0, b1;
 
         if ((ik < pair_inds_count_for_K_pd) && (j < count_i))
         {
-            Q_ij   = Q_K_pd[displ_i + j];
+            Q_ij   = rawValue(Q_K_pd, displ_i + j);
 
-            j_prim = D_inds_K_pd[displ_i + j];
+            j_prim = rawValue(D_inds_K_pd, displ_i + j);
 
-            j_cgto = d_prim_aoinds[(j_prim / 6) + d_prim_count * (j_prim % 6)];
+            j_cgto = rawValue(d_prim_aoinds, (j_prim / 6) + d_prim_count * (j_prim % 6));
 
-            a_j = d_prim_info[j_prim / 6 + d_prim_count * 0];
+            a_j = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 0);
 
-            r_j[0] = d_prim_info[j_prim / 6 + d_prim_count * 2];
-            r_j[1] = d_prim_info[j_prim / 6 + d_prim_count * 3];
-            r_j[2] = d_prim_info[j_prim / 6 + d_prim_count * 4];
+            r_j[0] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 2);
+            r_j[1] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 3);
+            r_j[2] = rawValue(d_prim_info, j_prim / 6 + d_prim_count * 4);
 
             S1 = a_i + a_j;
             inv_S1 = 1.0 / S1;
 
-            S_ij_00 = pair_data_K_pd[displ_i + j];
+            S_ij_00 = rawValue(pair_data_K_pd, displ_i + j);
 
             PA_x = (a_j * inv_S1) * (r_j[grad_cart_ind] - r_i[grad_cart_ind]);
 
@@ -14547,26 +14547,26 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
         }
 
 
-        for (uint32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
+        for (int32_t n = 0; n < (count_k + TILE_DIM_X_K - 1) / TILE_DIM_X_K; n++)
         {
-            const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
+            const int32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
-            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * Q_K_dd[displ_k + l] * dd_max_D) <= eri_threshold))
+            if ((ik >= pair_inds_count_for_K_pd) || (j >= count_i) || (l >= count_k) || (fabs(Q_ij * rawValue(Q_K_dd, displ_k + l) * dd_max_D) <= eri_threshold))
             {
                 break;
             }
 
-            const auto l_prim = D_inds_K_dd[displ_k + l];
+            const auto l_prim = rawValue(D_inds_K_dd, displ_k + l);
 
-            const auto l_cgto = d_prim_aoinds[(l_prim / 6) + d_prim_count * (l_prim % 6)];
+            const auto l_cgto = rawValue(d_prim_aoinds, (l_prim / 6) + d_prim_count * (l_prim % 6));
 
-            const auto a_l = d_prim_info[l_prim / 6 + d_prim_count * 0];
+            const auto a_l = rawValue(d_prim_info, l_prim / 6 + d_prim_count * 0);
 
-            const double r_l[3] = {d_prim_info[l_prim / 6 + d_prim_count * 2],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 3],
-                                   d_prim_info[l_prim / 6 + d_prim_count * 4]};
+            const double r_l[3] = {rawValue(d_prim_info, l_prim / 6 + d_prim_count * 2),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 3),
+                                   rawValue(d_prim_info, l_prim / 6 + d_prim_count * 4)};
 
-            const auto S_kl_00 = pair_data_K_dd[displ_k + l];
+            const auto S_kl_00 = rawValue(pair_data_K_dd, displ_k + l);
 
             const auto d0 = d_cart_inds[l_prim % 6][0];
             const auto d1 = d_cart_inds[l_prim % 6][1];
@@ -14934,7 +14934,7 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * mat_D_full_AO[l_cgto * naos + j_cgto];
+            ERIs[threadIdx.y][threadIdx.x] -= eri_ijkl * rawValue(mat_D_full_AO, l_cgto * naos + j_cgto);
         }
     }
 
@@ -14945,15 +14945,15 @@ computeExchangeGradientPDDD_K_17(double*         grad_x,
     {
         double grad_k_x = 0.0;
 
-        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
+        for (int32_t y = 0; y < TILE_DIM_Y_K; y++)
         {
-            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
+            for (int32_t x = 0; x < TILE_DIM_X_K; x++)
             {
                 grad_k_x += ERIs[y][x];
             }
         }
 
-        atomicAdd(grad_x + prim_cart_ao_to_atom_inds[s_prim_count + p_prim_count * 3 + k], grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
+        atomicAdd(grad_x + rawValue(prim_cart_ao_to_atom_inds, s_prim_count + p_prim_count * 3 + k), grad_k_x * ik_factor_D * 2.0 * frac_exact_exchange);
     }
 }
 

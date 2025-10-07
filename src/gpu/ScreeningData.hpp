@@ -67,19 +67,19 @@ class CScreeningData
     CDenseMatrix _Q_matrix_pd;
     CDenseMatrix _Q_matrix_dd;
 
-    std::vector<std::vector<uint32_t>> _ss_first_inds_local;
-    std::vector<std::vector<uint32_t>> _sp_first_inds_local;
-    std::vector<std::vector<uint32_t>> _sd_first_inds_local;
-    std::vector<std::vector<uint32_t>> _pp_first_inds_local;
-    std::vector<std::vector<uint32_t>> _pd_first_inds_local;
-    std::vector<std::vector<uint32_t>> _dd_first_inds_local;
+    std::vector<std::vector<int32_t>> _ss_first_inds_local;
+    std::vector<std::vector<int32_t>> _sp_first_inds_local;
+    std::vector<std::vector<int32_t>> _sd_first_inds_local;
+    std::vector<std::vector<int32_t>> _pp_first_inds_local;
+    std::vector<std::vector<int32_t>> _pd_first_inds_local;
+    std::vector<std::vector<int32_t>> _dd_first_inds_local;
 
-    std::vector<std::vector<uint32_t>> _ss_second_inds_local;
-    std::vector<std::vector<uint32_t>> _sp_second_inds_local;
-    std::vector<std::vector<uint32_t>> _sd_second_inds_local;
-    std::vector<std::vector<uint32_t>> _pp_second_inds_local;
-    std::vector<std::vector<uint32_t>> _pd_second_inds_local;
-    std::vector<std::vector<uint32_t>> _dd_second_inds_local;
+    std::vector<std::vector<int32_t>> _ss_second_inds_local;
+    std::vector<std::vector<int32_t>> _sp_second_inds_local;
+    std::vector<std::vector<int32_t>> _sd_second_inds_local;
+    std::vector<std::vector<int32_t>> _pp_second_inds_local;
+    std::vector<std::vector<int32_t>> _pd_second_inds_local;
+    std::vector<std::vector<int32_t>> _dd_second_inds_local;
 
     std::vector<std::vector<double>> _ss_mat_Q_local;
     std::vector<std::vector<double>> _sp_mat_Q_local;
@@ -95,19 +95,19 @@ class CScreeningData
     std::vector<std::vector<double>> _pd_pair_data_local;
     std::vector<std::vector<double>> _dd_pair_data_local;
 
-    std::vector<uint32_t> _ss_first_inds;
-    std::vector<uint32_t> _sp_first_inds;
-    std::vector<uint32_t> _sd_first_inds;
-    std::vector<uint32_t> _pp_first_inds;
-    std::vector<uint32_t> _pd_first_inds;
-    std::vector<uint32_t> _dd_first_inds;
+    std::vector<int32_t> _ss_first_inds;
+    std::vector<int32_t> _sp_first_inds;
+    std::vector<int32_t> _sd_first_inds;
+    std::vector<int32_t> _pp_first_inds;
+    std::vector<int32_t> _pd_first_inds;
+    std::vector<int32_t> _dd_first_inds;
 
-    std::vector<uint32_t> _ss_second_inds;
-    std::vector<uint32_t> _sp_second_inds;
-    std::vector<uint32_t> _sd_second_inds;
-    std::vector<uint32_t> _pp_second_inds;
-    std::vector<uint32_t> _pd_second_inds;
-    std::vector<uint32_t> _dd_second_inds;
+    std::vector<int32_t> _ss_second_inds;
+    std::vector<int32_t> _sp_second_inds;
+    std::vector<int32_t> _sd_second_inds;
+    std::vector<int32_t> _pp_second_inds;
+    std::vector<int32_t> _pd_second_inds;
+    std::vector<int32_t> _dd_second_inds;
 
     std::vector<double> _ss_mat_Q;
     std::vector<double> _sp_mat_Q;
@@ -147,35 +147,35 @@ class CScreeningData
     std::vector<double>   _Q_K_dp;
     std::vector<double>   _Q_K_dd;
 
-    std::vector<uint32_t> _D_inds_K_ss;
-    std::vector<uint32_t> _D_inds_K_sp;
-    std::vector<uint32_t> _D_inds_K_ps;
-    std::vector<uint32_t> _D_inds_K_sd;
-    std::vector<uint32_t> _D_inds_K_ds;
-    std::vector<uint32_t> _D_inds_K_pp;
-    std::vector<uint32_t> _D_inds_K_pd;
-    std::vector<uint32_t> _D_inds_K_dp;
-    std::vector<uint32_t> _D_inds_K_dd;
+    std::vector<int32_t> _D_inds_K_ss;
+    std::vector<int32_t> _D_inds_K_sp;
+    std::vector<int32_t> _D_inds_K_ps;
+    std::vector<int32_t> _D_inds_K_sd;
+    std::vector<int32_t> _D_inds_K_ds;
+    std::vector<int32_t> _D_inds_K_pp;
+    std::vector<int32_t> _D_inds_K_pd;
+    std::vector<int32_t> _D_inds_K_dp;
+    std::vector<int32_t> _D_inds_K_dd;
 
-    std::vector<uint32_t> _pair_displs_K_ss;
-    std::vector<uint32_t> _pair_displs_K_sp;
-    std::vector<uint32_t> _pair_displs_K_ps;
-    std::vector<uint32_t> _pair_displs_K_sd;
-    std::vector<uint32_t> _pair_displs_K_ds;
-    std::vector<uint32_t> _pair_displs_K_pp;
-    std::vector<uint32_t> _pair_displs_K_pd;
-    std::vector<uint32_t> _pair_displs_K_dp;
-    std::vector<uint32_t> _pair_displs_K_dd;
+    std::vector<int32_t> _pair_displs_K_ss;
+    std::vector<int32_t> _pair_displs_K_sp;
+    std::vector<int32_t> _pair_displs_K_ps;
+    std::vector<int32_t> _pair_displs_K_sd;
+    std::vector<int32_t> _pair_displs_K_ds;
+    std::vector<int32_t> _pair_displs_K_pp;
+    std::vector<int32_t> _pair_displs_K_pd;
+    std::vector<int32_t> _pair_displs_K_dp;
+    std::vector<int32_t> _pair_displs_K_dd;
 
-    std::vector<uint32_t> _pair_counts_K_ss;
-    std::vector<uint32_t> _pair_counts_K_sp;
-    std::vector<uint32_t> _pair_counts_K_ps;
-    std::vector<uint32_t> _pair_counts_K_sd;
-    std::vector<uint32_t> _pair_counts_K_ds;
-    std::vector<uint32_t> _pair_counts_K_pp;
-    std::vector<uint32_t> _pair_counts_K_pd;
-    std::vector<uint32_t> _pair_counts_K_dp;
-    std::vector<uint32_t> _pair_counts_K_dd;
+    std::vector<int32_t> _pair_counts_K_ss;
+    std::vector<int32_t> _pair_counts_K_sp;
+    std::vector<int32_t> _pair_counts_K_ps;
+    std::vector<int32_t> _pair_counts_K_sd;
+    std::vector<int32_t> _pair_counts_K_ds;
+    std::vector<int32_t> _pair_counts_K_pp;
+    std::vector<int32_t> _pair_counts_K_pd;
+    std::vector<int32_t> _pair_counts_K_dp;
+    std::vector<int32_t> _pair_counts_K_dd;
 
     std::vector<double>   _pair_data_K_ss;
     std::vector<double>   _pair_data_K_sp;
@@ -187,23 +187,23 @@ class CScreeningData
     std::vector<double>   _pair_data_K_dp;
     std::vector<double>   _pair_data_K_dd;
 
-    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_ss;
-    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_ss;
+    std::vector<std::vector<int32_t>> _local_pair_inds_i_for_K_ss;
+    std::vector<std::vector<int32_t>> _local_pair_inds_k_for_K_ss;
 
-    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_sp;
-    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_sp;
+    std::vector<std::vector<int32_t>> _local_pair_inds_i_for_K_sp;
+    std::vector<std::vector<int32_t>> _local_pair_inds_k_for_K_sp;
 
-    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_sd;
-    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_sd;
+    std::vector<std::vector<int32_t>> _local_pair_inds_i_for_K_sd;
+    std::vector<std::vector<int32_t>> _local_pair_inds_k_for_K_sd;
 
-    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_pp;
-    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_pp;
+    std::vector<std::vector<int32_t>> _local_pair_inds_i_for_K_pp;
+    std::vector<std::vector<int32_t>> _local_pair_inds_k_for_K_pp;
 
-    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_pd;
-    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_pd;
+    std::vector<std::vector<int32_t>> _local_pair_inds_i_for_K_pd;
+    std::vector<std::vector<int32_t>> _local_pair_inds_k_for_K_pd;
 
-    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_dd;
-    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_dd;
+    std::vector<std::vector<int32_t>> _local_pair_inds_i_for_K_dd;
+    std::vector<std::vector<int32_t>> _local_pair_inds_k_for_K_dd;
 
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
@@ -237,9 +237,9 @@ class CScreeningData
     auto sortQD(const int64_t s_prim_count,
                 const int64_t p_prim_count,
                 const int64_t d_prim_count,
-                const std::vector<uint32_t>& s_prim_aoinds,
-                const std::vector<uint32_t>& p_prim_aoinds,
-                const std::vector<uint32_t>& d_prim_aoinds,
+                const std::vector<int32_t>& s_prim_aoinds,
+                const std::vector<int32_t>& p_prim_aoinds,
+                const std::vector<int32_t>& d_prim_aoinds,
                 const std::vector<double>& s_prim_info,
                 const std::vector<double>& p_prim_info,
                 const std::vector<double>& d_prim_info,
@@ -250,25 +250,25 @@ class CScreeningData
     auto findMaxDensities(const int64_t s_prim_count,
                           const int64_t p_prim_count,
                           const int64_t d_prim_count,
-                          const std::vector<uint32_t>& s_prim_aoinds,
-                          const std::vector<uint32_t>& p_prim_aoinds,
-                          const std::vector<uint32_t>& d_prim_aoinds,
+                          const std::vector<int32_t>& s_prim_aoinds,
+                          const std::vector<int32_t>& p_prim_aoinds,
+                          const std::vector<int32_t>& d_prim_aoinds,
                           const int64_t naos,
                           const double* dens_ptr) -> void;
 
-    auto get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_sd_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_pp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_pd_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_dd_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_sd_first_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_pp_first_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_pd_first_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_dd_first_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
-    auto get_ss_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_sp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_sd_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_pp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_pd_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_dd_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_ss_second_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_sp_second_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_sd_second_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_pp_second_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_pd_second_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_dd_second_inds_local(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
     auto get_ss_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
     auto get_sp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>&;
@@ -284,19 +284,19 @@ class CScreeningData
     auto get_pd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
     auto get_dd_pair_data_local(const int64_t gpu_id) const -> const std::vector<double>&;
 
-    auto get_ss_first_inds() const -> const std::vector<uint32_t>&;
-    auto get_sp_first_inds() const -> const std::vector<uint32_t>&;
-    auto get_sd_first_inds() const -> const std::vector<uint32_t>&;
-    auto get_pp_first_inds() const -> const std::vector<uint32_t>&;
-    auto get_pd_first_inds() const -> const std::vector<uint32_t>&;
-    auto get_dd_first_inds() const -> const std::vector<uint32_t>&;
+    auto get_ss_first_inds() const -> const std::vector<int32_t>&;
+    auto get_sp_first_inds() const -> const std::vector<int32_t>&;
+    auto get_sd_first_inds() const -> const std::vector<int32_t>&;
+    auto get_pp_first_inds() const -> const std::vector<int32_t>&;
+    auto get_pd_first_inds() const -> const std::vector<int32_t>&;
+    auto get_dd_first_inds() const -> const std::vector<int32_t>&;
 
-    auto get_ss_second_inds() const -> const std::vector<uint32_t>&;
-    auto get_sp_second_inds() const -> const std::vector<uint32_t>&;
-    auto get_sd_second_inds() const -> const std::vector<uint32_t>&;
-    auto get_pp_second_inds() const -> const std::vector<uint32_t>&;
-    auto get_pd_second_inds() const -> const std::vector<uint32_t>&;
-    auto get_dd_second_inds() const -> const std::vector<uint32_t>&;
+    auto get_ss_second_inds() const -> const std::vector<int32_t>&;
+    auto get_sp_second_inds() const -> const std::vector<int32_t>&;
+    auto get_sd_second_inds() const -> const std::vector<int32_t>&;
+    auto get_pp_second_inds() const -> const std::vector<int32_t>&;
+    auto get_pd_second_inds() const -> const std::vector<int32_t>&;
+    auto get_dd_second_inds() const -> const std::vector<int32_t>&;
 
     auto get_ss_mat_Q() const -> const std::vector<double>&;
     auto get_sp_mat_Q() const -> const std::vector<double>&;
@@ -336,35 +336,35 @@ class CScreeningData
     auto get_Q_K_dp() const -> const std::vector<double>&;
     auto get_Q_K_dd() const -> const std::vector<double>&;
 
-    auto get_D_inds_K_ss() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_sp() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_ps() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_sd() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_ds() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_pp() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_pd() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_dp() const -> const std::vector<uint32_t>&;
-    auto get_D_inds_K_dd() const -> const std::vector<uint32_t>&;
+    auto get_D_inds_K_ss() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_sp() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_ps() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_sd() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_ds() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_pp() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_pd() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_dp() const -> const std::vector<int32_t>&;
+    auto get_D_inds_K_dd() const -> const std::vector<int32_t>&;
 
-    auto get_pair_displs_K_ss() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_sp() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_ps() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_sd() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_ds() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_pp() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_pd() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_dp() const -> const std::vector<uint32_t>&;
-    auto get_pair_displs_K_dd() const -> const std::vector<uint32_t>&;
+    auto get_pair_displs_K_ss() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_sp() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_ps() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_sd() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_ds() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_pp() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_pd() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_dp() const -> const std::vector<int32_t>&;
+    auto get_pair_displs_K_dd() const -> const std::vector<int32_t>&;
 
-    auto get_pair_counts_K_ss() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_sp() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_ps() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_sd() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_ds() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_pp() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_pd() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_dp() const -> const std::vector<uint32_t>&;
-    auto get_pair_counts_K_dd() const -> const std::vector<uint32_t>&;
+    auto get_pair_counts_K_ss() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_sp() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_ps() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_sd() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_ds() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_pp() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_pd() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_dp() const -> const std::vector<int32_t>&;
+    auto get_pair_counts_K_dd() const -> const std::vector<int32_t>&;
 
     auto get_pair_data_K_ss() const -> const std::vector<double>&;
     auto get_pair_data_K_sp() const -> const std::vector<double>&;
@@ -376,40 +376,40 @@ class CScreeningData
     auto get_pair_data_K_dp() const -> const std::vector<double>&;
     auto get_pair_data_K_dd() const -> const std::vector<double>&;
 
-    auto get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
-    auto get_local_pair_inds_i_for_K_sp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_local_pair_inds_k_for_K_sp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_i_for_K_sp(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_local_pair_inds_k_for_K_sp(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
-    auto get_local_pair_inds_i_for_K_sd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_local_pair_inds_k_for_K_sd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_i_for_K_sd(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_local_pair_inds_k_for_K_sd(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
-    auto get_local_pair_inds_i_for_K_pp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_local_pair_inds_k_for_K_pp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_i_for_K_pp(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_local_pair_inds_k_for_K_pp(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
-    auto get_local_pair_inds_i_for_K_pd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_local_pair_inds_k_for_K_pd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_i_for_K_pd(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_local_pair_inds_k_for_K_pd(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
-    auto get_local_pair_inds_i_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
-    auto get_local_pair_inds_k_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_i_for_K_dd(const int64_t gpu_id) const -> const std::vector<int32_t>&;
+    auto get_local_pair_inds_k_for_K_dd(const int64_t gpu_id) const -> const std::vector<int32_t>&;
 
     auto get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) const -> CDenseMatrix;
     auto get_mat_D_abs_full(const int64_t s_prim_count,
                             const int64_t p_prim_count,
                             const int64_t d_prim_count,
-                            const std::vector<uint32_t>& s_prim_aoinds,
-                            const std::vector<uint32_t>& p_prim_aoinds,
-                            const std::vector<uint32_t>& d_prim_aoinds,
+                            const std::vector<int32_t>& s_prim_aoinds,
+                            const std::vector<int32_t>& p_prim_aoinds,
+                            const std::vector<int32_t>& d_prim_aoinds,
                             const int64_t naos,
                             const double* dens_ptr) const -> CDenseMatrix;
 
     auto form_Q_and_D_inds_for_K(const int64_t                s_prim_count,
                                  const int64_t                p_prim_count,
                                  const int64_t                d_prim_count,
-                                 const std::vector<uint32_t>& s_prim_aoinds,
-                                 const std::vector<uint32_t>& p_prim_aoinds,
-                                 const std::vector<uint32_t>& d_prim_aoinds,
+                                 const std::vector<int32_t>& s_prim_aoinds,
+                                 const std::vector<int32_t>& p_prim_aoinds,
+                                 const std::vector<int32_t>& d_prim_aoinds,
                                  const std::vector<double>&   s_prim_info,
                                  const std::vector<double>&   p_prim_info,
                                  const std::vector<double>&   d_prim_info) -> void;
