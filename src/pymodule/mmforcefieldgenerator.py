@@ -2828,7 +2828,8 @@ class MMForceFieldGenerator:
 
             for at in self.unique_atom_types:
                 for i, atom in self.atoms.items():
-                    if atom['type'] == at:
+                    # Note: need strip() for converting e.g. 'c ' to 'c'
+                    if atom['type'].strip() == at.strip():
                         line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
                             at, at, 0., 0., 'A')
                         line_str += '{:16.5e}{:14.5e}\n'.format(
