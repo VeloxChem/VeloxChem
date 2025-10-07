@@ -1623,6 +1623,45 @@ class AtomTypeIdentifier:
                 else:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
 
+        # Check and correct e.g. ce-ce-ce-ce chain
+        # Need to the central pair of ce-ce-ce-ce chain
+        # Then correct central pair if both atoms have two ce-ce/cf bonds
+
+        while True:
+            found_correction = False
+            for i, j in assigned_bonds:
+                if atom_types[i] not in ['cc', 'ce', 'cg', 'nc', 'ne']:
+                    continue
+                if atom_types[j] not in ['cc', 'ce', 'cg', 'nc', 'ne']:
+                    continue
+                i_count = {'ee_and_ef': 1, 'ee': 1}
+                j_count = {'ee_and_ef': 1, 'ee': 1}
+                for k, l in assigned_bonds:
+                    if i == k and j != l:
+                        i_count['ee_and_ef'] += 1
+                        if atom_types[l] in ['cc', 'ce', 'cg', 'nc', 'ne']:
+                            i_count['ee'] += 1
+                    if i == l and j != k:
+                        i_count['ee_and_ef'] += 1
+                        if atom_types[k] in ['cc', 'ce', 'cg', 'nc', 'ne']:
+                            i_count['ee'] += 1
+                    if j == k and i != l:
+                        j_count['ee_and_ef'] += 1
+                        if atom_types[l] in ['cc', 'ce', 'cg', 'nc', 'ne']:
+                            j_count['ee'] += 1
+                    if j == l and i != k:
+                        j_count['ee_and_ef'] += 1
+                        if atom_types[k] in ['cc', 'ce', 'cg', 'nc', 'ne']:
+                            j_count['ee'] += 1
+                if (i_count['ee_and_ef'] == 2 and i_count['ee'] > 1 and
+                        j_count['ee_and_ef'] == 2 and j_count['ee'] > 1):
+                    atom_types[i] = conjugated_atom_type_pairs[atom_types[i]][1]
+                    atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
+                    found_correction = True
+                    break
+            if not found_correction:
+                break
+
         # Look for bonds formed between cp
 
         for i, at_i in enumerate(atom_types):
