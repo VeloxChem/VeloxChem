@@ -119,8 +119,15 @@ class DispersionModel:
                              model='d4')
 
         disp_xc_label = self._xc_label_to_dftd4(xc_label)
-        disp_res = disp_model.get_dispersion(D4Param(method=disp_xc_label),
-                                             grad=True)
+
+        try:
+            disp_res = disp_model.get_dispersion(D4Param(method=disp_xc_label),
+                                                 grad=True)
+        except Exception as e:
+            errmsg = 'DispersionModel: Could not get dispersion correction for'
+            errmsg += f' {xc_label}. Please use a more recent version of'
+            errmsg += ' dftd4-python.\n'
+            assert_msg_critical(False, errmsg)
 
         self._energy = disp_res.get("energy")
         self._gradient = disp_res.get("gradient")

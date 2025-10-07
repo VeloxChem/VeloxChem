@@ -137,9 +137,12 @@ from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
 from .tdaeigensolver import TdaEigenSolver
+from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
+from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
@@ -178,6 +181,7 @@ from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 from .densityviewer import DensityViewer
+from .densityvieweralternative import DensityViewerAlternative
 from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
@@ -187,7 +191,7 @@ from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
-from .evbffbuilder import EvbForceFieldBuilder
+from .reaffbuilder import ReactionForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
 from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
@@ -220,7 +224,9 @@ from .localbayesresidual import LocalBayesResidual
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
 from .tsguesser import TransitionStateGuesser
+from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
+from .atombdedriver import AtomBdeDriver
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 

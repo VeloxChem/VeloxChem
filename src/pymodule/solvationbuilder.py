@@ -142,7 +142,7 @@ class SolvationBuilder:
         # Standard forcefield
         self.parent_forcefield = 'amber03'
 
-    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False, constraint_solute=True):
+    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False, box = None, constraint_solute=True):
         """
         Create a solvated system with the most typical solvent molecules.
 
@@ -192,22 +192,30 @@ class SolvationBuilder:
 
         # Add the solute to the system
         self._load_solute_molecule(solute)
+        solute_volume = self._get_volume(solute) * 1e-3
 
         # Determine the size of the box
-        box_size = self._determine_cubic_box_size(solute.get_coordinates_in_angstrom(), padding)
+        if box is None:
+            box_size = self._determine_cubic_box_size(solute.get_coordinates_in_angstrom(), padding)
+            volume_nm3 = box_size ** 3 * 0.001  - solute_volume
+            self._define_box(box_size, box_size, box_size)
+            self.ostream.print_info("The box size is: {:.2f} x {:.2f} x {:.2f} nm^3".format(box_size * 0.1 , box_size * 0.1, box_size * 0.1))
+            self.ostream.flush()
+
+            # Create a box with the origin at the centroid
+            box_center = [box_size / 2]*3
+        else:
+            volume_nm3 = box[0]*box[1]*box[2] * 0.001  - solute_volume
+            self._define_box(*box)
+            box_center = [box[0]/2,box[1]/2,box[2]/2]
 
         # Determine the solute volume and convert it to nm^3
-        solute_volume = self._get_volume(solute) * 1e-3
         self.ostream.print_info("The volume of the solute is: {:.2f} nm^3".format(solute_volume))
         self.ostream.flush()
 
         # Define the box
-        self._define_box(box_size, box_size, box_size)
-        self.ostream.print_info("The box size is: {:.2f} x {:.2f} x {:.2f} nm^3".format(box_size * 0.1 , box_size * 0.1, box_size * 0.1))
-        self.ostream.flush()
 
         # Accesible volume for the solvent
-        volume_nm3 = box_size ** 3 * 0.001  - solute_volume
         self.ostream.print_info("The volume available for the solvent is: {:.2f} nm^3".format(volume_nm3))
         self.ostream.flush()
 
@@ -248,6 +256,7 @@ class SolvationBuilder:
             
             # Register the solvent molecule and its quantity to be added to the system
             self._load_solvent_molecule(solute, number_of_solvents)
+            
 
         else:
             # Extract the properties of the solvent
@@ -266,14 +275,11 @@ class SolvationBuilder:
         solute_xyz = self.solute.get_coordinates_in_angstrom()
         centroid = np.mean(solute_xyz, axis=0)
 
-        # Create a box with the origin at the centroid
-        box_center = box_size / 2
-
         # Define the molecule id
         molecule_id = 0
 
         # Translate the solute to the center of the box
-        translation = box_center - centroid
+        translation = np.array(box_center) - np.array(centroid)
         self.centered_solute = [(molecule_id, label, coord + translation) for label, coord in zip(self.solute_labels, solute_xyz)]
 
         # Add the centered solute to the system

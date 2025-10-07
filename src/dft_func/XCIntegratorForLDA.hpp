@@ -108,6 +108,28 @@ auto integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockP
                                        const CXCFunctional&              xcFunctional) -> void;
 
 /**
+ Integrates second-order LDA exchange-correlation functional contribution
+ to open-shell AO Fock matrix.
+
+ @param aoFockPointers the pointers to AO Fock matrices.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointers the pointers to perturbed density matrices.
+ @param gsDensityPointers the pointers to ground state density matrices.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ */
+auto integrateFxcFockForLdaOpenShell(const std::vector<double*>&       aoFockPointers,
+                                     const CMolecule&                  molecule,
+                                     const CMolecularBasis&            basis,
+                                     const std::vector<const double*>& rwDensityPointers,
+                                     const std::vector<const double*>& gsDensityPointers,
+                                     const CMolecularGrid&             molecularGrid,
+                                     const double                      screeningThresholdForGTOValues,
+                                     const CXCFunctional&              xcFunctional) -> void;
+
+/**
  Integrates third-order LDA exchange-correlation functional contribution
  to closed-shell AO Fock matrix.
 

@@ -1,35 +1,3 @@
-//
-//                                   VELOXCHEM
-//              ----------------------------------------------------
-//                          An Electronic Structure Code
-//
-//  SPDX-License-Identifier: BSD-3-Clause
-//
-//  Copyright 2018-2025 VeloxChem developers
-//
-//  Redistribution and use in source and binary forms, with or without modification,
-//  are permitted provided that the following conditions are met:
-//
-//  1. Redistributions of source code must retain the above copyright notice, this
-//     list of conditions and the following disclaimer.
-//  2. Redistributions in binary form must reproduce the above copyright notice,
-//     this list of conditions and the following disclaimer in the documentation
-//     and/or other materials provided with the distribution.
-//  3. Neither the name of the copyright holder nor the names of its contributors
-//     may be used to endorse or promote products derived from this software without
-//     specific prior written permission.
-//
-//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #ifndef ElectronRepulsionGeom1010RecDPSP_hpp
 #define ElectronRepulsionGeom1010RecDPSP_hpp
 
@@ -44,7 +12,6 @@
 #include "ElectronRepulsionGeom1010ContrRecSDXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecSFXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecSPXX.hpp"
-#include "ElectronRepulsionContrRecPPXX.hpp"
 #include "ElectronRepulsionPrimRecSDSD.hpp"
 #include "ElectronRepulsionPrimRecSDSP.hpp"
 #include "ElectronRepulsionPrimRecSDSS.hpp"
@@ -156,6 +123,12 @@ comp_electron_repulsion_geom1010_dpsp(T& distributor,
 
     CSimdArray<double> bf_data(8, ket_npgtos);
 
+    // set up range seperation factor
+
+    const auto use_rs = distributor.need_omega();
+
+    const auto omega = distributor.get_omega();
+
     // set up ket partitioning
 
     const auto ket_dim = ket_indices.second - ket_indices.first;
@@ -264,9 +237,18 @@ comp_electron_repulsion_geom1010_dpsp(T& distributor,
 
                 t4cfunc::comp_distances_wp(pfactors, 26, 17, r_p);
 
-                t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp);
+                if (use_rs)
+                {
+                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp, omega);
 
-                bf_table.compute(bf_data, 0, 7);
+                    bf_table.compute(bf_data, 0, 7, pfactors, a_exp, b_exp, omega);
+                }
+                else
+                {
+                    t4cfunc::comp_boys_args(bf_data, 7, pfactors, 13, a_exp, b_exp);
+
+                    bf_table.compute(bf_data, 0, 7);
+                }
 
                 t4cfunc::comp_ovl_factors(pfactors, 16, 2, 3, ab_ovl, ab_norm, a_exp, b_exp);
 
@@ -432,12 +414,6 @@ comp_electron_repulsion_geom1010_dpsp(T& distributor,
 
             t4cfunc::ket_transform<0, 1>(skbuffer, 144, ckbuffer, 63, 0, 2);
 
-            //t4cfunc::ket_transform<0, 1>(skbuffer, 594, ckbuffer, 0, 1, 1);
-
-            //t4cfunc::ket_transform<0, 1>(skbuffer, 621, ckbuffer, 27, 1, 1);
-
-            //t4cfunc::ket_transform<0, 1>(skbuffer, 648, ckbuffer, 54, 1, 1);
-
             t4cfunc::ket_transform<0, 1>(skbuffer, 1890, ckbuffer, 81, 0, 1);
 
             t4cfunc::ket_transform<0, 1>(skbuffer, 1899, ckbuffer, 90, 0, 1);
@@ -461,11 +437,11 @@ comp_electron_repulsion_geom1010_dpsp(T& distributor,
             t4cfunc::ket_transform<0, 1>(skbuffer, 2106, ckbuffer, 297, 0, 4);
 
             t4cfunc::ket_transform<0, 1>(skbuffer, 2151, ckbuffer, 342, 0, 4);
-            
+
             erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 594, 0, 108, r_ab, 0, 1);
-            
+
             erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 621, 9, 126, r_ab, 0, 1);
-            
+
             erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 648, 18, 144, r_ab, 0, 1);
 
             erirec::comp_bra_geom1010_hrr_electron_repulsion_spxx(skbuffer, 27, 1890, 1917, r_ab, 0, 1);

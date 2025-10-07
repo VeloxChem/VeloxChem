@@ -140,3 +140,44 @@ class TestScfHessianDriver:
             hf.close()
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
+
+    @pytest.mark.solvers
+    def test_analytical_camb3lyp_hessian(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
+        h5file = str(here / 'data' / 'water_analytical_hessian_camb3lyp.h5')
+
+        task = MpiTask([inpfile, None])
+
+        method_settings = {'xcfun': 'cam-b3lyp', 'grid_level': 7}
+        scf_settings = {}
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.update_settings(scf_settings, method_settings)
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        cphf_settings = {'conv_thresh': 1e-8}
+        hess_settings = {'numerical': 'no'}
+
+        hessian_drv = ScfHessianDriver(scf_drv)
+        hessian_drv.update_settings(method_settings,
+                                    hess_dict=hess_settings,
+                                    cphf_dict=cphf_settings)
+        hessian_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+            hf = h5py.File(h5file)
+            ref_hessian = np.array(hf.get('hessian'))
+            hf.close()
+            diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
+            assert diff_hessian < 1e-6
+
+        hessian_drv.use_subcomms = True
+        hessian_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+            hf = h5py.File(h5file)
+            ref_hessian = np.array(hf.get('hessian'))
+            hf.close()
+            diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
+            assert diff_hessian < 1e-6
