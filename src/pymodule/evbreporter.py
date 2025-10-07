@@ -155,7 +155,7 @@ class EvbReporter():
                 self.decomp_out.write(header)
         
         self.report_bonded_decomp = False
-        if 'reactant_bonded' in systems.keys():
+        if 'reactant_bonded_decomp' in systems.keys():
             if forming_bonds is None or breaking_bonds is None:
                 self.ostream.print_warning(
                     "Formed and broken bonds need to be supplied to do bonded decomposition"
@@ -273,7 +273,7 @@ class EvbReporter():
     def report(self, simulation, state):
         E = {}
         for name, sim in self.simulations.items():
-            if name == 'reactant_bonded' or name == 'product_bonded':
+            if name == 'reactant_bonded_decomp' or name == 'product_bonded_decomp':
                 # Skip bonded decomposition systems
                 continue
             e = self._get_potential_energy(
@@ -336,11 +336,11 @@ class EvbReporter():
             self.pro_FG_out.write(E2_line)
 
         if self.report_bonded_decomp:
-            reasim = self.simulations['reactant_bonded']
+            reasim = self.simulations['reactant_bonded_decomp']
             E1 = self._get_bonded_decomp_energy(reasim, state,self.reactant_params)
             line = ", ".join([f"{e:.10e}" for e in E1]) + '\n'
             self.bonded_E1_decomp_out.write(line)
-            pro_sim = self.simulations['product_bonded']
+            pro_sim = self.simulations['product_bonded_decomp']
             E2 = self._get_bonded_decomp_energy(pro_sim, state,self.product_params)
             line = ", ".join([f"{e:.10e}" for e in E2]) + '\n'
             self.bonded_E2_decomp_out.write(line)

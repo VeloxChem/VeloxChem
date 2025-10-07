@@ -443,7 +443,7 @@ def _Molecule_from_dict(mol_dict):
     return mol
 
 
-def _Molecule_get_connectivity_matrix(self, factor=1.3):
+def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
     """
     Gets connectivity matrix.
 
@@ -460,12 +460,20 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3):
 
     natoms = coords_in_au.shape[0]
     connectivity_matrix = np.zeros((natoms, natoms), dtype='int32')
+    labels = self.get_labels()
 
     for i in range(natoms):
         for j in range(i + 1, natoms):
             distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
             threshold = (covalent_radii_in_au[i] +
-                         covalent_radii_in_au[j]) * 1.3
+                         covalent_radii_in_au[j])
+            
+            # Special case for H2 molecule
+            if labels[i] == 'H' and labels[j] == 'H':
+                threshold *= H2_factor
+            else:
+                threshold *= factor
+                
             if distance <= threshold:
                 connectivity_matrix[i, j] = 1
                 connectivity_matrix[j, i] = 1
@@ -944,7 +952,7 @@ def _Molecule_show(self,
     :param atom_indices:
         The flag for showing atom indices (1-based).
     :param atom_labels:
-        The flag for showing atom labels.
+        The flag for showing atom labels. If provided with a list, will use that list as labels.
     :starting_index:
         The starting index for atom indices.
     :bonds:
@@ -992,10 +1000,16 @@ def _Molecule_show(self,
                 sdf = '\n'.join(lines)
 
             viewer.addModel(sdf, 'sdf')
-
+        
         if atom_indices or atom_labels:
             coords = self.get_coordinates_in_angstrom()
-            labels = self.get_labels()
+            if type(atom_labels) == list:
+                labels = atom_labels
+                assert_msg_critical(
+                    len(labels) == coords.shape[0],
+                    'Molecule.show: Inconsistent number of labels')
+            else:
+                labels = self.get_labels()
             for i in range(coords.shape[0]):
                 text = ''
                 if atom_labels:
