@@ -1294,27 +1294,21 @@ class CphfSolver(LinearSolver):
         profiler.start_timer('RHS')
 
         if self.rank == mpi_master():
-            mo_energies = scf_tensors['E_alpha']
-            # nmo is sometimes different than nao (because of linear
-            # dependencies which get removed during SCF)
-            nmo = mo_energies.shape[0]
-            nao = scf_tensors['C_alpha'].shape[0]
-            nocc = molecule.number_of_alpha_electrons()
-            nvir = nmo - nocc
-            eocc = mo_energies[:nocc]
-            evir = mo_energies[nocc:]
-            eov = eocc.reshape(-1, 1) - evir
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
+            nmo = scf_tensors['C_alpha'].shape[1]
+            nvir_a = nmo - nocc_a
+            nvir_b = nmo - nocc_b
         else:
-            mo_energies = None
-            eov = None
-            nao = None
+            nocc_a = None
+            nocc_b = None
+            nvir_a = None
+            nvir_b = None
 
-        mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
-        eov = self.comm.bcast(eov, root=mpi_master())
-        nao = self.comm.bcast(nao, root=mpi_master())
-        nmo = mo_energies.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-        nvir = nmo - nocc
+        nocc_a = self.comm.bcast(nocc_a, root=mpi_master())
+        nvir_a = self.comm.bcast(nvir_a, root=mpi_master())
+        nocc_b = self.comm.bcast(nocc_b, root=mpi_master())
+        nvir_b = self.comm.bcast(nvir_b, root=mpi_master())
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, *args)
@@ -1324,7 +1318,11 @@ class CphfSolver(LinearSolver):
             for vec in cphf_rhs_dict['dist_cphf_rhs']:
                 list_rhs.append(vec.array())
             dof = len(list_rhs)
-            cphf_rhs = np.array(list_rhs).reshape(dof, nocc, nvir)
+            if self._method_type == 'restricted':
+                cphf_rhs = np.array(list_rhs).reshape(dof, nocc_a, nvir_a)
+            else:
+                assert_msg_critical(False,
+                    'CphfSolver: conjugate gradient not implemented for unrestricted case.')
         else:
             cphf_rhs = None
 
@@ -1354,11 +1352,14 @@ class CphfSolver(LinearSolver):
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
             # Create the list of DistributedArrays
-            solutions = []
-            for i in range(dof):
-                vec_cphf_ov = cphf_ov[i].reshape(nocc*nvir)
-                vec_cphf_ov = cphf_ov[i].reshape(nocc * nvir)
-                solutions.append(DistributedArray(vec_cphf_ov, self.comm))
+            if self._method_type == 'restricted':
+                solutions = []
+                for i in range(dof):
+                    vec_cphf_ov = cphf_ov[i].reshape(nocc_a * nvir_a)
+                    solutions.append(DistributedArray(vec_cphf_ov, self.comm))
+            else:
+                assert_msg_critical(False,
+                    'CphfSolver: conjugate gradient not implemented for the unrestricted case.')
 
         # merge the rhs dict with the solution
         return {
