@@ -76,6 +76,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         super().__init__(comm, ostream)
 
         self.orbrsp_type = 'hessian'
+        self._method_type = 'unrestricted'
         self._embedding_hess_drv = None
 
     def update_settings(self, cphf_dict, method_dict=None):
@@ -639,15 +640,17 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                                          dist_fock_deriv_ov_ix_b.data -
                                          dist_orben_ovlp_deriv_ov_ix_b.data)
 
-                dist_cphf_rhs_ix_a = DistributedArray(dist_cphf_rhs_ix_data_a,
-                                                    self.comm,
-                                                    distribute=False)
-                dist_cphf_rhs_ix_b = DistributedArray(dist_cphf_rhs_ix_data_b,
+                # stack alpha and beta
+                dist_cphf_rhs_ix_data = np.hstack((
+                    dist_cphf_rhs_ix_data_a,
+                    dist_cphf_rhs_ix_data_b,
+                ))
+
+                dist_cphf_rhs_ix = DistributedArray(dist_cphf_rhs_ix_data,
                                                     self.comm,
                                                     distribute=False)
 
-                dist_cphf_rhs.append(dist_cphf_rhs_ix_a)
-                dist_cphf_rhs.append(dist_cphf_rhs_ix_b)
+                dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
             profiler.add_timing_info('distRHS', tm.time() - uij_t0)
 

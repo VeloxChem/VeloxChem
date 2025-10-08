@@ -83,6 +83,7 @@ class CphfSolver(LinearSolver):
         self.max_iter = 150
 
         self.orbrsp_type = 'default'
+        self._method_type = 'restricted'
 
         self._input_keywords['orbitalresponse'] = {
             'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
@@ -336,9 +337,6 @@ class CphfSolver(LinearSolver):
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'CphfSolver: not implemented for unrestricted case')
 
         if self.use_subspace_solver:
             self.cphf_results = self.compute_subspace_solver(
@@ -406,30 +404,6 @@ class CphfSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        if self.rank == mpi_master():
-            mo_energies = scf_tensors['E_alpha']
-            # nmo is sometimes different than nao (because of linear
-            # dependencies which get removed during SCF)
-            nmo = mo_energies.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
-            nvir = nmo - nocc
-            nao = scf_tensors['C_alpha'].shape[0]
-            eocc = mo_energies[:nocc]
-            evir = mo_energies[nocc:]
-            eov = eocc.reshape(-1, 1) - evir
-        else:
-            mo_energies = None
-            eov = None
-            nao = None
-
-        mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
-        eov = self.comm.bcast(eov, root=mpi_master())
-        nao = self.comm.bcast(nao, root=mpi_master())
-
-        nmo = mo_energies.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-        nvir = nmo - nocc
-
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, *args)
 
@@ -440,9 +414,8 @@ class CphfSolver(LinearSolver):
         self.dist_trials = None
         self.dist_sigmas = None
 
-        # the preconditioner: 1 / (eocc - evir)
-        precond = (1.0 / eov).reshape(nocc * nvir)
-        dist_precond = DistributedArray(precond, self.comm)
+        dist_precond = self._get_precond(molecule, basis, scf_tensors,
+                                        self._method_type)
 
         orbrsp_vector_labels = [
             self.orbrsp_type.upper() + '_orbrsp_trials',
@@ -466,7 +439,8 @@ class CphfSolver(LinearSolver):
 
             # construct the sigma (E*t) vectors
             self.build_sigmas(molecule, basis, scf_tensors, dist_trials,
-                              eri_dict, dft_dict, pe_dict, profiler)
+                              eri_dict, dft_dict, pe_dict, profiler,
+                              self._method_type)
 
         # lists that will hold the solutions and residuals
         # TODO: double check residuals in setup_trials
@@ -541,7 +515,7 @@ class CphfSolver(LinearSolver):
                     {
                         'dist_trials': self.dist_trials,
                         'dist_sigmas': self.dist_sigmas,
-                        'precond': precond,
+                        'dist_precond': dist_precond,
                         'solutions': solutions,
                         'residuals': residuals,
                     }, self.ostream)
@@ -587,7 +561,8 @@ class CphfSolver(LinearSolver):
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials,
-                              eri_dict, dft_dict, pe_dict, profiler)
+                              eri_dict, dft_dict, pe_dict, profiler,
+                              self._method_type)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -626,16 +601,51 @@ class CphfSolver(LinearSolver):
                      eri_dict,
                      dft_dict,
                      pe_dict,
-                     profiler=None):
+                     profiler=None,
+                     method_type='restricted'):
+        """
+        Compute the matrix-vector product corresponding to the
+        left-hand-side of the CPHF/CPKS equations.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param scf_tensors:
+            The dictionary of tensors from a converged SCF calculation.
+        :param dist_trials:
+            The trial vectors as a list of distributed arrays.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param profiler:
+            The profiler.
+        :param method_type:
+            The method type (restricted, unrestricted).
+        """
 
         if self.use_subcomms:
-            self.build_sigmas_subcomms(molecule, basis, scf_tensors,
-                                       dist_trials, eri_dict, dft_dict, pe_dict,
-                                       profiler)
+            if method_type == 'restricted':
+                self.build_sigmas_subcomms(molecule, basis, scf_tensors,
+                                           dist_trials, eri_dict, dft_dict, pe_dict,
+                                           profiler)
+            else:
+                # TODO: enable subcomms for unrestricted
+                assert_msg_critical(False,
+                    'CphfSolver.build_sigmas: '
+                    'Cannot use subcomms for unrestricted case.')
         else:
-            self.build_sigmas_single_comm(molecule, basis, scf_tensors,
-                                          dist_trials, eri_dict, dft_dict,
-                                          pe_dict, profiler)
+            if method_type == 'restricted':
+                self.build_sigmas_single_comm(molecule, basis, scf_tensors,
+                                              dist_trials, eri_dict, dft_dict,
+                                              pe_dict, profiler)
+            else:
+                self.build_sigmas_single_comm_unrestricted(molecule, basis, scf_tensors,
+                                              dist_trials, eri_dict, dft_dict,
+                                              pe_dict, profiler)
 
     def build_sigmas_subcomms(self,
                               molecule,
@@ -647,7 +657,8 @@ class CphfSolver(LinearSolver):
                               pe_dict,
                               profiler=None):
         """
-        Apply orbital Hessian matrix to a set of trial vectors.
+        Compute the matrix-vector product corresponding to the
+        left-hand-side of the CPHF/CPKS equations.
         Appends sigma and trial vectors to member variable.
 
         :param molecule:
@@ -840,7 +851,8 @@ class CphfSolver(LinearSolver):
                                  pe_dict,
                                  profiler=None):
         """
-        Apply orbital Hessian matrix to a set of trial vectors.
+        Compute the matrix-vector product corresponding to the
+        left-hand-side of the CPHF/CPKS equations.
         Appends sigma and trial vectors to member variable.
 
         :param molecule:
@@ -855,7 +867,7 @@ class CphfSolver(LinearSolver):
 
         if self.rank == mpi_master():
             mo = scf_tensors['C_alpha']
-            nao = mo.shape[0]
+            nao = basis.get_dimension_of_basis()
             mo_energies = scf_tensors['E_alpha']
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
@@ -942,6 +954,204 @@ class CphfSolver(LinearSolver):
                                                 distribute=False)
         else:
             self.dist_trials.append(dist_trials, axis=1)
+
+    def build_sigmas_single_comm_unrestricted(self,
+                                             molecule,
+                                             basis,
+                                             scf_tensors,
+                                             dist_trials,
+                                             eri_dict,
+                                             dft_dict,
+                                             pe_dict,
+                                             profiler=None):
+        """
+        Compute the matrix-vector product corresponding to the
+        left-hand-side of the CPHF/CPKS equations.
+        Appends sigma and trial vectors to member variable.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param dist_trials:
+            Distributed array of trial vectors
+        """
+
+        if self.rank == mpi_master():
+            mo_a = scf_tensors['C_alpha']
+            mo_b = scf_tensors['C_beta']
+            nao = basis.get_dimension_of_basis()
+            orb_ene_a = scf_tensors['E_alpha']
+            orb_ene_b = scf_tensors['E_beta']
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
+            mo_occ_a = mo_a[:, :nocc_a]
+            mo_occ_b = mo_b[:, :nocc_b]
+            mo_vir_a = mo_a[:, nocc_a:]
+            mo_vir_b = mo_b[:, nocc_b:]
+            eocc_a = orb_ene_a[:nocc_a]
+            evir_a = orb_ene_a[nocc_a:]
+            eocc_b = orb_ene_b[:nocc_b]
+            evir_b = orb_ene_b[nocc_b:]
+            nvir_a = evir_a.shape[0]
+            nvir_b = evir_b.shape[0]
+            nov_a = nocc_a * nvir_a
+            nov_b = nocc_b * nvir_b
+            eov_a = eocc_a.reshape(-1, 1) - evir_a
+            eov_b = eocc_b.reshape(-1, 1) - evir_b
+        else:
+            nao = None
+
+        num_vecs = dist_trials.shape(1)
+
+        batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
+        num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
+
+        if self.rank == mpi_master():
+            batch_str = f'Processing {num_vecs} Fock build'
+            if num_vecs > 1:
+                batch_str += 's'
+            batch_str += '...'
+            self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        for batch_ind in range(num_batches):
+
+            batch_start = batch_size * batch_ind
+            batch_end = min(batch_start + batch_size, num_vecs)
+
+            if self.rank == mpi_master():
+                vec_list_a = []
+                vec_list_b = []
+            else:
+                vec_list = None
+
+            # loop over columns / trial vectors
+            for col in range(batch_start, batch_end):
+                vec = dist_trials.get_full_vector(col)
+
+                if self.rank == mpi_master():
+                    vec_a = vec[:nov_a].reshape(nocc_a, nvir_a)
+                    vec_b = vec[nov_a:].reshape(nocc_b, nvir_b)
+                    vec_ao_a = np.linalg.multi_dot([mo_occ_a, vec_a, mo_vir_a.T])
+                    vec_ao_b = np.linalg.multi_dot([mo_occ_b, vec_b, mo_vir_b.T])
+                    vec_list_a.append(vec_ao_a)
+                    vec_list_b.append(vec_ao_b)
+
+            # create Fock matrices and contract with two-electron integrals
+            fock = self._comp_lr_fock_unrestricted([vec_list_a, vec_list_b],
+                                      molecule, basis, eri_dict,
+                                      dft_dict, pe_dict, profiler)
+
+            # create sigma vectors
+            if self.rank == mpi_master():
+                sigmas_a = np.zeros((nocc_a * nvir_a, batch_end - batch_start))
+                sigmas_b = np.zeros((nocc_b * nvir_b, batch_end - batch_start))
+            else:
+                sigmas_a = None
+                sigmas_b = None
+
+            for col in range(batch_start, batch_end):
+                vec = dist_trials.get_full_vector(col)
+                ifock = col - batch_start
+
+                if self.rank == mpi_master():
+                    vec_a = vec[:nov_a].reshape(nocc_a, nvir_a)
+                    vec_b = vec[nov_a:].reshape(nocc_b, nvir_b)
+                    fock_vec_a = fock[ifock * 2 + 0]
+                    fock_vec_b = fock[ifock * 2 + 1]
+                    cphf_mo_a = (
+                       -np.linalg.multi_dot([mo_occ_a.T, fock_vec_a, mo_vir_a]) -
+                        np.linalg.multi_dot([mo_vir_a.T, fock_vec_a, mo_occ_a]).T +
+                        vec_a.reshape(nocc_a, nvir_a) * eov_a)
+                    cphf_mo_b = (
+                       -np.linalg.multi_dot([mo_occ_b.T, fock_vec_b, mo_vir_b]) -
+                        np.linalg.multi_dot([mo_vir_b.T, fock_vec_b, mo_occ_b]).T +
+                        vec_b.reshape(nocc_b, nvir_b) * eov_b)
+                    sigmas_a[:, ifock] = cphf_mo_a.reshape(nocc_a * nvir_a)
+                    sigmas_b[:, ifock] = cphf_mo_b.reshape(nocc_b * nvir_b)
+                    sigmas = np.vstack((sigmas_a, sigmas_b))
+
+            dist_sigmas = DistributedArray(sigmas, self.comm)
+
+            # append new sigma and trial vectors
+            # TODO: create new function for this?
+            if self.dist_sigmas is None:
+                self.dist_sigmas = DistributedArray(dist_sigmas.data,
+                                                    self.comm,
+                                                    distribute=False)
+            else:
+                self.dist_sigmas.append(dist_sigmas, axis=1)
+
+        if self.dist_trials is None:
+            self.dist_trials = DistributedArray(dist_trials.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_trials.append(dist_trials, axis=1)
+
+    def _get_precond(self,
+                     molecule,
+                     basis,
+                     scf_tensors,
+                     method_type="restricted"):
+        """
+        Construct the preconditioners.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param scf_tensors:
+            The SCF tensors.
+        :param method_type:
+            The type of method (restricted, unresticted).
+
+        :return:
+            The distributed preconditioners.
+        """
+        if self.rank == mpi_master():
+            orb_ene_a = scf_tensors['E_alpha']
+            orb_ene_b = scf_tensors['E_beta']
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
+            eocc_a = orb_ene_a[:nocc_a]
+            eocc_b = orb_ene_b[:nocc_b]
+            evir_a = orb_ene_a[nocc_a:]
+            evir_b = orb_ene_b[nocc_b:]
+            eov_a = eocc_a.reshape(-1, 1) - evir_a
+            eov_b = eocc_b.reshape(-1, 1) - evir_b
+        else:
+            eov_a = None
+            eov_b = None
+            nao = None
+
+        eov_a = self.comm.bcast(eov_a, root=mpi_master())
+        eov_b = self.comm.bcast(eov_b, root=mpi_master())
+
+        if method_type == "restricted":
+            nocc_a = eov_a.shape[0]
+            nvir_a = eov_a.shape[1]
+            precond = (1.0 / eov_a).reshape(nocc_a * nvir_a)
+        else:
+            nocc_a = eov_a.shape[0]
+            nvir_a = eov_a.shape[1]
+            nocc_b = eov_b.shape[0]
+            nvir_b = eov_b.shape[1]
+            precond_a = (1.0 / eov_a).reshape(nocc_a * nvir_a)
+            precond_b = (1.0 / eov_b).reshape(nocc_b * nvir_b)
+            # TODO: should it be hstack or vstack?
+            precond = np.hstack((
+                precond_a,
+                precond_b,
+            ))
+
+        dist_precond = DistributedArray(precond, self.comm)
+
+        return dist_precond
 
     def setup_trials(self,
                      molecule,
