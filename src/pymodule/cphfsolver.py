@@ -1234,6 +1234,7 @@ class CphfSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self.is_converged,
                                              root=mpi_master())
 
+    # TODO: retire conjugate_gradient
     def compute_conjugate_gradient(self, molecule, basis, scf_tensors, *args):
         """
         Computes the coupled-perturbed Hartree-Fock (CPHF) coefficients.
@@ -1321,8 +1322,9 @@ class CphfSolver(LinearSolver):
             if self._method_type == 'restricted':
                 cphf_rhs = np.array(list_rhs).reshape(dof, nocc_a, nvir_a)
             else:
-                assert_msg_critical(False,
-                    'CphfSolver: conjugate gradient not implemented for unrestricted case.')
+                cphf_rhs = np.array(list_rhs)
+                #assert_msg_critical(False,
+                #    'CphfSolver: conjugate gradient not implemented for unrestricted case.')
         else:
             cphf_rhs = None
 
@@ -1331,12 +1333,20 @@ class CphfSolver(LinearSolver):
         profiler.stop_timer('RHS')
 
         # Solve the CPHF equations using conjugate gradient (cg)
-        cphf_ov = self.solve_cphf_cg(
-            molecule,
-            basis,
-            scf_tensors,
-            cphf_rhs,  # TODO: possibly change the shape
-        )
+        if self._method_type == 'restricted':
+            cphf_ov = self.solve_cphf_cg(
+                molecule,
+                basis,
+                scf_tensors,
+                cphf_rhs,  # TODO: possibly change the shape
+            )
+        else:
+            cphf_ov = self.solve_cphf_cg_unrestricted(
+                molecule,
+                basis,
+                scf_tensors,
+                cphf_rhs,  # TODO: possibly change the shape
+            )
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -1352,14 +1362,15 @@ class CphfSolver(LinearSolver):
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
             # Create the list of DistributedArrays
+            solutions = []
             if self._method_type == 'restricted':
-                solutions = []
                 for i in range(dof):
-                    vec_cphf_ov = cphf_ov[i].reshape(nocc_a * nvir_a)
-                    solutions.append(DistributedArray(vec_cphf_ov, self.comm))
+                    # vec_cphf_ov = cphf_ov[i].reshape(nocc_a * nvir_a)
+                    solutions.append(DistributedArray(cphf_ov[i], self.comm))
             else:
-                assert_msg_critical(False,
-                    'CphfSolver: conjugate gradient not implemented for the unrestricted case.')
+                for i in range(dof):
+                    dist_cphf_ov = DistributedArray(cphf_ov[i], self.comm)
+                    solutions.append(dist_cphf_ov)
 
         # merge the rhs dict with the solution
         return {
@@ -1368,6 +1379,237 @@ class CphfSolver(LinearSolver):
         }
 
         return cphf_ov_dict
+
+    def solve_cphf_cg_unrestricted(self, molecule, basis, scf_tensors, cphf_rhs):
+        """
+        Solves the CPHF equations using conjugate gradient
+        for all atomic coordinates to obtain the ov block
+        of the CPHF coefficients.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param cphf_rhs:
+            The right-hand side of the CPHF equations for all atomic coordinates.
+
+        :returns:
+            The ov block of the CPHF coefficients.
+        """
+
+        try:
+            from scipy.sparse import linalg
+        except ImportError:
+            raise ImportError('Unable to import scipy. Please install scipy ' +
+                              'via pip or conda.')
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        nocc = molecule.number_of_alpha_electrons()
+
+        # degrees of freedom from rhs (can be different from number of atoms)
+        dof = cphf_rhs.shape[0]
+
+        if self.rank == mpi_master():
+            dof = cphf_rhs.shape[0]
+            mo_a = scf_tensors['C_alpha']
+            mo_b = scf_tensors['C_beta']
+            nao = basis.get_dimension_of_basis()
+            orb_ene_a = scf_tensors['E_alpha']
+            orb_ene_b = scf_tensors['E_beta']
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
+            mo_occ_a = mo_a[:, :nocc_a].copy()
+            mo_vir_a = mo_a[:, nocc_a:].copy()
+            mo_occ_b = mo_b[:, :nocc_b].copy()
+            mo_vir_b = mo_b[:, nocc_b:].copy()
+            nvir_a = mo_vir_a.shape[1]
+            nvir_b = mo_vir_b.shape[1]
+            eocc_a = orb_ene_a[:nocc_a]
+            evir_a = orb_ene_a[nocc_a:]
+            eocc_b = orb_ene_b[:nocc_b]
+            evir_b = orb_ene_b[nocc_b:]
+            nov_a = nocc_a * nvir_a
+            nov_b = nocc_b * nvir_b
+            eov_a = eocc_a.reshape(-1, 1) - evir_a
+            eov_b = eocc_b.reshape(-1, 1) - evir_b
+        else:
+            eov_a = None
+            eov_b = None
+        eov_a = self.comm.bcast(eov_a, root=mpi_master())
+        eov_b = self.comm.bcast(eov_b, root=mpi_master())
+        nocc_a = eov_a.shape[0]
+        nvir_a = eov_a.shape[1]
+        nocc_b = eov_b.shape[0]
+        nvir_b = eov_b.shape[1]
+        nov_a = nocc_a * nvir_a
+        nov_b = nocc_b * nvir_b
+
+        if self.rank == mpi_master():
+            # Calculate the initial guess for the CPHF coefficients given by
+            # the RHS divided by orbital-energy differences
+            list_cphf_guess = []
+            for i in range(dof):
+                rhs_a = cphf_rhs[i, :nov_a].reshape(nocc_a, nvir_a)
+                rhs_b = cphf_rhs[i, nov_a:].reshape(nocc_b, nvir_b)
+                cphf_guess_a = rhs_a / eov_a
+                cphf_guess_b = rhs_b / eov_b
+                cphf_guess_stack = np.hstack((
+                                              cphf_guess_a.reshape(nov_a),
+                                              cphf_guess_b.reshape(nov_b)
+                                   ))
+                list_cphf_guess.append(cphf_guess_stack)
+            cphf_guess = np.array(list_cphf_guess)
+        else:
+            cphf_guess = None
+
+        # Matrix-vector product of orbital Hessian with trial vector
+        def cphf_matvec(v):
+            """
+            Function to carry out matrix multiplication of CPHF coefficient
+            vector with orbital Hessian matrix.
+            """
+
+            profiler.set_timing_key('Iter ' + str(self._cur_iter) + 'CG')
+            profiler.start_timer('Iter ' + str(self._cur_iter) + 'CG')
+
+            # Create AODensityMatrix object from lambda in AO
+            if self.rank == mpi_master():
+                cphf_ao_a = np.zeros((dof, nao, nao))
+                cphf_ao_b = np.zeros((dof, nao, nao))
+                vec = v.reshape(dof, nov_a + nov_b)
+                for i in range(dof):
+                    vec_a = vec[i, :nov_a]
+                    vec_b = vec[i, nov_a:]
+                    cphf_ao_a[i] = np.linalg.multi_dot(
+                        [mo_occ_a,
+                         vec_a.reshape(nocc_a, nvir_a), mo_vir_a.T])
+                    cphf_ao_b[i] = np.linalg.multi_dot(
+                        [mo_occ_b,
+                         vec_b.reshape(nocc_b, nvir_b), mo_vir_b.T])
+                cphf_ao_list_a = list([cphf_ao_a[x] for x in range(dof)])
+                cphf_ao_list_b = list([cphf_ao_b[x] for x in range(dof)])
+            else:
+                cphf_ao_list_a = None
+                cphf_ao_list_b = None
+
+            fock_cphf = self._comp_lr_fock_unrestricted([cphf_ao_list_a, cphf_ao_list_b],
+                                           molecule, basis,
+                                           eri_dict, dft_dict, pe_dict,
+                                           profiler)
+
+            # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
+            # and add diagonal part
+            if self.rank == mpi_master():
+                cphf_ao_list_a.clear()
+                cphf_ao_list_b.clear()
+
+                list_cphf_mo = []
+
+                for i in range(dof):
+                    # -np.linalg.multi_dot([mo_occ.T, fock_cphf_numpy, mo_vir])
+                    # -np.linalg.multi_dot([mo_vir.T, fock_cphf_numpy, mo_occ]).T
+                    cphf_mo_a = -np.linalg.multi_dot(
+                        [mo_occ_a.T, (fock_cphf[ 2 * i + 0] + fock_cphf[ 2 * i + 0].T), mo_vir_a])
+                    cphf_mo_b = -np.linalg.multi_dot(
+                        [mo_occ_b.T, (fock_cphf[ 2 * i + 1] + fock_cphf[ 2 * i + 1].T), mo_vir_b])
+                    cphf_mo_a += vec[i, :nov_a].reshape(nocc_a, nvir_a) * eov_a
+                    cphf_mo_b += vec[i, nov_a:].reshape(nocc_b, nvir_b) * eov_b
+                    cphf_mo_data = np.hstack((
+                        cphf_mo_a.reshape(nov_a),
+                        cphf_mo_b.reshape(nov_b)
+                    ))
+                    list_cphf_mo.append(cphf_mo_data)
+                cphf_mo = np.array(list_cphf_mo)
+            else:
+                cphf_mo = None
+
+            cphf_mo = self.comm.bcast(cphf_mo, root=mpi_master())
+
+            profiler.stop_timer('Iter ' + str(self._cur_iter) + 'CG')
+
+            profiler.check_memory_usage(
+                'CG Iteration {:d}'.format(self._cur_iter + 1))
+
+            profiler.print_memory_tracing(self.ostream)
+
+            # increase iteration counter every time this function is called
+            self._cur_iter += 1
+
+            if self.rank == mpi_master():
+                if self.print_residuals:
+                    residual_norms = np.zeros(dof)
+                    for i in range(dof):
+                        residual_norms[i] = np.linalg.norm(cphf_mo[i] -
+                                                           cphf_rhs[i])
+                    self.print_iteration(residual_norms, molecule)
+
+            return cphf_mo.reshape(dof * (nov_a + nov_b))
+
+        # Matrix-vector product for preconditioner using the
+        # inverse of the diagonal (i.e. eocc - evir)
+        def precond_matvec(v):
+            """
+            Function that defines the matrix-vector product
+            required by the pre-conditioner for the conjugate gradient.
+            It is an approximation for the inverse of matrix A in Ax = b.
+            """
+            vec = v.reshape(dof, nov_a + nov_b)
+            current_v_a = vec[:, :nov_a].reshape(dof, nocc_a, nvir_a)
+            current_v_b = vec[:, nov_a:].reshape(dof, nocc_b, nvir_b)
+            M_dot_v_a = current_v_a / eov_a
+            M_dot_v_b = current_v_b / eov_b
+            M_dot_v = np.hstack((M_dot_v_a, M_dot_v_b))
+
+            return M_dot_v.reshape(dof * (nov_a + nov_b))
+
+        # 5) Define the linear operators and run conjugate gradient
+        LinOp = linalg.LinearOperator((dof * (nov_a + nov_b), dof * (nov_a + nov_b)),
+                                      matvec=cphf_matvec)
+        PrecondOp = linalg.LinearOperator(
+            (dof * (nov_a + nov_b), dof * (nov_a + nov_b)), matvec=precond_matvec)
+
+        b = cphf_rhs.reshape(dof * (nov_a + nov_b))
+        x0 = cphf_guess.reshape(dof * (nov_a + nov_b))
+
+        try:
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      rtol=self.conv_thresh,
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
+        except TypeError:
+            # workaround for scipy < 1.11
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      tol=(self.conv_thresh *
+                                                           np.linalg.norm(b)),
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
+
+        self._is_converged = (cg_conv == 0)
+
+        return cphf_coefficients_ov.reshape(dof, nov_a + nov_b)
 
     def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs):
         """
