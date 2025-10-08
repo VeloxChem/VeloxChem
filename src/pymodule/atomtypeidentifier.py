@@ -38,6 +38,7 @@ import sys
 import re
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import chemical_element_identifier
 from .outputstream import OutputStream
 from .errorhandler import safe_arccos
 
@@ -171,8 +172,21 @@ class AtomTypeIdentifier:
             True if the atom is sp2 hybridized, False otherwise.
         """
 
+        neighbor_identifiers = [
+            chemical_element_identifier(self.atomic_symbols[x].upper())
+            for x in list(self.graph.neighbors(atom_idx))]
+
+        nonmetal_neighbor_count = 0
+        for elem_id in neighbor_identifiers:
+            if not ((elem_id in [3, 4, 11, 12, 13]) or
+                    (19 <= elem_id and elem_id <= 32) or
+                    (37 <= elem_id and elem_id <= 51) or
+                    (55 <= elem_id and elem_id <= 84) or
+                    (87 <= elem_id and elem_id <= 108)):
+                nonmetal_neighbor_count += 1
+
         return (self.atomic_symbols[atom_idx] == 'N' and
-                len(list(self.graph.neighbors(atom_idx))) == 2)
+                nonmetal_neighbor_count == 2)
 
     def detect_closed_cyclic_structures(self):
         """
