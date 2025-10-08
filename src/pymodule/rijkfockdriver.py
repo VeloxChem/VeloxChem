@@ -44,11 +44,7 @@ from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
 
-try:
-    from scipy.linalg import lu_factor, lu_solve, sqrtm
-except ImportError:
-    pass
-
+from scipy.linalg import lu_factor, lu_solve, sqrtm
 
 class RIJKFockDriver:
     """
@@ -134,12 +130,9 @@ class RIJKFockDriver:
 
             ri_prep_t0 = time.time()
 
-            if 'scipy' in sys.modules:
-                lu, piv = lu_factor(mat_j_np)
-                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
-            else:
-                inv_mat_j_np = np.linalg.inv(mat_j_np)
-            metric_np = np.linalg.cholesky(inv_mat_j_np)
+            lu, piv = lu_factor(mat_j_np)
+            inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            metric_np = sqrtm(inv_mat_j_np)
             
             self.metric = SubMatrix(
                 [0, 0, metric_np.shape[0], metric_np.shape[1]])
