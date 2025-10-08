@@ -435,7 +435,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                             dist_DSD_ix_a.data.reshape(-1),
                             dist_fock_deriv_ao_a[key_jy].data.reshape(-1))
 
-                        Six_Sjy_a =  np.dot(
+                        Six_Sjy_a =  2.0 * np.dot(
                             dist_OmegaSD_ix_a.data.reshape(-1),
                             dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
@@ -563,10 +563,10 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
 
                 if self.rank == mpi_master():
                     # transform to MO basis
-                    fock_uij_ov_2_a =  np.linalg.multi_dot(
+                    fock_uij_ov_2_a =  2.0 * np.linalg.multi_dot(
                         [mo_occ_a.T, fock_uij[x * 2 + 0], mo_vir_a])
                     fock_uij_ov_2_a = fock_uij_ov_2_a.reshape(nocc_a * nvir_a)
-                    fock_uij_ov_2_b = np.linalg.multi_dot(
+                    fock_uij_ov_2_b = 2.0 * np.linalg.multi_dot(
                         [mo_occ_b.T, fock_uij[x * 2 + 1], mo_vir_b])
                     fock_uij_ov_2_b = fock_uij_ov_2_b.reshape(nocc_b * nvir_b)
                 else:

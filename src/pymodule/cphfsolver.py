@@ -1110,9 +1110,11 @@ class CphfSolver(LinearSolver):
                                          dft_dict, pe_dict, *args)
 
         if self.rank == mpi_master():
-            cphf_rhs = cphf_rhs_dict['cphf_rhs']
-            dof = cphf_rhs.shape[0]
-            cphf_rhs = cphf_rhs.reshape(dof, nocc, nvir)
+            list_rhs = []
+            for vec in cphf_rhs_dict['dist_cphf_rhs']:
+                list_rhs.append(vec.array())
+            dof = len(list_rhs)
+            cphf_rhs = np.array(list_rhs).reshape(dof, nocc, nvir)
         else:
             cphf_rhs = None
 
@@ -1141,8 +1143,18 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
+            # Create the list of DistributedArrays
+            solutions = []
+            for i in range(dof):
+                vec_cphf_ov = cphf_ov[i].reshape(nocc*nvir)
+                vec_cphf_ov = cphf_ov[i].reshape(nocc * nvir)
+                solutions.append(DistributedArray(vec_cphf_ov, self.comm))
+
         # merge the rhs dict with the solution
-        cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
+        return {
+            **cphf_rhs_dict,
+            'dist_cphf_ov': solutions,
+        }
 
         return cphf_ov_dict
 
