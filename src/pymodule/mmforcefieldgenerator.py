@@ -1654,16 +1654,17 @@ class MMForceFieldGenerator:
                         f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}"
                     )
 
-                    sigma = self.water_parameters[water_model][atom_type][
+                    sigma = self.water_parameters[water_model][gafftype][
                         'sigma']
-                    epsilon = self.water_parameters[water_model][atom_type][
+                    epsilon = self.water_parameters[water_model][gafftype][
                         'epsilon']
 
                     self.partial_charges[i] = self.water_parameters[
-                        water_model][atom_type]['charge']
+                        water_model][gafftype]['charge']
 
                     atom_type_found = True
                     use_water_model = True
+                    atom_type = gafftype
                     self.eq_param = False
                     comment = water_model
 
