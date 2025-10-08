@@ -1870,6 +1870,16 @@ class AtomTypeIdentifier:
             'cq': 'cp',
         }
 
+        conjugated_cc_cd_mapping = {
+            'cc': 'cd',
+            'cd': 'cc',
+        }
+
+        conjugated_nc_nd_mapping = {
+            'nc': 'nd',
+            'nd': 'nc',
+        }
+
         self.equivalent_atoms = []
         atom_types_for_equil = []
         for name, type in self.atom_types_dict.items():
@@ -1886,7 +1896,17 @@ class AtomTypeIdentifier:
 
             # skip cd/cf/ch/nd/nf/cq since they will be counted by
             # cc/ce/cg/nc/ne/cp
-            if atom_type in ['cd', 'cf', 'ch', 'nd', 'nf', 'cq']:
+            if atom_type == 'cd' and 'cc' in atom_types_for_equil:
+                continue
+            if atom_type == 'cf' and 'ce' in atom_types_for_equil:
+                continue
+            if atom_type == 'ch' and 'cg' in atom_types_for_equil:
+                continue
+            if atom_type == 'nd' and 'nc' in atom_types_for_equil:
+                continue
+            if atom_type == 'nf' and 'ne' in atom_types_for_equil:
+                continue
+            if atom_type == 'cq' and 'cp' in atom_types_for_equil:
                 continue
 
             swapped_atom_type = conjugated_atomtype_mapping.get(
@@ -1911,6 +1931,7 @@ class AtomTypeIdentifier:
                     ]
                     path_types = tuple(sorted(path_types))
 
+                    # this is full swapping using conjugated_atomtype_mapping
                     swapped_path_types = [
                         tuple(
                             conjugated_atomtype_mapping.get(at, at)
@@ -1919,8 +1940,33 @@ class AtomTypeIdentifier:
                     ]
                     swapped_path_types = tuple(sorted(swapped_path_types))
 
+                    # this is just cc-cd swapping using conjugated_cc_cd_mapping
+                    swapped_cc_cd_path_types = [
+                        tuple(
+                            conjugated_cc_cd_mapping.get(at, at)
+                            for at in path)
+                        for path in path_types
+                    ]
+                    swapped_cc_cd_path_types = tuple(sorted(swapped_cc_cd_path_types))
+
+                    # this is just nc-nd swapping using conjugated_nc_nd_mapping
+                    swapped_nc_nd_path_types = [
+                        tuple(
+                            conjugated_nc_nd_mapping.get(at, at)
+                            for at in path)
+                        for path in path_types
+                    ]
+                    swapped_nc_nd_path_types = tuple(sorted(swapped_nc_nd_path_types))
+
+                    # we should include more single/double/... pair swapping
+                    # but for now doing only cc-cd and nc-nd seems to suffice
+
                     if swapped_path_types in atom_paths:
                         atom_paths[swapped_path_types].add(idx)
+                    elif swapped_cc_cd_path_types in atom_paths:
+                        atom_paths[swapped_cc_cd_path_types].add(idx)
+                    elif swapped_nc_nd_path_types in atom_paths:
+                        atom_paths[swapped_nc_nd_path_types].add(idx)
                     else:
                         atom_paths[path_types].add(idx)
 
