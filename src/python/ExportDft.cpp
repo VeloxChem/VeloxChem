@@ -140,7 +140,11 @@ CXCIntegrator_integrate_fxc_fock(const CXCIntegrator&                    self,
     auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
     std::string errnum("integrate_fxc_fock: Inconsistent number of numpy arrays");
     errors::assertMsgCritical(num_rw_dens == num_focks, errnum);
-    errors::assertMsgCritical(num_gs_dens == 1, errnum);
+    errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
+    if (num_gs_dens == 2)
+    {
+        errors::assertMsgCritical(num_rw_dens % 2 == 0, errnum);
+    }
 
     auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_fxc_fock", aoFockArrays, nao);

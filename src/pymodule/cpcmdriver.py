@@ -425,7 +425,11 @@ class CpcmDriver:
         atom_end = sum(counts[:self.rank + 1])
 
         for i in range(atom_start, atom_end):
-            if identifiers[i] == 1:
+            if identifiers[i] == 0:
+                # dummy atom
+                continue
+
+            elif identifiers[i] == 1:
                 # scale and shift unit grid of hydrogen atom
                 atom_grid_coords = (unit_hydrogen_grid_coords * atom_radii[i] +
                                     atom_coords[i])
@@ -435,6 +439,7 @@ class CpcmDriver:
                 atom_grid = np.hstack(
                     (atom_grid_coords, unit_hydrogen_grid_weights, grid_zeta,
                      atom_idx))
+
             else:
                 # scale and shift unit grid of non-hydrogen atom
                 atom_grid_coords = (unit_grid_coords * atom_radii[i] +
@@ -443,6 +448,7 @@ class CpcmDriver:
                 atom_idx = np.full_like(grid_zeta, i)
                 atom_grid = np.hstack(
                     (atom_grid_coords, unit_grid_weights, grid_zeta, atom_idx))
+
             cpcm_grid_raw = np.vstack((cpcm_grid_raw, atom_grid))
 
         gathered_cpcm_grid_raw = self.comm.allgather(cpcm_grid_raw)

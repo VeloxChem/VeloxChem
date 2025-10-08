@@ -137,9 +137,12 @@ from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
 from .tdaeigensolver import TdaEigenSolver
+from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
+from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .lrsolver import LinearResponseSolver
+from .lrsolverunrest import LinearResponseUnrestrictedSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
@@ -179,6 +182,7 @@ from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 from .densityviewer import DensityViewer
+from .densityvieweralternative import DensityViewerAlternative
 from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver

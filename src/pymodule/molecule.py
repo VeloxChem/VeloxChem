@@ -899,7 +899,10 @@ def _Molecule_get_xyz_string(self, precision=12, comment=''):
         xa, ya, za = coords_in_angstrom[a]
 
         if elem_ids[a] == 0 and atom_basis_labels[a][1]:
-            elem_name = 'Bq_' + atom_basis_labels[a][1].capitalize()
+            if atom_basis_labels[a][1].capitalize() == 'Bq':
+                elem_name = 'Bq'
+            else:
+                elem_name = 'Bq_' + atom_basis_labels[a][1].capitalize()
         else:
             elem_name = labels[a]
 

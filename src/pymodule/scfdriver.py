@@ -572,7 +572,7 @@ class ScfDriver:
             self.acc_type = 'DIIS'
 
         # check molecule
-        molecule_sanity_check(molecule)
+        molecule_sanity_check(molecule, self.scf_type)
 
         # check dft setup
         dft_sanity_check(self, 'compute')
