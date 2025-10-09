@@ -102,6 +102,7 @@ class TransitionStateGuesser():
         self.discont_conformer_search = False
         self.peak_conformer_search = False
         self.peak_conformer_search_range = 1
+        self.scf_scan = True
         self.conformer_steps = 10000
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
@@ -112,7 +113,6 @@ class TransitionStateGuesser():
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
-        scf=True,
         **ff_kwargs,
     ):
         """Find a guess for the transition state using a force field scan.
@@ -141,7 +141,7 @@ class TransitionStateGuesser():
         Returns:
             molecule, dict: molecule object of the guessed transition state and a dictionary with the results of the scan.
         """
-
+        self.results = {}
         # Build forcefields and systems
         self.build_forcefields(reactant, product, **ff_kwargs)
 
@@ -149,24 +149,28 @@ class TransitionStateGuesser():
         self.scan_mm()
 
         # Scan SCF
-        if scf:
+        if self.scf_scan:
             # assert False, 'Not implemented yet'
             self.scan_scf(self.results)
 
         return self.results
 
-    def build_forcefields(self, reactant, product, constraints=[], **ts_kwargs):
+    def build_forcefields(self,
+                          reactant_mol,
+                          product_mol,
+                          constraints=[],
+                          **ff_kwargs):
         if self.mute_ff_build:
-            self.ffbuilder.ostream.mute()
             self.ostream.print_info(
                 "Building forcefields. Disable mute_ff_build to see detailed output."
             )
             self.ostream.flush()
-        self.ffbuilder.read_keywords(**ts_kwargs)
+            self.ffbuilder.ostream.mute()
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
-            reactant=reactant,
-            product=product,
+            reactant=reactant_mol,
+            product=product_mol,
+            **ff_kwargs,
         )
 
         self.molecule = Molecule.read_xyz_string(
@@ -179,7 +183,8 @@ class TransitionStateGuesser():
             self.ostream.print_blank()
             self.ostream.flush()
             self.ffbuilder.ostream.unmute()
-            self.ffbuilder._summarise_reaction(self.reactant, self.product)
+            self.ffbuilder._summarise_reaction(self.reactant, self.product,
+                                               self.ostream)
             self.ffbuilder.ostream.mute()
         self.ostream.print_info(
             f"System has charge {self.molecule.get_charge()} and multiplicity {self.molecule.get_multiplicity()}. Provide correct values if this is wrong."
@@ -225,10 +230,16 @@ class TransitionStateGuesser():
         self.ostream.flush()
         sysbuilder.save_systems_as_xml(self.systems,
                                        self.folder_name + "/systems")
+        rea_bonds = set(self.reactant.bonds.keys())
+        pro_bonds = set(self.product.bonds.keys())
+        static_bonds = rea_bonds & pro_bonds
         self.results.update({
             'breaking_bonds': self.breaking_bonds,
             'forming_bonds': self.forming_bonds,
-            'lambda_vec': self.lambda_vec
+            'static_bonds': static_bonds,
+            'lambda_vec': self.lambda_vec,
+            'reactant': self.reactant,
+            'product': self.product,
         })
 
         return
@@ -638,7 +649,8 @@ class TransitionStateGuesser():
             scf_results = self.scf_drv.compute(self.molecule, basis)
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
-    def show_results(self, ts_results=None, filename=None, **mol_show_kwargs):
+    @staticmethod
+    def show_results(ts_results=None, filename=None, **mol_show_kwargs):
         """Show the results of the transition state guesser.
         This function uses ipywidgets to create an interactive plot of the MM and SCF energies as a function of lambda.
 
@@ -655,34 +667,47 @@ class TransitionStateGuesser():
         except ImportError:
             raise ImportError('ipywidgets is required for this functionality.')
 
+        ostream = OutputStream(sys.stdout)
+
         if ts_results is None:
-            if self.results is not None and self.results != {}:
-                self.ostream.print_info("Loading self.results")
-                ts_results = self.results
-            else:
+            if filename is not None:
                 try:
-                    if filename is not None:
-                        self.results_file = filename
-                    self.ostream.print_info(
-                        f"Loading results from {self.results_file}")
-                    ts_results = self.load_results(self.results_file)
+                    # self.results_file = filename
+                    ostream.print_info(f"Loading results from {filename}")
+                    ts_results = TransitionStateGuesser.load_results(
+                        filename,
+                        ostream,
+                    )
                 except Exception as e:
                     raise e
+            else:
+                raise ValueError(
+                    "No results provided. Provide either ts_results or filename."
+                )
 
         mm_energies = ts_results.get('mm_energies', None)
         structures = ts_results.get('structures', None)
         lambda_vec = ts_results.get('lambda_vec', None)
         scf_energies = ts_results.get('scf_energies', None)
+
         if scf_energies is not None:
             final_lambda = ts_results.get('max_scf_lambda', None)
         else:
             final_lambda = ts_results.get('max_mm_lambda', None)
+
+        forming_bonds = set(ts_results.get('forming_bonds', None))
+        breaking_bonds = set(ts_results.get('breaking_bonds', None))
+        bonds = set(ts_results.get('static_bonds', None))
+        dashed_bonds = forming_bonds | breaking_bonds
+
         ipywidgets.interact(
-            self._show_iteration,
+            TransitionStateGuesser._show_iteration,
             mm_energies=ipywidgets.fixed(mm_energies),
             scf_energies=ipywidgets.fixed(scf_energies),
             structures=ipywidgets.fixed(structures),
             lambda_vec=ipywidgets.fixed(lambda_vec),
+            bonds=ipywidgets.fixed(bonds),
+            dashed_bonds=ipywidgets.fixed(dashed_bonds),
             step=ipywidgets.SelectionSlider(
                 options=lambda_vec,
                 description='Lambda',
@@ -691,13 +716,15 @@ class TransitionStateGuesser():
             **mol_show_kwargs,
         )
 
+    @staticmethod
     def _show_iteration(
-        self,
         mm_energies,
         structures,
         lambda_vec,
         step,
         scf_energies=None,
+        bonds=None,
+        dashed_bonds=None,
         **mol_show_kwargs,
     ):
         """
@@ -793,14 +820,10 @@ class TransitionStateGuesser():
 
         mol = Molecule.read_xyz_string(structure_i)
 
-        if self.reactant.bonds is not None and self.product.bonds is not None:
-            reactant_bonds = set(self.reactant.bonds.keys())
-            product_bonds = set(self.product.bonds.keys())
-            changing_bonds = list(self.forming_bonds) + list(
-                self.breaking_bonds)
+        if bonds is not None and dashed_bonds is not None:
             mol.show(
-                bonds=reactant_bonds | product_bonds,
-                dashed_bonds=changing_bonds,
+                bonds=bonds,
+                dashed_bonds=dashed_bonds,
                 width=640,
                 height=360,
                 **mol_show_kwargs,
@@ -842,13 +865,15 @@ class TransitionStateGuesser():
 
         structures = results.get('structures', None)
 
-        reactant = self.reactant.get_forcefield_as_json(self.reactant)
-        product = self.product.get_forcefield_as_json(self.product)
-        rea_xyz = self.reactant.molecule.get_xyz_string()
-        pro_xyz = self.product.molecule.get_xyz_string()
+        reactant = results['reactant'].get_forcefield_as_json(
+            results['reactant'])
+        product = results['product'].get_forcefield_as_json(results['product'])
+        rea_xyz = results['reactant'].molecule.get_xyz_string()
+        pro_xyz = results['product'].molecule.get_xyz_string()
 
         forming_bonds = results.get('forming_bonds', None)
         breaking_bonds = results.get('breaking_bonds', None)
+        static_bonds = results.get('static_bonds', None)
 
         hf.create_dataset('reactant_ff', data=reactant)
         hf.create_dataset('product_ff', data=product)
@@ -866,6 +891,9 @@ class TransitionStateGuesser():
         hf.create_dataset('breaking_bonds',
                           data=np.array(np.array(list(breaking_bonds)),
                                         dtype='i'))
+        hf.create_dataset('static_bonds',
+                          data=np.array(np.array(list(static_bonds)),
+                                        dtype='i'))
 
         dt = h5py.string_dtype(encoding='utf-8')
         hf.create_dataset('structures', data=np.array(structures, dtype=dt))
@@ -875,9 +903,12 @@ class TransitionStateGuesser():
             hf.create_dataset('max_scf_structure', data=[max_scf_structure])
             hf.create_dataset('max_scf_lambda', data=max_scf_lambda, dtype='f')
 
-    def load_results(self, fname):
-        self.ostream.print_info(f"Loading results from {fname}")
-        self.ostream.flush()
+    @staticmethod
+    def load_results(fname, ostream=None):
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+        ostream.print_info(f"Loading results from {fname}")
+        ostream.flush()
 
         hf = h5py.File(fname, 'r')
         results = {}
@@ -892,18 +923,31 @@ class TransitionStateGuesser():
         reactant_xyz = hf['reactant_xyz'][()].decode('utf-8')
         product_xyz = hf['product_xyz'][()].decode('utf-8')
 
+        results[
+            'reactant'] = MMForceFieldGenerator.load_forcefield_from_json_string(
+                reactant_ff)
+        results['reactant'].molecule = Molecule.read_xyz_string(reactant_xyz)
+        results[
+            'product'] = MMForceFieldGenerator.load_forcefield_from_json_string(
+                product_ff)
+        results['product'].molecule = Molecule.read_xyz_string(product_xyz)
+
         forming_bonds = hf['forming_bonds'][()]
         breaking_bonds = hf['breaking_bonds'][()]
+        static_bonds = hf['static_bonds'][()]
 
-        self.reactant = MMForceFieldGenerator.load_forcefield_from_json_string(
-            reactant_ff)
-        self.reactant.molecule = Molecule.read_xyz_string(reactant_xyz)
-        self.product = MMForceFieldGenerator.load_forcefield_from_json_string(
-            product_ff)
-        self.product.molecule = Molecule.read_xyz_string(product_xyz)
-
-        self.forming_bonds = set([tuple(bond) for bond in forming_bonds])
-        self.breaking_bonds = set([tuple(bond) for bond in breaking_bonds])
+        results['forming_bonds'] = {
+            tuple(map(int, bond))
+            for bond in forming_bonds
+        }
+        results['breaking_bonds'] = {
+            tuple(map(int, bond))
+            for bond in breaking_bonds
+        }
+        results['static_bonds'] = {
+            tuple(map(int, bond))
+            for bond in static_bonds
+        }
 
         if 'scf_energies' in hf:
             results['scf_energies'] = hf['scf_energies'][:]

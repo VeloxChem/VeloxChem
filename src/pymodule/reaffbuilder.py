@@ -84,9 +84,6 @@ class ReactionForceFieldBuilder():
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.reactant: MMForceFieldGenerator = None
-        self.product: MMForceFieldGenerator = None
-
         self.optimize_mol: bool = False
         self.reparameterize_bonds: bool = False
         self.reparameterize_angles: bool = False
@@ -101,140 +98,114 @@ class ReactionForceFieldBuilder():
         #Todo get better basis set once we have f-functionals
         # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
         self.hessian_basis = 'def2-SV_P_'
-        
-        # argument inputs
-        self.reactant_partial_charges: list[float] | list[
-            list[float]] | None = None
-        self.product_partial_charges: list[float] | list[
-            list[float]] | None = None
-        self.reactant_hessians: np.ndarray | list[np.ndarray
-                                                  | None] | None = None
-        self.product_hessians: np.ndarray | list[np.ndarray
-                                                 | None] | None = None
-        self.breaking_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
-        self.forming_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
-        self.reactant_total_multiplicity: int = -1
-        self.product_total_multiplicity: int = -1
-
-        self.keywords = {
-            "reactant_partial_charges": list | None,
-            "product_partial_charges": list | None,
-            "reactant_hessians": np.ndarray | list | None,
-            "product_hessians": np.ndarray | list | None,
-            "reactant_total_multiplicity": int,
-            "product_total_multiplicity": int,
-            "breaking_bonds": set | tuple,
-            "forming_bonds": set | tuple,
-        }
-
-    def read_keywords(self, **kwargs):
-        for key, value in kwargs.items():
-            if key in self.keywords.keys():
-                if isinstance(value, self.keywords[key]):
-                    setattr(self, key, value)
-                else:
-                    raise ValueError(
-                        f"Type for given keyword {key} is {type(value)} but should be {self.keywords[key]}"
-                    )
-            else:
-                raise ValueError(
-                    f"Unknown keyword {key} in EvbForceFieldBuilder")
 
     def build_forcefields(
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
+        reactant_partial_charges: list[float] | list[list[float]] | None = None,
+        product_partial_charges: list[float] | list[list[float]] | None = None,
+        reactant_hessians: np.ndarray | list[np.ndarray | None] | None = None,
+        product_hessians: np.ndarray | list[np.ndarray | None] | None = None,
+        reactant_total_multiplicity: int = -1,
+        product_total_multiplicity: int = -1,
+        forced_breaking_bonds: set[tuple[int, int]] | tuple = (),
+        forced_forming_bonds: set[tuple[int, int]] | tuple = (),
+        product_mapping: dict[int, int] | None = None,
     ):
 
-        self.reactant, reactants, reactant_total_charge = self._create_combined_forcefield(
+        reactant_ff, reactant_ffs, reactant_total_charge = self._create_combined_forcefield(
             reactant,
-            self.reactant_partial_charges,
-            self.reactant_hessians,
+            reactant_partial_charges,
+            reactant_hessians,
             "REA",
+            reactant_total_multiplicity,
         )
 
-        self.product, products, product_total_charge = self._create_combined_forcefield(
+        product_ff, product_ffs, product_total_charge = self._create_combined_forcefield(
             product,
-            self.product_partial_charges,
-            self.product_hessians,
+            product_partial_charges,
+            product_hessians,
             "PRO",
+            product_total_multiplicity,
         )
 
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
-        if not self.skip_reaction_matching and self.product_mapping is None:
+        if not self.skip_reaction_matching and product_mapping is None:
             breaking_bonds_insert = "no forced breaking bonds"
-            if len(self.breaking_bonds) > 0:
-                breaking_bonds_insert = f"forced breaking bonds: {self.breaking_bonds}"
-                
+            if len(forced_breaking_bonds) > 0:
+                breaking_bonds_insert = f"forced breaking bonds: {forced_breaking_bonds}"
+
             forming_bonds_insert = "no forced forming bonds"
-            if len(self.forming_bonds) > 0:
-                forming_bonds_insert = f"forced forming bonds: {self.forming_bonds}"
-            self.ostream.print_info(
-                "Matching reactant and product force fields with " +
-                breaking_bonds_insert + " and " + forming_bonds_insert + ".")
+            if len(forced_forming_bonds) > 0:
+                forming_bonds_insert = f"forced forming bonds: {forced_forming_bonds}"
+
+            msg = "Matching reactant and product force fields with "
+            msg += breaking_bonds_insert + " and " + forming_bonds_insert + "."
+            self.ostream.print_info(msg)
             self.ostream.flush()
+
             # adjust for 1-indexed input of breaking bonds
-            self.breaking_bonds = {(bond[0] - 1, bond[1] - 1)
-                                   for bond in self.breaking_bonds}
-            self.forming_bonds = {(bond[0] - 1, bond[1] - 1) for bond in self.forming_bonds}
-            self.product, self.product_mapping = self._match_reactant_and_product(
-                self.reactant,
-                self.reactant.molecule.get_element_ids(),
-                self.product,
-                self.product.molecule.get_element_ids(),
-                self.breaking_bonds,
-                self.forming_bonds,
+            forced_breaking_bonds = {(bond[0] - 1, bond[1] - 1)
+                                     for bond in forced_breaking_bonds}
+            forced_forming_bonds = {(bond[0] - 1, bond[1] - 1)
+                                    for bond in forced_forming_bonds}
+
+            product_ff, product_mapping = self._match_reactant_and_product(
+                reactant_ff,
+                reactant_ff.molecule.get_element_ids(),
+                product_ff,
+                product_ff.molecule.get_element_ids(),
+                forced_breaking_bonds,
+                forced_forming_bonds,
             )
-        elif self.product_mapping is not None:
+        elif product_mapping is not None:
             self.ostream.print_info(
-                f"Skipping reaction matching because the mapping {self.product_mapping} is already provided"
+                f"Skipping reaction matching because the mapping {product_mapping} is already provided"
             )
-            self.product_mapping = {
-                k - 1: v - 1
-                for k, v in self.product_mapping.items()
-            }
+            product_mapping = {k - 1: v - 1 for k, v in product_mapping.items()}
         else:
             self.ostream.print_info("Skipping reaction matching")
         self.ostream.flush()
 
-        if self.product_mapping is not None:
-            self.product = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
-                self.product,
-                self.product_mapping,
+        if product_mapping is not None:
+            product_ff = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
+                product_ff,
+                product_mapping,
             )
 
-            self.product.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
-                self.product.molecule,
-                self.product_mapping,
+            product_ff.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
+                product_ff.molecule,
+                product_mapping,
             )
 
-        self.forming_bonds, self.breaking_bonds = self._summarise_reaction(
-            self.reactant, self.product)
+        forming_bonds, breaking_bonds = self._summarise_reaction(
+            reactant_ff, product_ff, self.ostream)
 
-        for bond in self.breaking_bonds:
-            self.reactant.bonds[bond]['comment'] += ', broken in reaction'
-        for bond in self.forming_bonds:
-            self.product.bonds[bond]['comment'] += ', formed in reaction'
+        for bond in breaking_bonds:
+            reactant_ff.bonds[bond]['comment'] += ', broken in reaction'
+        for bond in forming_bonds:
+            product_ff.bonds[bond]['comment'] += ', formed in reaction'
 
         self.ostream.flush()
         if self.optimize_ff:
-            if len(reactants) > 1:
-                self.reactant.molecule = self._optimize_molecule(
-                    self.reactant.molecule.get_element_ids(),
-                    self.reactant,
-                    self.forming_bonds,
+            if len(reactant_ffs) > 1:
+                reactant_ff.molecule = self._optimize_molecule(
+                    reactant_ff.molecule.get_element_ids(),
+                    reactant_ff,
+                    forming_bonds,
                     note='reactant',
                 )
-            if len(products) > 1:
-                self.product.molecule = self._optimize_molecule(
-                    self.product.molecule.get_element_ids(),
-                    self.product,
-                    self.breaking_bonds,
+            if len(product_ffs) > 1:
+                product_ff.molecule = self._optimize_molecule(
+                    product_ff.molecule.get_element_ids(),
+                    product_ff,
+                    breaking_bonds,
                     note='product',
                 )
 
-        return self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, self.product_mapping
+        return reactant_ff, product_ff, forming_bonds, breaking_bonds, reactant_ffs, product_ffs, product_mapping
 
     def _create_combined_forcefield(
         self,
@@ -243,6 +214,7 @@ class ReactionForceFieldBuilder():
         | list[float] | None,
         hessians: np.ndarray | list[np.ndarray | None] | None,
         name: str,
+        total_multiplicity: int,
     ):
         if isinstance(molecules, Molecule):
             molecules = [molecules]
@@ -294,8 +266,8 @@ class ReactionForceFieldBuilder():
         self.ostream.flush()
         combined_mol = self._combine_molecule(
             molecules,
-            self.reactant_total_multiplicity,
-            name=name,
+            total_multiplicity,
+            name,
         )
         self.ostream.print_info(
             f"Combined reactant with total charge {combined_mol.get_charge()} and multiplicity {combined_mol.get_multiplicity()}"
@@ -662,14 +634,14 @@ class ReactionForceFieldBuilder():
 
         new_atom_info = {}
         for atom_info_key in forcefield.atom_info_dict.keys():
-            key = mapping[atom_info_key-1]+1
+            key = mapping[atom_info_key - 1] + 1
             val = forcefield.atom_info_dict[atom_info_key]
             val['ConnectedAtomsNumbers'] = [
-                mapping[key-1]+1 for key in val['ConnectedAtomsNumbers']
+                mapping[key - 1] + 1 for key in val['ConnectedAtomsNumbers']
             ]
-            val['AtomNumber'] = mapping[val['AtomNumber']-1]+1
+            val['AtomNumber'] = mapping[val['AtomNumber'] - 1] + 1
             new_atom_info.update({key: val})
-        
+
         # Sort the atoms by index
         forcefield.atoms = dict(sorted(new_ff_atoms.items()))
         forcefield.atom_info_dict = dict(sorted(new_atom_info.items()))
@@ -713,7 +685,7 @@ class ReactionForceFieldBuilder():
             new_parameters.update({new_key: val})
         return new_parameters
 
-    def _summarise_reaction(self, reactant, product):
+    def _summarise_reaction(self, reactant, product, ostream):
         """
         Summarises the reaction by printing the bonds that are being broken and formed.
 
@@ -724,12 +696,11 @@ class ReactionForceFieldBuilder():
         product_bonds = set(product.bonds)
         formed_bonds = product_bonds - reactant_bonds
         broken_bonds = reactant_bonds - product_bonds
-        self.ostream.print_header("Reaction summary")
-        self.ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
-        
+        ostream.print_header("Reaction summary")
+        ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
+
         if len(broken_bonds) > 0:
-            self.ostream.print_header(
-                f"ReaType  ProType  ID - ReaType  ProType  ID")
+            ostream.print_header(f"ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -737,14 +708,13 @@ class ReactionForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1] + 1
-            self.ostream.print_header(
+            ostream.print_header(
                 f"{reactant_type0:^9}{product_type0:^9}{id0:^2} - {reactant_type1:^9}{product_type1:^9}{id1:^2}"
             )
-        self.ostream.print_blank()
-        self.ostream.print_header(f"{len(formed_bonds)} forming bonds:")
+        ostream.print_blank()
+        ostream.print_header(f"{len(formed_bonds)} forming bonds:")
         if len(formed_bonds) > 0:
-            self.ostream.print_header(
-                "ReaType  ProType  ID - ReaType  ProType  ID")
+            ostream.print_header("ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -752,26 +722,12 @@ class ReactionForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1] + 1
-            self.ostream.print_header(
+            ostream.print_header(
                 f"{reactant_type0:^9}{product_type0:^9}{id0:^2} - {reactant_type1:^9}{product_type1:^9}{id1:^2}"
             )
-        self.ostream.print_blank()
-        self.ostream.flush()
+        ostream.print_blank()
+        ostream.flush()
         return formed_bonds, broken_bonds
-
-    def show_molecule(self, reactant=False, product=False, **kwargs):
-        if reactant:
-            bonds = self.reactant.bonds
-            dashed_bonds = self.forming_bonds
-            self.reactant.molecule.show(bonds=bonds,
-                                        dashed_bonds=dashed_bonds,
-                                        **kwargs)
-        if product:
-            bonds = self.product.bonds
-            dashed_bonds = self.breaking_bonds
-            self.product.molecule.show(bonds=bonds,
-                                       dashed_bonds=dashed_bonds,
-                                       **kwargs)
 
     # Does an FF optimization of the molecule.
     def _optimize_molecule(
