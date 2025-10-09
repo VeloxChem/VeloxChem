@@ -425,7 +425,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
 
             eigvals, rnorms = self.solver.get_eigenvalues()
-            eigvecs = self.solver.ritz_vectors.copy() * math.sqrt(2.0)
+            eigvecs = self.solver.ritz_vectors.copy()
 
             eigvecs_a = eigvecs[:n_ov_a, :]
             eigvecs_b = eigvecs[n_ov_a:, :]
@@ -435,7 +435,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
             trans_dipoles = {}
             for trans_dipole_key in trans_dipoles_a:
-                trans_dipoles[trans_dipole_key] = 0.5 * (
+                trans_dipoles[trans_dipole_key] = (
                     trans_dipoles_a[trans_dipole_key] +
                     trans_dipoles_b[trans_dipole_key])
 
@@ -448,8 +448,10 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
 
         # natural transition orbitals and detachment/attachment densities
 
-        nto_lambdas = []
-        nto_cube_files = []
+        nto_lambdas_a = []
+        nto_lambdas_b = []
+        nto_cube_files_a = []
+        nto_cube_files_b = []
         dens_cube_files = []
 
         excitation_details = []
@@ -466,12 +468,6 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                         (mo_occ_a.shape[1], mo_occ_b.shape[1]),
                         (mo_vir_a.shape[1], mo_vir_b.shape[1])))
 
-            # TODO: enable nto and detach_attach
-            assert_msg_critical(
-                not (self.nto or self.detach_attach),
-                'TdaUnrestrictedEigenSolver: ' +
-                'not yet implemented for nto or detach_attach')
-
             if self.nto or self.detach_attach:
                 vis_drv = VisualizationDriver(self.comm)
                 if self.cube_origin is None or self.cube_stepsize is None:
@@ -487,12 +483,19 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
+                    nto_mo = self.get_nto_unrestricted(
+                        (t_mat_a, t_mat_b),
+                        (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b))
 
-                    nto_lam = nto_mo.occa_to_numpy()
-                    lam_start = mo_occ.shape[1]
-                    lam_end = lam_start + min(mo_occ.shape[1], mo_vir.shape[1])
-                    nto_lambdas.append(nto_lam[lam_start:lam_end])
+                    nto_lam_a = nto_mo.occa_to_numpy()
+                    lam_start_a = mo_occ_a.shape[1]
+                    lam_end_a = lam_start_a + min(mo_occ_a.shape[1], mo_vir_a.shape[1])
+                    nto_lambdas_a.append(nto_lam_a[lam_start_a:lam_end_a])
+
+                    nto_lam_b = nto_mo.occb_to_numpy()
+                    lam_start_b = mo_occ_b.shape[1]
+                    lam_end_b = lam_start_b + min(mo_occ_b.shape[1], mo_vir_b.shape[1])
+                    nto_lambdas_b.append(nto_lam_b[lam_start_b:lam_end_b])
 
                     # Add the NTO to the final hdf5 file.
                     nto_label = f'NTO_S{s + 1}'
@@ -504,11 +507,16 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
 
                 if self.nto_cubes:
-                    lam_diag, nto_cube_fnames = self.write_nto_cubes(
-                        cubic_grid, molecule, basis, s, nto_mo, self.nto_pairs)
+                    lam_diag_a, nto_cube_fnames_a = self.write_nto_cubes(
+                        cubic_grid, molecule, basis, s, nto_mo,
+                        self.nto_pairs, nto_spin='alpha')
+                    lam_diag_b, nto_cube_fnames_b = self.write_nto_cubes(
+                        cubic_grid, molecule, basis, s, nto_mo,
+                        self.nto_pairs, nto_spin='beta')
 
                     if self.rank == mpi_master():
-                        nto_cube_files.append(nto_cube_fnames)
+                        nto_cube_files_a.append(nto_cube_fnames_a)
+                        nto_cube_files_b.append(nto_cube_fnames_b)
 
             if self.detach_attach and self._is_converged:
                 self.ostream.print_info(
@@ -517,8 +525,13 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
                 self.ostream.flush()
 
                 if self.rank == mpi_master():
-                    dens_D, dens_A = self.get_detach_attach_densities(
-                        t_mat, None, mo_occ, mo_vir)
+                    dens_D_alpha, dens_A_alpha = self.get_detach_attach_densities(
+                        t_mat_a, None, mo_occ_a, mo_vir_a)
+                    dens_D_beta, dens_A_beta = self.get_detach_attach_densities(
+                        t_mat_b, None, mo_occ_b, mo_vir_b)
+
+                    dens_D = dens_D_alpha + dens_D_beta
+                    dens_A = dens_A_alpha + dens_A_beta
 
                     # Add the detachment and attachment density matrices
                     # to the final hdf5 file
@@ -562,9 +575,11 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             }
 
             if self.nto:
-                ret_dict['nto_lambdas'] = nto_lambdas
+                ret_dict['nto_lambdas_a'] = nto_lambdas_a
+                ret_dict['nto_lambdas_b'] = nto_lambdas_b
                 if self.nto_cubes:
-                    ret_dict['nto_cubes'] = nto_cube_files
+                    ret_dict['nto_cubes_a'] = nto_cube_files_a
+                    ret_dict['nto_cubes_b'] = nto_cube_files_b
 
             if self.detach_attach_cubes:
                 ret_dict['density_cubes'] = dens_cube_files
@@ -882,12 +897,11 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
             'magnetic': np.zeros((self.nstates, 3))
         }
 
-        sqrt_2 = math.sqrt(2.0)
-
         for s in range(self.nstates):
             exc_vec = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1]).copy()
-            trans_dens = sqrt_2 * np.linalg.multi_dot(
-                [mo_occ, exc_vec, mo_vir.T])
+
+            # for unrestricted
+            trans_dens = np.linalg.multi_dot([mo_occ, exc_vec, mo_vir.T])
 
             transition_dipoles['electric'][s, :] = np.array([
                 np.vdot(trans_dens, integrals['electric_dipole'][d].T)
