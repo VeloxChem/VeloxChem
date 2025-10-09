@@ -42,9 +42,7 @@ from .veloxchemlib import SubMatrix
 from .veloxchemlib import Matrix
 from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
-from .errorhandler import assert_msg_critical
 
-from scipy.linalg import lu_factor, lu_solve, sqrtm
 
 class RIJKFockDriver:
     """
@@ -130,10 +128,15 @@ class RIJKFockDriver:
 
             ri_prep_t0 = time.time()
 
-            lu, piv = lu_factor(mat_j_np)
-            inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
-            metric_np = sqrtm(inv_mat_j_np)
-            
+            # compute J^{-1/2}
+            # for now, use hard-coded threshold
+            eigvals, eigvecs = np.linalg.eigh(mat_j_np)
+            num_eigs = sum(eigvals > 1.0e-6)
+            if num_eigs < eigvals.size:
+                eigvals = eigvals[-num_eigs:]
+                eigvecs = eigvecs[:, -num_eigs:]
+            metric_np = eigvecs * (1.0 / np.sqrt(eigvals))
+
             self.metric = SubMatrix(
                 [0, 0, metric_np.shape[0], metric_np.shape[1]])
             self.metric.set_values(metric_np)
@@ -189,7 +192,8 @@ class RIJKFockDriver:
         
         ri_prep_t0 = time.time()
         
-        self._ri_drv.compute_bq_vectors(molecule, basis, basis_ri, self.metric, self.rank, self.nodes)
+        self._ri_drv.compute_bq_vectors(molecule, basis, basis_ri, self.metric,
+                                        self.rank, self.nodes)
         
         if verbose:
             self.ostream.print_info('B^Q vectors for RI done in ' +
