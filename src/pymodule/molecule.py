@@ -1000,14 +1000,14 @@ def _Molecule_show(self,
                 sdf = '\n'.join(lines)
 
             viewer.addModel(sdf, 'sdf')
-        
+
         if atom_indices or atom_labels:
             coords = self.get_coordinates_in_angstrom()
-            if type(atom_labels) == list:
+            if isinstance(atom_labels, list):
                 labels = atom_labels
                 assert_msg_critical(
                     len(labels) == coords.shape[0],
-                    'Molecule.show: Inconsistent number of labels')
+                    'Molecule.show: Inconsistent number of atom_labels')
             else:
                 labels = self.get_labels()
             for i in range(coords.shape[0]):
