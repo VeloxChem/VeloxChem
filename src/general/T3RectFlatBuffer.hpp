@@ -74,6 +74,26 @@ class CT3RectFlatBuffer
     
     /// @brief The default constructor.
     /// @param indices The vector of indices along x axis of tensor.
+    /// @param width The width of tensor along  z axes.
+    CT3RectFlatBuffer(const std::vector<size_t>&      indices,
+                      const size_t                    width)
+    {
+        _indices = indices;
+        
+        _width = width;
+        
+        _data.reserve(_indices.size());
+        
+        if (const auto nelems = _width * _width; nelems > 0)
+        {
+            std::ranges::for_each(_indices, [&](const auto& index) {
+                _data.push_back(std::vector<T>(nelems, T{0.0}));
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
+    /// @param indices The vector of indices along x axis of tensor.
     /// @param mask_indices The map of indices along y axis of tensor.
     /// @param width The width of tensor along  z axes.
     /// @param nbatches The number of batches.

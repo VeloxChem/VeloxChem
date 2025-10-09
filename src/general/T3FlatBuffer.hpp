@@ -39,6 +39,11 @@
 #include <map>
 #include <ranges>
 
+#include "SubMatrix.hpp"
+#include "MathFunc.hpp"
+
+#include <iostream>
+
 /// @brief Class CT3FlatBuffer stores general semi-symmetric rank-3 tensor as 2D flattened data structure.
 template <typename T>
 class CT3FlatBuffer
@@ -185,6 +190,30 @@ class CT3FlatBuffer
     data(const size_t index) -> T*
     {
         return _data[index].data();
+    }
+    
+    /// @brief Unpacks specific tensor slice into matrix.
+    /// @param matrix The matrix to unpack tensor slice.
+    /// @param index The index of tensor slice.
+    auto
+    unpack_data(CSubMatrix& matrix, const size_t index) const -> void
+    {
+        if (_width == matrix.number_of_rows())
+        {
+            auto ptr_data = _data[index].data();
+         
+            for (size_t i = 0; i < _width; i++)
+            {
+                for (size_t j = i; j < _width; j++)
+                {
+                    const auto fact = ptr_data[mathfunc::uplo_rm_index(i, j, _width)];
+                    
+                    matrix.at({i, j}) = fact;
+                    
+                    matrix.at({j, i}) = fact;
+                }
+            }
+        }
     }
     
     /// @brief Gets the constant pointer to slice of tensor data.
