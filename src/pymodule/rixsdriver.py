@@ -80,8 +80,8 @@ class RixsDriver:
                 ostream = OutputStream(None)
 
         # mpi information
-        self.comm = comm
-        self.rank = comm.Get_rank()
+        self.comm  = comm
+        self.rank  = comm.Get_rank()
         self.nodes = comm.Get_size()
 
         # outputstream
@@ -189,7 +189,6 @@ class RixsDriver:
             and the scattering amplitude tensor.
         """
 
-        #norb = scf_tensors['C_alpha'].shape[0]
         nocc = molecule.number_of_alpha_electrons()
 
         self.twoshot = cvs_rsp_tensors
@@ -206,7 +205,7 @@ class RixsDriver:
             core_states             = list(range(num_intermediate_states))
             val_states              = list(range(num_final_states))
 
-            self._approach_string = (f'Running RIXS in the two‑shot approach')
+            self._approach_string = (f'Running RIXS calculation in the two‑shot approach')
 
         else:
             num_core_orbitals = rsp_tensors['num_core']
@@ -223,10 +222,10 @@ class RixsDriver:
             assert_msg_critical(num_intermediate_states > 0,
                                 'Too few excited states included in response calculation.')
 
-            val_states = self._valence_state_indices(detuning, tol=tol)
+            val_states = self._valence_state_indices(detuning, rsp_tensors['eigenvalues'], tol=tol)
             num_final_states = len(val_states)
            
-            self._approach_string = (f'Running RIXS in the restricted‑subspace approach')
+            self._approach_string = (f'Running RIXS calculation in the restricted‑subspace approach')
             cvs_rsp_tensors = rsp_tensors
             occupied_core = num_core_orbitals + num_val_orbitals
 
@@ -238,7 +237,6 @@ class RixsDriver:
 
         core_eigvals    = cvs_rsp_tensors['eigenvalues'][core_states]
         valence_eigvals = rsp_tensors['eigenvalues'][val_states]
-        
         core_eigvecs    = self._get_eigvecs(cvs_rsp_tensors, core_states, "core")
         valence_eigvecs = self._get_eigvecs(rsp_tensors, val_states, "valence")
 
@@ -288,7 +286,7 @@ class RixsDriver:
                                            3, 3), dtype=complex)
 
         if self.rank == mpi_master():
-            self._print_header()
+            self._print_header(molecule)
 
         for w_ind, omega in enumerate(self.photon_energy):
             F_elastic = np.zeros((3,3), dtype=complex)
@@ -301,6 +299,7 @@ class RixsDriver:
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
                     gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
+                    
                     F_inelastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], valence_eigvals[f],
                                                                     gs2core, core2val, dipole_integrals)
                     if f == 0:
@@ -392,37 +391,8 @@ class RixsDriver:
                 core_states.append(int(state))
 
         return core_states
-    def _core_state_indices(self, rsp_tensors, first_core_ene, tol=1e-8):
-        """
-        Filter out (possibly) unphysical non-core states.
-        Keep states with detuning >= -tol and labeled 'core'.
 
-        :param rsp_tensors:
-            Dictionary containing the response data.
-        :param first_core_ene:
-            Energy of the first core-excited state.
-        :param tol:
-            Numerical tolerance used for detuning cutoff.
-
-        :return: 
-            List of core-excited states and array of detuning.
-        """
-        ev = rsp_tensors['eigenvalues']
-        detuning = ev - first_core_ene
-
-        # -tol to make sure the first_core_ene-state is included
-        init_core_states = np.where(detuning >= -tol)[0]
-
-        core_states = []
-        for state in init_core_states:
-            entry = rsp_tensors['excitation_details'][state][0].split()
-            label = entry[0]
-            if label.startswith("core"):
-                core_states.append(int(state))
-
-        return core_states
-
-    def _valence_state_indices(self, detuning, tol=1e-8):
+    def _valence_state_indices(self, detuning, eigenvalues, tol=1e-8):
         """
         Final/valence states: detuning < 0, 
         possibly windowed by self.final_state_cutoff.
@@ -437,10 +407,13 @@ class RixsDriver:
             Array containing the indices of 
             final (valence) states.
         """
+
         val_states = np.where(detuning < 0)[0]
         if self.final_state_cutoff is not None:
-            mask_val = detuning[val_states] >= -(self.final_state_cutoff + tol)
-            val_states = val_states[mask_val]
+            cutoff = float(self.final_state_cutoff) + tol
+            keep = eigenvalues[val_states] <= cutoff
+            val_states = val_states[keep]
+            assert_msg_critical(val_states.size > 0, "No valence states pass the cutoff.")
         return val_states.astype(int)
 
     
@@ -468,6 +441,7 @@ class RixsDriver:
         :return: 
             The scattering amplitude tensor: shape = (3,3)
         """
+
         gamma_hwhm = self.gamma / 2
         e_n = 1 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
 
@@ -742,24 +716,65 @@ class RixsDriver:
             print('Failed to create h5 data file: {}'.format(e),
                   file=sys.stdout)
 
-    def _print_header(self):
+    def _print_header(self, molecule):
         """
         Prints RIXS calculation setup details to output stream.
         """
         
-        def _format_indices(lst, max_show=5):
+        def _format_indices(lst, max_show=3):
             """
             Shrink list of indices if too long.
             """
-            if len(lst) > max_show:
-                return f"[{lst[0]} ... {lst[-1]}]"
-            return str(list(lst))
+            arr = np.asarray(lst)
+            if arr.size == 0:
+                return "[]"
+            
+            items = [str(x) for x in arr.tolist()]
+            if len(items) > max_show:
+                return f"[{items[0]} ... {items[-1]}]"
+            return "[" + ", ".join(items) + "]"
+
         
         def _join_indices(parts, n):
             sep = ", " if n <= 3 else " "
             return sep.join(parts)
+        
+        def _format_orbital_names(indices, orb_type, nocc):
+            """
+            Convert orbital indices to orbital labels.
+
+            :param indices:
+                List or array of orbital indices.
+            :param orb_type:
+                One of 'core', 'valence', or 'virtual'.
+            :param nocc:
+                Number of occupied orbitals.
+
+            :return:
+                List of orbital labels.
+            """
+            labels = []
+            if orb_type == "core":
+                # Core orbitals: Core1, Core2, ...
+                labels = [f"Core{idx + 1}" for idx in indices]
+
+            elif orb_type == "valence":
+                # Valence orbitals: HOMO-1, HOMO, ...
+                max_val = max(indices)
+                for idx in indices:
+                    diff = max_val - idx
+                    labels.append("HOMO" if diff == 0 else f"HOMO-{diff}")
+
+            elif orb_type == "virtual":
+                # Virtual orbitals: LUMO, LUMO+1, ...
+                for idx in indices:
+                    diff = idx - nocc
+                    labels.append("LUMO" if diff == 0 else f"LUMO+{diff}")
+            
+            return labels
 
         str_width   = 60
+        nocc        = molecule.number_of_alpha_electrons()
 
         self.ostream.print_blank()
         title = 'Resonant Inelastic X‑ray Scattering (RIXS) Setup'
@@ -796,8 +811,13 @@ class RixsDriver:
                 f'Number of intermediate states    : {od["num_intermediate_states"]}'.ljust(str_width))
             self.ostream.print_header(
                 f'Number of final states           : {od["num_final_states"]}'.ljust(str_width))
-            self.ostream.print_blank()
             
+            if self.final_state_cutoff is not None:
+                self.ostream.print_header(
+                f'Final state energy cutoff [eV]   : {hartree_in_ev() * self.final_state_cutoff:.2f}'.ljust(str_width))
+
+            self.ostream.print_blank()
+
             self.ostream.print_header('State index sets'.center(str_width))
             state_list = _format_indices(od["core_states"])
             self.ostream.print_header(
@@ -810,18 +830,23 @@ class RixsDriver:
                 )
             self.ostream.print_blank()
 
-            self.ostream.print_header('Orbital index ranges'.center(str_width))
-            orbital_list = _format_indices(od["mo_core_indices"])
+            self.ostream.print_header('Orbital sets'.center(str_width))
+            orbital_labels = _format_orbital_names(od["mo_core_indices"], "core", nocc)
+            orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
-                f'Core orbitals                    : {orbital_list}'.ljust(str_width)
+                f'Core orbitals                    : {orbital_str}'.ljust(str_width)
                 )
-            orbital_list = _format_indices(od["mo_val_indices"])
+
+            orbital_labels = _format_orbital_names(od["mo_val_indices"], "valence", nocc)
+            orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
-                f'Valence orbitals                 : {orbital_list}'.ljust(str_width)
+                f'Valence orbitals                 : {orbital_str}'.ljust(str_width)
                 )
-            orbital_list = _format_indices(od["mo_vir_indices"])
+            
+            orbital_labels = _format_orbital_names(od["mo_vir_indices"], "virtual", nocc)
+            orbital_str    = _format_indices(orbital_labels)
             self.ostream.print_header(
-                f'Virtual orbitals                 : {orbital_list}'.ljust(str_width)
+                f'Virtual orbitals                 : {orbital_str}'.ljust(str_width)
                 )
             self.ostream.print_blank()
 

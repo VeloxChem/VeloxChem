@@ -72,7 +72,25 @@ class LocalizationDriver:
         self.max_iter = 50
         self.threshold = 1e-12
 
+        # choose localization routine: "boys" (only boys for now)
+        self.method = 'boys'
+
     def compute(self, molecule, basis, scf_res, mo_list):
+        """
+        Send to the selected localization routine.
+        """
+        link = {
+            "boys": self._compute_foster_boys,
+            #TODO "pm": self._compute_pipek_mezey,
+        }
+
+        assert_msg_critical(self.method.lower() in link, 
+                            'Only Foster-Boys localization available!')
+        func = link[self.method.lower()]
+
+        return func(molecule, basis, scf_res, mo_list)
+
+    def _compute_foster_boys(self, molecule, basis, scf_res, mo_list):
         """
         Foster-Boys localization.
         """
@@ -109,7 +127,10 @@ class LocalizationDriver:
 
                         for x in range(3):
                             r[x, [i, j], :] = R.T @ r[x, [i, j], :].copy()
-                            r[x, :, [i, j]] = r[x, :, [i, j]].copy() @ R
+                            #r[x, :, [i, j]] = r[x, :, [i, j]].copy() @ R
+                            rx = r[x].copy()
+                            rx[:, [i, j]] = rx[:, [i, j]] @ R
+                            r[x] = rx
 
                         max_theta = max(max_theta, abs(theta_opt))
 
@@ -121,10 +142,6 @@ class LocalizationDriver:
                     
             C_loc = C.copy()
             C_loc[:, mo_list] = C_local
-
-            ortho = np.max(np.abs(C_loc.T @ scf_res['S'] @ C_loc - np.eye(C_loc.shape[1])))
-            if ortho > 1e-9:
-                print('[WARNING] Transformed MOs not orthonormal!')
 
             return C_loc
         else:
