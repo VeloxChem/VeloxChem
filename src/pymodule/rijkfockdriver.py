@@ -236,7 +236,7 @@ class RIJKFockDriver:
             
         return gmat
         
-    def compute_k_fock(self, density, molorbs, verbose=True):
+    def compute_k_fock(self, density, molorbs, verbose=True, spin='alpha'):
         """
         Computes exchange Fock matrix.
         
@@ -258,9 +258,14 @@ class RIJKFockDriver:
         
         # retrieve occupied orbitals
         # TODO: make generic version in MolecularOrbitals class
-        nocc = int(np.sum(molorbs.occa_to_numpy()))
-        occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-        occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
+        if spin == 'alpha':
+            nocc = int(np.sum(molorbs.occa_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
+        elif spin == 'beta':
+            nocc = int(np.sum(molorbs.occb_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0 : nocc])
         
         fmat = self._ri_drv.compute_k_fock(density, occ_mos)
         

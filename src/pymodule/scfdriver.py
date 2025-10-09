@@ -568,16 +568,15 @@ class ScfDriver:
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_scf.h5'
 
-        # check RI-J
-        # for now, force DIIS for RI-J
+        # check RI
+        # for now, force DIIS for RI
         # TODO: double check
         if self.ri_coulomb or self.ri_jk:
             self.acc_type = 'DIIS'
 
             assert_msg_critical(
                 not (self.ri_coulomb and self.ri_jk),
-                'ScfDriver: please use either ri_coulomb or ri_jk, not both.'
-            )
+                'ScfDriver: please use either ri_coulomb or ri_jk, not both.')
 
             if self.ri_coulomb and self.ri_auxiliary_basis == 'def2-universal-jkfit':
                 self.ri_auxiliary_basis = 'def2-universal-jfit'
@@ -617,7 +616,8 @@ class ScfDriver:
             self.smd_energy = self.smd_cds_energy
             self.cpcm_drv.epsilon = self.smd_drv.epsilon
             # apply intrinsic Coulomb radii for SMD
-            self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii()
+            self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii(
+            )
             self.cpcm_drv.custom_vdw_radii_verbose = False
             self.cpcm_drv.radii_scaling = 1.0
 
@@ -1470,9 +1470,11 @@ class ScfDriver:
                                          verbose=True)
         elif self.ri_jk:
             self._ri_drv = RIJKFockDriver(self.comm, self.ostream)
-            self._ri_drv.compute_metric(molecule, self.ri_auxiliary_basis,
+            self._ri_drv.compute_metric(molecule,
+                                        self.ri_auxiliary_basis,
                                         verbose=True)
-            self._ri_drv.compute_bq_vectors(molecule, ao_basis,
+            self._ri_drv.compute_bq_vectors(molecule,
+                                            ao_basis,
                                             self.ri_auxiliary_basis,
                                             verbose=False)
 
@@ -2084,18 +2086,24 @@ class ScfDriver:
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
-                    'SCF driver: RI-J is only applicable to pure DFT functional')
+                    'SCF driver: RI-J is only applicable to pure DFT functional'
+                )
             elif self.ri_jk:
                 assert_msg_critical(
                     fock_type != 'j',
-                    'SCF driver: RI-JK is not applicable to pure DFT functional')
+                    'SCF driver: RI-JK is not applicable to pure DFT functional'
+                )
 
             if self.ri_coulomb and fock_type == 'j':
                 fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
                 fock_mat_np = fock_mat.to_numpy()
-            elif self.ri_jk and fock_type != 'j' and (self.molecular_orbitals._orbitals is not None):
-                fock_mat_j = self._ri_drv.compute_j_fock(den_mat_for_fock, 'j', verbose=False)
-                fock_mat_k = self._ri_drv.compute_k_fock(den_mat_for_fock, self.molecular_orbitals, verbose=False)
+            elif self.ri_jk and fock_type != 'j' and (
+                    self.molecular_orbitals._orbitals is not None):
+                fock_mat_j = self._ri_drv.compute_j_fock(den_mat_for_fock,
+                                                         'j',
+                                                         verbose=False)
+                fock_mat_k = self._ri_drv.compute_k_fock(
+                    den_mat_for_fock, self.molecular_orbitals, verbose=False)
                 fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
                                fock_mat_k.to_numpy() * exchange_scaling_factor)
             else:
@@ -2110,6 +2118,12 @@ class ScfDriver:
                 fock_mat_np *= 2.0
 
             if need_omega:
+                assert_msg_critical(
+                    not self.ri_jk,
+                    'SCF driver: RI-JK not yet implemented for ' +
+                    'range-separated functional'
+                )
+
                 # for range-separated functional
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
@@ -2133,7 +2147,13 @@ class ScfDriver:
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
-                    'SCF driver: RI is only applicable to pure DFT functional')
+                    'SCF driver: RI-J is only applicable to pure DFT functional'
+                )
+            elif self.ri_jk:
+                assert_msg_critical(
+                    fock_type != 'j',
+                    'SCF driver: RI-JK is not applicable to pure DFT functional'
+                )
 
             if fock_type == 'j':
                 # for pure functional
@@ -2150,31 +2170,58 @@ class ScfDriver:
                 fock_mat_b_np = J_ab_np.copy()
 
             else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+                if self.ri_jk and (self.molecular_orbitals._orbitals
+                                   is not None):
+                    fock_mat = self._ri_drv.compute_j_fock(den_mat_for_Jab,
+                                                           'j',
+                                                           verbose=False)
+                    J_ab_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
 
-                K_a_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
+                    fock_mat = self._ri_drv.compute_k_fock(
+                        den_mat_for_Ka, self.molecular_orbitals, verbose=False,
+                        spin='alpha')
+                    K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
+                    fock_mat = Matrix()
 
-                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+                    fock_mat = self._ri_drv.compute_k_fock(
+                        den_mat_for_Kb, self.molecular_orbitals, verbose=False,
+                        spin='beta')
+                    K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
+                    fock_mat = Matrix()
 
-                K_b_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
+                else:
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
+                                                exchange_scaling_factor, 0.0,
+                                                thresh_int)
 
-                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+                    K_a_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
 
-                J_ab_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
+                                                exchange_scaling_factor, 0.0,
+                                                thresh_int)
+
+                    K_b_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
+
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                                exchange_scaling_factor, 0.0,
+                                                thresh_int)
+
+                    J_ab_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
 
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
 
             if need_omega:
+                assert_msg_critical(
+                    not self.ri_jk,
+                    'SCF driver: RI-JK not yet implemented for ' +
+                    'range-separated functional'
+                )
+
                 # for range-separated functional
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
