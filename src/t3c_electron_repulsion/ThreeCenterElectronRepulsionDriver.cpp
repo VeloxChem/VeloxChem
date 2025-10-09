@@ -163,6 +163,36 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis,
         }
     }
     
+    return buffer;
+}
+
+auto
+CThreeCenterElectronRepulsionDriver::compute(const CT4CScreener& screener, const CMolecularBasis &aux_basis, const CMolecule &molecule, const std::vector<int>& atoms, const int ithreshold) const -> CT3FlatBuffer<double>
+{
+    // set up GTOs data
+    
+    const auto aux_gto_blocks = gtofunc::make_gto_blocks(aux_basis, molecule, atoms);
+    
+    const auto gto_pair_blocks = screener.gto_pair_blocks();
+    
+    // set up composite flat tensor for integrals
+    
+    const auto mask_indices = t3cfunc::mask_indices(aux_gto_blocks);
+    
+   // CT3FlatBuffer<double> buffer(mask_indices, basis.dimensions_of_basis());
+    CT3FlatBuffer<double> buffer(mask_indices, 10); // FIX ME!
+    
+    // prepare pointers for OMP parallel region
+    
+    auto ptr_aux_gto_blocks = &aux_gto_blocks;
+    
+    auto ptr_buffer = &buffer;
+    
+    // execute OMP tasks with static scheduling
+
+    omp::set_static_scheduler();
+    
+    
     
     return buffer;
 }

@@ -106,6 +106,7 @@ class CFockDriver
     /// @param label The label of Fock matrix type.
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
+    /// @param ithreshold The integrals screening threshold.
     /// @return The Fock matrix.
     auto compute(const CT4CScreener &screener,
                  const CMatrix      &density,
@@ -120,6 +121,7 @@ class CFockDriver
     /// @param label The label of Fock matrix type.
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
+    /// @param ithreshold The integrals screening threshold.
     /// @return The Fock matrix.
     auto compute_mixpre(const CT4CScreener &screener,
                         const CMatrix      &density,
@@ -134,6 +136,7 @@ class CFockDriver
     /// @param labels The vector of  Fock matrix type labels.
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
+    /// @param ithreshold The integrals screening threshold.
     /// @return The Fock matrix.
     auto compute(const CT4CScreener             &screener,
                  const CMatrices                &densities,
@@ -150,6 +153,7 @@ class CFockDriver
     /// @param label The label of Fock matrix type.
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
+    /// @param ithreshold The integrals screening threshold.
     /// @return The Fock matrix.
     auto compute(const CT4CScreener &screener,
                  const int           rank,
@@ -168,6 +172,7 @@ class CFockDriver
     /// @param labels The vector of  Fock matrix type labels.
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
+    /// @param ithreshold The integrals screening threshold.
     /// @return The Fock matrix.
     auto compute(const CT4CScreener             &screener,
                  const int                       rank,

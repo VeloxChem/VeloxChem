@@ -384,6 +384,7 @@ export_orbdata(py::module &m)
         .def("number_of_contracted_pairs",
              &CGtoPairBlock::number_of_contracted_pairs,
              "Gets number of contracted GTO pairs in basis function pairs block.")
+        .def("unique_terms", &CGtoPairBlock::unique_terms, "Gets number of unique terms.")
         .def("__eq__", [](const CGtoPairBlock &self, const CGtoPairBlock &other) { return self == other; })
         .def("__neq__", [](const CGtoPairBlock &self, const CGtoPairBlock &other) { return self != other; })
         .def("__copy__", [](const CGtoPairBlock &self) { return CGtoPairBlock(self); })
