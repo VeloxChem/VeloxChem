@@ -1365,8 +1365,8 @@ class CphfSolver(LinearSolver):
             solutions = []
             if self._method_type == 'restricted':
                 for i in range(dof):
-                    # vec_cphf_ov = cphf_ov[i].reshape(nocc_a * nvir_a)
-                    solutions.append(DistributedArray(cphf_ov[i], self.comm))
+                    vec_cphf_ov = cphf_ov[i].reshape(nocc_a * nvir_a)
+                    solutions.append(DistributedArray(vec_cphf_ov, self.comm))
             else:
                 for i in range(dof):
                     dist_cphf_ov = DistributedArray(cphf_ov[i], self.comm)
