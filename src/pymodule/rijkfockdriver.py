@@ -39,7 +39,6 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import _RIJKFockDriver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import SubMatrix
-from .veloxchemlib import Matrix
 from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
 
@@ -73,18 +72,15 @@ class RIJKFockDriver:
         self.nodes = self.comm.Get_size()
 
         self.ostream = ostream
-        
+
         self.metric = None
 
         self._ri_drv = _RIJKFockDriver()
 
-    def compute_metric(self,
-                       molecule,
-                       basis,
-                       verbose=True):
+    def compute_metric(self, molecule, basis, verbose=True):
         """
         Computes Cholesky decomposed J metric for the RI-JK Fock driver.
-        
+
         :param molecule:
             The molecule to compute J metric.
         :param basis:
@@ -92,7 +88,7 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         # NOTE: For numerical stability J metric is computed on master node
         # and distributed to worker nodes
         if self.rank == mpi_master():
@@ -149,7 +145,7 @@ class RIJKFockDriver:
 
         # broadcast Cholesky decomposed J metric
         self.metric = self.comm.bcast(self.metric)
-        
+
     def compute_bq_vectors(self,
                            molecule,
                            basis,
@@ -157,7 +153,7 @@ class RIJKFockDriver:
                            verbose=True):
         """
         Computes B^Q vectors (distributed) for the RI-JK Fock driver.
-        
+
         :param molecule:
             The molecule to compute three-center integrals.
         :param basis:
@@ -167,7 +163,7 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
@@ -189,25 +185,22 @@ class RIJKFockDriver:
                                     f'{basis_ri.get_dimensions_of_basis()}')
             self.ostream.print_blank()
             self.ostream.flush()
-        
+
         ri_prep_t0 = time.time()
-        
+
         self._ri_drv.compute_bq_vectors(molecule, basis, basis_ri, self.metric,
                                         self.rank, self.nodes)
-        
+
         if verbose:
             self.ostream.print_info('B^Q vectors for RI done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-        
-    def compute_j_fock(self,
-                       density,
-                       label,
-                       verbose=True):
+
+    def compute_j_fock(self, density, label, verbose=True):
         """
         Computes Coulomb Fock matrix.
-        
+
         :param density:
             The AO density matrix (restricted).
         :param label:
@@ -215,31 +208,31 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
+
         ri_prep_t0 = time.time()
 
         fmat = self._ri_drv.compute_j_fock(density, label)
-        
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
-        
+
+        # No reduction here. Reduction will be done in scfdriver.
+
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
-        return gmat
-        
+
+        return fmat
+
     def compute_k_fock(self, density, molorbs, verbose=True, spin='alpha'):
         """
         Computes exchange Fock matrix.
-        
+
         :param density:
             The AO density matrix (restricted).
         :param molorbs:
@@ -247,7 +240,7 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
@@ -255,26 +248,26 @@ class RIJKFockDriver:
             self.ostream.flush()
 
         ri_prep_t0 = time.time()
-        
+
         # retrieve occupied orbitals
         # TODO: make generic version in MolecularOrbitals class
         if spin == 'alpha':
             nocc = int(np.sum(molorbs.occa_to_numpy()))
             occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
+            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0:nocc])
         elif spin == 'beta':
             nocc = int(np.sum(molorbs.occb_to_numpy()))
             occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0 : nocc])
-        
+            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0:nocc])
+
         fmat = self._ri_drv.compute_k_fock(density, occ_mos)
-        
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
-    
+
+        # No reduction here. Reduction will be done in scfdriver.
+
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
-        return gmat
+
+        return fmat
