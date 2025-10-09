@@ -11,7 +11,11 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem import TwoCenterElectronRepulsionDriver
 from veloxchem.rijkfockdriver import RIJKFockDriver
+<<<<<<< HEAD
 from veloxchem.rifockdriver import RIFockDriver
+=======
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+>>>>>>> ef6622c93f36830652a4f89a0ac01d467a45b70e
 from veloxchem.fockdriver import FockDriver
 
 
@@ -40,32 +44,26 @@ class TestRIMODriver:
         npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
         den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
+    
+        ri_fock_drv.compute_bq_vectors(mol_h2o, bas_sto3g, bas_sto3g)
         
-        ri_fock_drv = RIJKFockDriver()
-        ri_fock_drv.compute_metric(mol_h2o, bas_aux)
         
-        ri_fock_drv.compute_bq_vectors(mol_h2o, bas_sto3g, bas_aux)
+    def test_h2o_compute_k_fock(self):
+
+        mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
+        
+        scf_drv = ScfRestrictedDriver()
+        scf_results = scf_drv.compute(mol_h2o, bas_sto3g)
+        
+        dmat = make_matrix(bas_sto3g, mat_t.symmetric)
+        dmat.set_values(scf_results['D_alpha'])
+        
+        molorbs = scf_drv.molecular_orbitals
         
         fmat = ri_fock_drv.compute_j_fock(den_mat, "j")
         
         #print(fmat.full_matrix().to_numpy())
+        fmat = ri_fock_drv.compute_k_fock(dmat, molorbs)
         
-        # screen basis function pairs
-        t4c_drv = T4CScreener()
-        t4c_drv.partition(bas_sto3g, mol_h2o, "eri")
-
-        # compute Fock matrix
-        fock_drv = FockDriver()
-        rmat = fock_drv._compute_fock_omp(t4c_drv, den_mat, "j", 0.0, 0.0,
-                                              15)
-        
-        print(np.max(np.abs(rmat.full_matrix().to_numpy() - fmat.full_matrix().to_numpy())))
-       
-        
-        ri_fock_drv = RIFockDriver()
-        ri_fock_drv.prepare_buffers(mol_h2o, bas_sto3g, bas_aux)
-        cfock = ri_fock_drv.compute(den_mat, 'j')
-        print(np.max(np.abs(cfock.full_matrix().to_numpy() - fmat.full_matrix().to_numpy())))
-       
         assert False
             

@@ -39,6 +39,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import _RIJKFockDriver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import SubMatrix
+from .veloxchemlib import Matrix
 from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
@@ -213,7 +214,7 @@ class RIJKFockDriver:
         :param density:
             The AO density matrix (restricted).
         :param label:
-            The label of Fock matrix type ("J", "J_rs", "2JK", "2JK_rs").
+            The label of Fock matrix type ("J", "2JK").
         :param verbose:
             The information printout level.
         """
@@ -228,10 +229,50 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_j_fock(density, label)
         
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
+        
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
             
-        return fmat
+        return gmat
+        
+    def compute_k_fock(self, density, molorbs, verbose=True):
+        """
+        Computes exchange Fock matrix.
+        
+        :param density:
+            The AO density matrix (restricted).
+        :param molorbs:
+            The molecular orbitals (restricted).
+        :param verbose:
+            The information printout level.
+        """
+        
+        if verbose:
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        ri_prep_t0 = time.time()
+        
+        # retrieve occupied orbitals
+        # TODO: make generic version in MolecularOrbitals class
+        nocc = int(np.sum(molorbs.occa_to_numpy()))
+        occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+        occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
+        
+        fmat = self._ri_drv.compute_k_fock(density, occ_mos)
+        
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
+    
+        if verbose:
+            self.ostream.print_info('Exchange contribution done in ' +
+                                    f'{time.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            
+        return gmat
