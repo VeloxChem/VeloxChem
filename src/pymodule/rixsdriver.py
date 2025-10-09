@@ -32,7 +32,6 @@
 
 from mpi4py import MPI
 import numpy as np
-import math
 import h5py
 import sys
 
@@ -50,6 +49,9 @@ class RixsDriver:
     Implements the RIXS driver in a linear-response framework with two 
     approaches: the two-shot and restricted-subspace approximation.
 
+    # vlxtag: RHF, RIXS
+    # vlxtag: RKS, RIXS
+
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -60,6 +62,7 @@ class RixsDriver:
         - theta: Angle between incident polarization-
           and outgoing propagation vectors (rad.)
         - gamma: Life-time broadening (FWHM) (a.u.)
+        - final_state_cutoff: Energy window of final states to include (a.u.)'),
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -93,15 +96,12 @@ class RixsDriver:
         self.tda = False
         self.orb_and_state_dict = None
 
-        #self.rixs_dict = {}
+        self.rixs_dict = {}
         self.filename = None
 
-        # TODO?: define both in terms of either nr. of states or energy
-        self.num_final_states = None
-        # TODO: why would this be useful? the rixs-computation will never(?) be the limiting
-        # factor in computing spectra, if i have computed states i'll probably just
-        # use all, why not?
-        self.core_cutoff = np.inf
+        # TODO?: should this be in terms of energy or number of states?
+        #self.num_final_states = None
+        self.final_state_cutoff = None
 
         # input keywords
         self.input_keywords = {
@@ -109,14 +109,13 @@ class RixsDriver:
                 'theta': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
                 'gamma': ('float', 'broadening term (FWHM)'),
                 'photon_energy': ('list', 'list of incoming photon energies'),
-                'num_final_states': ('int', 'number of final states to include'),
-                'core_cutoff': ('float', 'energy threshold, above first core excited, for which to include core-excited states'),
+                'final_state_cutoff': ('float', 'energy window of final states to include'),
             },
         }
 
-    def update_settings(self, rixs_dict, method_dict=None):
+    def update_settings(self, rixs_dict=None, method_dict=None):
         """
-        Updates settings in RIXS driver.
+        Updates settings in RixsDriver.
 
         :param rixs_dict:
             The dictionary of rixs input.
@@ -124,6 +123,8 @@ class RixsDriver:
 
         if method_dict is None:
             method_dict = {}
+        if rixs_dict is None:
+            rixs_dict = {}
 
         rixs_keywords = {
             key: val[0] for key, val in self.input_keywords['rixs'].items()
@@ -154,6 +155,294 @@ class RixsDriver:
             print(f'\nNumber of states: (intermediate, final): ({intermed_states}, {final_states})')
             print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
+    
+    def compute(self, molecule, basis, scf_tensors, 
+                rsp_tensors, cvs_rsp_tensors=None,
+                cvs_scf_tensors=None):
+        """
+        Computes RIXS properties.
+        
+        :param molecule:
+            The molecule object.
+        :param basis:
+            The AO basis set.
+        :scf_tensors:
+            The dictionary of tensors from converged SCF 
+            wavefunction.
+        :rsp_tensors:
+            The linear-response results dictionary.
+        :cvs_rsp_tensors:
+            The core-valence-separated (CVS) linear-response 
+            results dictionary.
+        :cvs_scf_tensors:
+            The dictionary of tensors from converged CVS SCF 
+            wavefunction. If given -- assumes that the CVS response
+            was obtained from an independent SCF wavefunction.
+            
+        NOTE: To run full diagonalization, do a restricted
+              subspace calculation with the full space, 
+              indicating which orbitals define the core.
+
+        :return:
+            Dictionary with cross-sections, outgoing photon energy
+            in (energy loss and full energy (emission)),
+            and the scattering amplitude tensor.
+        """
+
+        #norb = scf_tensors['C_alpha'].shape[0]
+        nocc = molecule.number_of_alpha_electrons()
+
+        self.twoshot = cvs_rsp_tensors
+        init_photon_set = True
+        
+        num_vir_orbitals = rsp_tensors['num_vir']
+
+        if self.twoshot is not None:
+            num_core_orbitals       = cvs_rsp_tensors['num_core']
+            num_val_orbitals        = nocc - num_core_orbitals 
+            num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
+            num_final_states        = len(rsp_tensors['eigenvalues'])
+            occupied_core           = num_core_orbitals
+            core_states             = list(range(num_intermediate_states))
+            val_states              = list(range(num_final_states))
+
+            self._approach_string = (f'Running RIXS in the two‑shot approach')
+
+        else:
+            num_core_orbitals = rsp_tensors['num_core']
+            assert_msg_critical(num_core_orbitals > 0,
+                                 'No core orbitals indicated in the response tensor.')
+            num_val_orbitals  = rsp_tensors['num_val']
+
+            tol = 1e-8
+            first_core_ene = self._first_core_energy(rsp_tensors)
+            detuning = rsp_tensors['eigenvalues'] - first_core_ene
+
+            core_states = self._core_state_indices(rsp_tensors, detuning, tol=tol)
+            num_intermediate_states = len(core_states)
+            assert_msg_critical(num_intermediate_states > 0,
+                                'Too few excited states included in response calculation.')
+
+            val_states = self._valence_state_indices(detuning, tol=tol)
+            num_final_states = len(val_states)
+           
+            self._approach_string = (f'Running RIXS in the restricted‑subspace approach')
+            cvs_rsp_tensors = rsp_tensors
+            occupied_core = num_core_orbitals + num_val_orbitals
+
+        mo_core_indices = list(range(num_core_orbitals))
+        mo_val_indices  = list(range(nocc - num_val_orbitals, nocc))
+        mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
+        mo_occ          = scf_tensors['C_alpha'][:, mo_core_indices + mo_val_indices]
+        mo_vir          = scf_tensors['C_alpha'][:, mo_vir_indices]
+
+        core_eigvals    = cvs_rsp_tensors['eigenvalues'][core_states]
+        valence_eigvals = rsp_tensors['eigenvalues'][val_states]
+        
+        core_eigvecs    = self._get_eigvecs(cvs_rsp_tensors, core_states, "core")
+        valence_eigvecs = self._get_eigvecs(rsp_tensors, val_states, "valence")
+
+        # get transformation matrices from valence to core basis, if the
+        # valence- and core-excited states were obtained from independent SCFs
+        # returns identity if cvs_scf_tensors are not given (None)
+        U_occ, U_vir = None, None
+        if cvs_scf_tensors is not None:
+            U_occ, U_vir = self.get_transformation_mats(scf_tensors, cvs_scf_tensors, 
+                                                    mo_core_indices + mo_val_indices, mo_vir_indices)
+        core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
+                                                 num_val_orbitals, num_vir_orbitals, U_occ, U_vir)
+        
+        dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+
+        # store state and orbital information used in computation
+        self.orb_and_state_dict = {
+            'num_intermediate_states': num_intermediate_states,
+            'num_final_states': num_final_states,
+            'mo_core_indices': mo_core_indices,
+            'mo_val_indices': mo_val_indices,
+            'mo_vir_indices': mo_vir_indices,
+            'core_states': core_states,
+            'val_states': val_states,
+        }
+        
+        # if incoming photon energy is not set set it to match the
+        # first core-excited state with osc_strength > 1e-3
+        if self.photon_energy is None:
+            init_photon_set = False
+            if cvs_rsp_tensors is None:
+                osc_arr = rsp_tensors['oscillator_strengths']
+            else:
+                osc_arr = cvs_rsp_tensors['oscillator_strengths']
+            for eig, osc in zip(core_eigvals, osc_arr[core_states]):
+                if osc > 1e-3:
+                    self.photon_energy = [eig]
+                    break
+        elif isinstance(self.photon_energy, (float, int, np.floating)):
+            self.photon_energy = [self.photon_energy]
+
+        self.ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
+        self.emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
+        self.cross_sections         = np.zeros((num_final_states, len(self.photon_energy)))
+        self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
+        self.scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
+                                           3, 3), dtype=complex)
+
+        if self.rank == mpi_master():
+            self._print_header()
+
+        for w_ind, omega in enumerate(self.photon_energy):
+            F_elastic = np.zeros((3,3), dtype=complex)
+
+            for f in range(num_final_states):
+                F_inelastic = np.zeros((3,3), dtype=complex)
+                z_val, y_val = self.split_eigvec(valence_eigvecs[f], num_core_orbitals + num_val_orbitals,
+                                            num_vir_orbitals, self.tda)
+                   
+                for n in range(num_intermediate_states):
+                    z_core, y_core = core_mats[n]
+                    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
+                    F_inelastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], valence_eigvals[f],
+                                                                    gs2core, core2val, dipole_integrals)
+                    if f == 0:
+                        F_elastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], None,
+                                                                      gs2core, None, dipole_integrals)
+                
+                self.emission_enes[f, w_ind] = omega - valence_eigvals[f]
+                self.ene_losses[f, w_ind] = valence_eigvals[f]
+                # w'/w
+                prefactor = self.emission_enes[f, w_ind] / omega
+                sigma = self.cross_section(F_inelastic, prefactor)
+                self.cross_sections[f, w_ind] = sigma.real
+                self.scattering_amplitudes[f, w_ind] = F_inelastic
+
+            sigma_elastic = self.cross_section(F_elastic)
+            self.elastic_cross_sections[w_ind] = sigma_elastic.real
+
+            self.ostream.print_info(f'Computed RIXS cross-sections for {num_final_states} ' 
+                                    f'final states at photon energy: {omega*hartree_in_ev():.2f} eV.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+        
+        results_dict = {
+                    'cross_sections': self.cross_sections,
+                    'elastic_cross_sections': self.elastic_cross_sections,
+                    'elastic_emission': self.photon_energy,
+                    'scattering_amplitudes': self.scattering_amplitudes,
+                    'emission_energies': self.emission_enes,
+                    'energy_losses': self.ene_losses,
+                    #'excitation_energies': self.core_eigvals,
+                    }
+
+        if self.filename is not None:
+            self.ostream.print_info('Writing to files...')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            self._write_hdf5(self.filename + '_rixs')
+
+        if not init_photon_set:
+            self.photon_energy = None
+
+        self.ostream.print_info('...done.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return results_dict
+    
+    def _first_core_energy(self, rsp_tensors):
+        """
+        Return energy of the first core-excited state (by label order).
+
+        :param rsp_tensors:
+            Dictionary containing excitation information.
+
+        :return:
+            The energy (float) corresponding to the first
+            state labeled as 'core' in exciitation_details.
+        """
+        for k, entries in enumerate(rsp_tensors['excitation_details']):
+            if entries[0].split()[0].startswith("core"):
+                return rsp_tensors['eigenvalues'][k]
+        raise ValueError("No core-labeled state found in excitation_details.")
+
+    def _core_state_indices(self, rsp_tensors, detuning, tol=1e-8):
+        """
+        Filter out (possibly) unphysical non-core states.
+        Keep states with detuning >= -tol and labeled 'core'.
+
+        :param rsp_tensors:
+            Dictionary containing the response data.
+        :param detuning:
+            Array of detuning values relative to the
+            first core-excited state.
+        :param tol:
+            Numerical tolerance used for detuning cutoff.
+
+        :return: 
+            List of core-excited states and array of detuning.
+        """
+
+        # -tol to make sure the first_core_ene-state is included
+        init_core_states = np.where(detuning >= -tol)[0]
+
+        core_states = []
+        for state in init_core_states:
+            entry = rsp_tensors['excitation_details'][state][0].split()
+            label = entry[0]
+            if label.startswith("core"):
+                core_states.append(int(state))
+
+        return core_states
+    def _core_state_indices(self, rsp_tensors, first_core_ene, tol=1e-8):
+        """
+        Filter out (possibly) unphysical non-core states.
+        Keep states with detuning >= -tol and labeled 'core'.
+
+        :param rsp_tensors:
+            Dictionary containing the response data.
+        :param first_core_ene:
+            Energy of the first core-excited state.
+        :param tol:
+            Numerical tolerance used for detuning cutoff.
+
+        :return: 
+            List of core-excited states and array of detuning.
+        """
+        ev = rsp_tensors['eigenvalues']
+        detuning = ev - first_core_ene
+
+        # -tol to make sure the first_core_ene-state is included
+        init_core_states = np.where(detuning >= -tol)[0]
+
+        core_states = []
+        for state in init_core_states:
+            entry = rsp_tensors['excitation_details'][state][0].split()
+            label = entry[0]
+            if label.startswith("core"):
+                core_states.append(int(state))
+
+        return core_states
+
+    def _valence_state_indices(self, detuning, tol=1e-8):
+        """
+        Final/valence states: detuning < 0, 
+        possibly windowed by self.final_state_cutoff.
+        
+        :param detuning:
+            Array of detuning values relative
+            to the first core-excited state.
+        :param tol:
+            Numerical tolerance used for detuning cutoff.
+        
+        :return: 
+            Array containing the indices of 
+            final (valence) states.
+        """
+        val_states = np.where(detuning < 0)[0]
+        if self.final_state_cutoff is not None:
+            mask_val = detuning[val_states] >= -(self.final_state_cutoff + tol)
+            val_states = val_states[mask_val]
+        return val_states.astype(int)
+
     
     def scattering_amplitude_tensor(self, omega, core_eigenvalue, val_eigenvalue,
                                     intermediate_tdens, final_tdens, dipole_integrals):
@@ -219,241 +508,19 @@ class RixsDriver:
         """
         
         # F_xy (F^(xy))^*
-        F2 = np.sum(np.abs(F)**2)
+        F2 = np.vdot(F, F).real
         # F_xy (F^(yx))^*
-        FF_T_conj = np.sum(F * F.T.conjugate())
+        FF_T_conj = np.vdot(F, F.T).real
         # F_xx (F^(yy))^*
-        trace_F2 = np.abs(np.trace(F))**2
+        tr_F2 = np.abs(np.trace(F))**2
 
         sigma_f = omegaprime_omega * (1.0/15.0) * (
                     (2.0 - 0.5*np.sin(self.theta)**2) * F2 +
-                    (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + trace_F2))
+                    (0.75*np.sin(self.theta)**2 - 0.5) * (FF_T_conj + tr_F2))
         
         return sigma_f
     
-    def compute(self, molecule, basis, scf_tensors, 
-                rsp_tensors, cvs_rsp_tensors=None,
-                cvs_scf_tensors=None):
-        """
-        Computes RIXS properties.
-        
-        :param molecule:
-            The molecule object.
-        :param basis:
-            The AO basis set.
-        :scf_tensors:
-            The dictionary of tensors from converged SCF 
-            wavefunction.
-        :rsp_tensors:
-            The linear-response results dictionary.
-        :cvs_rsp_tensors:
-            The core-valence-separated (CVS) linear-response 
-            results dictionary.
-        :cvs_scf_tensors:
-            The dictionary of tensors from converged CVS SCF 
-            wavefunction. If given -- assumes that the CVS response
-            was obtained from an independent SCF wavefunction.
-            
-        NOTE: To run full diagonalization, do a restricted
-              subspace calculation with the full space, 
-              indicating which orbitals define the core.
-
-        :return:
-            Dictionary with cross-sections, outgoing photon energy
-            in (energy loss and full energy (emission)),
-            and the scattering amplitude tensor.
-        """
-
-        norb = scf_tensors['C_alpha'].shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-
-        self.twoshot = False
-        init_photon_set = True
-        
-        num_vir_orbitals  = rsp_tensors['num_vir']
-
-        if cvs_rsp_tensors is not None:
-            self.twoshot = True
-            num_core_orbitals = cvs_rsp_tensors['num_core']
-            num_val_orbitals  = nocc - num_core_orbitals 
-
-            num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
-            num_final_states = len(rsp_tensors['eigenvalues'])
-            if self.num_final_states is not None:
-                num_final_states = self.num_final_states
-
-            occupied_core = num_core_orbitals
-            core_states = list(range(num_intermediate_states))
-            val_states = list(range(num_final_states))
-
-            self._approach_string = (f'Running RIXS in the two‑shot approach '
-                             f'with {num_intermediate_states} intermediate states.')
-
-        else:
-            num_core_orbitals = rsp_tensors['num_core']
-            assert_msg_critical(num_core_orbitals > 0,
-                                 'No core orbitals indicated in the response tensor.')
-            num_val_orbitals  = rsp_tensors['num_val']
-
-
-            for k, entries in enumerate(rsp_tensors['excitation_details']):
-                if entries[0].split()[0].startswith("core"):
-                    first_core_ene = rsp_tensors['eigenvalues'][k]
-                    break
-
-            detuning = rsp_tensors['eigenvalues'] - first_core_ene
-            tol = 1e-8
-            # -tol to make sure the first_core_ene-state is included
-            mask = (detuning >= -tol) & (detuning <= self.core_cutoff)
-            #mask = (detuning <= self.core_cutoff) & ((detuning >= 0) | np.isclose(detuning, 0, atol=tol))
-
-            init_core_states = np.where(mask)[0]
-            core_states = []
-            for state in init_core_states:
-                entry = rsp_tensors['excitation_details'][state][0].split()
-                label = entry[0]
-                if label.startswith("core"):
-                    core_states.append(state)
-
-            num_intermediate_states = len(core_states)
-            assert_msg_critical(num_intermediate_states > 0,
-                                 'Too few excited states included in response calculation.')
-
-            val_states = np.where(detuning < 0)[0]
-            num_final_states = len(val_states)
-            if self.num_final_states is not None:
-                self._approach_string = (f'Running RIXS in the restricted‑subspace approach with '
-                                 f'{num_intermediate_states} intermediate states; '
-                                 f'{self.num_final_states} final states kept.')
-
-                num_final_states = self.num_final_states
-                val_states = val_states[:self.num_final_states]
-            else:
-                self._approach_string = (f'Running RIXS in the restricted‑subspace approach with '
-                                 f'{num_intermediate_states} intermediate states.')
-
-            cvs_rsp_tensors = rsp_tensors
-            occupied_core = num_core_orbitals + num_val_orbitals
-
-
-        mo_core_indices = list(range(num_core_orbitals))
-        mo_val_indices  = list(range(nocc - num_val_orbitals, nocc))
-        mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
-        
-        mo_occ = scf_tensors['C_alpha'][:, mo_core_indices + mo_val_indices]
-        mo_vir = scf_tensors['C_alpha'][:, mo_vir_indices]
-
-        core_eigvals    = cvs_rsp_tensors['eigenvalues'][core_states]
-        valence_eigvals = rsp_tensors['eigenvalues'][val_states]
-        
-        core_eigvecs    = self.get_eigvecs(cvs_rsp_tensors, core_states, "core")
-        valence_eigvecs = self.get_eigvecs(rsp_tensors, val_states, "valence")
-
-        # get transformation matrices from valence to core basis
-        # returns identity if cvs_scf_tensors are not given (None)
-        U_occ, U_vir = None, None
-        if cvs_scf_tensors is not None:
-            U_occ, U_vir = self.get_transformation_mats(scf_tensors, cvs_scf_tensors, 
-                                                    mo_core_indices + mo_val_indices, mo_vir_indices)
-        core_mats = self.preprocess_core_eigvecs(core_eigvecs, occupied_core,
-                                                 num_val_orbitals, num_vir_orbitals, U_occ, U_vir)
-        
-        dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
-
-        # store state and orbital information used in computation
-        self.orb_and_state_dict = {
-            'num_intermediate_states': num_intermediate_states,
-            'num_final_states': num_final_states,
-            'mo_core_indices': mo_core_indices,
-            'mo_val_indices': mo_val_indices,
-            'mo_vir_indices': mo_vir_indices,
-            'core_states': core_states,
-            'val_states': val_states,
-        }
-        
-        if self.photon_energy is None:
-            init_photon_set = False
-            # assume first core resonance
-            if cvs_rsp_tensors is None:
-                osc_arr = rsp_tensors['oscillator_strengths']
-            else:
-                osc_arr = cvs_rsp_tensors['oscillator_strengths']
-            for eig, osc in zip(core_eigvals, osc_arr[core_states]):
-                if osc > 1e-3:
-                    self.photon_energy = [eig]
-                    break
-        elif isinstance(self.photon_energy, (float, int, np.floating)):
-            self.photon_energy = [self.photon_energy]
-
-        self.ene_losses             = np.zeros((num_final_states, len(self.photon_energy)))
-        self.emission_enes          = np.zeros((num_final_states, len(self.photon_energy)))
-        self.cross_sections         = np.zeros((num_final_states, len(self.photon_energy)))
-        self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
-        self.scattering_amplitudes  = np.zeros((num_final_states, len(self.photon_energy),
-                                           3, 3), dtype=complex)
-
-        self.print_header()
-
-        for w_ind, omega in enumerate(self.photon_energy):
-            F_elastic = np.zeros((3,3), dtype=complex)
-
-            for f in range(num_final_states):
-                F_inelastic = np.zeros((3,3), dtype=complex)
-                z_val, y_val = self.split_eigvec(valence_eigvecs[f], num_core_orbitals + num_val_orbitals,
-                                            num_vir_orbitals, self.tda)
-                    
-                for n in range(num_intermediate_states):
-                    z_core, y_core = core_mats[n]
-
-                    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
-                    
-                    F_inelastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], valence_eigvals[f],
-                                                                    gs2core, core2val, dipole_integrals)
-                    if f == 0:
-                        F_elastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], None,
-                                                                      gs2core, None, dipole_integrals)
-                
-                self.emission_enes[f, w_ind] = omega - valence_eigvals[f]
-                self.ene_losses[f, w_ind] = valence_eigvals[f]
-                # w'/w
-                prefactor_ratio = self.emission_enes[f, w_ind] / omega
-
-                sigma = self.cross_section(F_inelastic, prefactor_ratio)
-
-                self.cross_sections[f, w_ind] = sigma.real
-                self.scattering_amplitudes[f, w_ind] = F_inelastic
-
-            sigma_elastic = self.cross_section(F_elastic)
-            self.elastic_cross_sections[w_ind] = sigma_elastic.real
-
-            self.ostream.print_info(f'Computed RIXS cross-sections for {num_final_states} ' 
-                                    f'final states at photon energy: {omega*hartree_in_ev():.2f} eV.')
-            self.ostream.print_blank()
-        
-        results_dict = {
-                    'cross_sections': self.cross_sections,
-                    'elastic_cross_sections': self.elastic_cross_sections,
-                    'elastic_emission': self.photon_energy,
-                    'scattering_amplitudes': self.scattering_amplitudes,
-                    'emission_energies': self.emission_enes,
-                    'energy_losses': self.ene_losses,
-                    #'excitation_energies': self.core_eigvals,
-                    }
-
-        if self.filename is not None:
-            self.ostream.print_info('Writing to files...')
-            self.ostream.print_blank()
-            self.write_hdf5(self.filename + '_rixs')
-
-        if not init_photon_set:
-            self.photon_energy = None
-
-        self.ostream.print_info('...done.')
-        self.ostream.print_blank()
-
-        return results_dict
-    
-    def get_eigvecs(self, tensor, states, label):
+    def _get_eigvecs(self, tensor, states, label):
         if 'eigenvectors_distributed' in tensor:
             return np.array([
                 self.get_full_solution_vector(tensor['eigenvectors_distributed'][i]) for i in states])
@@ -538,10 +605,12 @@ class RixsDriver:
         padding = ((0, pad_occ), (0, 0))
         return np.pad(z_mat, padding), np.pad(y_mat, padding)
     
-    def preprocess_core_eigvecs(self, core_eigvecs, occ_core,
-                                num_val_orbs, num_vir_orbs, U_occ=None, U_vir=None):
+    def _preprocess_core_eigvecs(self, core_eigvecs, occ_core,
+                                num_val_orbs, num_vir_orbs,
+                                U_occ=None, U_vir=None):
         """
-        Split, pad with zeros (if twoshot) and transform core eigenvectors.
+        Split, pad with zeros (if twoshot) and 
+        possibly transform core eigenvectors if needed.
         """
         pp_core_eigvecs = []
 
@@ -628,9 +697,9 @@ class RixsDriver:
 
         return U_occ, U_vir
     
-    def write_hdf5(self, fname):
+    def _write_hdf5(self, fname):
         """
-        Writes the Pulsed response vectors to the specified output file in h5
+        Writes the RIXS results to the specified output file in h5
         format. The h5 file saved contains the following datasets:
 
         - photon_energies
@@ -653,7 +722,7 @@ class RixsDriver:
         """
 
         if not fname:
-            raise ValueError('No filename given to write_hdf5()')
+            raise ValueError('No filename given to _write_hdf5()')
 
         # Add the .h5 extension if not given
         if not fname[-3:] == '.h5':
@@ -673,75 +742,112 @@ class RixsDriver:
             print('Failed to create h5 data file: {}'.format(e),
                   file=sys.stdout)
 
-    def print_header(self):
+    def _print_header(self):
         """
         Prints RIXS calculation setup details to output stream.
         """
         
-        def _fmt_indices(lst, max_show=5):
+        def _format_indices(lst, max_show=5):
             """
             Shrink list of indices if too long.
             """
             if len(lst) > max_show:
-                return f"[{lst[0]} .. {lst[-1]}]"
+                return f"[{lst[0]} ... {lst[-1]}]"
             return str(list(lst))
+        
+        def _join_indices(parts, n):
+            sep = ", " if n <= 3 else " "
+            return sep.join(parts)
 
-        label_width = 42
-        str_width   = 90
+        str_width   = 60
 
         self.ostream.print_blank()
-        title = 'Resonant Inelastic X‑ray Scattering (RIXS) Calculation'
+        title = 'Resonant Inelastic X‑ray Scattering (RIXS) Setup'
         self.ostream.print_header(f'{title:^{str_width}}')
         self.ostream.print_header(f'{"=" * len(title):^{str_width}}')
         self.ostream.print_blank()
 
+        cur_str = 'Scattering angle (theta) [rad]   : {:.2f}'.format(self.theta)
+        self.ostream.print_header(cur_str.ljust(str_width))
         gamma_ev = self.gamma * hartree_in_ev()
-        basic_fields = {
-            'Scattering angle (theta) (rad)'   : f'{self.theta:.3g}',
-            'Lifetime broadening (gamma) (eV)'  : f'{gamma_ev:.3g}',
-            'Core‑excited energy cutoff (a.u.)' : f'{self.core_cutoff}',
-        }
-        for label, val in basic_fields.items():
-            self.ostream.print_header(f'{label:<{label_width}} : {val}'.ljust(str_width))
-        self.ostream.print_blank()
+        cur_str = 'Lifetime broadening (gamma) [eV] : {:.2f}'.format(gamma_ev)
+        self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.photon_energy:
-            au_str = ', '.join(f'{e:.4f}'        for e in self.photon_energy)
-            ev_str = ', '.join(f'{e*hartree_in_ev():.2f}' for e in self.photon_energy)
-            self.ostream.print_header(f'Incoming photon energies (a.u.)'.ljust(label_width) +
-                                    f': {au_str}'.ljust(str_width-label_width-3))
-            self.ostream.print_header(f'Incoming photon energies (eV) '.ljust(label_width) +
-                                    f': {ev_str}'.ljust(str_width-label_width-3))
-            self.ostream.print_blank()
+            if len(self.photon_energy) > 3:
+                display_energies = self.photon_energy[:1] + ["..."] + self.photon_energy[-1:]
+            else:
+                display_energies = self.photon_energy
 
-        if getattr(self, "_approach_string", None):
-            self.ostream.print_header(self._approach_string.ljust(str_width))
-            self.ostream.print_blank()
+            au_parts = [f"{e:.4f}" if isinstance(e, (int, float)) else e for e in display_energies]
+            ev_parts = [f"{e * hartree_in_ev():.2f}" if isinstance(e, (int, float)) else e for e in display_energies]
+            au_str = _join_indices(au_parts, len(self.photon_energy))
+            ev_str = _join_indices(ev_parts, len(self.photon_energy))
+
+            self.ostream.print_header(
+                f"Incoming photon energies [a.u.]  : {au_str}".ljust(str_width))
+            self.ostream.print_header(
+                f"Incoming photon energies [eV]    : {ev_str}".ljust(str_width))
 
         if self.orb_and_state_dict:
             od = self.orb_and_state_dict
-            orb_fields = {
-                'Core orbitals'    : _fmt_indices(od["mo_core_indices"]),
-                'Valence orbitals' : _fmt_indices(od["mo_val_indices"]),
-                'Virtual orbitals' : _fmt_indices(od["mo_vir_indices"]),
-            }
-            self.ostream.print_header('Orbital index ranges:'.center(str_width))
-            for lab, val in orb_fields.items():
-                self.ostream.print_header(f'{lab:<{label_width-2}} : {val}'.ljust(str_width))
-            self.ostream.print_blank()
-
-            state_fields = {
-                'Intermediate/core states' : _fmt_indices(od["core_states"]),
-                'Final/valence states'     : _fmt_indices(od["val_states"]),
-            }
-            self.ostream.print_header('State index sets:'.center(str_width))
-            for lab, val in state_fields.items():
-                self.ostream.print_header(f'{lab:<{label_width-2}} : {val}'.ljust(str_width))
-            self.ostream.print_blank()
 
             self.ostream.print_header(
-                f'Number of intermediate states : {od["num_intermediate_states"]}'.ljust(str_width))
+                f'Number of intermediate states    : {od["num_intermediate_states"]}'.ljust(str_width))
             self.ostream.print_header(
-                f'Number of final states        : {od["num_final_states"]}'.ljust(str_width))
+                f'Number of final states           : {od["num_final_states"]}'.ljust(str_width))
+            self.ostream.print_blank()
+            
+            self.ostream.print_header('State index sets'.center(str_width))
+            state_list = _format_indices(od["core_states"])
+            self.ostream.print_header(
+                f'Intermediate/core states         : {state_list}'.ljust(str_width)
+                )
+
+            state_list = _format_indices(od["val_states"])
+            self.ostream.print_header(
+                f'Final/valence states             : {state_list}'.ljust(str_width)
+                )
             self.ostream.print_blank()
 
+            self.ostream.print_header('Orbital index ranges'.center(str_width))
+            orbital_list = _format_indices(od["mo_core_indices"])
+            self.ostream.print_header(
+                f'Core orbitals                    : {orbital_list}'.ljust(str_width)
+                )
+            orbital_list = _format_indices(od["mo_val_indices"])
+            self.ostream.print_header(
+                f'Valence orbitals                 : {orbital_list}'.ljust(str_width)
+                )
+            orbital_list = _format_indices(od["mo_vir_indices"])
+            self.ostream.print_header(
+                f'Virtual orbitals                 : {orbital_list}'.ljust(str_width)
+                )
+            self.ostream.print_blank()
+
+        if getattr(self, "_approach_string", None):
+            self.ostream.print_info(self._approach_string)
+            self.ostream.print_blank()
+        
+        self.ostream.flush()
+
+    @staticmethod
+    def lorentzian_broadening(x, y, xmin, xmax, xstep, br):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = (yi[i] + y[k] * br / ((xi[i] - x[k])**2 +
+                                              (br / 2.0)**2) / np.pi)
+        return xi, yi
+
+    @staticmethod
+    def gaussian_broadening(x, y, xmin, xmax, xstep, br):
+        br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(y)):
+                yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
+                                              (2 * br_g**2))
+        return xi, yi
