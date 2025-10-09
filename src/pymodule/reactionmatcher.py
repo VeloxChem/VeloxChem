@@ -80,6 +80,7 @@ class ReactionMatcher:
         product_ff,
         pro_elems,
         breaking_bonds,
+        forming_bonds,
     ):
 
         self.rea_graph, self.pro_graph = self._create_reaction_graphs(
@@ -87,7 +88,6 @@ class ReactionMatcher:
             rea_elems,
             product_ff,
             pro_elems,
-            breaking_bonds,
         )
 
         N = len(self.rea_graph.edges)
@@ -103,7 +103,11 @@ class ReactionMatcher:
         self.ostream.flush()
 
         map, breaking_edges, forming_edges = self._find_mapping(
-            self.rea_graph.copy(), self.pro_graph.copy(), breaking_bonds)
+            self.rea_graph.copy(),
+            self.pro_graph.copy(),
+            breaking_bonds,
+            forming_bonds,
+        )
 
         self.ostream.flush()
         self.ostream.print_info(
@@ -112,7 +116,7 @@ class ReactionMatcher:
         return map, breaking_edges, forming_edges
 
     def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
-                                pro_elems, breaking_bonds):
+                                pro_elems):
         rea_graph = nx.Graph()
         reactant_bonds = list(reactant_ff.bonds.keys())
         # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
@@ -131,13 +135,20 @@ class ReactionMatcher:
 
         return rea_graph, pro_graph
 
-    def _find_mapping(self, A, B, forced_breaking_edges=set()):
+    def _find_mapping(self,
+                      A,
+                      B,
+                      forced_breaking_edges=set(),
+                      forced_forming_edges=set()):
         """
         Find a mapping between the connected components of A and B, while avoiding reconnecting broken edges.
         """
-        # make copies of A and B to avoid modifying the original graphs
         for edge in forced_breaking_edges:
             A.remove_edge(*edge)
+
+        for edge in forced_forming_edges:
+            A.add_edge(*edge)
+
         # loop progressively over more and more broken bonds till all connected components of A are subgraphs of B
         # can be done based on elements
         swapped = False
@@ -151,31 +162,11 @@ class ReactionMatcher:
             swapped = True
 
         self._start_time = time.time()
-        breaking_edges = None
-        B_composition = self._get_bond_element_composition(B)
-        for depth in range(0, self._breaking_depth):
-            self._check_monomorphic = False
-            self.ostream.print_info(
-                f"Finding isomorphic breaking edges at depth {depth}")
-            self.ostream.flush()
-            breaking_edges = self._find_breaking_edges(A, B, depth,
-                                                       B_composition)
-            if breaking_edges is not None:
-                break
-            self._check_monomorphic = True
-            self.ostream.print_info(
-                f"Finding monomorphic breaking edges at depth {depth}")
-            self.ostream.flush()
-            breaking_edges = self._find_breaking_edges(A, B, depth,
-                                                       B_composition)
-            if breaking_edges is not None:
-                break
-            else:
-                self.ostream.print_info(
-                    f"No breaking edges found at depth {depth}, increasing depth."
-                )
-                self.ostream.flush()
-
+        breaking_edges = self._find_breaking_edges(
+            A,
+            B,
+            forced_forming_edges,
+        )
         if breaking_edges is None:
             return None, None, None
 
@@ -184,6 +175,7 @@ class ReactionMatcher:
             f"Found subgraph {insert} with breaking bonds: {self._print_bond_list(breaking_edges)} and forced breaking bonds: {self._print_bond_list(forced_breaking_edges)}, continuing to find forming bonds"
         )
         self.ostream.flush()
+
         forming_edges = self._find_forming_edges(
             A, B, breaking_edges | forced_breaking_edges)
         if forming_edges is None:
@@ -198,7 +190,7 @@ class ReactionMatcher:
             return None, None, None
 
         self.ostream.print_info(
-            f"Found forming bonds: {self._print_bond_list(forming_edges)}. Finding mapping from isomorphism."
+            f"Found forming bonds: {self._print_bond_list(forming_edges)} with forced forming bonds: {self._print_bond_list(forced_forming_edges)}. Finding mapping from isomorphism."
         )
         self.ostream.flush()
         # print(forming_edges)
@@ -213,7 +205,52 @@ class ReactionMatcher:
             map = {v: k for k, v in map.items()}
         return map, breaking_edges, forming_edges
 
-    def _find_breaking_edges(self, A, B, depth, B_composition):
+    def _find_breaking_edges(self, A, B, forced_forming_edges):
+        breaking_edges = None
+        B_composition = self._get_bond_element_composition(B)
+        for depth in range(0, self._breaking_depth):
+            self._check_monomorphic = False
+            self.ostream.print_info(
+                f"Finding isomorphic breaking edges at depth {depth}")
+            self.ostream.flush()
+            breaking_edges = self._recurse_breaking_edges(
+                A,
+                B,
+                depth,
+                B_composition,
+                forced_forming_edges,
+            )
+            if breaking_edges is not None:
+                break
+            self._check_monomorphic = True
+            self.ostream.print_info(
+                f"Finding monomorphic breaking edges at depth {depth}")
+            self.ostream.flush()
+            breaking_edges = self._recurse_breaking_edges(
+                A,
+                B,
+                depth,
+                B_composition,
+                forced_forming_edges,
+            )
+            if breaking_edges is not None:
+                break
+            else:
+                self.ostream.print_info(
+                    f"No breaking edges found at depth {depth}, increasing depth."
+                )
+                self.ostream.flush()
+        return breaking_edges
+
+    def _recurse_breaking_edges(self, A, B, depth, B_composition,
+                                forced_forming_edges):
+        """
+        Search the minimal amount of edges that need to be removed from A so that all connected components of A are subgraphs of B. 
+        Searches recursively up to given depth. Returns None if no edges are found at a given depth, or when the time limit is exceeded.
+        In looping, it prioritizes breaking bonds involving combinations of elements that are more abundant in A then in B. 
+        After that, it prioritizes breaking bonds involving Hydrogen atoms.
+        """
+
         if not self._check_time():
             return None
 
@@ -221,20 +258,24 @@ class ReactionMatcher:
             return set()
 
         if depth > 0:
+
             # B will have more bonds then A, if there is a type of bond in A of which there are more in A then in B, then those bonds for sure need to be removed
             A_composition = self._get_bond_element_composition(A)
-            required_elements = set()
+            required_element_combinations = set()
             for key, val in A_composition.items():
                 if B_composition.get(key, 0) < val:
-                    required_elements.add(key)
+                    required_element_combinations.add(key)
 
             # Sorted edges has all edges involving H first, prioritizing a solution that breaks bonds with Hydrogen atoms
             sorted_edges = self._sort_edges(A)
             for edge in sorted_edges:
-                if len(required_elements) > 0:
+                if len(required_element_combinations) > 0:
                     comb = self._get_elem_comb(edge[0], edge[1], A)
-                    if comb not in required_elements:
+                    if comb not in required_element_combinations:
                         continue
+                if edge in forced_forming_edges or (
+                        edge[1], edge[0]) in forced_forming_edges:
+                    continue
 
                 A.remove_edge(*edge)
                 if self._verbose:
@@ -242,8 +283,13 @@ class ReactionMatcher:
                         f"Trying to find breaking edge {self._print_bond(edge)} at depth {depth}"
                     )
                 self.ostream.flush()
-                edges = self._find_breaking_edges(A, B, depth - 1,
-                                                  B_composition)
+                edges = self._recurse_breaking_edges(
+                    A,
+                    B,
+                    depth - 1,
+                    B_composition,
+                    forced_forming_edges,
+                )
                 if edges is not None:
                     edges.add(edge)
                     self.ostream.print_info(
@@ -256,7 +302,7 @@ class ReactionMatcher:
 
     def _find_forming_edges(self, A, B, breaking_edges):
         """
-        Find forming edges in A that are not in B, while avoiding reconnecting broken edges.
+        Keep adding edges to A until it is isomorphic to B, while avoiding reconnecting broken edges.
         """
         bond_count = 0
         forming_edges = []
@@ -265,6 +311,7 @@ class ReactionMatcher:
         for edge in breaking_edges:
             active_nodes.add(edge[0])
             active_nodes.add(edge[1])
+
         # Move every element of active_nodes in nodes to the front of the list
         nodes = [n for n in nodes if n in active_nodes
                  ] + [n for n in nodes if n not in active_nodes]
@@ -279,9 +326,11 @@ class ReactionMatcher:
                 for j, node_j in enumerate(nodes):
                     if j <= i:
                         continue
+                    # If an edge is in A, it cannot be formed
                     edge_in_A = (node_i,
                                  node_j) in A.edges() or (node_j,
                                                           node_i) in A.edges()
+                    # If an edge was broken, it should not be re-formed
                     edge_in_broken = (node_i, node_j) in breaking_edges or (
                         node_j, node_i) in breaking_edges
 
@@ -387,6 +436,9 @@ class ReactionMatcher:
         # This is done after the first routine, because we need to start with the largest component this time.
         cc_A.reverse()
         B = nx.Graph(B)
+        
+        # Loop over every connected subgraph in A in decreasing size
+        # Look for all maps from A_sub to B and find the mapping that leaves the least amount of connected components in B when removing the mapped nodes
         for g in cc_A:
             A_sub = A.subgraph(g)
             GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
@@ -400,18 +452,36 @@ class ReactionMatcher:
                     return False
 
             # find mapping that leaves least amount of connected components
-            maps = [map for map in GM.subgraph_monomorphisms_iter()]
-            best_map = maps[0]
+            if self._check_monomorphic:
+                iterator = GM.subgraph_monomorphisms_iter()
+                self._mono_count += 1
+            else:
+                iterator = GM.subgraph_isomorphisms_iter()
+                self._iso_count += 1
+                
+            best_map = next(iterator)
+            
             B_copy = nx.Graph(B)
             B_copy.remove_nodes_from(best_map.keys())
             best_cc_count = len(list(nx.connected_components(B_copy)))
-            for map in maps[1:]:
+            for map in iterator:
+                if self._check_monomorphic:
+                    self._mono_count += 1
+                else:
+                    self._iso_count += 1
+                    
                 B_copy = nx.Graph(B)
                 B_copy.remove_nodes_from(map.keys())
                 cc_count = len(list(nx.connected_components(B_copy)))
                 if cc_count < best_cc_count:
                     best_cc_count = cc_count
                     best_map = map
+                    
+                # The least amount of connected components is 1, or 0 if there is nothing left
+                # TODO are there ways to predict that the minimum needs to be higher?
+                if best_cc_count <= 1:
+                    break
+
 
             B.remove_nodes_from(best_map.keys())
         return True
