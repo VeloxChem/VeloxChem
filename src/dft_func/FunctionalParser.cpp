@@ -109,21 +109,13 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (format::upper_case(xcLabel) == "LRC-WPBEH") return CXCFunctional("LRC-WPBEH", {"HYB_GGA_XC_LRC_WPBEH"}, {1.0});
 
         if (format::upper_case(xcLabel) == "CAM-B3LYP") return CXCFunctional("CAM-B3LYP", {"HYB_GGA_XC_CAM_B3LYP"}, {1.0});
-        
-        if (format::upper_case(xcLabel) == "CAM-QTP00") return CXCFunctional("CAM-QTP00", {"HYB_GGA_XC_CAM_QTP_00"}, {1.0});
-        
-        if (format::upper_case(xcLabel) == "CAM-QTP01") return CXCFunctional("CAM-QTP01", {"HYB_GGA_XC_CAM_QTP_01"}, {1.0});
-        
-        if (format::upper_case(xcLabel) == "CAM-QTP02") return CXCFunctional("CAM-QTP02", {"HYB_GGA_XC_CAM_QTP_02"}, {1.0});
 
         if (format::upper_case(xcLabel) == "RCAM-B3LYP") return CXCFunctional("RCAM-B3LYP", {"HYB_GGA_XC_RCAM_B3LYP"}, {1.0});
 
-        if (format::upper_case(xcLabel) == "WB97X-V") return CXCFunctional("WB97X-V", {"HYB_GGA_XC_WB97X_V"}, {1.0});
-        
         if (format::upper_case(xcLabel) == "WB97X-D") return CXCFunctional("WB97X-D", {"HYB_GGA_XC_WB97X_D"}, {1.0});
 
         if (format::upper_case(xcLabel) == "WB97X-D3") return CXCFunctional("WB97X-D3", {"HYB_GGA_XC_WB97X_D3"}, {1.0});
-        
+
         // meta-GGA
 
         if (format::upper_case(xcLabel) == "TPSS") return CXCFunctional("TPSS", {"MGGA_X_TPSS", "MGGA_C_TPSS"}, {1.0, 1.0});
