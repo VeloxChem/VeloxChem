@@ -44,7 +44,7 @@ getAvailableFunctionals()
 {
     return std::vector<std::string>({"SLATER", "SLDA",   "B88X",    "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",   "PBE0",   "REVPBE",
                                      "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1", "B97-2",  "B97-3",
-                                     "LRC-WPBEH", "CAM-B3LYP", "CAM-QTP00", "CAM-QTP01", "CAM-QTP02", "RCAM-B3LYP", "WB97X-V", "WB97X-D", "WB97X-D3", "WB97X-D4", "WB97M-D4",
+                                     "LRC-WPBEH", "CAM-B3LYP", "RCAM-B3LYP", "WB97X-D", "WB97X-D3", "WB97X-D4", "WB97M-D4",
                                      "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",   "M05-2X", "M06",
                                      "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
 }

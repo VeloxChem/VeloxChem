@@ -307,7 +307,7 @@ class RixsDriver:
 
         for w_ind, omega in enumerate(self.photon_energy):
             F_elastic_local = np.zeros((3, 3), dtype=complex)
-            local_cross_sections   = np.empty(n_local)
+            local_cross_sections    = np.empty(n_local)
             local_amplitude_tensors = np.empty((n_local, 3, 3), dtype=complex)
             local_emission_energies = np.empty(n_local)
             local_energy_losses     = np.empty(n_local)
@@ -339,7 +339,7 @@ class RixsDriver:
                 local_cross_sections[local_i]    = self.cross_section(F_inelastic, prefactor).real
                 local_amplitude_tensors[local_i] = F_inelastic
 
-            # reduce/gather per omega
+            # Reduce per omega
             F_elastic = self.comm.allreduce(F_elastic_local, op=MPI.SUM)
             parts = self.comm.allgather(
                 (f_start, f_end,
