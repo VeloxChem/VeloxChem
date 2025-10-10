@@ -127,8 +127,28 @@ def show_embedding(molecule,
 
 
 class EmbeddingIntegralDriver:
+    """
+    Implements a driver for computing embedding-related integrals.
+
+    :param molecule:
+        The molecule.
+    :param ao_basis:
+        The AO basis set.
+
+    Instance variables:
+        - molecule: The molecule.
+        - basis: The AO basis set.
+    """
 
     def __init__(self, molecule, ao_basis):
+        """
+        Initializes the embedding integral driver.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        """
 
         self.molecule = molecule
         self.basis = ao_basis
@@ -527,6 +547,20 @@ class PolarizableEmbedding:
     """
 
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+        """
+        Initializes the polarizable embedding.
+
+        :param molecule:
+            The molecule to be embedded.
+        :param ao_basis:
+            The AO basis set.
+        :param options:
+            Dictionary with settings and inputs.
+        :param comm:
+            The MPI communicator.
+        :param log_level:
+            Sets the logging level to be used.
+        """
 
         self.options = options
 
@@ -556,6 +590,12 @@ class PolarizableEmbedding:
         self.quantum_subsystem.coordinates = molecule.get_coordinates_in_bohr()
 
     def _create_pyframe_objects(self):
+        """
+        Creates PyFraME objects from input options.
+
+        Reads the input file or uses provided objects to create the simulation box,
+        quantum subsystem, and classical subsystem instances.
+        """
         def categorize_subsystems(reader_output):
             """Categorize components from the reader output tuple."""
             simulation_box = SimulationBox()
@@ -614,6 +654,20 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
     """
 
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+        """
+        Initializes the SCF driver with polarizable embedding.
+
+        :param molecule:
+            The molecule to be embedded.
+        :param ao_basis:
+            The AO basis set.
+        :param options:
+            Dictionary with settings and inputs.
+        :param comm:
+            The MPI communicator.
+        :param log_level:
+            Sets the logging level to be used.
+        """
 
         super().__init__(molecule, ao_basis, options, comm, log_level)
 
@@ -655,6 +709,15 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
         self.pe_summary = None
 
     def compute_pe_contributions(self, density_matrix):
+        """
+        Computes polarizable embedding contributions for SCF.
+
+        :param density_matrix:
+            The density matrix.
+
+        :return:
+            A tuple containing the embedding energy and the embedding Fock matrix.
+        """
 
         if self._e_nuc_es is None:
             self._e_nuc_es = electrostatic_interactions.compute_electrostatic_nuclear_energy(
@@ -723,6 +786,12 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
         return e_emb, V_emb
 
     def get_pe_summary(self):
+        """
+        Gets the summary of polarizable embedding energy contributions.
+
+        :return:
+            A list containing the summary information.
+        """
 
         return self.pe_summary
 
@@ -733,10 +802,33 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
     """
 
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+        """
+        Initializes the LRS driver with polarizable embedding.
+
+        :param molecule:
+            The molecule to be embedded.
+        :param ao_basis:
+            The AO basis set.
+        :param options:
+            Dictionary with settings and inputs.
+        :param comm:
+            The MPI communicator.
+        :param log_level:
+            Sets the logging level to be used.
+        """
 
         super().__init__(molecule, ao_basis, options, comm, log_level)
 
     def compute_pe_contributions(self, density_matrix):
+        """
+        Computes polarizable embedding contributions for linear response calculations.
+
+        :param density_matrix:
+            The density matrix.
+
+        :return:
+            The embedding Fock matrix contribution.
+        """
 
         el_fields = self.quantum_subsystem.compute_electronic_fields(
             coordinates=self.classical_subsystem.coordinates,
@@ -764,6 +856,20 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
     """
 
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+        """
+        Initializes the gradient driver with polarizable embedding.
+
+        :param molecule:
+            The molecule to be embedded.
+        :param ao_basis:
+            The AO basis set.
+        :param options:
+            Dictionary with settings and inputs.
+        :param comm:
+            The MPI communicator.
+        :param log_level:
+            Sets the logging level to be used.
+        """
         super().__init__(molecule, ao_basis, options, comm, log_level)
         # TODO read in from options gradient specific options?
         self._e_es_nuc_grad = electrostatic_interactions.compute_electrostatic_nuclear_gradients(
@@ -792,6 +898,15 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
             self._e_vdw_grad = 0.0
 
     def compute_pe_contributions(self, density_matrix):
+        """
+        Computes polarizable embedding contributions to the gradient.
+
+        :param density_matrix:
+            The density matrix.
+
+        :return:
+            The gradient contribution from polarizable embedding.
+        """
         # FIXME -> ind dipoles only necessary if not passed from scf results
         # usecase call gradients several times? -> yes different geometries though -> guess of recalculation of ind dipoles from previous set of ind dipoles -> DIIS scheme
         if np.all(self.classical_subsystem.induced_dipoles.induced_dipoles == 0):
@@ -831,6 +946,22 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
     """
 
     def __init__(self, molecule, ao_basis, options, density, comm=None, log_level=20):
+        """
+        Initializes the Hessian driver with polarizable embedding.
+
+        :param molecule:
+            The molecule to be embedded.
+        :param ao_basis:
+            The AO basis set.
+        :param options:
+            Dictionary with settings and inputs.
+        :param density:
+            The density matrix.
+        :param comm:
+            The MPI communicator.
+        :param log_level:
+            Sets the logging level to be used.
+        """
         super().__init__(molecule, ao_basis, options, comm, log_level)
         self._e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
@@ -873,6 +1004,15 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
                 mic=self._mic,
                 box=self.simulation_box.box)
     def compute_pe_fock_gradient_contributions(self, i):
+        """
+        Computes polarizable embedding Fock gradient contributions.
+
+        :param i:
+            The index of the nucleus.
+
+        :return:
+            The Fock gradient contribution from polarizable embedding.
+        """
 
         es_fock_grad = electrostatic_interactions.compute_electronic_electrostatic_fock_gradient(
             i=i,
@@ -888,6 +1028,15 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         return es_fock_grad + ind_fock_grad
 
     def compute_pe_energy_hess_contributions(self, density_matrix):
+        """
+        Computes polarizable embedding energy Hessian contributions.
+
+        :param density_matrix:
+            The density matrix.
+
+        :return:
+            The energy Hessian contribution from polarizable embedding.
+        """
         nuc_list = np.arange(self.quantum_subsystem.num_nuclei, dtype=np.int64)
         # TODO: double check density_matrix
         e_es_elec_hess = electrostatic_interactions.compute_electronic_electrostatic_energy_hessian(
