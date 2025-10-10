@@ -115,9 +115,9 @@ class LinearResponseEigenSolver(LinearSolver):
         self.num_core_orbitals = 0
 
         # restricted subspace
-        self.rsa = False
+        self.restricted_subspace = False
         self.num_vir_orbitals = 0
-        self.num_val_orbitals = 0
+        self.num_valence_orbitals = 0
 
         self.nto = False
         self.nto_pairs = None
@@ -135,8 +135,8 @@ class LinearResponseEigenSolver(LinearSolver):
             'nstates': ('int', 'number of excited states'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
-            'rsa': ('bool', 'subspace-restricted approach'),
-            'num_val_orbitals': ('int', 'number of involved valence-orbitals'),
+            'restricted_subspace': ('bool', 'restricted subspace approximation'),
+            'num_valence_orbitals': ('int', 'number of involved valence-orbitals'),
             'num_vir_orbitals': ('int', 'number of involved virtual-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
@@ -275,11 +275,11 @@ class LinearResponseEigenSolver(LinearSolver):
             assert_msg_critical(
                 self.nstates <= nocc * (norb - nocc),
                 'LinearResponseEigenSolver: too many excited states')
-            if getattr(self, 'rsa', False) and not self.core_excitation:
+            if getattr(self, 'restricted_subspace', False) and not self.core_excitation:
                 assert_msg_critical(
-                self.nstates <= (self.num_core_orbitals + self.num_val_orbitals) 
+                self.nstates <= (self.num_core_orbitals + self.num_valence_orbitals) 
                                 * (self.num_vir_orbitals),
-                'LinearResponseEigenSolver (RSA): too many excited states')
+                'LinearResponseEigenSolver: too many excited states')
 
             if self.core_excitation:
                 assert_msg_critical(
@@ -603,11 +603,11 @@ class LinearResponseEigenSolver(LinearSolver):
             velo_trans_dipoles = np.zeros((self.nstates, 3))
             magn_trans_dipoles = np.zeros((self.nstates, 3))
 
-            if self.rsa:
+            if self.restricted_subspace:
                 orbital_details = {
                     'nstates': self.nstates,
                     'num_core': self.num_core_orbitals,
-                    'num_val': self.num_val_orbitals,
+                    'num_val': self.num_valence_orbitals,
                     'num_vir': self.num_vir_orbitals
                 }
             else:
@@ -643,14 +643,14 @@ class LinearResponseEigenSolver(LinearSolver):
                             self.num_core_orbitals, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(
                             self.num_core_orbitals, -1)
-                    elif self.rsa:
+                    elif self.restricted_subspace:
                         mo_occ = np.hstack((scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
-                                scf_tensors['C_alpha'][:, nocc - self.num_val_orbitals:nocc].copy()))
+                                scf_tensors['C_alpha'][:, nocc - self.num_valence_orbitals:nocc].copy()))
                         mo_vir = scf_tensors['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()
                         z_mat = eigvec[:eigvec.size // 2].reshape(
-                            self.num_core_orbitals + self.num_val_orbitals, -1)
+                            self.num_core_orbitals + self.num_valence_orbitals, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(
-                            self.num_core_orbitals + self.num_val_orbitals, -1)
+                            self.num_core_orbitals + self.num_valence_orbitals, -1)
                     else:
                         mo_occ = scf_tensors['C_alpha'][:, :nocc]
                         mo_vir = scf_tensors['C_alpha'][:, nocc:]
@@ -1008,12 +1008,11 @@ class LinearResponseEigenSolver(LinearSolver):
             excitations = [(i, a)
                            for i in range(self.num_core_orbitals)
                            for a in range(nocc, norb)]
-        elif self.rsa:
-            core_and_val_indices = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, nocc)) 
+        elif self.restricted_subspace:
+            core_and_val_indices = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_valence_orbitals, nocc)) 
             excitations = [(i, a)
                             for i in core_and_val_indices
                             for a in range(nocc, nocc+self.num_vir_orbitals)]
-            #n_exc = (self.num_core_orbitals + self.num_val_orbitals) * self.num_vir_orbitals
         else:
             excitations = [
                 (i, a) for i in range(nocc) for a in range(nocc, norb)
@@ -1113,9 +1112,9 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.core_excitation:
             ediag, sdiag = self.construct_ediag_sdiag_half(
                 orb_ene, nocc, norb, self.num_core_orbitals)
-        elif self.rsa:
+        elif self.restricted_subspace:
             ediag, sdiag = self.construct_ediag_sdiag_half(
-                orb_ene, nocc, norb, self.num_core_orbitals, self.num_val_orbitals,
+                orb_ene, nocc, norb, self.num_core_orbitals, self.num_valence_orbitals,
                 self.num_vir_orbitals)
         else:
             ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)

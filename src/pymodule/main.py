@@ -686,7 +686,7 @@ def main():
         cvs_rsp_dict = (dict(task.input_dict['cvs_response'])
                     if 'cvs_response' in task.input_dict else {})
         if cvs_rsp_dict == {}:
-            # RSA
+            # Restricted subspace approach
             cvs_rsp_prop = None
         else:
             # Two-shot approach

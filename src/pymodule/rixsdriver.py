@@ -200,7 +200,7 @@ class RixsDriver:
             self._approach_string = (f'Running RIXS calculation in the two‑shot approach')
 
             num_core_orbitals       = cvs_rsp_tensors['num_core']
-            num_val_orbitals        = nocc - num_core_orbitals 
+            num_valence_orbitals    = nocc - num_core_orbitals 
             num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
             num_final_states        = len(rsp_tensors['eigenvalues'])
             occupied_core           = num_core_orbitals
@@ -210,8 +210,8 @@ class RixsDriver:
         else:
             self._approach_string = (f'Running RIXS calculation in the restricted‑subspace approach')
 
-            num_val_orbitals  = rsp_tensors['num_val']
-            num_core_orbitals = rsp_tensors['num_core']
+            num_valence_orbitals = rsp_tensors['num_val']
+            num_core_orbitals    = rsp_tensors['num_core']
             assert_msg_critical(num_core_orbitals > 0,
                                  'No core orbitals indicated in the response tensor.')
 
@@ -231,10 +231,10 @@ class RixsDriver:
             # for compatibiltiy with the two-shot approach
             cvs_rsp_tensors = rsp_tensors
             # for compatibiltiy with the two-shot approach
-            occupied_core   = num_core_orbitals + num_val_orbitals
+            occupied_core   = num_core_orbitals + num_valence_orbitals
 
         mo_core_indices = list(range(num_core_orbitals))
-        mo_val_indices  = list(range(nocc - num_val_orbitals, nocc))
+        mo_val_indices  = list(range(nocc - num_valence_orbitals, nocc))
         mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
         mo_occ          = scf_tensors['C_alpha'][:, mo_core_indices + mo_val_indices]
         mo_vir          = scf_tensors['C_alpha'][:, mo_vir_indices]
@@ -253,7 +253,7 @@ class RixsDriver:
                                                     mo_core_indices + mo_val_indices, mo_vir_indices)
         # TODO parallelise, and broadcast?
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
-                                                 num_val_orbitals, num_vir_orbitals, U_occ, U_vir)
+                                                 num_valence_orbitals, num_vir_orbitals, U_occ, U_vir)
         
         # TODO parallelise, and broadcast?
         if self.rank == mpi_master():
@@ -315,7 +315,7 @@ class RixsDriver:
             for local_i, f in enumerate(range(f_start, f_end)):
                 F_inelastic = np.zeros((3, 3), dtype=complex)
                 z_val, y_val = self.split_eigvec(valence_eigvecs[f],
-                                                num_core_orbitals + num_val_orbitals,
+                                                num_core_orbitals + num_valence_orbitals,
                                                 num_vir_orbitals, self.tda)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
@@ -923,3 +923,4 @@ class RixsDriver:
                 yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
                                               (2 * br_g**2))
         return xi, yi
+    

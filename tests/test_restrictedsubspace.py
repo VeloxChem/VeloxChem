@@ -39,9 +39,9 @@ class TestRestrictedSubspace:
         # verify rsa reproduces core excitation
         rpa_drv = LinearResponseEigenSolver()
         rpa_drv.xcfun = xcfun_label
-        rpa_drv.rsa = True
+        rpa_drv.restricted_subspace = True
         rpa_drv.num_core_orbitals = 1
-        rpa_drv.num_val_orbitals = 0
+        rpa_drv.num_valence_orbitals = 0
         rpa_drv.num_vir_orbitals = 34
         rpa_drv.nstates = 10
         rpa_drv.ostream.mute()
@@ -69,9 +69,9 @@ class TestRestrictedSubspace:
         # verify that rsa reproduces core excitation
         tda_drv = TdaEigenSolver()
         tda_drv.xcfun = xcfun_label
-        tda_drv.rsa = True
+        tda_drv.restricted_subspace = True
         tda_drv.num_core_orbitals = 1
-        tda_drv.num_val_orbitals = 0
+        tda_drv.num_valence_orbitals = 0
         tda_drv.num_vir_orbitals = 34
         tda_drv.nstates = 10
         tda_drv.ostream.mute()
@@ -122,9 +122,9 @@ class TestRestrictedSubspace:
             lr_drv = LinearResponseEigenSolver()
 
         lr_drv.ostream.mute()
-        lr_drv.rsa = True
+        lr_drv.restricted_subspace = True
         lr_drv.num_core_orbitals = ncore
-        lr_drv.num_val_orbitals = nval
+        lr_drv.num_valence_orbitals = nval
         lr_drv.num_vir_orbitals = nvir
         lr_drv.nstates = 5
         lr_results = lr_drv.compute(mol, bas, scf_results)
