@@ -62,6 +62,13 @@ auto integrateExcHessianForLdaClosedShell(const CMolecule&                  mole
                                           const double                      screeningThresholdForGTOValues,
                                           const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
+auto integrateExcHessianForLdaOpenShell(const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const std::vector<const double*>& gsDensityPointers,
+                                        const CMolecularGrid&   molecularGrid,
+                                        const double            screeningThresholdForGTOValues,
+                                        const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+
 /**
  Integrates LDA exchnage-correlation functional contribution to molecular
  gradient of Vxc matrix element.
