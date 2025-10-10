@@ -53,6 +53,12 @@ class SadGuessDriver:
         self._num_unpaired_electrons_on_atoms = []
 
     def set_number_of_unpaired_electrons_on_atoms(self, num_unpaired_electrons):
+        """
+        Sets the number of unpaired electrons on atoms.
+
+        :param num_unpaired_electrons:
+            The number of unpaired electrons on each atom.
+        """
 
         self._num_unpaired_electrons_on_atoms = list(num_unpaired_electrons)
 
