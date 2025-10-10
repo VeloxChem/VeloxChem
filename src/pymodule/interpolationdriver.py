@@ -1414,6 +1414,12 @@ class InterpolationDriver():
         """Determines the most important internal coordinates
            leading to the large deviation.
         """
+
+        selection_rule='relative' # 'relative' | 'coverage' | 'topk'
+        relative_threshold=0.7
+        coverage_mass=0.8
+        topk=None
+
         constraints = []
         print(len(datapoints), self.z_matrix, self.symmetry_information)
         for datapoint in datapoints:
@@ -1497,10 +1503,16 @@ class InterpolationDriver():
             abs_pg       = np.abs(partial_gradient)
             sum_abs_pg   = abs_pg.sum()
 
+            # effective displacements already computed as internal_coord_elem_distance (Δq_eff)
             eps = 1e-12
+            dq_eff = np.array(internal_coord_elem_distance)
+            abs_pE = np.abs(partial_energies)
+            abs_work = np.abs(delta_g) * np.abs(dq_eff)      # |Δg_i| * |Δq_i,eff|
 
-        
-            abs_pE       = np.abs(partial_energies)
+            w_raw = abs_pE * abs_work                        # energy-active AND force-mismatch where you actually are
+            w = w_raw / (w_raw.sum() + eps)
+
+            important_single_E_err = delta_E * w   
             
             print('Partial energies', abs_pE, delta_g, abs_pE * np.abs(delta_g))
             wE_raw  = abs_pE * np.abs(delta_g)            # or: np.abs(Delta_q_eff * delta_g)
@@ -1517,7 +1529,7 @@ class InterpolationDriver():
                   "sum_1_kcal =", single_E_err_1.sum() * hartree_in_kcalpermol(), '2', single_E_err * hartree_in_kcalpermol(),
                   "sum_1_kcal =", single_E_err.sum() * hartree_in_kcalpermol(), '\n\n')
 
-            # ---- gradient branch (the bit you asked about) -----------------
+    
             # Here:  weight_i  = |partial_G_i|  / Σ|partial_G|
             abs_pG       = np.abs(partial_gradient)
             sum_abs_pG   = abs_pG.sum()
@@ -1533,24 +1545,69 @@ class InterpolationDriver():
 
             print('Error with QM ', np.allclose(single_E_err.sum(), delta_E, atol=1e-12), np.allclose(single_G_err.sum(), delta_G, atol=1e-12))
             
-            for grad_idx, individual_contrib in enumerate(partial_energies):
+            # for grad_idx, individual_contrib in enumerate(partial_energies):
                 
-                energy_error = delta_E * (abs(individual_contrib) / sum(abs(partial_energies)))  # each coord’s share
-                single_weight = abs(individual_contrib) / sum(abs(partial_energies))
-                weights.append(single_weight)
-                single_energy_error.append(energy_error * hartree_in_kcalpermol())
+            #     energy_error = delta_E * (abs(individual_contrib) / sum(abs(partial_energies)))  # each coord’s share
+            #     single_weight = abs(individual_contrib) / sum(abs(partial_energies))
+            #     weights.append(single_weight)
+            #     single_energy_error.append(energy_error * hartree_in_kcalpermol())
 
-                gradient_error = delta_G * w_G[grad_idx]     # share of |Δg|
-                single_gradient_error.append(gradient_error  * hartree_in_kcalpermol() * bohr_in_angstrom())
+            #     gradient_error = delta_G * w_G[grad_idx]     # share of |Δg|
+            #     single_gradient_error.append(gradient_error  * hartree_in_kcalpermol() * bohr_in_angstrom())
             
             # Pair each energy error with its corresponding partial energy and internal coordinate
-            contributions_energy = list(zip(partial_energies, single_E_err_1 * hartree_in_kcalpermol(), weights, z_matrix))
+            contributions_energy = list(zip(partial_energies, important_single_E_err * hartree_in_kcalpermol(), w, z_matrix))
             # contributions_gradient = list(zip(partial_gradient, single_gradient_error, w_G, z_matrix))
 
 
             # Sort contributions by the energy error in descending order
             sorted_contributions = sorted(contributions_energy, key=lambda x: x[1], reverse=True)
-            print('Delta E:', delta_E * hartree_in_kcalpermol(), constraints, error_source, weights)
+            
+            print('Delta E (kcal/mol):', delta_E * hartree_in_kcalpermol())
+
+            # --- selection using the SAME weights ---
+            sorted_weights = np.array([c[2] for c in sorted_contributions])
+            sorted_coords = [tuple(int(x) for x in c[3]) for c in sorted_contributions]
+
+            selected_idx = []
+            if selection_rule == 'relative':
+                if sorted_weights.size > 0:
+                    wmax = sorted_weights.max()
+                    keep = sorted_weights >= (relative_threshold * wmax)
+                    selected_idx = list(np.where(keep)[0])
+            elif selection_rule == 'coverage':
+                cum = np.cumsum(sorted_weights)
+                keep = cum <= coverage_mass
+                if keep.size > 0:
+                    keep[0] = True
+                selected_idx = list(np.where(keep)[0])
+            elif selection_rule == 'topk':
+                k = topk if (topk is not None) else max(1, int(0.25 * N))
+                selected_idx = list(range(min(k, N)))
+            else:
+                raise ValueError(f"Unknown selection_rule: {selection_rule}")
+
+
+            for idx in selected_idx:
+                coord = sorted_coords[idx]
+                if coord in constraints:
+                    continue
+                # optional symmetry filtering for torsions
+                if len(coord) == 4 and (tuple(sorted(coord)) in self.symmetry_information[7][3]):
+                    continue
+                constraints.append(coord)
+
+
+            # --- human-readable prints ---
+            print('Top contributors (first 10):')
+            for i, (pE, e_kcal, w_i, coord) in enumerate(sorted_contributions[:10]):
+                picked = 'SELECTED' if i in selected_idx else ''
+                print(f" {i:2d} {tuple(int(x) for x in coord)}: |pE|={abs(pE):.3e} Ha, share={e_kcal:.3f} kcal/mol, w={w_i:.3f} {picked}")
+                print('Sum of energy-weights:', float(sorted_weights.sum()))
+                print('Selected constraints so far:', constraints)
+
+
+            return constraints
 
             # if error_source == 'gradient':
             #     print('Delta G:', delta_G * hartree_in_kcalpermol() * bohr_in_angstrom(), constraints)
@@ -1574,20 +1631,20 @@ class InterpolationDriver():
 
             # Print the sorted contributions with internal coordinates
             
-            for contrib, error, ind_weight, coord in sorted_contributions[:]:        
-                print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
-                if tuple(int(x) for x in coord) in constraints:
-                    continue
-                if len(coord) == 2 and ind_weight > max(weights) * 0.7:
-                    constraints.append(tuple(int(x) for x in coord))
-                elif len(coord) == 3 and ind_weight > max(weights) * 0.7:
-                    constraints.append(tuple(int(x) for x in coord))
-                elif len(coord) == 4 and ind_weight > max(weights) * 0.7: #and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
-                    constraints.append(tuple(int(x) for x in coord))
-                print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error} kcal/mol')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
-            print('Sum of Weights', sum(weights), sum(single_energy_error))
+        #     for contrib, error, ind_weight, coord in sorted_contributions[:]:        
+        #         print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
+        #         if tuple(int(x) for x in coord) in constraints:
+        #             continue
+        #         if len(coord) == 2 and ind_weight > max(weights) * 0.7:
+        #             constraints.append(tuple(int(x) for x in coord))
+        #         elif len(coord) == 3 and ind_weight > max(weights) * 0.7:
+        #             constraints.append(tuple(int(x) for x in coord))
+        #         elif len(coord) == 4 and ind_weight > max(weights) * 0.7: #and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
+        #             constraints.append(tuple(int(x) for x in coord))
+        #         print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error} kcal/mol')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
+        #     print('Sum of Weights', sum(weights), sum(single_energy_error))
 
-        return constraints
+        # return constraints
     
     def transform_gradient_to_internal_coordinates(self, molecule, gradient, b_matrix, tol=1e-6):
         """

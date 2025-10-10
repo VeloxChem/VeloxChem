@@ -112,6 +112,15 @@ class GPRInterpolationDriver:
         angle_idx   = _active_dims(groups.get('angle', []))
         torsion_idx = _active_dims(groups.get('torsion', []))
 
+        self.group_names  = ["bond", "angle", "torsion"]
+        self.group_dims   = {
+            "bond":    _active_dims(groups.get("bond", [])),      # list[int]
+            "angle":   _active_dims(groups.get("angle", [])),
+            "torsion": _active_dims(groups.get("torsion", [])),
+        }
+
+        self.num_groups = sum(len(v) > 0 for v in self.group_dims.values())
+
         ls_prior = LogNormalPrior(0.0, 0.5)  # centered ~1.0 after standardization
         ls_constraint = Interval(
             torch.tensor(0.05, dtype=self.dtype, device=self.device),
@@ -134,6 +143,8 @@ class GPRInterpolationDriver:
 
         if not kernels:
             raise ValueError("No non-empty groups in 'groups' dict.")
+        
+        self.group_kernels = kernels[:]
 
         base_kernel = kernels[0]
         for k in kernels[1:]:
@@ -1139,32 +1150,109 @@ class GPRInterpolationDriver:
 
         return False, {"cause":"none", "mu":mu, "sigma_lat":sig, "bound":bound, "T":T, "d_eff":d_eff, "k":k, "d_thresh":d_thresh}
     
-    @torch.no_grad()
-    def max_kernel_similarity(self, Xq_std: torch.Tensor, Xtr_std: torch.Tensor, topk: int = 1) -> float:
-        """
-        Returns max (or top-K mean) *normalized* kernel similarity in [0,1].
-        Uses the *base* kernel (sum of per-group Matérns) and normalizes by k(x,x).
-        Xq_std: (1,D) standardized query (use the SAME transform as training)
-        Xtr_std: (N,D) standardized training
-        """
-        base = self.model.covar_module.base_kernel  # SumKernel of group Matérns (no global outputscale)
 
-        # k(xq, Xtr): shape (1, N)
-        k_row = base(Xq_std, Xtr_std).evaluate().squeeze(0)  # (N,)
+    def _norm_sim_group(self, ker, Xq_std, Xtr_std):
+        """Normalized k(xq, xi)/sqrt(k(xq,xq)k(xi,xi)) for ONE group kernel."""
+        with torch.no_grad():
+            K_q_tr = ker(Xq_std, Xtr_std).evaluate()       # (1, Ntr)
+            K_q_q  = ker(Xq_std, Xq_std).evaluate()[0, 0]  # scalar
+            K_trtr = ker(Xtr_std, Xtr_std).evaluate()      # (Ntr, Ntr)
+            diag   = torch.diag(K_trtr).clamp_min(1e-12)   # (Ntr,)
+            s = (K_q_tr / torch.sqrt(K_q_q * diag)).cpu().numpy().ravel()
+        return np.clip(s, 1e-12, 1.0)
 
-        # Normalize by k(xq,xq) so the diagonal equals 1
-        k_self = base(Xq_std, Xq_std).evaluate().squeeze().item()  # ~= number of groups (e.g., 3.0)
-        if k_self <= 0:
+    def max_kernel_similarity(self, Xq_std, Xtr_std, *, topk: int = 5,
+                          agg: str = "geom", weight_mode: str = "inv_dim"):
+        """
+        Size-invariant similarity using your bond/angle/torsion kernels.
+        agg: 'geom' (default), 'mean', or 'max'
+        weight_mode: 'inv_dim' or 'inv_l2' (1/ell^2 if ARD/ell exists)
+        """
+        sims = []
+        weights = []
+
+        if not getattr(self, "group_kernels", None):
+            # fallback: try to pull from model's sum kernel
+            bk = getattr(self.model.covar_module, "base_kernel", None)
+            if hasattr(bk, "kernels"):
+                self.group_kernels = list(bk.kernels)
+            else:
+                # last resort: use the whole kernel (will be dimension-dependent)
+                with torch.no_grad():
+                    K_q_tr = self.model.covar_module.base_kernel(Xq_std, Xtr_std).evaluate()
+                    K_q_q  = self.model.covar_module.base_kernel(Xq_std, Xq_std).evaluate()[0, 0]
+                    K_trtr = self.model.covar_module.base_kernel(Xtr_std, Xtr_std).evaluate()
+                    diag   = torch.diag(K_trtr).clamp_min(1e-12)
+                    s_full = (K_q_tr / torch.sqrt(K_q_q * diag)).cpu().numpy().ravel()
+                s_full = np.clip(s_full, 1e-12, 1.0)
+                # power correction by number of groups to avoid collapse
+                s_full = s_full ** (1.0 / max(1, getattr(self, "num_groups", 1)))
+                s_full.sort()
+                return float(np.mean(s_full[-min(topk, s_full.size):]))
+
+        # per-group normalized similarities + weights
+        for ker in self.group_kernels:
+            s_g = self._norm_sim_group(ker, Xq_std, Xtr_std)
+            sims.append(s_g)
+
+            if weight_mode == "inv_l2" and hasattr(ker, "lengthscale"):
+                ell = ker.lengthscale
+                try:
+                    ell_val = float(ell.mean().detach().cpu().numpy())
+                except Exception:
+                    ell_val = 1.0
+                w = 1.0 / max(ell_val**2, 1e-6)
+            else:
+                # inverse by group size as a robust default
+                ad = getattr(ker, "active_dims", None)
+                gdim = int(len(ad)) if ad is not None else 1
+                w = 1.0 / max(gdim, 1)
+            weights.append(w)
+
+        S = np.vstack(sims)            # (G, Ntr)
+        w = np.asarray(weights, float)
+        w = w / (w.sum() if w.sum() > 0 else 1.0)
+
+        if S.size == 0:
             return 0.0
 
-        s = (k_row / k_self).clamp(min=0.0, max=1.0)  # (N,)
+        if agg == "max":
+            s_vec = S.max(axis=0)
+        elif agg == "mean":
+            s_vec = (w[:, None] * S).sum(axis=0)
+        else:  # 'geom' (default)
+            s_vec = np.exp((w[:, None] * np.log(S)).sum(axis=0))
 
-        if topk is None or topk <= 1:
-            return float(s.max().cpu())
-        else:
-            topk = min(topk, s.numel())
-            vals, _ = torch.topk(s, k=topk, largest=True)
-            return float(vals.mean().cpu())
+        s_vec.sort()
+        k = min(topk, s_vec.size)
+        return float(np.mean(s_vec[-k:]))
+    
+    # @torch.no_grad()
+    # def max_kernel_similarity(self, Xq_std: torch.Tensor, Xtr_std: torch.Tensor, topk: int = 1) -> float:
+    #     """
+    #     Returns max (or top-K mean) *normalized* kernel similarity in [0,1].
+    #     Uses the *base* kernel (sum of per-group Matérns) and normalizes by k(x,x).
+    #     Xq_std: (1,D) standardized query (use the SAME transform as training)
+    #     Xtr_std: (N,D) standardized training
+    #     """
+    #     base = self.model.covar_module.base_kernel  # SumKernel of group Matérns (no global outputscale)
+
+    #     # k(xq, Xtr): shape (1, N)
+    #     k_row = base(Xq_std, Xtr_std).evaluate().squeeze(0)  # (N,)
+
+    #     # Normalize by k(xq,xq) so the diagonal equals 1
+    #     k_self = base(Xq_std, Xq_std).evaluate().squeeze().item()  # ~= number of groups (e.g., 3.0)
+    #     if k_self <= 0:
+    #         return 0.0
+
+    #     s = (k_row / k_self).clamp(min=0.0, max=1.0)  # (N,)
+
+    #     if topk is None or topk <= 1:
+    #         return float(s.max().cpu())
+    #     else:
+    #         topk = min(topk, s.numel())
+    #         vals, _ = torch.topk(s, k=topk, largest=True)
+    #         return float(vals.mean().cpu())
 
     
     def _collect_group_ls(self):

@@ -932,8 +932,10 @@ class IMDatabasePointCollecter:
             # Initialize the object
             driver_object = InterpolationDriver(self.z_matrix)
             driver_object.update_settings(self.interpolation_settings[root])
-  
-            if root == 0 or root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
+
+            if root == 0:
+                driver_object.symmetry_information = self.non_core_symmetry_groups['gs']
+            elif root == 0 or root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
                 driver_object.symmetry_information = self.non_core_symmetry_groups['es']
             else:
                 driver_object.symmetry_information = self.non_core_symmetry_groups['es']
@@ -2803,11 +2805,12 @@ class IMDatabasePointCollecter:
 
             
                 
-            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) >= 2 and self.density_around_data_point[0][self.current_state] > 1:
+            if self.use_opt_confidence_radius[0] and len(self.allowed_molecules[self.current_state]['molecules']) % 15 == 0 and self.density_around_data_point[0][self.current_state] > 1:
                         
                 trust_radius = None
                 sym_dict = self.non_core_symmetry_groups['gs']
-                if state > 0 or root == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
+
+                if self.current_state > 0 or self.current_state == 1 and self.drivers['es'] is not None and self.drivers['es'][0].spin_flip:
                     sym_dict = self.non_core_symmetry_groups['es']
                  
                  
@@ -3111,12 +3114,16 @@ class IMDatabasePointCollecter:
             print(key, entries)
             drivers = self.drivers[key]
 
-            org_roots = drivers[0].roots
+            org_roots = self.roots_to_follow[0]
+            if any(x >= 1 for x in self.roots_to_follow):
+                org_roots = drivers[0].roots
             label_counter = 0
             for mol_basis in entries:
-                drivers[0].roots = mol_basis[4]           
-                drivers[1].roots_to_follow = mol_basis[4]
-                drivers[2].roots_to_follow = mol_basis[4]
+
+                if any(x >= 1 for x in self.roots_to_follow):
+                    drivers[0].roots = mol_basis[4]           
+                    drivers[1].roots_to_follow = mol_basis[4]
+                    drivers[2].roots_to_follow = mol_basis[4]
                 
                 energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
                 print('Energies one', energies)
@@ -3320,9 +3327,11 @@ class IMDatabasePointCollecter:
                                                             root)
                         self.last_added = len(self.allowed_molecules[root]['molecules'])
                 label_counter += 1
-            drivers[0].roots = org_roots           
-            drivers[1].roots_to_follow = org_roots
-            drivers[2].roots_to_follow = org_roots
+            
+            if any(x >= 1 for x in self.roots_to_follow):
+                drivers[0].roots = org_roots           
+                drivers[1].roots_to_follow = org_roots
+                drivers[2].roots_to_follow = org_roots
         
         
         # exit()
