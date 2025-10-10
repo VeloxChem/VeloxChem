@@ -91,6 +91,14 @@ auto integrateVxcFockGradientForLdaClosedShell(const CMolecule&                 
                                                const CXCFunctional&              xcFunctional,
                                                const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
 
+auto integrateVxcFockGradientForLdaOpenShell(const CMolecule&        molecule,
+                                             const CMolecularBasis&  basis,
+                                             const std::vector<const double*>& gsDensityPointers,
+                                             const CMolecularGrid&   molecularGrid,
+                                             const double            screeningThresholdForGTOValues,
+                                             const CXCFunctional&    xcFunctional,
+                                             const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>;
+
 }  // namespace xchesslda
 
 #endif /* XCMolecularHessianForLDA_hpp */
