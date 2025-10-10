@@ -297,3 +297,20 @@ class TestGtoPairBlock:
         p3x1_pairs_a = comm.bcast(p3x1_pairs_a)
         p3x1_pairs_b = GtoPairBlock(p3_gtos, p1_gtos)
         assert p3x1_pairs_a == p3x1_pairs_b
+        
+    def test_unique_terms(self):
+
+        mol_co, bas_svp = self.get_data()
+
+        # GTO blocks
+
+        p3_gtos = GtoBlock(bas_svp, mol_co, 1, 3)
+        p1_gtos = GtoBlock(bas_svp, mol_co, 1, 1)
+
+        # GTO pairs
+
+        p3x3_pairs = GtoPairBlock(p3_gtos)
+        assert p3x3_pairs.unique_terms() == 21
+
+        p3x1_pairs = GtoPairBlock(p3_gtos, p1_gtos)
+        assert p3x1_pairs.unique_terms() == 36
