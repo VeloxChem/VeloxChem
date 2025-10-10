@@ -251,10 +251,16 @@ class RixsDriver:
         if cvs_scf_tensors is not None:
             U_occ, U_vir = self.get_transformation_mats(scf_tensors, cvs_scf_tensors, 
                                                     mo_core_indices + mo_val_indices, mo_vir_indices)
+        # TODO parallelise, and broadcast?
         core_mats = self._preprocess_core_eigvecs(core_eigvecs, occupied_core,
                                                  num_val_orbitals, num_vir_orbitals, U_occ, U_vir)
         
-        dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+        # TODO parallelise, and broadcast?
+        if self.rank == mpi_master():
+            dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+        else:
+            dipole_integrals = None
+        dipole_integrals = self.comm.bcast(dipole_integrals, root=mpi_master())
 
         # store state and orbital information used in computation
         self.orb_and_state_dict = {
@@ -293,65 +299,95 @@ class RixsDriver:
         if self.rank == mpi_master():
             self._print_header(molecule)
 
-            # Loop over photon energies
-            for w_ind, omega in enumerate(self.photon_energy):
-                F_elastic = np.zeros((3,3), dtype=complex)
-                # Loop over final/valence states
-                for f in range(num_final_states):
-                    F_inelastic = np.zeros((3,3), dtype=complex)
-                    z_val, y_val = self.split_eigvec(valence_eigvecs[f], num_core_orbitals + num_val_orbitals,
+        ave, rem = divmod(num_final_states, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        f_start = sum(counts[:self.rank])
+        f_end   = sum(counts[:self.rank + 1])
+        n_local = f_end - f_start
+
+        for w_ind, omega in enumerate(self.photon_energy):
+            F_elastic_local = np.zeros((3, 3), dtype=complex)
+            local_cross_sections   = np.empty(n_local)
+            local_amplitude_tensors = np.empty((n_local, 3, 3), dtype=complex)
+            local_emission_energies = np.empty(n_local)
+            local_energy_losses     = np.empty(n_local)
+
+            for local_i, f in enumerate(range(f_start, f_end)):
+                F_inelastic = np.zeros((3, 3), dtype=complex)
+                z_val, y_val = self.split_eigvec(valence_eigvecs[f],
+                                                num_core_orbitals + num_val_orbitals,
                                                 num_vir_orbitals, self.tda)
-                    
-                    for n in range(num_intermediate_states):
-                        z_core, y_core = core_mats[n]
-                        # Form the transition dnesity matrices
-                        gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
+                for n in range(num_intermediate_states):
+                    z_core, y_core = core_mats[n]
+                    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
 
-                        F_inelastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], valence_eigvals[f],
-                                                                        gs2core, core2val, dipole_integrals)
-                        if f == 0:
-                            F_elastic += self.scattering_amplitude_tensor(omega, core_eigvals[n], None,
-                                                                        gs2core, None, dipole_integrals)
-                    
-                    self.emission_enes[f, w_ind] = omega - valence_eigvals[f]
-                    self.ene_losses[f, w_ind] = valence_eigvals[f]
-                    # w'/w
-                    prefactor = self.emission_enes[f, w_ind] / omega
-                    sigma = self.cross_section(F_inelastic, prefactor)
-                    self.cross_sections[f, w_ind] = sigma.real
-                    self.scattering_amplitudes[f, w_ind] = F_inelastic
+                    F_inelastic += self.scattering_amplitude_tensor(
+                        omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, dipole_integrals
+                    )
+                    if f == 0:
+                        F_elastic_local += self.scattering_amplitude_tensor(
+                            omega, core_eigvals[n], None, gs2core, None, dipole_integrals
+                        )
 
-                sigma_elastic = self.cross_section(F_elastic)
-                self.elastic_cross_sections[w_ind] = sigma_elastic.real
+                emission_energy = omega - valence_eigvals[f]
+                energy_loss     = valence_eigvals[f]
+                prefactor       = emission_energy / omega
 
-                self.ostream.print_info(f'Computed RIXS cross-sections for {num_final_states} ' 
-                                        f'final states at photon energy: {omega*hartree_in_ev():.2f} eV.')
+                # Fill local result slices
+                local_emission_energies[local_i] = emission_energy
+                local_energy_losses[local_i]     = energy_loss
+                local_cross_sections[local_i]    = self.cross_section(F_inelastic, prefactor).real
+                local_amplitude_tensors[local_i] = F_inelastic
+
+            # reduce/gather per omega
+            F_elastic = self.comm.allreduce(F_elastic_local, op=MPI.SUM)
+            parts = self.comm.allgather(
+                (f_start, f_end,
+                local_emission_energies,
+                local_energy_losses,
+                local_cross_sections,
+                local_amplitude_tensors)
+            )
+
+            if self.rank == mpi_master():
+                self.elastic_cross_sections[w_ind] = self.cross_section(F_elastic).real
+                for start, end, em_en_part, loss_part, cs_part, amp_part in parts:
+                    self.emission_enes[start:end, w_ind]         = em_en_part
+                    self.ene_losses[start:end, w_ind]            = loss_part
+                    self.cross_sections[start:end, w_ind]        = cs_part
+                    self.scattering_amplitudes[start:end, w_ind] = amp_part
+
+                self.ostream.print_info(
+                    f'Computed RIXS cross-sections for {num_final_states} final states '
+                    f'at photon energy: {omega*hartree_in_ev():.2f} eV.'
+                )
                 self.ostream.print_blank()
                 self.ostream.flush()
-            
-            results_dict = {
-                        'cross_sections': self.cross_sections,
-                        'elastic_cross_sections': self.elastic_cross_sections,
-                        'elastic_emission': self.photon_energy,
-                        'scattering_amplitudes': self.scattering_amplitudes,
-                        'emission_energies': self.emission_enes,
-                        'energy_losses': self.ene_losses,
-                        }
 
-            if self.filename is not None:
-                self.ostream.print_info('Writing to files...')
-                self.ostream.print_blank()
-                self.ostream.flush()
-                self._write_hdf5(self.filename + '_rixs')
+        results_dict = {
+            'cross_sections': self.cross_sections,
+            'elastic_cross_sections': self.elastic_cross_sections,
+            'elastic_emission': self.photon_energy,
+            'scattering_amplitudes': self.scattering_amplitudes,
+            'emission_energies': self.emission_enes,
+            'energy_losses': self.ene_losses,
+        }
 
-            if not init_photon_set:
-                self.photon_energy = None
+        if self.filename is not None and self.rank == mpi_master():
+            self.ostream.print_info('Writing to files...')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            self._write_hdf5(self.filename + '_rixs')
 
+        if not init_photon_set:
+            self.photon_energy = None
+
+        if self.rank == mpi_master():
             self.ostream.print_info('...done.')
             self.ostream.print_blank()
             self.ostream.flush()
 
-            return results_dict
+        return results_dict
     
     def _first_core_energy(self, rsp_tensors):
         """

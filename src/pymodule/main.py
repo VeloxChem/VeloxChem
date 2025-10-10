@@ -73,7 +73,7 @@ from .xtbhessiandriver import XtbHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 from .localizationdriver import LocalizationDriver
-from .checkpoint import create_hdf5, write_scf_results_to_hdf5
+
 
 def select_scf_driver(task, scf_type):
     """
@@ -584,30 +584,8 @@ def main():
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
         if 'localize_mos' in rsp_dict:
-            loc_drv = LocalizationDriver()
-            mo_list_str = rsp_dict['localize_mos']
-            mo_list = [int(x) for x in mo_list_str.strip("[]").split(",")]
-            C_loc = loc_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors, mo_list)
-            if task.mpi_rank == mpi_master():
-                scf_results['C_alpha'] = C_loc
-                scf_drv.scf_tensors['C_alpha'] = C_loc
-                print("\n\nTHE ORBITALS HAVE BEEN LOCALIZED!\n\n")
-                loc_h5_fname = f'{scf_drv.filename}_boys_loc.h5'
-                print(loc_h5_fname)
-                if scf_drv._dft:
-                    xc_label = scf_drv.xcfun.get_func_label()
-                else:
-                    xc_label = 'HF'
-
-                if scf_drv._pe:
-                    with open(str(scf_drv.pe_options['potfile']), 'r') as f_pot:
-                        potfile_text = '\n'.join(f_pot.readlines())
-                else:
-                    potfile_text = ''
-
-                create_hdf5(loc_h5_fname, task.molecule, task.ao_basis, xc_label, potfile_text)
-                write_scf_results_to_hdf5(loc_h5_fname, scf_drv.scf_tensors, scf_drv.history)
-            #scf_results['C_alpha'] = loc_drv.compute(task.molecule, task.ao_basis, scf_results, mo_list)
+            loc_drv = LocalizationDriver(task.mpi_comm, task.ostream)
+            loc_drv.localize_and_write(task.molecule, task.ao_basis, scf_drv, rsp_dict['localize_mos'], write_hdf5 = True)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream,
@@ -689,7 +667,7 @@ def main():
         pulsed_response.compute(task.molecule, task.ao_basis, scf_results)
 
     # Resonant inelastic X-ray scattering
-    if task_type == 'rixs':# and scf_drv.scf_type == 'restricted':
+    if (task_type == 'rixs') and (scf_drv.scf_type == 'restricted'):
         rixs_dict = (task.input_dict['rixs']
                      if 'rixs' in task.input_dict else {})
         rixs_dict['program_end_time'] = program_end_time

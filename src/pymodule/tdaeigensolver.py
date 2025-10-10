@@ -664,10 +664,9 @@ class TdaEigenSolver(LinearSolver):
                 mo_occ = tensors['C_alpha'][:, :self.num_core_orbitals].copy()
                 mo_vir = tensors['C_alpha'][:, nocc:].copy()
             elif self.rsa:
-                #mo_occ = tensors['C_alpha'][:, :self.num_core_orbitals].copy()
                 mo_occ = np.hstack((tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
                                     tensors['C_alpha'][:, nocc - self.num_val_orbitals:nocc].copy()))
-                mo_vir = tensors['C_alpha'][:, nocc:nocc + self.num_vir_orbitals].copy() #mo_vir = tensors['C_alpha'][:, nocc:norb - self.num_vir_orbitals].copy()
+                mo_vir = tensors['C_alpha'][:, nocc:nocc + self.num_vir_orbitals].copy()
             else:
                 mo_occ = tensors['C_alpha'][:, :nocc].copy()
                 mo_vir = tensors['C_alpha'][:, nocc:].copy()
