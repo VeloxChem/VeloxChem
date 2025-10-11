@@ -2421,6 +2421,19 @@ class IMDatabasePointCollecter:
             velocities *= scaling_factor
 
             context.setVelocities(velocities)
+        
+        if self.swap_back == False and self.temperatures[-1] > 50:
+            state = context.getState(getVelocities=True)
+            velocities = state.getVelocities(asNumpy=True)  # unit: nanometers/picosecond
+
+            
+            velocities *= 0.9
+
+            context.setVelocities(velocities)
+        elif self.swap_back == False and self.temperatures[-1] < self.temperatures[0]:
+            self.swap_back = True
+            self.point_checker = 0
+        
     ####################################################################
     ################ Functions to expand the database ##################
     ####################################################################
@@ -2492,6 +2505,8 @@ class IMDatabasePointCollecter:
             #     qm_energy = np.array([qm_energy])
             #     if emergency_qm_driver.is_converged is False:
             #         print('the original scf is not converged', emergency_qm_driver.is_converged)
+
+            print('weights', self.impes_drivers[state].weights)
             
             gradients = self.compute_gradient(drivers[1], molecule, current_basis, scf_tensors)
             # qm_energy = [1, 2]
@@ -2603,7 +2618,7 @@ class IMDatabasePointCollecter:
                     if self.add_gpr_model:
 
                        for root in self.roots_to_follow:
-                            # Last molecule only
+
                             x_list, y_list = [], []
                             interpolation_driver = InterpolationDriver(self.z_matrix)
                             interpolation_driver.update_settings(self.interpolation_settings[root])
@@ -2619,17 +2634,15 @@ class IMDatabasePointCollecter:
                             x_groups = None
 
                             for idx, mol in enumerate(self.allowed_molecules[root]['molecules']):
-                                # 1) ICs + groups (groups should be identical for every mol)
                                 X_single, groups, types = self.impes_drivers[root].compute_ic_and_groups(mol.get_coordinates_in_bohr())
                                 if x_groups is None:
                                     x_groups = groups
-                                else:
-                                    # sanity: same layout across all mols
+                                else:                           
                                     assert all(np.array_equal(x_groups[k], groups[k]) for k in x_groups.keys()), "IC groups changed!"
 
                                 x_list.append(np.asarray(X_single, dtype=np.float64).reshape(1, -1))
 
-                                # 2) energies -> per-atom ΔE (use mol, not molecule!)
+                 
                                 interpolation_driver.compute(mol)
                                 im_energy = interpolation_driver.get_energy()
                                 self.allowed_molecules[root]['im_energies'][idx] = im_energy
@@ -2643,9 +2656,9 @@ class IMDatabasePointCollecter:
                                     ).reshape(-1)
                                 )
 
-                            # 3) stack batch
-                            X_np = np.vstack(x_list)              # (N,D)
-                            y_np = np.concatenate(y_list, axis=0) # (N,)
+   
+                            X_np = np.vstack(x_list)           
+                            y_np = np.concatenate(y_list, axis=0) 
                             new_idx = X_np.shape[0] - 1
 
                             drv = self.impes_drivers[root].gpr_intdriver
@@ -2660,19 +2673,15 @@ class IMDatabasePointCollecter:
                                 Xq  = X_t[new_idx:new_idx+1, :]    # (1,D)
                                 y_true = float(y_t[new_idx].cpu().numpy())
 
-                                # Transform with the CURRENT drv scalers (not refit yet)
                                 Xtr_std, ytr_std = drv._transform(Xtr, ytr)
                                 Xq_std           = drv._transform(Xq)
 
-                                # Latent prediction out-of-sample (using current drv trained on X_raw/y_raw)
-                                mu_lat, sig_lat = drv.predict_latent(Xq, return_std=True)  # add this method if you haven’t
+                                mu_lat, sig_lat = drv.predict_latent(Xq, return_std=True) 
                                 mu_lat = float(mu_lat.squeeze()); sig_lat = float(sig_lat.squeeze())
 
-                                # Effective distance of query to current training set
                                 d_eff = drv._min_effective_distance(Xq_std, Xtr_std, x_groups)
                                 s_max       = drv.max_kernel_similarity(Xq_std, Xtr_std, topk=5)
 
-                                # Scalar absolute residual for THIS query (QM label already available)
                                 abs_res = abs(y_true - mu_lat)
                                 if root in addition_of_state_specific_points:
                                     drv.record_similarity_event(s_max, True, abs_res, T=self.energy_threshold)
@@ -2687,12 +2696,7 @@ class IMDatabasePointCollecter:
 
                                     drv.record_distance_event(d_eff, False, abs_res, T=self.energy_threshold)
                                     drv.update_distance_threshold()
-                            
-                                
-
-
-                            
-
+                                              
             if self.add_a_point:    
             
                 if not self.expansion:

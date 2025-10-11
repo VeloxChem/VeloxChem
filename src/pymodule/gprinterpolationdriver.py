@@ -112,15 +112,6 @@ class GPRInterpolationDriver:
         angle_idx   = _active_dims(groups.get('angle', []))
         torsion_idx = _active_dims(groups.get('torsion', []))
 
-        self.group_names  = ["bond", "angle", "torsion"]
-        self.group_dims   = {
-            "bond":    _active_dims(groups.get("bond", [])),      # list[int]
-            "angle":   _active_dims(groups.get("angle", [])),
-            "torsion": _active_dims(groups.get("torsion", [])),
-        }
-
-        self.num_groups = sum(len(v) > 0 for v in self.group_dims.values())
-
         ls_prior = LogNormalPrior(0.0, 0.5)  # centered ~1.0 after standardization
         ls_constraint = Interval(
             torch.tensor(0.05, dtype=self.dtype, device=self.device),

@@ -1423,6 +1423,7 @@ class InterpolationDriver():
         constraints = []
         print(len(datapoints), self.z_matrix, self.symmetry_information)
         for datapoint in datapoints:
+            dihedral_difference = []
             internal_coord_elem_distance = []
             org_interal_coord_elem_distance = []
             for elem_idx, element in enumerate(self.z_matrix): 
@@ -1439,6 +1440,10 @@ class InterpolationDriver():
                     
                     internal_coord_elem_distance.append(np.sin(self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]))
                     org_interal_coord_elem_distance.append(np.cos(self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx]))
+
+                    if internal_coord_elem_distance[-1] > 0.3:
+                        dihedral_difference.append(element)
+                    
                 else:
                     org_interal_coord_elem_distance.append(1.0)
                     internal_coord_elem_distance.append(self.impes_coordinate.internal_coordinates_values[elem_idx] - datapoint.internal_coordinates_values[elem_idx])
@@ -1587,6 +1592,7 @@ class InterpolationDriver():
             else:
                 raise ValueError(f"Unknown selection_rule: {selection_rule}")
 
+            
 
             for idx in selected_idx:
                 coord = sorted_coords[idx]
@@ -1595,10 +1601,15 @@ class InterpolationDriver():
                 # optional symmetry filtering for torsions
                 if len(coord) == 4 and (tuple(sorted(coord)) in self.symmetry_information[7][3]):
                     continue
+                               
                 constraints.append(coord)
+            
+            for dev_dihedral in dihedral_difference:
+                if dev_dihedral in constraints:
+                    continue
+                
+                constraints.append(dev_dihedral)
 
-
-            # --- human-readable prints ---
             print('Top contributors (first 10):')
             for i, (pE, e_kcal, w_i, coord) in enumerate(sorted_contributions[:10]):
                 picked = 'SELECTED' if i in selected_idx else ''
@@ -1631,6 +1642,18 @@ class InterpolationDriver():
 
             # Print the sorted contributions with internal coordinates
             
+        #     for contrib, error, ind_weight, coord in sorted_contributions[:]:        
+        #         print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
+        #         if tuple(int(x) for x in coord) in constraints:
+        #             continue
+        #         if len(coord) == 2 and ind_weight > max(weights) * 0.7:
+        #             constraints.append(tuple(int(x) for x in coord))
+        #         elif len(coord) == 3 and ind_weight > max(weights) * 0.7:
+        #             constraints.append(tuple(int(x) for x in coord))
+        #         elif len(coord) == 4 and ind_weight > max(weights) * 0.7: #and tuple(sorted(coord)) not in self.symmetry_information[7][3] and tuple(sorted(coord)) not in self.symmetry_information[7][2]:
+        #             constraints.append(tuple(int(x) for x in coord))
+        #         print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Error: {error} kcal/mol')#, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()} kcal/mol')
+        #     print('Sum of Weights', sum(weights), sum(single_energy_error))
         #     for contrib, error, ind_weight, coord in sorted_contributions[:]:        
         #         print('additional coord', abs(ind_weight - max(weights)) < 1e-8)
         #         if tuple(int(x) for x in coord) in constraints:
