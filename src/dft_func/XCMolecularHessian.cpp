@@ -120,9 +120,13 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
         {
             return xchesslda::integrateVxcFockGradientForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xchessgga::integrateVxcFockGradientForGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
+        }
         else
         {
-            std::string erropenshell("XCMolecularHessian.integrateVxcFockGradient: Not implemented for open-shell GGA/meta-GGA");
+            std::string erropenshell("XCMolecularHessian.integrateVxcFockGradient: Not implemented for open-shell meta-GGA");
 
             errors::assertMsgCritical(false, erropenshell);
         }
