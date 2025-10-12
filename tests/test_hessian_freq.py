@@ -9,7 +9,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 
-@pytest.mark.solvers
 class TestHessianFrequencies:
 
     def run_hessian_freq(self, dispersion, ref_vib_freqs):
@@ -48,6 +47,7 @@ class TestHessianFrequencies:
             assert np.max(np.abs(calc_vib_freqs[:n_freqs] -
                                  ref_vib_freqs)) < 0.5
 
+    @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
     def test_hessian_freq_d4(self):
@@ -56,6 +56,7 @@ class TestHessianFrequencies:
         ref_vib_freqs = np.array([52.90, 57.96, 154.53, 199.51, 275.38])
         self.run_hessian_freq(dispersion, ref_vib_freqs)
 
+    @pytest.mark.timeconsuming
     def test_hessian_freq(self):
 
         dispersion = False
