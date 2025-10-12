@@ -76,9 +76,13 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
         {
             return xchesslda::integrateExcHessianForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xchessgga::integrateExcHessianForGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
         else
         {
-            std::string erropenshell("XCMolecularHessian.integrateExcHessian: Not implemented for open-shell GGA/meta-GGA");
+            std::string erropenshell("XCMolecularHessian.integrateExcHessian: Not implemented for open-shell meta-GGA");
 
             errors::assertMsgCritical(false, erropenshell);
         }

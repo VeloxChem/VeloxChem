@@ -61,6 +61,13 @@ auto integrateExcHessianForGgaClosedShell(const CMolecule&                  mole
                                           const double                      screeningThresholdForGTOValues,
                                           const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
+auto integrateExcHessianForGgaOpenShell(const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const std::vector<const double*>& gsDensityPointers,
+                                        const CMolecularGrid&   molecularGrid,
+                                        const double            screeningThresholdForGTOValues,
+                                        const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+
 /**
  Integrates GGA exchnage-correlation functional contribution to molecular
  gradient of Vxc matrix element.
