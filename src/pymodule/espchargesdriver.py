@@ -43,7 +43,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .inputparser import parse_input, print_keywords, get_random_string_parallel
+from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical, safe_solve
 
 
@@ -67,15 +67,12 @@ class EspChargesDriver:
         - number_layers: The number of layers of scaled van der Waals surfaces.
         - density: The density of grid points in points per square Angstrom.
         - equal_charges: The charges that are constrained to be equal.
-        - restrain_hydrogen: If hydrogens should be restrained or not.
         - weights: The weight factors of different conformers.
         - energies: The energies of different conformers for Boltzmann weight factors.
         - temperature: The temperature for Boltzmann weight factors.
         - net_charge: The charge of the molecule.
         - multiplicity: The multiplicity of the molecule.
         - method_dict: The dictionary of method settings.
-        - max_iter: The maximum number of iterations of the ESP fit.
-        - threshold: The convergence threshold of the ESP fit.
         - filename: The filename for the calculation.
         - xyz_file: The xyz file containing the conformers.
         - fitting_points: The fitting point on which charges are calculated.
@@ -107,8 +104,10 @@ class EspChargesDriver:
         self.filename = None
 
         # method
-        self.xcfun = None
         self.restart = True
+        self.conv_thresh = 1.0e-6
+        self.xcfun = None
+        self.grid_level = None
         self.solvation_model = None
 
         # conformers
@@ -140,16 +139,14 @@ class EspChargesDriver:
         # input keywords
         self._input_keywords = {
             'esp_charges': {
-                'restart': ('bool', 'restart from checkpoint file'),
+                'restart': ('bool', 'restart flag for SCF driver'),
+                'conv_thresh': ('float', 'convergence threshold for SCF driver'),
                 'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
                 'density': ('float', 'density of points in each layer'),
                 'chelpg_spacing': ('float', 'step size for CHELPG grid'),
                 'chelpg_margin': ('float', 'maximum radius for CHELPG grid'),
-                'restrain_hydrogen': ('bool', 'restrain hydrogen atoms'),
-                'max_iter': ('int', 'maximum iterations in ESP fit'),
-                'threshold': ('float', 'convergence threshold of ESP fit'),
                 'equal_charges': ('str', 'constraints for equal charges'),
                 'custom_mk_radii':
                     ('seq_fixed_str', 'custom MK radii for ESP charges'),
@@ -204,7 +201,7 @@ class EspChargesDriver:
         if 'filename' in esp_dict:
             self.filename = esp_dict['filename']
 
-    def compute(self, molecule, basis=None, scf_results=None):
+    def compute(self, molecule, basis=None, scf_results=None, flag=None):
         """
         Computes ESP charges.
 
@@ -218,6 +215,13 @@ class EspChargesDriver:
         :return:
             The charges.
         """
+
+        # backward compatibility
+        assert_msg_critical(
+            flag is None or flag.lower() == 'esp',
+            f'{type(self).__name__}.compute: Use of resp/esp flag is ' +
+            'deprecated. Please use either RespChargesDriver or ' +
+            'EspChargesDriver')
 
         if isinstance(molecule, list):
             # conformer-weighted esp charges
@@ -256,7 +260,7 @@ class EspChargesDriver:
                 self.equal_charges = eq_chgs
             assert_msg_critical(
                 isinstance(self.equal_charges, (list, tuple)),
-                'EspChargesDriver.compute: Invalid equal_charges')
+                f'{type(self).__name__}.compute: Invalid equal_charges')
 
         # check basis and scf_results
         if self.rank == mpi_master():
@@ -288,17 +292,18 @@ class EspChargesDriver:
             if self.filename is not None:
                 scf_drv.filename = self.filename
             scf_drv.restart = self.restart
+            scf_drv.conv_thresh = self.conv_thresh
             scf_drv.xcfun = self.xcfun
+            scf_drv.grid_level = self.grid_level
             scf_drv.solvation_model = self.solvation_model
             scf_results = scf_drv.compute(molecule, basis)
 
         # sanity check
-        if self.rank == mpi_master():
-            if nalpha != nbeta:
-                assert_msg_critical(
-                    scf_results['scf_type'] != 'restricted',
-                    'EspChargesDriver.compute: Molecule is open-shell while ' +
-                    'SCF is closed-shell')
+        if (self.rank == mpi_master()) and (nalpha != nbeta):
+            assert_msg_critical(
+                scf_results['scf_type'] != 'restricted',
+                f'{type(self).__name__}.compute: Molecule is open-shell ' +
+                'while SCF is closed-shell')
 
         grid_m = self.get_grid_points(molecule)
         esp_m = self.get_electrostatic_potential(grid_m, molecule, basis,
@@ -330,6 +335,12 @@ class EspChargesDriver:
             The charges.
         """
 
+        # sanity check for fitting_points
+        assert_msg_critical(
+            self.fitting_points is None,
+            f'{type(self).__name__}.compute: Cannot compute ESP charges on fitting '
+            + 'points for multiple conformers')
+
         # sanity check for equal_charges
         if self.equal_charges is not None:
             if isinstance(self.equal_charges, str):
@@ -340,7 +351,7 @@ class EspChargesDriver:
                 self.equal_charges = eq_chgs
             assert_msg_critical(
                 isinstance(self.equal_charges, (list, tuple)),
-                'EspChargesDriver.compute: Invalid equal_charges')
+                f'{type(self).__name__}.compute: Invalid equal_charges')
 
         molecules = molecule_list
         basis_sets = basis_set_list
@@ -356,12 +367,12 @@ class EspChargesDriver:
         if self.rank == mpi_master():
             if self.weights is not None and self.energies is not None:
                 # avoid conflict between weights and energies
-                errmsg = 'EspChargesDriver: Please do not specify weights and '
+                errmsg = f'{type(self).__name__}: Please do not specify weights and '
                 errmsg += 'energies at the same time.'
                 assert_msg_critical(False, errmsg)
 
             elif self.weights is not None:
-                errmsg = 'EspChargesDriver: Number of weights does not match '
+                errmsg = f'{type(self).__name__}: Number of weights does not match '
                 errmsg += 'number of conformers.'
                 assert_msg_critical(len(self.weights) == len(molecules), errmsg)
                 # normalize weights
@@ -369,7 +380,7 @@ class EspChargesDriver:
                 self.weights = [w / sum_of_weights for w in self.weights]
 
             elif self.energies is not None:
-                errmsg = 'EspChargesDriver: Number of energies does not match '
+                errmsg = f'{type(self).__name__}: Number of energies does not match '
                 errmsg += 'number of conformers.'
                 assert_msg_critical(
                     len(self.energies) == len(molecules), errmsg)
@@ -395,15 +406,18 @@ class EspChargesDriver:
             if self.filename is not None:
                 output_dir = Path(self.filename + '_files')
             else:
-                name_string = get_random_string_parallel(self.comm)
-                output_dir = Path('vlx_' + name_string + '_files')
+                output_dir = None
 
             if self.rank == mpi_master():
-                output_dir.mkdir(parents=True, exist_ok=True)
+                if output_dir is not None:
+                    output_dir.mkdir(parents=True, exist_ok=True)
             self.comm.barrier()
 
-            ostream_fname = str(output_dir / f'conformer_{ind + 1}')
-            ostream = OutputStream(ostream_fname + '.out')
+            if output_dir is not None:
+                ostream_fname = str(output_dir / f'conformer_{ind + 1}')
+                ostream = OutputStream(ostream_fname + '.out')
+            else:
+                ostream = self.ostream
 
             # select SCF driver
             if nalpha == nbeta:
@@ -413,10 +427,14 @@ class EspChargesDriver:
             if self.filename is not None:
                 scf_drv.filename = self.filename
             scf_drv.restart = self.restart
+            scf_drv.conv_thresh = self.conv_thresh
             scf_drv.xcfun = self.xcfun
+            scf_drv.grid_level = self.grid_level
             scf_drv.solvation_model = self.solvation_model
             scf_results = scf_drv.compute(mol, bas)
-            ostream.close()
+
+            if output_dir is not None:
+                ostream.close()
 
             grid_m = self.get_grid_points(mol)
             esp_m = self.get_electrostatic_potential(grid_m, mol, bas,
@@ -429,21 +447,17 @@ class EspChargesDriver:
                 scf_energies.append(scf_energy_m)
 
         if self.rank == mpi_master():
-            if self.energies is None:
-                self.energies = scf_energies
-            if self.weights is None:
-                self.weights = self.get_boltzmann_weights(
-                    self.energies, self.temperature)
-
-        q = None
-
-        if self.rank == mpi_master():
-            if self.fitting_points is not None:
-                q = self.compute_esp_charges_on_fitting_points(
-                    molecules, grids, esp)
+            if self.weights is not None:
+                weights = self.weights
+            elif self.energies is not None:
+                weights = self.get_boltzmann_weights(self.energies,
+                                                     self.temperature)
             else:
-                q = self.compute_esp_charges(molecules, grids, esp,
-                                             self.weights)
+                weights = self.get_boltzmann_weights(scf_energies,
+                                                     self.temperature)
+            q = self.compute_esp_charges(molecules, grids, esp, weights)
+        else:
+            q = None
 
         return q
 
@@ -605,76 +619,6 @@ class EspChargesDriver:
 
         return q[:n_points]
 
-    def optimize_charges(self, molecules, grids, esp, weights, q0, constr,
-                         restraint_strength):
-        """
-        Iterative procedure to optimize charges for a single stage of the ESP fit.
-
-        :param molecules:
-            The list of molecules.
-        :param grids:
-            The list of grid points.
-        :param esp:
-            The QM ESP on grid points.
-        :param weights:
-            The weight factors of different conformers.
-        :param q0:
-            The intial charges.
-        :param constr:
-            The constraints of the charges.
-        :param restraint_strength:
-            The strength of the hyperbolic penalty function (used in RESP).
-
-        :return:
-            The optimized charges.
-        """
-
-        n_atoms = molecules[0].number_of_atoms()
-
-        # initializes equation system
-        a, b = self.generate_equation_system(molecules, grids, esp, weights, q0,
-                                             constr)
-        q_new = np.concatenate((q0, np.zeros(b.size - n_atoms)), axis=None)
-
-        fitting_converged = False
-        current_iteration = 0
-
-        # iterative ESP fitting procedure
-        for iteration in range(self.max_iter):
-            q_old = q_new
-
-            # add restraint to matrix a
-            rstr = np.zeros(b.size)
-            for i in range(n_atoms):
-                if (not self.restrain_hydrogen and
-                        molecules[0].get_labels()[i] == 'H'):
-                    continue
-                elif constr[i] == -1:
-                    continue
-                else:
-                    # eq.10, J. Phys. Chem. 1993, 97, 10269-10280
-                    rstr[i] += restraint_strength / np.sqrt(q_old[i]**2 +
-                                                            0.1**2)
-            a_tot = a + np.diag(rstr)
-
-            q_new = safe_solve(a_tot, b)
-            dq_norm = np.linalg.norm(q_new - q_old)
-
-            current_iteration = iteration
-            if dq_norm < self.threshold:
-                fitting_converged = True
-                break
-
-        errmsg = 'EspChargesDriver: Charge fitting is not converged!'
-        assert_msg_critical(fitting_converged, errmsg)
-
-        cur_str = '*** Charge fitting converged in '
-        cur_str += f'{current_iteration + 1} iterations.'
-        self.ostream.print_header(cur_str.ljust(40))
-        self.ostream.print_blank()
-
-        return q_new[:n_atoms]
-
     def generate_equation_system(self,
                                  molecules,
                                  grids,
@@ -784,8 +728,8 @@ class EspChargesDriver:
 
         else:
             assert_msg_critical(
-                False,
-                'EspChargesDriver.compute: Invalid grid_type ' + self.grid_type)
+                False, f'{type(self).__name__}.compute: Invalid grid_type ' +
+                self.grid_type)
 
     def get_grid_points_mk(self, molecule):
         """
@@ -806,8 +750,8 @@ class EspChargesDriver:
         if self.custom_mk_radii is not None:
             assert_msg_critical(
                 len(self.custom_mk_radii) % 2 == 0,
-                'EspChargesDriver: expecting even number of entries for ' +
-                'user-defined MK radii')
+                f'{type(self).__name__}: expecting even number of entries for '
+                + 'user-defined MK radii')
 
             keys = self.custom_mk_radii[0::2]
             vals = self.custom_mk_radii[1::2]
@@ -820,7 +764,7 @@ class EspChargesDriver:
                     idx = int(key) - 1
                     assert_msg_critical(
                         0 <= idx and idx < molecule.number_of_atoms(),
-                        'EspChargesDriver: invalid atom index for ' +
+                        f'{type(self).__name__}: invalid atom index for ' +
                         'user-defined MK radii')
                     mol_mk_radii[idx] = val_au
                     self.ostream.print_info(
@@ -1113,13 +1057,14 @@ class EspChargesDriver:
         cur_str = 'Number of Conformers         :  ' + str(n_conf)
         self.ostream.print_header(cur_str.ljust(str_width))
         if n_conf > 1:
-            cur_str = 'Weights of Conformers        :  {:4f}'.format(
-                self.weights[0])
-            self.ostream.print_header(cur_str.ljust(str_width))
-            for i in range(1, n_conf):
-                cur_str = '                                {:4f}'.format(
-                    self.weights[i])
+            if self.weights is not None:
+                cur_str = 'Weights of Conformers        :  {:4f}'.format(
+                    self.weights[0])
                 self.ostream.print_header(cur_str.ljust(str_width))
+                for i in range(1, n_conf):
+                    cur_str = '                                {:4f}'.format(
+                        self.weights[i])
+                    self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.grid_type == 'mk':
             cur_str = 'Number of Layers             :  ' + str(
@@ -1242,7 +1187,7 @@ class EspChargesDriver:
 
         assert_msg_critical(
             self.xyz_file is not None,
-            'EspChargesDriver.compute: xyz_file not specified')
+            f'{type(self).__name__}.compute: xyz_file not specified')
 
         if self.rank == mpi_master():
             with open(self.xyz_file, 'r') as f_xyz:
@@ -1262,7 +1207,8 @@ class EspChargesDriver:
 
                 assert_msg_critical(
                     int(xyz_lines[i_start].split()[0]) == n_atoms,
-                    'EspChargesDriver.compute: inconsistent number of atoms')
+                    f'{type(self).__name__}.compute: inconsistent number of atoms'
+                )
 
                 mol_str = ''.join(xyz_lines[i_start + 2:i_end])
 
