@@ -607,4 +607,31 @@ partition_atoms(const int natoms, const int rank, const int nodes) -> std::vecto
     return omp::partition_tasks(atoms, rank, nodes);
 }
 
+auto
+partition_flat_buffer(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
+                      const int                                ithreshold) -> std::vector<std::array<size_t, 4>>
+{
+    auto indices = std::vector<std::array<size_t, 4>>();
+    
+    if (const auto ngpblocks = gto_pair_blocks.size(); ngpblocks > 0)
+    {
+        size_t start = 0;
+        
+        for (size_t i = 0; i < ngpblocks; i++)
+        {
+            for (int j = 0; j <= ithreshold; j++)
+            {
+                if (const auto nterms = gto_pair_blocks[i].unique_terms(j); nterms > 0)
+                {
+                    indices.push_back(std::array<size_t, 4>({i, (size_t)j, start, nterms}));
+                    
+                    start += nterms;
+                }
+            }
+        }
+    }
+
+    return indices;
+}
+
 }  // namespace omp

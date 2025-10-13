@@ -163,6 +163,5 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis,
         }
     }
     
-    
     return buffer;
 }

@@ -7,6 +7,7 @@ from veloxchem.veloxchemlib import make_gto_pair_blocks
 from veloxchem.veloxchemlib import make_work_tasks
 from veloxchem.veloxchemlib import make_diag_work_tasks
 from veloxchem.veloxchemlib import make_work_group
+from veloxchem.veloxchemlib import partition_flat_buffer
 from veloxchem.veloxchemlib import T4CScreener
 
 
@@ -237,3 +238,21 @@ class TestOpenMPFunc:
         assert wtasks == rtasks
 
         set_number_of_threads(nthreads)
+
+    def test_partition_flat_buffer(self):
+
+        mol_h2o, bas_svp = self.get_data()
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_svp, mol_h2o, 'eri')
+
+        indices = partition_flat_buffer(t4c_drv.gto_pair_blocks(), 12)
+        ref_indices = [[0, 0, 0, 1], [0, 1, 1, 9], [1, 1, 10, 8], [2, 1, 18, 4],
+                       [3, 1, 22, 36], [4, 1, 58, 12], [5, 1, 70, 20],
+                       [6, 1, 90, 3], [7, 2, 93, 2], [8, 1, 95, 18],
+                       [9, 1, 113, 6], [10, 1, 119, 10], [11, 0, 129, 1],
+                       [12, 1, 130, 6], [12, 2, 136, 3], [13, 1, 139, 3],
+                       [14, 2, 142, 5], [15, 1, 147, 45], [16, 1, 192, 27],
+                       [17, 1, 219, 45], [18, 0, 264, 6], [19, 1, 270, 15],
+                       [20, 1, 285, 15]]
+        assert indices == ref_indices

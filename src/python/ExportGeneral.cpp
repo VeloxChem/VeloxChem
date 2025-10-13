@@ -226,7 +226,8 @@ export_general(py::module &m) -> void
           "Gets work group for ERIs.");
     m.def("make_bra_ket_work_group", &omp::make_bra_ket_work_group, "Gets work group for ERIs.");
     m.def("partition_atoms", &omp::partition_atoms, "Get atomic indices of partitioned atoms list.");
-
+    m.def("partition_flat_buffer", &omp::partition_flat_buffer, "Creates vector of indices required for partitioning of flat buffer.");
+    
     // exposing functions from SphericalMomentum.hpp
     m.def("spherical_momentum_s_factors", spher_mom::transformation_factors<0>, "Gets transformation factors for S type spherical momentum.");
     m.def("spherical_momentum_p_factors", spher_mom::transformation_factors<1>, "Gets transformation factors for P type spherical momentum.");

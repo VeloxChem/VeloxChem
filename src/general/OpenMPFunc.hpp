@@ -177,6 +177,13 @@ auto partition_tasks(const std::vector<T>& tasks, const int rank, const int node
 /// @return The reduced vector of atomic indices.
 auto partition_atoms(const int natoms, const int rank, const int nodes) -> std::vector<int>;
 
+/// @brief Generates partitioning of flat buffer.
+/// @param gto_pair_blocks The vector of basis functions pair blocks.
+/// @param ithreshold The screening threshold of integrals.
+/// @return The vector of partitioning indices.
+auto partition_flat_buffer(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
+                           const int                                ithreshold) -> std::vector<std::array<size_t, 4>>;
+
 }  // namespace omp
 
 #endif /* OpenMPFunc_hpp */
