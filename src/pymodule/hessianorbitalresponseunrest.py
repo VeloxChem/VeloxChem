@@ -297,72 +297,81 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         # Note: Parallelization of DFT integration is done over grid points
         # instead of atoms.
 
-        assert_msg_critical(
-            not self._dft, 'UnrestrictedHessianOrbitalResponse: ' +
-            'DFT not yet implemented.')
+        profiler.start_timer('dXC')
 
-        #profiler.start_timer('dXC')
+        if self._dft:
+            xc_mol_hess = XCMolecularHessian()
 
-        #if self._dft:
-        #    xc_mol_hess = XCMolecularHessian()
+            if atom_pairs is None:
+                naos = basis.get_dimensions_of_basis()
 
-        #    if atom_pairs is None:
-        #        naos = basis.get_dimensions_of_basis()
+                batch_size = get_batch_size(None, natm * 3, naos, self.comm)
+                batch_size = batch_size // 3
 
-        #        batch_size = get_batch_size(None, natm * 3, naos, self.comm)
-        #        batch_size = batch_size // 3
+                num_batches = natm // batch_size
+                if natm % batch_size != 0:
+                    num_batches += 1
+            else:
+                ao_map = basis.get_ao_basis_map(molecule)
+                # Create a dictionary of the amount of AOs per atom
+                aos_per_atom = dict(
+                    Counter(int(ao.strip().split()[0]) - 1 for ao in ao_map))
+                # Calculate total number of AOs for atoms in atoms_in_pairs
+                naos_in_pairs = sum(
+                    aos_per_atom.get(atom, 0) for atom in atoms_in_pairs)
+                batch_size = get_batch_size(None, natm_in_pairs * 3,
+                                            naos_in_pairs, self.comm)
+                batch_size = batch_size // 3
 
-        #        num_batches = natm // batch_size
-        #        if natm % batch_size != 0:
-        #            num_batches += 1
-        #    else:
-        #        ao_map = basis.get_ao_basis_map(molecule)
-        #        # Create a dictionary of the amount of AOs per atom
-        #        aos_per_atom = dict(
-        #            Counter(int(ao.strip().split()[0]) - 1 for ao in ao_map))
-        #        # Calculate total number of AOs for atoms in atoms_in_pairs
-        #        naos_in_pairs = sum(
-        #            aos_per_atom.get(atom, 0) for atom in atoms_in_pairs)
-        #        batch_size = get_batch_size(None, natm_in_pairs * 3,
-        #                                    naos_in_pairs, self.comm)
-        #        batch_size = batch_size // 3
+                num_batches = natm_in_pairs // batch_size
+                if natm % batch_size != 0:
+                    num_batches += 1
 
-        #        num_batches = natm_in_pairs // batch_size
-        #        if natm % batch_size != 0:
-        #            num_batches += 1
+            for batch_ind in range(num_batches):
 
-        #    for batch_ind in range(num_batches):
+                if atom_pairs is None:
+                    batch_start = batch_ind * batch_size
+                    batch_end = min(batch_start + batch_size, natm)
 
-        #        if atom_pairs is None:
-        #            batch_start = batch_ind * batch_size
-        #            batch_end = min(batch_start + batch_size, natm)
+                    atom_list = list(range(batch_start, batch_end))
+                else:
+                    batch_start = batch_ind * batch_size
+                    batch_end = min(batch_start + batch_size, natm_in_pairs)
 
-        #            atom_list = list(range(batch_start, batch_end))
-        #        else:
-        #            batch_start = batch_ind * batch_size
-        #            batch_end = min(batch_start + batch_size, natm_in_pairs)
+                    atom_list = atoms_in_pairs[batch_start:batch_end]
 
-        #            atom_list = atoms_in_pairs[batch_start:batch_end]
+                vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
+                    molecule, basis, gs_density, mol_grid,
+                    self.xcfun.get_func_label(), atom_list)
 
-        #        vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
-        #            molecule, basis, gs_density, mol_grid,
-        #            self.xcfun.get_func_label(), atom_list)
+                for vecind, (iatom, root_rank) in enumerate(
+                        all_atom_idx_rank[batch_start:batch_end]):
 
-        #        for vecind, (iatom, root_rank) in enumerate(
-        #                all_atom_idx_rank[batch_start:batch_end]):
+                    # alpha
+                    for x in range(3):
+                        vxc_deriv_ix = self.comm.reduce(
+                            vxc_deriv_batch[vecind * 6 + 0 + x])
 
-        #            for x in range(3):
-        #                vxc_deriv_ix = self.comm.reduce(
-        #                    vxc_deriv_batch[vecind * 3 + x])
+                        dist_vxc_deriv_ix = DistributedArray(
+                            vxc_deriv_ix, self.comm)
 
-        #                dist_vxc_deriv_ix = DistributedArray(
-        #                    vxc_deriv_ix, self.comm)
+                        key_ix = (iatom, x)
+                        dist_fock_deriv_ao_a[
+                            key_ix].data += dist_vxc_deriv_ix.data
 
-        #                key_ix = (iatom, x)
-        #                dist_fock_deriv_ao[
-        #                    key_ix].data += dist_vxc_deriv_ix.data
+                    # beta
+                    for x in range(3):
+                        vxc_deriv_ix = self.comm.reduce(
+                            vxc_deriv_batch[vecind * 6 + 3 + x])
 
-        #profiler.stop_timer('dXC')
+                        dist_vxc_deriv_ix = DistributedArray(
+                            vxc_deriv_ix, self.comm)
+
+                        key_ix = (iatom, x)
+                        dist_fock_deriv_ao_b[
+                            key_ix].data += dist_vxc_deriv_ix.data
+
+        profiler.stop_timer('dXC')
 
         t1 = tm.time()
 
