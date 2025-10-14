@@ -239,13 +239,13 @@ class RespChargesDriver(EspChargesDriver):
                 cur_str = 'Ignoring scf_results since multiple molecules were '
                 cur_str += 'provided.'
                 self.ostream.print_warning(cur_str)
-            molecule_list = molecule
-            return self.compute_multiple_molecules(molecule_list, basis)
+            molecules = molecule
+            return self._compute_multiple_molecules(molecules, basis)
         else:
             # single molecule resp charges
-            return self.compute_single_molecule(molecule, basis, scf_results)
+            return self._compute_single_molecule(molecule, basis, scf_results)
 
-    def compute_single_molecule(self, molecule, basis=None, scf_results=None):
+    def _compute_single_molecule(self, molecule, basis=None, scf_results=None):
         """
         Computes RSP charges for a single molecule.
 
@@ -260,215 +260,31 @@ class RespChargesDriver(EspChargesDriver):
             The ESP charges.
         """
 
-        # sanity check for equal_charges
-        if self.equal_charges is not None:
-            if isinstance(self.equal_charges, str):
-                eq_chgs = []
-                for q in self.equal_charges.split(','):
-                    if q:
-                        eq_chgs.append(list(map(int, q.split('='))))
-                self.equal_charges = eq_chgs
-            assert_msg_critical(
-                isinstance(self.equal_charges, (list, tuple)),
-                f'{type(self).__name__}.compute: Invalid equal_charges')
-
-        # sanity check for RESP
-        assert_msg_critical(
-            self.grid_type == 'mk',
-            f'{type(self).__name__}.compute: For RESP charges, ' +
-            'grid_type must be \'mk\'')
-
-        # check basis and scf_results
-        if self.rank == mpi_master():
-            need_basis = (basis is None)
-            need_scf = (scf_results is None)
-        else:
-            need_basis = None
-            need_scf = None
-        need_basis, need_scf = self.comm.bcast((need_basis, need_scf),
-                                               root=mpi_master())
-
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-
-        # default basis is 6-31g*
-        if need_basis:
-            if self.rank == mpi_master():
-                basis = MolecularBasis.read(molecule,
-                                            '6-31g*',
-                                            ostream=self.ostream)
-            basis = self.comm.bcast(basis, root=mpi_master())
-        else:
-            use_631gs_basis = (basis.get_label() in ['6-31G*', '6-31G_D_'])
-            if not use_631gs_basis:
-                cur_str = 'Recommended basis set 6-31G* is not used!'
-                self.ostream.print_warning(cur_str)
-                self.ostream.print_blank()
-
-        # run SCF if needed
-        if need_scf:
-            if nalpha == nbeta:
-                scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-            else:
-                scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
-            if self.filename is not None:
-                scf_drv.filename = self.filename
-            scf_drv.restart = self.restart
-            scf_drv.conv_thresh = self.conv_thresh
-            scf_drv.xcfun = self.xcfun
-            scf_drv.grid_level = self.grid_level
-            scf_drv.solvation_model = self.solvation_model
-            scf_results = scf_drv.compute(molecule, basis)
-
-        # sanity check
-        if (self.rank == mpi_master()) and (nalpha != nbeta):
-            assert_msg_critical(
-                scf_results['scf_type'] != 'restricted',
-                f'{type(self).__name__}.compute: Molecule is open-shell ' +
-                'while SCF is closed-shell')
-
-        grid_m = self.get_grid_points(molecule)
-        esp_m = self.get_electrostatic_potential(grid_m, molecule, basis,
-                                                 scf_results)
-
-        q = None
+        grid_m, esp_m = self._get_grid_esp_for_single_mol(
+            molecule, basis, scf_results, use_resp_sanity_check=True)
 
         if self.rank == mpi_master():
             q = self.compute_resp_charges([molecule], [grid_m], [esp_m], [1.0])
+        else:
+            q = None
 
         return q
 
-    def compute_multiple_molecules(self, molecule_list, basis_set_list=None):
+    def _compute_multiple_molecules(self, molecules, basis_sets=None):
         """
         Computes conformer-weighted RESP charges.
 
-        :param molecule_list:
+        :param molecules:
             The list of molecules.
-        :param basis_set_list:
+        :param basis_sets:
             The list of molecular basis set.
 
         :return:
             The charges.
         """
 
-        # sanity check for equal_charges
-        if self.equal_charges is not None:
-            if isinstance(self.equal_charges, str):
-                eq_chgs = []
-                for q in self.equal_charges.split(','):
-                    if q:
-                        eq_chgs.append(list(map(int, q.split('='))))
-                self.equal_charges = eq_chgs
-            assert_msg_critical(
-                isinstance(self.equal_charges, (list, tuple)),
-                f'{type(self).__name__}.compute: Invalid equal_charges')
-
-        # sanity check for RESP
-        assert_msg_critical(
-            self.grid_type == 'mk',
-            f'{type(self).__name__}.compute: For RESP charges, ' +
-            'grid_type must be \'mk\'')
-
-        molecules = molecule_list
-        basis_sets = basis_set_list
-
-        if basis_sets is None:
-            if self.rank == mpi_master():
-                basis_sets = [
-                    MolecularBasis.read(mol, '6-31g*', verbose=False)
-                    for mol in molecules
-                ]
-            basis_sets = self.comm.bcast(basis_sets, root=mpi_master())
-        else:
-            use_631gs_basis = all([
-                bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets
-            ])
-            if not use_631gs_basis:
-                cur_str = 'Recommended basis set 6-31G* is not used!'
-                self.ostream.print_warning(cur_str)
-                self.ostream.print_blank()
-
-        if self.rank == mpi_master():
-            if self.weights is not None and self.energies is not None:
-                # avoid conflict between weights and energies
-                errmsg = f'{type(self).__name__}: Please do not specify weights and '
-                errmsg += 'energies at the same time.'
-                assert_msg_critical(False, errmsg)
-
-            elif self.weights is not None:
-                errmsg = f'{type(self).__name__}: Number of weights does not match '
-                errmsg += 'number of conformers.'
-                assert_msg_critical(len(self.weights) == len(molecules), errmsg)
-                # normalize weights
-                sum_of_weights = sum(self.weights)
-                self.weights = [w / sum_of_weights for w in self.weights]
-
-            elif self.energies is not None:
-                errmsg = f'{type(self).__name__}: Number of energies does not match '
-                errmsg += 'number of conformers.'
-                assert_msg_critical(
-                    len(self.energies) == len(molecules), errmsg)
-
-        grids = []
-        esp = []
-        scf_energies = []
-
-        for ind, (mol, bas) in enumerate(zip(molecules, basis_sets)):
-            info_text = f'Processing conformer {ind + 1}...'
-            self.ostream.print_info(info_text)
-            self.ostream.print_blank()
-            self.ostream.print_block(mol.get_string())
-            self.ostream.print_block(mol.more_info())
-            self.ostream.print_blank()
-            self.ostream.print_block(bas.get_string('Atomic Basis'))
-            self.ostream.flush()
-
-            nalpha = mol.number_of_alpha_electrons()
-            nbeta = mol.number_of_beta_electrons()
-
-            # run SCF
-            if self.filename is not None:
-                output_dir = Path(self.filename + '_files')
-            else:
-                output_dir = None
-
-            if self.rank == mpi_master():
-                if output_dir is not None:
-                    output_dir.mkdir(parents=True, exist_ok=True)
-            self.comm.barrier()
-
-            if output_dir is not None:
-                ostream_fname = str(output_dir / f'conformer_{ind + 1}')
-                ostream = OutputStream(ostream_fname + '.out')
-            else:
-                ostream = self.ostream
-
-            # select SCF driver
-            if nalpha == nbeta:
-                scf_drv = ScfRestrictedDriver(self.comm, ostream)
-            else:
-                scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
-            if self.filename is not None:
-                scf_drv.filename = self.filename
-            scf_drv.restart = self.restart
-            scf_drv.conv_thresh = self.conv_thresh
-            scf_drv.xcfun = self.xcfun
-            scf_drv.grid_level = self.grid_level
-            scf_drv.solvation_model = self.solvation_model
-            scf_results = scf_drv.compute(mol, bas)
-
-            if output_dir is not None:
-                ostream.close()
-
-            grid_m = self.get_grid_points(mol)
-            esp_m = self.get_electrostatic_potential(grid_m, mol, bas,
-                                                     scf_results)
-            scf_energy_m = scf_drv.get_scf_energy()
-
-            if self.rank == mpi_master():
-                grids.append(grid_m)
-                esp.append(esp_m)
-                scf_energies.append(scf_energy_m)
+        grids, esp, scf_energies = self._get_grid_esp_ene_for_multi_mol(
+            molecules, basis_sets, use_resp_sanity_check=True)
 
         if self.rank == mpi_master():
             if self.weights is not None:

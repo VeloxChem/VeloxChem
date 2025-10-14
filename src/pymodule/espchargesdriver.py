@@ -230,15 +230,19 @@ class EspChargesDriver:
                 cur_str = 'Ignoring scf_results since multiple molecules were '
                 cur_str += 'provided.'
                 self.ostream.print_warning(cur_str)
-            molecule_list = molecule
-            return self.compute_multiple_molecules(molecule_list, basis)
+            molecules = molecule
+            return self._compute_multiple_molecules(molecules, basis)
         else:
             # single molecule esp charges
-            return self.compute_single_molecule(molecule, basis, scf_results)
+            return self._compute_single_molecule(molecule, basis, scf_results)
 
-    def compute_single_molecule(self, molecule, basis=None, scf_results=None):
+    def _get_grid_esp_for_single_mol(self,
+                                     molecule,
+                                     basis=None,
+                                     scf_results=None,
+                                     use_resp_sanity_check=False):
         """
-        Computes ESP charges for a single molecule.
+        Gets grid and ESP for a single molecule.
 
         :param molecule:
             The molecule.
@@ -248,8 +252,15 @@ class EspChargesDriver:
             The SCF results.
 
         :return:
-            The ESP charges.
+            The grid and ESP.
         """
+
+        if use_resp_sanity_check:
+            # sanity check for RESP
+            assert_msg_critical(
+                self.grid_type == 'mk',
+                f'{type(self).__name__}.compute: For RESP charges, ' +
+                'grid_type must be \'mk\'')
 
         # sanity check for equal_charges
         if self.equal_charges is not None:
@@ -284,6 +295,13 @@ class EspChargesDriver:
                                             ostream=self.ostream)
             basis = self.comm.bcast(basis, root=mpi_master())
 
+        if use_resp_sanity_check:
+            use_631gs_basis = (basis.get_label() in ['6-31G*', '6-31G_D_'])
+            if not use_631gs_basis:
+                cur_str = 'Recommended basis set 6-31G* is not used!'
+                self.ostream.print_warning(cur_str)
+                self.ostream.print_blank()
+
         # run SCF if needed
         if need_scf:
             if nalpha == nbeta:
@@ -310,7 +328,25 @@ class EspChargesDriver:
         esp_m = self.get_electrostatic_potential(grid_m, molecule, basis,
                                                  scf_results)
 
-        q = None
+        return grid_m, esp_m
+
+    def _compute_single_molecule(self, molecule, basis=None, scf_results=None):
+        """
+        Computes ESP charges for a single molecule.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The molecular basis set.
+        :param scf_results:
+            The SCF results.
+
+        :return:
+            The ESP charges.
+        """
+
+        grid_m, esp_m = self._get_grid_esp_for_single_mol(
+            molecule, basis, scf_results)
 
         if self.rank == mpi_master():
             if self.fitting_points is not None:
@@ -320,27 +356,37 @@ class EspChargesDriver:
             else:
                 q = self.compute_esp_charges([molecule], [grid_m], [esp_m],
                                              [1.0])
+        else:
+            q = None
 
         return q
 
-    def compute_multiple_molecules(self, molecule_list, basis_set_list=None):
+    def _get_grid_esp_ene_for_multi_mol(self,
+                                        molecules,
+                                        basis_sets=None,
+                                        use_resp_sanity_check=False):
         """
-        Computes conformer-weighted ESP charges.
+        Gets grid, ESP and SCF energies for multiple molecules.
 
-        :param molecule_list:
+        :param molecules:
             The list of molecules.
-        :param basis_set_list:
+        :param basis_sets:
             The list of molecular basis set.
 
         :return:
-            The charges.
+            The grid, ESP and SCF energies.
         """
 
-        # sanity check for fitting_points
-        assert_msg_critical(
-            self.fitting_points is None,
-            f'{type(self).__name__}.compute: Cannot compute ESP charges on fitting '
-            + 'points for multiple conformers')
+        if use_resp_sanity_check:
+            assert_msg_critical(
+                self.grid_type == 'mk',
+                f'{type(self).__name__}.compute: For RESP charges, ' +
+                'grid_type must be \'mk\'')
+        else:
+            assert_msg_critical(
+                self.fitting_points is None,
+                f'{type(self).__name__}.compute: Cannot compute ESP charges on fitting '
+                + 'points for multiple conformers')
 
         # sanity check for equal_charges
         if self.equal_charges is not None:
@@ -354,9 +400,7 @@ class EspChargesDriver:
                 isinstance(self.equal_charges, (list, tuple)),
                 f'{type(self).__name__}.compute: Invalid equal_charges')
 
-        molecules = molecule_list
-        basis_sets = basis_set_list
-
+        # default basis is 6-31g*
         if basis_sets is None:
             if self.rank == mpi_master():
                 basis_sets = [
@@ -364,6 +408,15 @@ class EspChargesDriver:
                     for mol in molecules
                 ]
             basis_sets = self.comm.bcast(basis_sets, root=mpi_master())
+
+        if use_resp_sanity_check:
+            use_631gs_basis = all([
+                bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets
+            ])
+            if not use_631gs_basis:
+                cur_str = 'Recommended basis set 6-31G* is not used!'
+                self.ostream.print_warning(cur_str)
+                self.ostream.print_blank()
 
         if self.rank == mpi_master():
             if self.weights is not None and self.energies is not None:
@@ -446,6 +499,24 @@ class EspChargesDriver:
                 grids.append(grid_m)
                 esp.append(esp_m)
                 scf_energies.append(scf_energy_m)
+
+        return grids, esp, scf_energies
+
+    def _compute_multiple_molecules(self, molecules, basis_sets=None):
+        """
+        Computes conformer-weighted ESP charges.
+
+        :param molecules:
+            The list of molecules.
+        :param basis_sets:
+            The list of molecular basis set.
+
+        :return:
+            The charges.
+        """
+
+        grids, esp, scf_energies = self._get_grid_esp_ene_for_multi_mol(
+            molecules, basis_sets)
 
         if self.rank == mpi_master():
             if self.weights is not None:
