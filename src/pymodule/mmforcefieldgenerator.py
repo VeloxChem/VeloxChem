@@ -1180,8 +1180,7 @@ class MMForceFieldGenerator:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
                 resp_drv.ostream.mute()
-                self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        'resp')
+                self.partial_charges = resp_drv.compute(self.molecule, basis)
                 resp_drv.ostream.unmute()
 
                 self.partial_charges = self.comm.bcast(self.partial_charges,
@@ -1205,7 +1204,7 @@ class MMForceFieldGenerator:
 
                 resp_drv.ostream.mute()
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        scf_results, 'resp')
+                                                        scf_results)
                 resp_drv.ostream.unmute()
 
                 self.partial_charges = self.comm.bcast(self.partial_charges,
