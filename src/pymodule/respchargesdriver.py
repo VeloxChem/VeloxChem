@@ -31,15 +31,11 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
-from .molecularbasis import MolecularBasis
-from .scfrestdriver import ScfRestrictedDriver
-from .scfunrestdriver import ScfUnrestrictedDriver
 from .espchargesdriver import EspChargesDriver
 from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical, safe_solve
@@ -194,6 +190,9 @@ class RespChargesDriver(EspChargesDriver):
             The dicitonary of method settings.
         """
 
+        if method_dict is None:
+            method_dict = {}
+
         resp_keywords = {
             key: val[0]
             for key, val in self._input_keywords['resp_charges'].items()
@@ -227,11 +226,14 @@ class RespChargesDriver(EspChargesDriver):
         """
 
         # backward compatibility
-        assert_msg_critical(
-            flag is None or flag.lower() == 'resp',
+        flag_err_msg = (
             f'{type(self).__name__}.compute: Use of resp/esp flag is ' +
             'deprecated. Please use either RespChargesDriver or ' +
             'EspChargesDriver')
+        assert_msg_critical((scf_results is None) or
+                            isinstance(scf_results, dict), flag_err_msg)
+        assert_msg_critical((flag is None) or (flag.lower() == 'resp'),
+                            flag_err_msg)
 
         if isinstance(molecule, list):
             # conformer-weighted resp charges

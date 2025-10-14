@@ -185,6 +185,9 @@ class EspChargesDriver:
             The dicitonary of method settings.
         """
 
+        if method_dict is None:
+            method_dict = {}
+
         esp_keywords = {
             key: val[0]
             for key, val in self._input_keywords['esp_charges'].items()
@@ -218,11 +221,14 @@ class EspChargesDriver:
         """
 
         # backward compatibility
-        assert_msg_critical(
-            flag is None or flag.lower() == 'esp',
+        flag_err_msg = (
             f'{type(self).__name__}.compute: Use of resp/esp flag is ' +
             'deprecated. Please use either RespChargesDriver or ' +
             'EspChargesDriver')
+        assert_msg_critical((scf_results is None) or
+                            isinstance(scf_results, dict), flag_err_msg)
+        assert_msg_critical((flag is None) or (flag.lower() == 'esp'),
+                            flag_err_msg)
 
         if isinstance(molecule, list):
             # conformer-weighted esp charges
@@ -276,6 +282,12 @@ class EspChargesDriver:
 
         # check basis and scf_results
         if self.rank == mpi_master():
+            # sanity check: if scf_results is provided, basis must also be provided
+            if scf_results is not None:
+                assert_msg_critical(
+                    basis is not None,
+                    f'{type(self).__name__}.compute: basis is needed if ' +
+                    'scf_results is provided')
             need_basis = (basis is None)
             need_scf = (scf_results is None)
         else:
@@ -296,9 +308,11 @@ class EspChargesDriver:
             basis = self.comm.bcast(basis, root=mpi_master())
 
         if use_resp_sanity_check:
+            use_hartree_fock = (self.xcfun is None or
+                                self.xcfun.upper() == 'HF')
             use_631gs_basis = (basis.get_label() in ['6-31G*', '6-31G_D_'])
-            if not use_631gs_basis:
-                cur_str = 'Recommended basis set 6-31G* is not used!'
+            if not (use_hartree_fock and use_631gs_basis):
+                cur_str = 'Recommended Hartree-Fock/6-31G* is not used!'
                 self.ostream.print_warning(cur_str)
                 self.ostream.print_blank()
 
@@ -410,11 +424,13 @@ class EspChargesDriver:
             basis_sets = self.comm.bcast(basis_sets, root=mpi_master())
 
         if use_resp_sanity_check:
+            use_hartree_fock = (self.xcfun is None or
+                                self.xcfun.upper() == 'HF')
             use_631gs_basis = all([
                 bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets
             ])
-            if not use_631gs_basis:
-                cur_str = 'Recommended basis set 6-31G* is not used!'
+            if not (use_hartree_fock and use_631gs_basis):
+                cur_str = 'Recommended Hartree-Fock/6-31G* is not used!'
                 self.ostream.print_warning(cur_str)
                 self.ostream.print_blank()
 
