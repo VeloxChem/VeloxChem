@@ -693,32 +693,23 @@ def main():
         pe_ff_gen = PEForceFieldGenerator(task.mpi_comm, task.ostream)
         pe_ff_gen.compute(task.molecule, task.ao_basis, scf_results)
 
-    # RESP charges
+    # RESP/ESP charges
 
-    if task_type == 'resp charges':
+    if task_type in ['resp charges', 'esp charges']:
         if (task_type == 'resp charges' and 'resp_charges' in task.input_dict):
             charges_dict = task.input_dict['resp_charges']
-        else:
-            charges_dict = {}
-
-        charges_dict['filename'] = task.input_dict['filename']
-
-        chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
-        chg_drv.update_settings(charges_dict, method_dict)
-
-        chg_drv.compute(task.molecule, task.ao_basis, 'resp')
-
-    # ESP charges
-
-    if task_type == 'esp charges':
-        if (task_type == 'esp charges' and 'esp_charges' in task.input_dict):
+        elif (task_type == 'esp charges' and 'esp_charges' in task.input_dict):
             charges_dict = task.input_dict['esp_charges']
         else:
             charges_dict = {}
 
         charges_dict['filename'] = task.input_dict['filename']
 
-        chg_drv = EspChargesDriver(task.mpi_comm, task.ostream)
+        if task_type == 'resp charges':
+            chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        elif task_type == 'esp charges':
+            chg_drv = EspChargesDriver(task.mpi_comm, task.ostream)
+
         chg_drv.update_settings(charges_dict, method_dict)
 
         if task.molecule.number_of_atoms() == 0:

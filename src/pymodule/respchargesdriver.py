@@ -35,26 +35,21 @@ from pathlib import Path
 import numpy as np
 import sys
 
-from .veloxchemlib import compute_nuclear_potential_values
-from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
-                           boltzmann_in_evperkelvin)
+from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
-from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .espchargesdriver import EspChargesDriver
-from .inputparser import parse_input, print_keywords, get_random_string_parallel
+from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical, safe_solve
 
 
 class RespChargesDriver(EspChargesDriver):
     """
-    Implements ESP and RESP charges.
+    Implements RESP charges driver.
 
     # vlxtag: RHF, RESP_charges
-    # vlxtag: RHF, ESP_charges
-    # vlxtag: RHF, ESP_on_points
 
     :param comm:
         The MPI communicator.
@@ -78,8 +73,8 @@ class RespChargesDriver(EspChargesDriver):
         - net_charge: The charge of the molecule.
         - multiplicity: The multiplicity of the molecule.
         - method_dict: The dictionary of method settings.
-        - max_iter: The maximum number of iterations of the RESP fit.
-        - threshold: The convergence threshold of the RESP fit.
+        - fitting_max_iter: The maximum number of iterations of the RESP fit.
+        - fitting_threshold: The convergence threshold of the RESP fit.
         - filename: The filename for the calculation.
         - xyz_file: The xyz file containing the conformers.
     """
@@ -110,14 +105,16 @@ class RespChargesDriver(EspChargesDriver):
         self.filename = None
 
         # method
-        self.xcfun = None
         self.restart = True
+        self.conv_thresh = 1.0e-6
+        self.xcfun = None
+        self.grid_level = None
+        self.solvation_model = None
 
         # conformers
         self.xyz_file = None
         self.net_charge = 0.0
         self.multiplicity = 1
-        self.method_dict = None
         self.weights = None
         self.energies = None
         self.temperature = 298.15
@@ -139,14 +136,15 @@ class RespChargesDriver(EspChargesDriver):
         self.restrain_hydrogen = False
         self.weak_restraint = 0.0005
         self.strong_restraint = 0.001
-        self.max_iter = 50
-        self.threshold = 1.0e-6
+        self.fitting_max_iter = 50
+        self.fitting_threshold = 1.0e-6
 
         # input keywords
-        self.input_keywords = {
+        self._input_keywords = {
             'resp_charges': {
-                'xcfun': ('str_upper', 'exchange-correlation functional'),
-                'restart': ('bool', 'restart from checkpoint file'),
+                'restart': ('bool', 'restart flag for SCF driver'),
+                'conv_thresh':
+                    ('float', 'convergence threshold for SCF driver'),
                 'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
@@ -158,8 +156,9 @@ class RespChargesDriver(EspChargesDriver):
                     ('float', 'strength of restraint in 1st RESP stage'),
                 'strong_restraint':
                     ('float', 'strength of restraint in 2nd RESP stage'),
-                'max_iter': ('int', 'maximum iterations in RESP fit'),
-                'threshold': ('float', 'convergence threshold of RESP fit'),
+                'fitting_max_iter': ('int', 'maximum iterations in RESP fit'),
+                'fitting_threshold':
+                    ('float', 'convergence threshold of RESP fit'),
                 'equal_charges': ('str', 'constraints for equal charges'),
                 'custom_mk_radii':
                     ('seq_fixed_str', 'custom MK radii for RESP charges'),
@@ -171,6 +170,11 @@ class RespChargesDriver(EspChargesDriver):
                 'temperature':
                     ('float', 'temperature for Boltzmann weight factor'),
             },
+            'method_settings': {
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
+                'solvation_model': ('str', 'solvation model'),
+            },
         }
 
     def print_keywords(self):
@@ -178,7 +182,7 @@ class RespChargesDriver(EspChargesDriver):
         Prints input keywords in SCF driver.
         """
 
-        print_keywords(self.input_keywords, self.ostream)
+        print_keywords(self._input_keywords, self.ostream)
 
     def update_settings(self, resp_dict, method_dict=None):
         """
@@ -192,20 +196,24 @@ class RespChargesDriver(EspChargesDriver):
 
         resp_keywords = {
             key: val[0]
-            for key, val in self.input_keywords['resp_charges'].items()
+            for key, val in self._input_keywords['resp_charges'].items()
         }
 
         parse_input(self, resp_keywords, resp_dict)
 
+        method_keywords = {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
+
+        parse_input(self, method_keywords, method_dict)
+
         if 'filename' in resp_dict:
             self.filename = resp_dict['filename']
 
-        if method_dict is not None:
-            self.method_dict = dict(method_dict)
-
-    def compute(self, molecule, basis, *args):
+    def compute(self, molecule, basis=None, scf_results=None, flag=None):
         """
-        Computes RESP or ESP charges.
+        Computes RESP charges.
 
         :param molecule:
             The molecule.
@@ -218,17 +226,39 @@ class RespChargesDriver(EspChargesDriver):
             The charges.
         """
 
-        # for backward compatibility, where three arguments were given: (mol,
-        # bas, chg_type)
-        if len(args) == 1 and isinstance(args[0], str):
-            chg_type = args[0]
-            return self.compute_weighted_charges(molecule, basis, chg_type)
-
-        # we expect scf_results and chg_type in addition to molecule and basis
+        # backward compatibility
         assert_msg_critical(
-            len(args) == 2,
-            'RespChargesDriver.compute: Expecting scf_results and chg_type')
-        scf_results, chg_type = args
+            flag is None or flag.lower() == 'resp',
+            f'{type(self).__name__}.compute: Use of resp/esp flag is ' +
+            'deprecated. Please use either RespChargesDriver or ' +
+            'EspChargesDriver')
+
+        if isinstance(molecule, list):
+            # conformer-weighted resp charges
+            if scf_results is not None:
+                cur_str = 'Ignoring scf_results since multiple molecules were '
+                cur_str += 'provided.'
+                self.ostream.print_warning(cur_str)
+            molecule_list = molecule
+            return self.compute_multiple_molecules(molecule_list, basis)
+        else:
+            # single molecule resp charges
+            return self.compute_single_molecule(molecule, basis, scf_results)
+
+    def compute_single_molecule(self, molecule, basis=None, scf_results=None):
+        """
+        Computes RSP charges for a single molecule.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The molecular basis set.
+        :param scf_results:
+            The SCF results.
+
+        :return:
+            The ESP charges.
+        """
 
         # sanity check for equal_charges
         if self.equal_charges is not None:
@@ -240,57 +270,82 @@ class RespChargesDriver(EspChargesDriver):
                 self.equal_charges = eq_chgs
             assert_msg_critical(
                 isinstance(self.equal_charges, (list, tuple)),
-                'RespChargesDriver.compute: Invalid equal_charges')
-
-        use_631gs_basis = (basis.get_label() in ['6-31G*', '6-31G_D_'])
+                f'{type(self).__name__}.compute: Invalid equal_charges')
 
         # sanity check for RESP
         assert_msg_critical(
             self.grid_type == 'mk',
-            'RespChargesDriver.compute: For RESP charges, ' +
+            f'{type(self).__name__}.compute: For RESP charges, ' +
             'grid_type must be \'mk\'')
-        if not use_631gs_basis:
-            cur_str = 'Recommended basis set 6-31G* is not used!'
-            self.ostream.print_warning(cur_str)
-            self.ostream.print_blank()
 
+        # check basis and scf_results
         if self.rank == mpi_master():
-            nalpha = molecule.number_of_alpha_electrons()
-            nbeta = molecule.number_of_beta_electrons()
-            if nalpha != nbeta:
-                assert_msg_critical(
-                    scf_results['scf_type'] != 'restricted',
-                    'RespChargesDriver.compute: Molecule is open-shell while ' +
-                    'SCF is closed-shell')
+            need_basis = (basis is None)
+            need_scf = (scf_results is None)
+        else:
+            need_basis = None
+            need_scf = None
+        need_basis, need_scf = self.comm.bcast((need_basis, need_scf),
+                                               root=mpi_master())
+
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+
+        # default basis is 6-31g*
+        if need_basis:
+            if self.rank == mpi_master():
+                basis = MolecularBasis.read(molecule,
+                                            '6-31g*',
+                                            ostream=self.ostream)
+            basis = self.comm.bcast(basis, root=mpi_master())
+        else:
+            use_631gs_basis = (basis.get_label() in ['6-31G*', '6-31G_D_'])
+            if not use_631gs_basis:
+                cur_str = 'Recommended basis set 6-31G* is not used!'
+                self.ostream.print_warning(cur_str)
+                self.ostream.print_blank()
+
+        # run SCF if needed
+        if need_scf:
+            if nalpha == nbeta:
+                scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+            else:
+                scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
+            if self.filename is not None:
+                scf_drv.filename = self.filename
+            scf_drv.restart = self.restart
+            scf_drv.conv_thresh = self.conv_thresh
+            scf_drv.xcfun = self.xcfun
+            scf_drv.grid_level = self.grid_level
+            scf_drv.solvation_model = self.solvation_model
+            scf_results = scf_drv.compute(molecule, basis)
+
+        # sanity check
+        if (self.rank == mpi_master()) and (nalpha != nbeta):
+            assert_msg_critical(
+                scf_results['scf_type'] != 'restricted',
+                f'{type(self).__name__}.compute: Molecule is open-shell ' +
+                'while SCF is closed-shell')
 
         grid_m = self.get_grid_points(molecule)
         esp_m = self.get_electrostatic_potential(grid_m, molecule, basis,
                                                  scf_results)
 
-        if self.rank == mpi_master():
-            scf_energy_m = scf_results['scf_energy']
-            if self.energies is None:
-                self.energies = [scf_energy_m]
-            if self.weights is None:
-                self.weights = self.get_boltzmann_weights(
-                    self.energies, self.temperature)
-
         q = None
 
         if self.rank == mpi_master():
-            q = self.compute_resp_charges([molecule], [grid_m], [esp_m],
-                                          self.weights)
+            q = self.compute_resp_charges([molecule], [grid_m], [esp_m], [1.0])
 
         return q
 
-    def compute_weighted_charges(self, molecule, basis):
+    def compute_multiple_molecules(self, molecule_list, basis_set_list=None):
         """
-        Computes RESP or ESP charges.
+        Computes conformer-weighted RESP charges.
 
-        :param molecule:
-            The molecule.
-        :param basis:
-            The molecular basis set.
+        :param molecule_list:
+            The list of molecules.
+        :param basis_set_list:
+            The list of molecular basis set.
 
         :return:
             The charges.
@@ -306,81 +361,42 @@ class RespChargesDriver(EspChargesDriver):
                 self.equal_charges = eq_chgs
             assert_msg_critical(
                 isinstance(self.equal_charges, (list, tuple)),
-                'RespChargesDriver.compute: Invalid equal_charges')
+                f'{type(self).__name__}.compute: Invalid equal_charges')
 
-        molecules = []
-        basis_sets = []
+        # sanity check for RESP
+        assert_msg_critical(
+            self.grid_type == 'mk',
+            f'{type(self).__name__}.compute: For RESP charges, ' +
+            'grid_type must be \'mk\'')
 
-        use_xyz_file = (molecule.number_of_atoms() == 0)
+        molecules = molecule_list
+        basis_sets = basis_set_list
 
-        if not use_xyz_file:
-            molecules.append(molecule)
-            basis_sets.append(basis)
-
-        else:
-            errmsg = 'RespChargesDriver: The \'xyz_file\' keyword is not '
-            errmsg += 'specified.'
-            assert_msg_critical(self.xyz_file is not None, errmsg)
-
-            xyz_lines = None
+        if basis_sets is None:
             if self.rank == mpi_master():
-                with open(self.xyz_file, 'r') as f_xyz:
-                    xyz_lines = f_xyz.readlines()
-            xyz_lines = self.comm.bcast(xyz_lines, root=mpi_master())
-
-            n_atoms = int(xyz_lines[0].split()[0])
-            n_geoms = len(xyz_lines) // (n_atoms + 2)
-
-            for i_geom in range(n_geoms):
-                i_start = i_geom * (n_atoms + 2)
-                i_end = i_start + (n_atoms + 2)
-
-                assert_msg_critical(
-                    int(xyz_lines[i_start].split()[0]) == n_atoms,
-                    'RespChargesDriver.compute: inconsistent number of atoms')
-
-                mol_str = ''.join(xyz_lines[i_start + 2:i_end])
-
-                if self.rank == mpi_master():
-                    # create molecule
-                    mol = Molecule.read_molecule_string(mol_str,
-                                                        units='angstrom')
-                    mol.set_charge(self.net_charge)
-                    mol.set_multiplicity(self.multiplicity)
-                    # create basis set
-                    basis_path = '.'
-                    if 'basis_path' in self.method_dict:
-                        basis_path = self.method_dict['basis_path']
-                    basis_name = self.method_dict['basis'].upper()
-                    bas = MolecularBasis.read(mol,
-                                              basis_name,
-                                              basis_path,
-                                              ostream=None)
-                else:
-                    mol = Molecule()
-                    bas = MolecularBasis()
-
-                # broadcast molecule and basis set
-                mol = self.comm.bcast(mol, root=mpi_master())
-                bas = self.comm.bcast(bas, root=mpi_master())
-
-                molecules.append(mol)
-                basis_sets.append(bas)
-
-            info_text = f'Found {len(molecules):d} conformers.'
-            self.ostream.print_info(info_text)
-            self.ostream.print_blank()
-            self.ostream.flush()
+                basis_sets = [
+                    MolecularBasis.read(mol, '6-31g*', verbose=False)
+                    for mol in molecules
+                ]
+            basis_sets = self.comm.bcast(basis_sets, root=mpi_master())
+        else:
+            use_631gs_basis = all([
+                bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets
+            ])
+            if not use_631gs_basis:
+                cur_str = 'Recommended basis set 6-31G* is not used!'
+                self.ostream.print_warning(cur_str)
+                self.ostream.print_blank()
 
         if self.rank == mpi_master():
             if self.weights is not None and self.energies is not None:
                 # avoid conflict between weights and energies
-                errmsg = 'RespChargesDriver: Please do not specify weights and '
+                errmsg = f'{type(self).__name__}: Please do not specify weights and '
                 errmsg += 'energies at the same time.'
                 assert_msg_critical(False, errmsg)
 
             elif self.weights is not None:
-                errmsg = 'RespChargesDriver: Number of weights does not match '
+                errmsg = f'{type(self).__name__}: Number of weights does not match '
                 errmsg += 'number of conformers.'
                 assert_msg_critical(len(self.weights) == len(molecules), errmsg)
                 # normalize weights
@@ -388,83 +404,60 @@ class RespChargesDriver(EspChargesDriver):
                 self.weights = [w / sum_of_weights for w in self.weights]
 
             elif self.energies is not None:
-                errmsg = 'RespChargesDriver: Number of energies does not match '
+                errmsg = f'{type(self).__name__}: Number of energies does not match '
                 errmsg += 'number of conformers.'
                 assert_msg_critical(
                     len(self.energies) == len(molecules), errmsg)
-
-        use_631gs_basis = all(
-            [bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets])
-
-        # sanity check for RESP
-        assert_msg_critical(
-            self.grid_type == 'mk',
-            'RespChargesDriver.compute: For RESP charges, ' +
-            'grid_type must be \'mk\'')
-        if not use_631gs_basis:
-            cur_str = 'Recommended basis set 6-31G* is not used!'
-            self.ostream.print_warning(cur_str)
-            self.ostream.print_blank()
 
         grids = []
         esp = []
         scf_energies = []
 
         for ind, (mol, bas) in enumerate(zip(molecules, basis_sets)):
-            if use_xyz_file:
-                info_text = f'Processing conformer {ind + 1}...'
-                self.ostream.print_info(info_text)
-                self.ostream.print_blank()
-                self.ostream.print_block(mol.get_string())
-                self.ostream.print_block(mol.more_info())
-                self.ostream.print_blank()
-                self.ostream.print_block(bas.get_string('Atomic Basis'))
-                self.ostream.flush()
+            info_text = f'Processing conformer {ind + 1}...'
+            self.ostream.print_info(info_text)
+            self.ostream.print_blank()
+            self.ostream.print_block(mol.get_string())
+            self.ostream.print_block(mol.more_info())
+            self.ostream.print_blank()
+            self.ostream.print_block(bas.get_string('Atomic Basis'))
+            self.ostream.flush()
 
             nalpha = mol.number_of_alpha_electrons()
             nbeta = mol.number_of_beta_electrons()
 
             # run SCF
-            if not use_xyz_file:
-                # select SCF driver
-                if nalpha == nbeta:
-                    scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-                else:
-                    scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
-                if self.filename is not None:
-                    scf_drv.filename = self.filename
-                scf_drv.restart = self.restart
-                if (self.method_dict is None or
-                        'xcfun' not in self.method_dict):
-                    scf_drv.xcfun = self.xcfun
-                scf_results = scf_drv.compute(mol, bas)
-
+            if self.filename is not None:
+                output_dir = Path(self.filename + '_files')
             else:
-                if self.filename is not None:
-                    output_dir = Path(self.filename + '_files')
-                else:
-                    name_string = get_random_string_parallel(self.comm)
-                    output_dir = Path('vlx_' + name_string + '_files')
+                output_dir = None
 
-                if self.rank == mpi_master():
+            if self.rank == mpi_master():
+                if output_dir is not None:
                     output_dir.mkdir(parents=True, exist_ok=True)
-                self.comm.barrier()
+            self.comm.barrier()
 
+            if output_dir is not None:
                 ostream_fname = str(output_dir / f'conformer_{ind + 1}')
                 ostream = OutputStream(ostream_fname + '.out')
+            else:
+                ostream = self.ostream
 
-                # select SCF driver
-                if nalpha == nbeta:
-                    scf_drv = ScfRestrictedDriver(self.comm, ostream)
-                else:
-                    scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
-                if self.filename is not None:
-                    scf_drv.filename = self.filename
-                scf_drv.restart = self.restart
-                if (self.method_dict is None or
-                        'xcfun' not in self.method_dict):
-                    scf_drv.xcfun = self.xcfun
-                scf_results = scf_drv.compute(mol, bas)
+            # select SCF driver
+            if nalpha == nbeta:
+                scf_drv = ScfRestrictedDriver(self.comm, ostream)
+            else:
+                scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
+            if self.filename is not None:
+                scf_drv.filename = self.filename
+            scf_drv.restart = self.restart
+            scf_drv.conv_thresh = self.conv_thresh
+            scf_drv.xcfun = self.xcfun
+            scf_drv.grid_level = self.grid_level
+            scf_drv.solvation_model = self.solvation_model
+            scf_results = scf_drv.compute(mol, bas)
+
+            if output_dir is not None:
                 ostream.close()
 
             grid_m = self.get_grid_points(mol)
@@ -478,17 +471,17 @@ class RespChargesDriver(EspChargesDriver):
                 scf_energies.append(scf_energy_m)
 
         if self.rank == mpi_master():
-            if self.energies is None:
-                self.energies = scf_energies
-            if self.weights is None:
-                self.weights = self.get_boltzmann_weights(
-                    self.energies, self.temperature)
-
-        q = None
-
-        if self.rank == mpi_master():
-            q = self.compute_resp_charges(molecules, grids, esp,
-                                          self.weights)
+            if self.weights is not None:
+                weights = self.weights
+            elif self.energies is not None:
+                weights = self.get_boltzmann_weights(self.energies,
+                                                     self.temperature)
+            else:
+                weights = self.get_boltzmann_weights(scf_energies,
+                                                     self.temperature)
+            q = self.compute_resp_charges(molecules, grids, esp, weights)
+        else:
+            q = None
 
         return q
 
@@ -543,6 +536,76 @@ class RespChargesDriver(EspChargesDriver):
         self.ostream.flush()
 
         return q
+
+    def optimize_charges(self, molecules, grids, esp, weights, q0, constr,
+                         restraint_strength):
+        """
+        Iterative procedure to optimize charges for a single stage of the ESP fit.
+
+        :param molecules:
+            The list of molecules.
+        :param grids:
+            The list of grid points.
+        :param esp:
+            The QM ESP on grid points.
+        :param weights:
+            The weight factors of different conformers.
+        :param q0:
+            The intial charges.
+        :param constr:
+            The constraints of the charges.
+        :param restraint_strength:
+            The strength of the hyperbolic penalty function (used in RESP).
+
+        :return:
+            The optimized charges.
+        """
+
+        n_atoms = molecules[0].number_of_atoms()
+
+        # initializes equation system
+        a, b = self.generate_equation_system(molecules, grids, esp, weights, q0,
+                                             constr)
+        q_new = np.concatenate((q0, np.zeros(b.size - n_atoms)), axis=None)
+
+        fitting_converged = False
+        current_iteration = 0
+
+        # iterative ESP fitting procedure
+        for iteration in range(self.fitting_max_iter):
+            q_old = q_new
+
+            # add restraint to matrix a
+            rstr = np.zeros(b.size)
+            for i in range(n_atoms):
+                if (not self.restrain_hydrogen and
+                        molecules[0].get_labels()[i] == 'H'):
+                    continue
+                elif constr[i] == -1:
+                    continue
+                else:
+                    # eq.10, J. Phys. Chem. 1993, 97, 10269-10280
+                    rstr[i] += restraint_strength / np.sqrt(q_old[i]**2 +
+                                                            0.1**2)
+            a_tot = a + np.diag(rstr)
+
+            q_new = safe_solve(a_tot, b)
+            dq_norm = np.linalg.norm(q_new - q_old)
+
+            current_iteration = iteration
+            if dq_norm < self.fitting_threshold:
+                fitting_converged = True
+                break
+
+        errmsg = f'{type(self).__name__}: Charge fitting is not converged!'
+        assert_msg_critical(fitting_converged, errmsg)
+
+        cur_str = '*** Charge fitting converged in '
+        cur_str += f'{current_iteration + 1} iterations.'
+        self.ostream.print_header(cur_str.ljust(40))
+        self.ostream.print_blank()
+
+        return q_new[:n_atoms]
 
     def generate_constraints(self, molecule):
         """
@@ -650,13 +713,14 @@ class RespChargesDriver(EspChargesDriver):
         cur_str = 'Number of Conformers         :  ' + str(n_conf)
         self.ostream.print_header(cur_str.ljust(str_width))
         if n_conf > 1:
-            cur_str = 'Weights of Conformers        :  {:4f}'.format(
-                self.weights[0])
-            self.ostream.print_header(cur_str.ljust(str_width))
-            for i in range(1, n_conf):
-                cur_str = '                                {:4f}'.format(
-                    self.weights[i])
+            if self.weights is not None:
+                cur_str = 'Weights of Conformers        :  {:4f}'.format(
+                    self.weights[0])
                 self.ostream.print_header(cur_str.ljust(str_width))
+                for i in range(1, n_conf):
+                    cur_str = '                                {:4f}'.format(
+                        self.weights[i])
+                    self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.grid_type == 'mk':
             cur_str = 'Number of Layers             :  ' + str(
@@ -718,9 +782,11 @@ class RespChargesDriver(EspChargesDriver):
         str_restrain_hydrogen = 'Yes' if self.restrain_hydrogen else 'No'
         cur_str = 'Restrained Hydrogens         :  ' + str_restrain_hydrogen
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Max. Number of Iterations    :  ' + str(self.max_iter)
+        cur_str = 'Max. Number of Iterations    :  ' + str(
+            self.fitting_max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold (a.u.) :  ' + str(self.threshold)
+        cur_str = 'Convergence Threshold (a.u.) :  ' + str(
+            self.fitting_threshold)
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
         self.ostream.flush()

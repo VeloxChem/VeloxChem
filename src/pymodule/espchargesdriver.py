@@ -140,7 +140,8 @@ class EspChargesDriver:
         self._input_keywords = {
             'esp_charges': {
                 'restart': ('bool', 'restart flag for SCF driver'),
-                'conv_thresh': ('float', 'convergence threshold for SCF driver'),
+                'conv_thresh':
+                    ('float', 'convergence threshold for SCF driver'),
                 'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
@@ -326,10 +327,10 @@ class EspChargesDriver:
         """
         Computes conformer-weighted ESP charges.
 
-        :param molecule:
-            The molecule.
-        :param basis:
-            The molecular basis set.
+        :param molecule_list:
+            The list of molecules.
+        :param basis_set_list:
+            The list of molecular basis set.
 
         :return:
             The charges.
@@ -463,7 +464,7 @@ class EspChargesDriver:
 
     def compute_esp_charges(self, molecules, grids, esp, weights):
         """
-        Computes Merz-Kollman ESP charges.
+        Computes Merz-Kollman or CHELPG ESP charges.
 
         :param molecules:
             The list of molecules.
