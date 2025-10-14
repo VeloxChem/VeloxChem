@@ -33,8 +33,9 @@
 
 def get_water_parameters():
     """
-    Initialize water model parameters. Reference: T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, 
-    D. A. Case, J. Tuszynski, A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.
+    Initialize water model parameters. Reference: SPC/E: Berendsen H, Grigera J, Straatsma T. J Phys Chem. 1987;91:6269–6271.
+    TIP3P: Jorgensen W, Chandrasekhar J, Madura J, Impey R, Klein M. J Chem Phys. 1983;79:926–935.
+    cSPC/E & cTIP3P: T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski, A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.
 
     :return:
         A dictionary containing water model parameters.
@@ -43,8 +44,6 @@ def get_water_parameters():
 
     water_parameters = {}
 
-
-    # TODO: Add more water models
     water_parameters['spce'] = {
         'bonds' : {
                 'type': 'harmonic',
@@ -72,12 +71,45 @@ def get_water_parameters():
                 'name': 'H1',
                 'mass': 1.007825,
                 'charge': 0.4238,
-                'sigma': 1.1658e-01,
-                'epsilon': 0.64978e-01,
+                'sigma': 1.0,
+                'epsilon': 0.0,
                 'equivalent_atom': 'SPC/E water'
                 }
     }
 
+    water_parameters['cspce'] = {
+        'bonds' : {
+                'type': 'harmonic',
+                'force_constant': 345000,
+                'equilibrium': 0.1,
+                'comment': 'cSPC/E water'
+                },
+        'angles' : {
+                'type': 'harmonic',
+                'force_constant': 383,
+                'equilibrium': 109.47,
+                'comment': 'cSPC/E water'
+                },
+        'ow' : {
+                'type': 'ow',
+                'name': 'O',
+                'mass': 15.994915,
+                'charge': -0.8476,
+                'sigma': 3.1658e-01,
+                'epsilon': 6.49775e-01,  
+                'equivalent_atom': 'cSPC/E water'
+                },
+        'hw' : {
+                'type': 'hw',
+                'name': 'H1',
+                'mass': 1.007825,
+                'charge': 0.4238,
+                'sigma': 1.1658e-01,
+                'epsilon': 0.64978e-01,
+                'equivalent_atom': 'cSPC/E water'
+                }
+    }
+    
     water_parameters['tip3p'] = {
 
         'bonds' : {
@@ -106,9 +138,43 @@ def get_water_parameters():
                 'name': 'H1',
                 'mass': 1.007825,
                 'charge': 0.417,
+                'sigma': 1.0,
+                'epsilon': 0.0,
+                'equivalent_atom': 'TIP-3P water'
+                }
+    }
+
+    water_parameters['ctip3p'] = {
+
+        'bonds' : {
+                'type': 'harmonic',
+                'force_constant': 502416.0,
+                'equilibrium': 0.09572,
+                'comment': 'cTIP-3P water'
+                },
+        'angles' : {
+                'type': 'harmonic',
+                'force_constant': 628.02,
+                'equilibrium': 104.52,
+                'comment': 'cTIP-3P water'
+                },
+        'ow' : {
+                'type': 'ow',
+                'name': 'O',
+                'mass': 15.994915,
+                'charge': -0.834,
+                'sigma': 3.1507e-01, 
+                'epsilon': 0.635968,        
+                'equivalent_atom': 'cTIP-3P water'
+                },
+        'hw' : {    
+                'type': 'hw',
+                'name': 'H1',
+                'mass': 1.007825,
+                'charge': 0.417,
                 'sigma': 1.2363e-01,
                 'epsilon': 0.63536e-01,
-                'equivalent_atom': 'TIP-3P water'
+                'equivalent_atom': 'cTIP-3P water'
                 }
     }
 
