@@ -399,6 +399,8 @@ export_general(py::module &m) -> void
         .def(py::init<const CT3FlatBuffer<double> &>())
         .def("indices", &CT3FlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
         .def("mask_indices", &CT3FlatBuffer<double>::mask_indices, "Gets mask of indices along x axis of tensor.")
+        .def("width", &CT3FlatBuffer<double>::width, "Gets width along x axis of tensor.")
+        .def("aux_width", &CT3FlatBuffer<double>::aux_width, "Gets width along y,x axes of tensor.")
         .def(
             "values",
              [](const CT3FlatBuffer<double> &self, const size_t index) -> py::array_t<double> {

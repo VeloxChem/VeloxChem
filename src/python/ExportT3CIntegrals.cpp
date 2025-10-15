@@ -66,7 +66,13 @@ export_t3cintegrals(py::module& m)
             [](const CThreeCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularBasis& aux_basis, const std::vector<int>& atoms) -> CT3FlatBuffer<double> {
                 return eri_drv.compute(basis, aux_basis, molecule, atoms);
             },
-            "Computes electron repulsion integrals for given molecule, basis, auxilary basis, and list of atoms.");
+            "Computes electron repulsion integrals for given molecule, basis, auxilary basis, and list of atoms.")
+        .def(
+            "compute",
+            [](const CThreeCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CT4CScreener& screener, const CMolecularBasis& aux_basis, const std::vector<int>& atoms, const int ithreshold) -> CT3FlatBuffer<double> {
+                return eri_drv.compute(screener, aux_basis, molecule, atoms, ithreshold);
+            },
+            "Computes electron repulsion integrals for given molecule, screener, auxilary basis, and list of atoms.");
     
     // CRIFockDriver class
     // Note: RIFockDriver is prefixed by an underscore and will be used in rifockdriver.py

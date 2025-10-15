@@ -629,3 +629,38 @@ CGtoPairBlock::unique_terms() const -> size_t
         return 0;
     }
 }
+
+auto
+CGtoPairBlock::unique_term_indices(const size_t start) const -> std::vector<size_t>
+{
+    std::vector<size_t> indices;
+    
+    if (const auto ncpairs = number_of_contracted_pairs(); ncpairs > 0)
+    {
+        indices.reserve(ncpairs); 
+        
+        auto acomps = tensor::number_of_spherical_components(std::array<int, 1>({_angular_momentums.first, }));
+        
+        auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>({_angular_momentums.second, }));
+        
+        auto ncomps = acomps * bcomps;
+        
+        auto rcomps = acomps * (acomps + 1) / 2;
+        
+        auto nterms = start;
+        
+        std::ranges::for_each(std::views::iota(size_t{0}, ncpairs), [&](const size_t index) {
+            indices.push_back(nterms);
+            if ((acomps == bcomps) && (_bra_orb_indices[index + 1] == _ket_orb_indices[index + 1]))
+            {
+                nterms += rcomps;
+            }
+            else
+            {
+                nterms += ncomps;
+            }
+        });
+    }
+    
+    return indices;
+}

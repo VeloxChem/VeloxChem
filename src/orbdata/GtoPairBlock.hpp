@@ -183,6 +183,12 @@ class CGtoPairBlock
     /// by this basis function pairs block.
     /// @return The number of unique terms.
     auto unique_terms() const -> size_t;
+    
+    /// @brief Gets number of unique terms (integral bra or ket side of integral) generated
+    /// by this basis function pairs block.
+    /// @param start The starting position of indices vector.
+    /// @return The vector of  unique term indices.
+    auto unique_term_indices(const size_t start) const -> std::vector<size_t>;
 
    private:
     /// @brief The vector of Cartesian coordinates of contracted GTO pairs on bra

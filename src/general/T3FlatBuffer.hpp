@@ -38,6 +38,7 @@
 #include <vector>
 #include <map>
 #include <ranges>
+#include <array>
 
 #include "SubMatrix.hpp"
 #include "MathFunc.hpp"
@@ -63,6 +64,8 @@ class CT3FlatBuffer
         
         _width = width;
         
+        _reduced = false;
+        
         _data.reserve(_indices.size());
         
         if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
@@ -82,12 +85,35 @@ class CT3FlatBuffer
         
         _width = width;
         
+        _reduced = false;
+        
         _data.reserve(_mask_indices.size());
         
         if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
         {
             std::ranges::for_each(_mask_indices, [&](const auto& index) {
                 _data.push_back(std::vector<T>(nelems, T{0.0}));
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
+    /// @param mask_indices The map of indices along x axis of tensor.
+    /// @param dimensions The dimensions of reduced tensor along  y,z axes.
+    CT3FlatBuffer(const std::map<size_t, size_t>& mask_indices, const std::array<size_t, 4>& dimensions)
+    {
+        _mask_indices = mask_indices;
+        
+        _width = dimensions[2] + dimensions[3];
+        
+        _reduced = true;
+        
+        _data.reserve(_mask_indices.size());
+        
+        if (_width > 0)
+        {
+            std::ranges::for_each(_mask_indices, [&](const auto& index) {
+                _data.push_back(std::vector<T>(_width, T{0.0}));
             });
         }
     }
@@ -101,6 +127,8 @@ class CT3FlatBuffer
         _indices = indices;
         
         _width = width;
+        
+        _reduced = false;
         
         _data.reserve(_indices.size() * nbatches);
         
@@ -123,6 +151,8 @@ class CT3FlatBuffer
         _mask_indices = mask_indices;
         
         _width = width;
+        
+        _reduced = false; 
         
         _data.reserve(_mask_indices.size() * nbatches);
         
@@ -277,6 +307,9 @@ class CT3FlatBuffer
     
     /// @brief The width of tensor along y,z axes.
     size_t _width;
+    
+    /// @brief The form of tensor alongf y,z axis.
+    bool _reduced;
 };
 
 #endif /* T3FlatBuffer_hpp */
