@@ -39,6 +39,7 @@
 #include "BatchFunc.hpp"
 #include "CustomViews.hpp"
 #include "SimdArray.hpp"
+#include "TensorComponents.hpp"
 
 namespace omp {  // omp namespace
 
@@ -632,6 +633,77 @@ partition_flat_buffer(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
     }
 
     return indices;
+}
+
+auto
+generate_flat_buffer_mask(const std::vector<CBlockedGtoPairBlock>&  gto_pair_blocks,
+                          const std::vector<std::array<size_t, 4>>& indices) -> std::vector<std::pair<size_t, size_t>>
+{
+    // set up mask vector
+    
+    auto mask = std::vector<std::pair<size_t, size_t>>();
+    
+    const auto dims = indices.back();
+    
+    mask.reserve(dims[2] + dims[3]);
+    
+    // set up AO indices mask
+    
+    for (const auto& index : indices)
+    {
+        const auto gpairs = gto_pair_blocks[index[0]].gto_pair_block((int)index[1]);
+        
+        // set up AO indices
+        
+        const auto c_indices = gpairs.bra_orbital_indices();
+
+        const auto d_indices = gpairs.ket_orbital_indices();
+        
+        // set up angular momentum
+      
+        const auto angmoms = gpairs.angular_momentums();
+        
+        const auto ccomps = tensor::number_of_spherical_components(std::array<int, 1>{angmoms.first});
+
+        const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{angmoms.second});
+        
+        // dimensions of bra and ket orbital indexes
+
+        const auto cdim = c_indices[0];
+
+        const auto ddim = d_indices[0];
+        
+        // add AO indices 
+        
+        for (int i = 0; i < gpairs.number_of_contracted_pairs(); i++)
+        {
+            // reference indexes on ket side
+
+            const auto refr = c_indices[i + 1];
+
+            const auto refs = d_indices[i + 1];
+            
+            // loop over ket components
+            
+            for (int k = 0; k < ccomps; k++)
+            {
+                const auto lstart = (refr == refs) ? k : 0;
+                
+                for (int l = lstart; l < dcomps; l++)
+                {
+                    // compute r and s indexes
+
+                    const auto r = k * cdim + refr;
+
+                    const auto s = l * ddim + refs;
+                    
+                    mask.push_back({r, s});
+                }
+            }
+        }
+    }
+
+    return mask;
 }
 
 }  // namespace omp

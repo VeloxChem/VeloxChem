@@ -184,6 +184,13 @@ auto partition_atoms(const int natoms, const int rank, const int nodes) -> std::
 auto partition_flat_buffer(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
                            const int                                ithreshold) -> std::vector<std::array<size_t, 4>>;
 
+/// @brief Generates masked indices for reduced flat buffer.
+/// @param gto_pair_blocks The vector of basis functions pair blocks.
+/// @param indices The vector of partitioned indices.
+/// @return The vector of masked indices for reduced flat buffer.
+auto generate_flat_buffer_mask(const std::vector<CBlockedGtoPairBlock>&  gto_pair_blocks,
+                               const std::vector<std::array<size_t, 4>>& indices) -> std::vector<std::pair<size_t, size_t>>;
+
 }  // namespace omp
 
 #endif /* OpenMPFunc_hpp */

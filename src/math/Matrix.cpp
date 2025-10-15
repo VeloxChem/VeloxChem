@@ -509,6 +509,40 @@ CMatrix::flat_values() const -> std::vector<double>
 }
 
 auto
+CMatrix::reduced_flat_values(std::vector<std::pair<size_t, size_t>>& mask) const -> std::vector<double>
+{
+    if (const auto nrows = number_of_rows(); nrows > 0)
+    {
+        std::vector<double> values(mask.size(), 0.0);
+        
+        const auto mat = full_matrix();
+        
+        size_t idx = 0;
+        
+        for (const auto& index : mask)
+        {
+            if (index.first == index.second)
+            {
+                values[idx] = mat.at(index);
+            }
+            else
+            {
+                values[idx] = 2.0 * mat.at(index);
+            }
+            
+            idx++;
+        }
+        
+        return values;
+    }
+    else
+    {
+        return std::vector<double>();
+    }
+}
+
+
+auto
 CMatrix::_row_angular_keys() const -> std::set<int>
 {
     std::set<int> row_keys;

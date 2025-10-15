@@ -246,6 +246,31 @@ class CT3FlatBuffer
         }
     }
     
+    /// @brief Unpacks specific tensor slice into matrix.
+    /// @param matrix The matrix to unpack tensor slice.
+    /// @param indices The vector of reduction indices.
+    /// @param index The index of tensor slice.
+    auto
+    reduced_unpack_data(CSubMatrix& matrix, std::vector<std::pair<size_t, size_t>>& indices, const size_t index) const -> void
+    {
+        matrix.zero();
+        
+        auto ptr_data = _data[index].data();
+         
+        size_t idx = 0;
+            
+        for (const auto& index : indices)
+        {
+            const auto fact = ptr_data[idx];
+                
+            matrix.at(index) = fact;
+                
+            matrix.at({index.second, index.first}) = fact;
+                
+            idx++;
+        }
+    }
+    
     /// @brief Gets the constant pointer to slice of tensor data.
     /// @param index The index of tensor slice.
     /// @return The constant pointer to slice of tensor.
@@ -261,6 +286,21 @@ class CT3FlatBuffer
     width() const -> size_t
     {
         return _width;
+    }
+    
+    /// @brief Gets number of elements in tensor slice along y,z axes.
+    /// @return The width of tensor along  y,z axes.
+    inline auto
+    elements() const -> size_t
+    {
+        if (_reduced)
+        {
+            return _width;
+        }
+        else
+        {
+            return _width * (_width + 1) / 2;
+        }
     }
     
     /// @brief Gets tensor width along x axis.

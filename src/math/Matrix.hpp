@@ -192,6 +192,11 @@ class CMatrix
     /// @brief Gets flatened values of matrix elements into vector.
     /// @return The constant pointer to matrix.
     auto flat_values() const -> std::vector<double>;
+    
+    /// @brief Gets reduced flatened values of matrix elements into vector.
+    /// @param mask The vector with reduction indices. 
+    /// @return The constant pointer to matrix.
+    auto reduced_flat_values(std::vector<std::pair<size_t, size_t>>& mask) const -> std::vector<double>;
 
    private:
     /// @brief The map of submatrices.
