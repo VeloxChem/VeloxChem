@@ -1017,7 +1017,8 @@ class CphfSolver(LinearSolver):
                 vec_list_a = []
                 vec_list_b = []
             else:
-                vec_list = None
+                vec_list_a = None
+                vec_list_b = None
 
             # loop over columns / trial vectors
             for col in range(batch_start, batch_end):
@@ -1041,8 +1042,7 @@ class CphfSolver(LinearSolver):
                 sigmas_a = np.zeros((nocc_a * nvir_a, batch_end - batch_start))
                 sigmas_b = np.zeros((nocc_b * nvir_b, batch_end - batch_start))
             else:
-                sigmas_a = None
-                sigmas_b = None
+                sigmas = None
 
             for col in range(batch_start, batch_end):
                 vec = dist_trials.get_full_vector(col)
@@ -1133,11 +1133,8 @@ class CphfSolver(LinearSolver):
             nvir_b = eov_b.shape[1]
             precond_a = (1.0 / eov_a).reshape(nocc_a * nvir_a)
             precond_b = (1.0 / eov_b).reshape(nocc_b * nvir_b)
-            # TODO: should it be hstack or vstack?
-            precond = np.hstack((
-                precond_a,
-                precond_b,
-            ))
+            # stack alpha and beta
+            precond = np.hstack((precond_a, precond_b))
 
         dist_precond = DistributedArray(precond, self.comm)
 

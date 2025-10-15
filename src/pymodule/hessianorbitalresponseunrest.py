@@ -47,7 +47,6 @@ from .matrix import Matrix
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
-from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 
@@ -579,8 +578,8 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                     fock_uij_ov_2_a = None
                     fock_uij_ov_2_b = None
 
-                dist_fock_uij_ov_2_a = DistributedArray(fock_uij_ov_2_a, self.comm)
-                dist_fock_uij_ov_2_b = DistributedArray(fock_uij_ov_2_b, self.comm)
+                fock_uij_ov_2_a = self.comm.bcast(fock_uij_ov_2_a, root=mpi_master())
+                fock_uij_ov_2_b = self.comm.bcast(fock_uij_ov_2_b, root=mpi_master())
 
                 # form dist_fock_deriv_ov_ix and dist_orben_ovlp_deriv_ov_ix
                 # from root_rank
@@ -623,37 +622,23 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                     fock_deriv_ov_dict_ix_b = None
                     orben_ovlp_deriv_ov_ix_b = None
 
-                dist_fock_deriv_ov_ix_a = DistributedArray(fock_deriv_ov_dict_ix_a,
-                                                           self.comm,
-                                                           root=root_rank)
+                if self.rank == root_rank:
 
-                dist_orben_ovlp_deriv_ov_ix_a = DistributedArray(
-                    orben_ovlp_deriv_ov_ix_a, self.comm, root=root_rank)
+                    cphf_rhs_ix_data_a = (fock_uij_ov_2_a +
+                                          fock_deriv_ov_dict_ix_a -
+                                          orben_ovlp_deriv_ov_ix_a)
 
-                dist_cphf_rhs_ix_data_a = (dist_fock_uij_ov_2_a.data +
-                                         dist_fock_deriv_ov_ix_a.data -
-                                         dist_orben_ovlp_deriv_ov_ix_a.data)
+                    cphf_rhs_ix_data_b = (fock_uij_ov_2_b +
+                                          fock_deriv_ov_dict_ix_b -
+                                          orben_ovlp_deriv_ov_ix_b)
 
-                dist_fock_deriv_ov_ix_b = DistributedArray(fock_deriv_ov_dict_ix_b,
-                                                           self.comm,
-                                                           root=root_rank)
+                    # stack alpha and beta
+                    cphf_rhs_ix_data = np.hstack((cphf_rhs_ix_data_a, cphf_rhs_ix_data_b))
+                else:
+                    cphf_rhs_ix_data = None
 
-                dist_orben_ovlp_deriv_ov_ix_b = DistributedArray(
-                    orben_ovlp_deriv_ov_ix_b, self.comm, root=root_rank)
-
-                dist_cphf_rhs_ix_data_b = (dist_fock_uij_ov_2_b.data +
-                                         dist_fock_deriv_ov_ix_b.data -
-                                         dist_orben_ovlp_deriv_ov_ix_b.data)
-
-                # stack alpha and beta
-                dist_cphf_rhs_ix_data = np.hstack((
-                    dist_cphf_rhs_ix_data_a,
-                    dist_cphf_rhs_ix_data_b,
-                ))
-
-                dist_cphf_rhs_ix = DistributedArray(dist_cphf_rhs_ix_data,
-                                                    self.comm,
-                                                    distribute=False)
+                dist_cphf_rhs_ix = DistributedArray(
+                    cphf_rhs_ix_data, self.comm, root=root_rank)
 
                 dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
@@ -876,7 +861,6 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                 fmat_deriv_a[x] -= gmat_eri_rs_a
                 fmat_deriv_b[x] -= gmat_eri_rs_b
 
-        gmats_eri = Matrices()
         Da_for_fock = Matrix()
         Db_for_fock = Matrix()
         Dab_for_fock = Matrix()
