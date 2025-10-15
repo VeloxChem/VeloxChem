@@ -137,6 +137,7 @@ class SolvationBuilder:
         self.pcharge = 'Na'
         self.ncharge = 'Cl'
         self.counterion = None
+        self.added_counterions = 0
 
         # Standard forcefield
         self.parent_forcefield = 'amber03'
@@ -219,6 +220,7 @@ class SolvationBuilder:
 
         self._clear_system()
         self._clear_solvent_molecules()
+        self._clear_counterions()
 
         if solvent == 'other':
 
@@ -316,16 +318,6 @@ class SolvationBuilder:
                 self.counterion = self._counterion_molecules()
                 number_of_solvents -= abs(charge)
 
-        # Insert the counterions
-        if self.counterion:
-            for _ in range(abs(charge)):
-                result = self._insert_molecule(self.counterion, tree)
-                if result:
-                    self.system.extend(result)
-                    existing_coords = np.array([atom[-1] for atom in self.system])
-                    # Update the KDTree with the counterion
-                    tree = cKDTree(existing_coords)
-                                
         # Solvate the solute with the solvent molecules
         # This dynamic batch size is used to avoid building too often the KDTree.
 
@@ -390,6 +382,16 @@ class SolvationBuilder:
             msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
             self.ostream.print_info(msg)
             self.ostream.flush()
+
+        # Insert the counterions
+        if self.counterion:
+            for _ in range(abs(charge)):
+                result = self._insert_molecule(self.counterion, tree)
+                if result:
+                    self.system.extend(result)
+                    existing_coords = np.array([atom[-1] for atom in self.system])
+                    # Update the KDTree with the counterion
+                    tree = cKDTree(existing_coords)
 
         end = time.time()
         self.ostream.print_info(f"Time to solvate the system: {end - start:.2f} s")
@@ -480,6 +482,7 @@ class SolvationBuilder:
         # Load the solvent molecules
         self._clear_system()
         self._clear_solvent_molecules()
+        self._clear_counterions()
         for solvent, quantity in zip(solvents, quantities):
             self._load_solvent_molecule(solvent, quantity)
 
@@ -848,6 +851,14 @@ class SolvationBuilder:
         self.solvent_labels.clear()
         self.quantities.clear()
         self.added_solvent_counts.clear()
+
+    def _clear_counterions(self):
+        """
+        Clear the registered counter ions.
+        """
+
+        self.counterion = None
+        self.added_counterions = 0
 
     def _load_solvent_molecule(self, solvent, quantity):
         """
@@ -1282,9 +1293,8 @@ class SolvationBuilder:
                         line_str += f'{coords_in_nm[i][d]:8.3f}'
                     line_str += '\n'
                     f.write(line_str) 
-
+                    atom_id_counter += 1
                 res_id_counter += 1
-                atom_id_counter += len(self.solute_ff.atoms)
 
                 # Solvents
                 for i, solvent in enumerate(self.solvent_ffs):
@@ -1311,7 +1321,7 @@ class SolvationBuilder:
                         atomid_i = (atom_id_counter + 1) % 100000
                         line_str = f'{resid_i:>5d}{atom_name:<5s}{atom_name:>5s}{atomid_i:>5d}'
                         for d in range(3):
-                            line_str += f'{coords_in_nm[counter_2][d]:8.3f}'
+                            line_str += f'{coords_in_nm[atom_id_counter][d]:8.3f}'
                         line_str += '\n'
                         f.write(line_str)
                         atom_id_counter += 1
