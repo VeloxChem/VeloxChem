@@ -172,7 +172,7 @@ class SolvationBuilder:
         # Save the solvent name
         self.solvent_name = solvent
         
-        header_msg = "VeloxChem System Builder"
+        header_msg = "VeloxChem Solvation Builder"
         self.ostream.print_header(header_msg)
         self.ostream.print_header("=" * (len(header_msg) + 2))
         self.ostream.print_blank()
@@ -216,6 +216,9 @@ class SolvationBuilder:
         # Accesible volume for the solvent
         self.ostream.print_info("The volume available for the solvent is: {:.2f} nm^3".format(volume_nm3))
         self.ostream.flush()
+
+        self._clear_system()
+        self._clear_solvent_molecules()
 
         if solvent == 'other':
 
@@ -437,6 +440,7 @@ class SolvationBuilder:
 
         from scipy.spatial import cKDTree
 
+
         # Add the solute to the system
         self._load_solute_molecule(solute)
 
@@ -447,6 +451,8 @@ class SolvationBuilder:
         self.added_solvent_counts = [0] * len(solvents)
 
         # Load the solvent molecules
+        self._clear_system()
+        self._clear_solvent_molecules()
         for solvent, quantity in zip(solvents, quantities):
             self._load_solvent_molecule(solvent, quantity)
 
@@ -800,20 +806,35 @@ class SolvationBuilder:
 
         self.box = [dim_x, dim_y, dim_z]
 
+    def _clear_system(self):
+        """
+        Clear the registered system.
+        """
+
+        self.system.clear()
+
+    def _clear_solvent_molecules(self):
+        """
+        Clear the registered solvent molecules.
+        """
+
+        self.solvents.clear()
+        self.quantities.clear()
+        self.solvent_labels.clear()
+
     def _load_solvent_molecule(self, solvent, quantity):
-        '''
+        """
         Register the solvent molecule and its quantity to be added to the system
 
         :param solvent:
             The VeloxChem molecule object of the solvent
         :param quantity:
             The quantity of the solvent molecules to be added
-        '''
+        """
 
         self.solvents.append(solvent)
         self.quantities.append(quantity)
         self.solvent_labels.append(solvent.get_labels())
-    
 
     def _insert_molecule(self, new_molecule, tree):
         """
