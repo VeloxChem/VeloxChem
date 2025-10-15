@@ -16,9 +16,8 @@ from veloxchem.polorbitalresponse import PolOrbitalResponse
 @pytest.mark.solvers
 class TestCphfPolgrad:
 
-    def run_cphfpolgrad_real(self, molecule, basis, xcfun=None,
-                              label1=None, label2=None, use_subspace_solver='yes'):
-        # conjugate gradient solver
+    def run_cphfpolgrad_real(self, molecule, basis, xcfun=None, label1=None, label2=None):
+
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
@@ -35,8 +34,7 @@ class TestCphfPolgrad:
 
         # test real analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
-        cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
-                                'use_subspace_solver': use_subspace_solver}
+        cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4)}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
@@ -84,8 +82,8 @@ class TestCphfPolgrad:
                                    - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6
 
 
-    def run_cphfpolgrad_complex(self, molecule, basis, xcfun=None,
-                                label1=None, label2=None, use_subspace_solver="yes"):
+    def run_cphfpolgrad_complex(self, molecule, basis, xcfun=None, label1=None, label2=None):
+
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
@@ -104,8 +102,7 @@ class TestCphfPolgrad:
         # test complex analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
-                                'is_complex': 'yes', 'damping': 0.5,
-                                'use_subspace_solver': 'yes'}
+                                'is_complex': 'yes', 'damping': 0.5}
         cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
@@ -165,9 +162,6 @@ class TestCphfPolgrad:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real",
-                                  "cphfpolgrad_omega_coefficients_red_real",
-                                   use_subspace_solver="no")
-        self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real",
                                   "cphfpolgrad_omega_coefficients_red_real")
 
     def test_cphfpolgrad_coefficients_complex(self):
@@ -182,8 +176,6 @@ class TestCphfPolgrad:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_cphfpolgrad_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex",
-                                     "cphfpolgrad_omega_coefficients_red_complex", use_subspace_solver="no")
         self.run_cphfpolgrad_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex",
                                      "cphfpolgrad_omega_coefficients_red_complex")
 
@@ -201,8 +193,6 @@ class TestCphfPolgrad:
 
 
         self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real",
-                                  "cpkspolgrad_omega_coefficients_red_b3lyp_real", use_subspace_solver="no")
-        self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real",
                                   "cpkspolgrad_omega_coefficients_red_b3lyp_real")
 
     def test_cpkspolgrad_coefficients_complex(self):
@@ -217,7 +207,5 @@ class TestCphfPolgrad:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex",
-                                     "cpkspolgrad_omega_coefficients_red_b3lyp_complex", use_subspace_solver="no")
         self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex",
                                      "cpkspolgrad_omega_coefficients_red_b3lyp_complex")
