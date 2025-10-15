@@ -424,7 +424,7 @@ class SolvationBuilder:
             self.ostream.flush()
 
 
-    def custom_solvate(self, solute, solvents, quantities, box):
+    def custom_solvate(self, solute, solvents, proportion, box_size):
         '''
         Solvate the solute
 
@@ -432,9 +432,9 @@ class SolvationBuilder:
             The VeloxChem molecule object of the solute
         :param solvents:
             The list of VeloxChem molecule objects of the solvent molecules
-        :param quantities:
-            The list of quantities of each solvent molecule. The order must match the order of the solvent molecules.
-        :param box:
+        :param proportion:
+            The proportion of solvent molecules in term of number of molecules.
+        :param box_size:
             The array with the dimensions of the box (x, y, z)
         '''
 
@@ -444,11 +444,41 @@ class SolvationBuilder:
         # Add the solute to the system
         self._load_solute_molecule(solute)
 
+        solute_nonh_count = 0
+        for atom_label in solute.get_labels():
+            if atom_label != 'H':
+                solute_nonh_count += 1
+
         # Define the box
-        self._define_box(*box)
+        self._define_box(*box_size)
 
         # Initialize solvent counts
         self.added_solvent_counts = [0] * len(solvents)
+
+        # Estimate quantities
+        # normalize proportion
+        sum_proportion = sum(proportion)
+        normalized_proportion = [p / sum_proportion for p in proportion]
+        # Make rough estimation of quantities based on the empirical
+        # observation that the density of nonhydrogen atoms is around 30 per
+        # nm^3. To give the solvation builder a bit more room for insertion we
+        # use an approximate density of 28 nonhydrogen atoms per nm^3.
+        norm_nonh_count = 0
+        for solvent, norm_prop in zip(solvents, normalized_proportion):
+            for atom_label in solvent.get_labels():
+                if atom_label != 'H':
+                    norm_nonh_count += norm_prop
+        box_volume_nm3 = box_size[0] * box_size[1] * box_size[2] * 1e-3
+        max_nonh_count = box_volume_nm3 * 28 - solute_nonh_count
+        solvent_counts = [int(norm_prop * int(max_nonh_count / norm_nonh_count))
+                          for norm_prop in normalized_proportion]
+        solvent_min_idx = np.argmin(np.array(solvent_counts))
+        for solvent_idx in range(len(solvent_counts)):
+            solvent_counts[solvent_idx] = int(
+                solvent_counts[solvent_min_idx] * (
+                    normalized_proportion[solvent_idx] /
+                    normalized_proportion[solvent_min_idx]))
+        quantities = list(solvent_counts)
 
         # Load the solvent molecules
         self._clear_system()
@@ -463,8 +493,7 @@ class SolvationBuilder:
         centroid = np.mean(solute_xyz, axis=0)
 
         # Create a box with the origin at the centroid
-        box_size = np.array(self.box)
-        box_center = box_size / 2
+        box_center = 0.5 * np.array(self.box)
 
         # Translate the solute to the center of the box
         molecule_id = 0
@@ -1258,6 +1287,8 @@ class SolvationBuilder:
                     f.write(line_str) 
                     counter_1 += 1
 
+                final_residx = 1
+
                 # Solvents
                 # This second counter is for the size of the solvents
                 counter_2 = counter_1
@@ -1266,9 +1297,10 @@ class SolvationBuilder:
                     for k in range(self.added_solvent_counts[i]):
                         for j, atom in solvent.atoms.items():
                             atom_name = atom['name']
-                            if k > 9999:
-                                k -= 9999
-                            line_str = f'{k:>5d}{f"SOL{i+1}":<5s}{atom_name:<5s}{j + 1:>5d}'
+                            resid_k = final_residx + 1
+                            if resid_k > 9999:
+                                resid_k -= 9999
+                            line_str = f'{resid_k:>5d}{f"SOL{i+1}":<5s}{atom_name:<5s}{j + 1:>5d}'
                             for d in range(3):
                                 line_str += f'{coords_in_nm[counter_2][d]:{8}.{3}f}'
                             line_str += '\n'
@@ -1276,7 +1308,7 @@ class SolvationBuilder:
                             counter_2 += 1
                             if counter_2 > 99999:
                                 counter_2 -= 99999
-                        final_residx = k
+                        final_residx += 1
                 
                 # Counterions
                 if self.counterion:
