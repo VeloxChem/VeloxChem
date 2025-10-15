@@ -45,7 +45,7 @@ class TestHessianFrequencies:
             n_freqs = len(ref_vib_freqs)
             calc_vib_freqs = vibanalysis_drv.vib_frequencies
             assert np.max(np.abs(calc_vib_freqs[:n_freqs] -
-                                 ref_vib_freqs)) < 0.5
+                                 ref_vib_freqs)) < 0.1
 
     @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
