@@ -1618,11 +1618,13 @@ class MMForceFieldGenerator:
 
         for i, atom_type in enumerate(self.atom_types_dict.values()):
             atom_type_found = False
+
             if 'gaff' in atom_type:
+                # Note: need strip() for converting e.g. 'c ' to 'c'
                 gafftype = atom_type['gaff'].strip()
+
                 if use_xml:
                     for atom_type_data in ff_data_dict['atom_types']:
-                        # Note: need strip() for converting e.g. 'c ' to 'c'
                         if atom_type_data['class'] == gafftype:
                             sigma = float(atom_type_data['sigma'])
                             epsilon = float(atom_type_data['epsilon'])
@@ -1793,7 +1795,7 @@ class MMForceFieldGenerator:
             elif use_water_model:
                 r = water_bonds['equilibrium']
                 k_r = water_bonds['force_constant']
-                comment = 'ow-hw'
+                comment = water_bonds['comment']
                 bond_found = True
 
             else:

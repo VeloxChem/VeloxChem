@@ -1142,12 +1142,38 @@ class SolvationBuilder:
                     if self.solvent_name in ['spce', 'tip3p']:
                         solvent_ff.create_topology(solvent, resp=False, water_model=self.solvent_name, use_xml=False)
                     else:
-                        solvent_ff.create_topology(solvent)
+                        if self._is_water_molecule(solvent):
+                            # auto-detect water molecule and use tip3p as default
+                            solvent_ff.create_topology(solvent, resp=False, water_model='tip3p', use_xml=False)
+                        else:
+                            solvent_ff.create_topology(solvent)
 
                     self.solvent_ffs.append(solvent_ff)
 
         else:
             self.solvent_ffs = solvent_ffs
+
+    @staticmethod
+    def _is_water_molecule(mol):
+        """
+        Checks if a molecule is a water molecule.
+        """
+
+        natoms = mol.number_of_atoms()
+
+        if natoms == 3:
+            atom_labels = mol.get_labels()
+            if sorted(atom_labels) == ['H','H','O']:
+                conn = mol.get_connectivity_matrix()
+                bond_labels = []
+                for atom_i in range(natoms):
+                    for atom_j in range(atom_i, natoms):
+                        if conn[atom_i, atom_j] == 1:
+                            bond_labels.append(sorted([atom_labels[atom_i], atom_labels[atom_j]]))
+                if bond_labels == [['H', 'O'], ['H', 'O']]:
+                    return True
+
+        return False
 
     def _write_system_gro(self, filename='system.gro'):
         """
