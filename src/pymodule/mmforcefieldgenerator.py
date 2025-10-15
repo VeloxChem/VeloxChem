@@ -1066,7 +1066,6 @@ class MMForceFieldGenerator:
                         basis=None,
                         scf_results=None,
                         resp=True,
-                        water_model=None,
                         use_xml=True):
         """
         Analyzes the topology of the molecule and create dictionaries
@@ -1150,7 +1149,6 @@ class MMForceFieldGenerator:
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
-        ## TODO: change this to skip when water is used
         if not resp:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
@@ -1247,13 +1245,12 @@ class MMForceFieldGenerator:
 
         # Atomtypes analysis
 
-        self.atoms, use_water_model, water_bonds, water_angles = self.populate_atoms(
+        self.atoms = self.populate_atoms(
             use_xml,
             ff_data_dict,
             ff_data_lines,
             gaff_version,
-            list(atomtypeidentifier.equivalent_atoms),
-            water_model,
+            list(atomtypeidentifier.equivalent_atoms)
         )
 
         self.bonds = self.populate_bonds(
@@ -1261,9 +1258,7 @@ class MMForceFieldGenerator:
             ff_data_dict,
             ff_data_lines,
             coords,
-            bond_indices,
-            use_water_model,
-            water_bonds,
+            bond_indices
         )
 
         self.angles = self.populate_angles(
@@ -1271,9 +1266,7 @@ class MMForceFieldGenerator:
             ff_data_dict,
             ff_data_lines,
             coords,
-            angle_indices,
-            use_water_model,
-            water_angles,
+            angle_indices
         )
 
         # Dihedrals analysis
@@ -1358,7 +1351,50 @@ class MMForceFieldGenerator:
             pairs[(i, j)] = {'comment': None}
 
         return bond_indices, angle_indices, dihedral_indices, pairs
+    
+    def create_water(self, water_model):
+        """
+        Creates the topology for water based on predefined parameters.
+        
+        :param water_model:
+            The water model to use.
+        
+        """
+        assert_msg_critical(water_model.lower() in self.water_parameters,
+        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}")
+        
+        self.ostream.print_info(f'Using water model parameters for {water_model}.')
+        self.ostream.print_reference('Reference: ' + self.water_parameters[water_model.lower()]['ref'])
+        self.ostream.flush()
 
+        water_parameters = self.water_parameters[water_model.lower()]
+        
+        self.molecule = Molecule.read_smiles('O')
+        self.unique_atom_types = [water_parameters['H']['type'], water_parameters['O']['type']]
+        self.connectivity_matrix = self.molecule.get_connectivity_matrix()
+        bond_indices, angle_indices, _, self.pairs = self.generate_topology_indices(n_atoms=3)
+        atom_names = self.get_atom_names()
+
+        atoms = {}
+        bonds = {}
+        angles = {}
+
+        for i, label in enumerate(self.molecule.get_labels()):
+            atoms[i] = water_parameters[label].copy()
+            atoms[i]['name'] = atom_names[i]
+        for i, j in bond_indices:
+            bonds[(i, j)] = water_parameters['bonds']
+        for i, j, k in angle_indices:
+            angles[(i, j, k)] = water_parameters['angles']
+
+        self.atoms = atoms
+        self.bonds = bonds
+        self.angles = angles
+        self.dihedrals = {}
+        self.impropers = {}
+        
+        return
+    
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
         impropers = {}
@@ -1596,19 +1632,11 @@ class MMForceFieldGenerator:
                 }
         return impropers
 
-    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines, gaff_version,
-                       equivalent_atoms, water_model):
+    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines, gaff_version, equivalent_atoms):
 
         use_gaff = False
         use_uff = False
         use_tm = False
-        use_water_model = False
-
-        # sigmas = []
-        # epsilons = []
-
-        water_bonds = None
-        water_angles = None
 
         # Atoms analysis
 
@@ -1645,29 +1673,6 @@ class MMForceFieldGenerator:
                             atom_type = gafftype
                             break
 
-                if gafftype in ['ow', 'hw']:
-                    assert_msg_critical(
-                        water_model is not None,
-                        'MMForceFieldGenerator: water model not specified.')
-                    assert_msg_critical(
-                        water_model in self.water_parameters,
-                        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}"
-                    )
-
-                    sigma = self.water_parameters[water_model][gafftype][
-                        'sigma']
-                    epsilon = self.water_parameters[water_model][gafftype][
-                        'epsilon']
-
-                    self.partial_charges[i] = self.water_parameters[
-                        water_model][gafftype]['charge']
-
-                    atom_type_found = True
-                    use_water_model = True
-                    atom_type = gafftype
-                    self.eq_param = False
-                    comment = water_model
-
             if not atom_type_found:
                 element = atom_type['uff'].strip()
 
@@ -1698,9 +1703,6 @@ class MMForceFieldGenerator:
                         f'MMForceFieldGenerator: atom type {atom_type} not found in GAFF or UFF.'
                     )
 
-            # sigmas.append(sigma)
-            # epsilons.append(epsilon)
-
             atoms[i] = {
                 'type': atom_type,
                 'name': atom_names[i],
@@ -1712,16 +1714,11 @@ class MMForceFieldGenerator:
                 'comment': comment,
             }
 
-        if use_water_model:
-            water_bonds = self.water_parameters[water_model]['bonds']
-            water_angles = self.water_parameters[water_model]['angles']
-        self.print_references(water_model, gaff_version, use_gaff, use_uff,
-                              use_tm, use_water_model)
+        self.print_references(gaff_version, use_gaff, use_uff, use_tm)
 
-        return atoms, use_water_model, water_bonds, water_angles
+        return atoms
 
-    def print_references(self, water_model, gaff_version, use_gaff, use_uff,
-                         use_tm, use_water_model):
+    def print_references(self, gaff_version, use_gaff, use_uff, use_tm):
         if use_gaff:
             if gaff_version is not None:
                 self.ostream.print_info(
@@ -1750,17 +1747,7 @@ class MMForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        if use_water_model:
-            self.ostream.print_info(
-                f'Using modified water model parameters for {water_model}.')
-            wff_ref = 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski,'
-            wff_ref += 'A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
-            self.ostream.print_reference('Reference: ' + wff_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
-                       bond_indices, use_water_model, water_bonds):
+    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords, bond_indices):
         bonds = {}
         for i, j in bond_indices:
             r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
@@ -1790,12 +1777,6 @@ class MMForceFieldGenerator:
                             comment = '-'.join(target_bond)
                             bond_found = True
                             break
-
-            elif use_water_model:
-                r = water_bonds['equilibrium']
-                k_r = water_bonds['force_constant']
-                comment = 'ow-hw'
-                bond_found = True
 
             else:
                 for line in ff_data_lines:
@@ -1828,8 +1809,7 @@ class MMForceFieldGenerator:
             }
         return bonds
 
-    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords,
-                        angle_indices, use_water_model, water_angles):
+    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords, angle_indices):
         angles = {}
 
         for i, j, k in angle_indices:
@@ -1867,13 +1847,6 @@ class MMForceFieldGenerator:
                             comment = '-'.join(target_angle)
                             angle_found = True
                             break
-
-            elif use_water_model:
-                k_theta = water_angles['force_constant']
-                theta = water_angles['equilibrium']
-                comment = water_angles['comment']
-                angle_found = True
-
             else:
                 for line in ff_data_lines:
                     for p in patterns:
@@ -2723,8 +2696,7 @@ class MMForceFieldGenerator:
                   top_file,
                   itp_file,
                   mol_name=None,
-                  amber_ff=None,
-                  water_model=None):
+                  amber_ff=None):
         """
         Writes a topology file.
 
@@ -2774,22 +2746,6 @@ class MMForceFieldGenerator:
             # include itp
 
             f_top.write('\n#include "' + Path(itp_fname).name + '"\n')
-
-            # TODO: change this to fit with the self.water_parameters
-            # e.g., if water_model in self.water_parameters
-            if water_model is not None:
-                # very rudimentary check for water model names
-                assert_msg_critical(
-                    water_model.startswith('tip') or
-                    water_model.startswith('spc'),
-                    'MMForceFieldGenerator.write_top: Invalid water model name')
-                assert_msg_critical(
-                    amber_ff is not None, 'MMForceFieldGenerator.write_top: ' +
-                    'amber_ff is required for water_model')
-                water_include = str(
-                    PurePath(f'{amber_ff}.ff') / f'{water_model}.itp'
-                )  ##TODO: add maybe changed water model or similar
-                f_top.write(f'\n#include "{water_include}"\n')
 
             # system
 
@@ -3212,7 +3168,6 @@ class MMForceFieldGenerator:
                             filename,
                             mol_name=None,
                             amber_ff=None,
-                            water_model=None,
                             gro_precision=3):
         """
         Writes all the needed files for a MD simulation with GROMACS.
@@ -3237,7 +3192,7 @@ class MMForceFieldGenerator:
         gro_file = Path(filename).with_suffix('.gro')
 
         self.write_itp(itp_file, mol_name)
-        self.write_top(top_file, itp_file, mol_name, amber_ff, water_model)
+        self.write_top(top_file, itp_file, mol_name, amber_ff)
         self.write_gro(gro_file, mol_name, gro_precision)
 
     def write_openmm_files(self, filename, mol_name=None):

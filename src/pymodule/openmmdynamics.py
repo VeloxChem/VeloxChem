@@ -550,7 +550,7 @@ class OpenMMDynamics:
         self.ostream.flush()
 
         # Combine XML files into a forcefield
-        forcefield = app.ForceField(*xml_files, self.parent_ff, self.water_ff)
+        forcefield = app.ForceField(*xml_files)
 
         # Create the system with appropriate nonbonded settings
         if periodic:
@@ -744,7 +744,8 @@ class OpenMMDynamics:
                                 lowest_conformations=10,
                                 save_pdb = False,
                                 k = 1000,
-                                r0 = 0.5
+                                r0 = 0.5,
+                                water_model = 'tip3p'
                                 ):
         """
         Runs high-temperature conformational sampling for multiple residues in the system.
@@ -775,29 +776,35 @@ class OpenMMDynamics:
             Force constant of the Centroid bond force. Default is 1000.
         :param r0:
             Equilibrium distance of the Centroid bond force. Default i 0.5 nm.
+        :param water_model:
+            The water model to be used if water molecules are present.
 
         :return:
             conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects, 
             and their corresponding coordinates in XYZ format.
         """
-
         if molecules:
             self.ostream.print_info("Generating system...")
             self.ostream.flush()
             self.atom_dict = {}
-            xml_files = [] 
+            xml_files = []
+            water_msg = False
 
             for i, mol in enumerate(molecules):
                 ff_gen = MMForceFieldGenerator()
                 ff_gen.ostream.mute()
-
                 duplicate = False
+                is_water = False
+                
+                if sorted(mol.get_labels()) == ['H','H','O']: 
+                    is_water = True
+                    water_msg = True
+
                 for j in range(i):
                     if (mol.get_labels() == molecules[j].get_labels() and
                         mol.get_connectivity_matrix().shape == molecules[j].get_connectivity_matrix().shape and
                         (mol.get_connectivity_matrix() == molecules[j].get_connectivity_matrix()).all()):
-
-                        ff_gen.create_topology(mol, resp=False)
+                        ff_gen.create_water(water_model) if is_water else ff_gen.create_topology(mol, resp=False)
                         self.atom_dict[f'{i}'] = ff_gen.atoms
                         duplicate = True
                         break
@@ -805,13 +812,16 @@ class OpenMMDynamics:
                 if not duplicate:
                     if partial_charges:
                         ff_gen.partial_charges = partial_charges[i]
-                    ff_gen.create_topology(mol)
-                    if mol.get_labels() != ['O', 'H', 'H']:  # skip for water to use self.water_ff
-                        ff_gen.generate_residue_xml(f'molecule_{i+1}.xml', f'M{i+1:02d}')
-                        xml_files.append(f'molecule_{i+1}.xml')
+                    ff_gen.create_water(water_model) if is_water else ff_gen.create_topology(mol)
+                    ff_gen.generate_residue_xml(f'molecule_{i+1}.xml', f'M{i+1:02d}')
+                    xml_files.append(f'molecule_{i+1}.xml')
                 
                 self.atom_dict[f'{i}'] = ff_gen.atoms
-
+            
+            if water_msg:    
+                self.ostream.print_info(f'Water molecule detected. Using {water_model} water model.')
+                self.ostream.flush()
+            
             pdb_file = 'system.pdb'
             use_chain = False
             self._create_system_from_multiple_molecules(molecules, pdb_file, write_pdb = True)
@@ -898,7 +908,7 @@ class OpenMMDynamics:
             state = self.simulation.context.getState(getEnergy=True, getPositions=True)
             positions = state.getPositions().value_in_unit(unit.nanometers)
             self.ostream.print_info(f'Saved coordinates for step {save_freq * (i + 1)}')
-            self.ostream.print_info(f"Energy for conformer {i}: {state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole):.4f} kJ/mol")
+            self.ostream.print_info(f"Energy for conformer {i+1}/{snapshots}: {state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole):.4f} kJ/mol")
             self.ostream.flush()
             conformations.append(positions)
         

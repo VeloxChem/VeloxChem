@@ -172,7 +172,7 @@ class SolvationFepDriver:
         self.final_free_energy = 0.0
         self.delta_f = None
 
-    def compute(self, molecule, ff_gen_solute=None, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None):
+    def compute(self, molecule, ff_gen_solute=None, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None):
         """
         Run the solvation free energy calculation using OpenMM.
 
@@ -203,7 +203,7 @@ class SolvationFepDriver:
                             padding=self.padding,
                             target_density=target_density, 
                             neutralize=False, 
-                            equilibrate=False)
+                            equilibrate=True)
         
         self.solvent_name = solvent
         sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)

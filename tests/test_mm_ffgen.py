@@ -19,11 +19,9 @@ class TestMMForceFieldGenerator:
                         reason='rdkit not available')
     def test_ffgen_water(self):
 
-        water = Molecule.read_smiles('O')
-
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
-        ff_gen.create_topology(water, water_model='spce', use_xml=False)
+        ff_gen.create_water(water_model='spce')
 
         fname = '_vlx_test_water_'
         ff_gen.write_openmm_files(fname)

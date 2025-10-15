@@ -33,14 +33,11 @@
 
 def get_water_parameters():
     """
-    Initialize water model parameters. Reference: SPC/E: Berendsen H, Grigera J, Straatsma T. J Phys Chem. 1987;91:6269–6271.
-    TIP3P: Jorgensen W, Chandrasekhar J, Madura J, Impey R, Klein M. J Chem Phys. 1983;79:926–935.
-    cSPC/E & cTIP3P: T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski, A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.
+    Initialize water model parameters.
 
     :return:
         A dictionary containing water model parameters.
     """
-
 
     water_parameters = {}
 
@@ -57,24 +54,27 @@ def get_water_parameters():
                 'equilibrium': 109.47,
                 'comment': 'SPC/E water'
                 },
-        'ow' : {
+        'O' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
                 'charge': -0.8476,
                 'sigma': 3.1658e-01,
                 'epsilon': 6.49775e-01,  
-                'equivalent_atom': 'SPC/E water'
+                'equivalent_atom': 'ow_00',
+                'comment': 'SPC/E water'
                 },
-        'hw' : {
+        'H' : {
                 'type': 'hw',
-                'name': 'H1',
+                'name': 'H',
                 'mass': 1.007825,
                 'charge': 0.4238,
                 'sigma': 1.0,
                 'epsilon': 0.0,
-                'equivalent_atom': 'SPC/E water'
-                }
+                'equivalent_atom': 'hw_00',
+                'comment': 'SPC/E water'
+                },
+        'ref' : 'Berendsen H, Grigera J, Straatsma T. J Phys Chem. 1987;91:6269–6271.'
     }
 
     water_parameters['cspce'] = {
@@ -90,24 +90,27 @@ def get_water_parameters():
                 'equilibrium': 109.47,
                 'comment': 'cSPC/E water'
                 },
-        'ow' : {
+        'O' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
                 'charge': -0.8476,
                 'sigma': 3.1658e-01,
-                'epsilon': 6.49775e-01,  
-                'equivalent_atom': 'cSPC/E water'
+                'epsilon': 6.49775e-01,
+                'equivalent_atom': 'ow_00',  
+                'comment': 'cSPC/E water'
                 },
-        'hw' : {
+        'H' : {
                 'type': 'hw',
-                'name': 'H1',
+                'name': 'H',
                 'mass': 1.007825,
                 'charge': 0.4238,
                 'sigma': 1.1658e-01,
                 'epsilon': 0.64978e-01,
-                'equivalent_atom': 'cSPC/E water'
-                }
+                'equivalent_atom': 'hw_00',
+                'comment': 'cSPC/E water'
+                },
+        'ref' : 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski, A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
     }
     
     water_parameters['tip3p'] = {
@@ -124,24 +127,27 @@ def get_water_parameters():
                 'equilibrium': 104.52,
                 'comment': 'TIP-3P water'
                 },
-        'ow' : {
+        'O' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
                 'charge': -0.834,
                 'sigma': 3.1507e-01, 
-                'epsilon': 0.635968,        
-                'equivalent_atom': 'TIP-3P water'
+                'epsilon': 0.635968,
+                'equivalent_atom': 'ow_00',        
+                'comment': 'TIP-3P water'
                 },
-        'hw' : {    
+        'H' : {    
                 'type': 'hw',
-                'name': 'H1',
+                'name': 'H',
                 'mass': 1.007825,
                 'charge': 0.417,
                 'sigma': 1.0,
                 'epsilon': 0.0,
-                'equivalent_atom': 'TIP-3P water'
-                }
+                'equivalent_atom': 'hw_00',
+                'comment': 'TIP-3P water'
+                },
+        'ref' : 'Jorgensen W, Chandrasekhar J, Madura J, Impey R, Klein M. J Chem Phys. 1983;79:926–935.'
     }
 
     water_parameters['ctip3p'] = {
@@ -158,25 +164,27 @@ def get_water_parameters():
                 'equilibrium': 104.52,
                 'comment': 'cTIP-3P water'
                 },
-        'ow' : {
+        'O' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
                 'charge': -0.834,
                 'sigma': 3.1507e-01, 
-                'epsilon': 0.635968,        
-                'equivalent_atom': 'cTIP-3P water'
+                'epsilon': 0.635968,
+                'equivalent_atom': 'ow_00',        
+                'comment': 'cTIP-3P water'
                 },
-        'hw' : {    
+        'H' : {    
                 'type': 'hw',
-                'name': 'H1',
+                'name': 'H',
                 'mass': 1.007825,
                 'charge': 0.417,
                 'sigma': 1.2363e-01,
                 'epsilon': 0.63536e-01,
-                'equivalent_atom': 'cTIP-3P water'
-                }
+                'equivalent_atom': 'hw_00',
+                'comment': 'cTIP-3P water'
+                },
+        'ref' : 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski, A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
     }
-
 
     return water_parameters

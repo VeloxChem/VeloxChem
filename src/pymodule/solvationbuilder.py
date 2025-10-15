@@ -39,6 +39,7 @@ import time
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .molecule import Molecule
+from .waterparameters import get_water_parameters
 from .outputstream import OutputStream
 
 
@@ -118,6 +119,7 @@ class SolvationBuilder:
         self.quantities = []
         self.added_solvent_counts = []
         self.solvent_name = None
+        self.water_parameters = get_water_parameters()
 
         # System
         self.system_molecule = None
@@ -616,7 +618,7 @@ class SolvationBuilder:
         # Special case for 'itself' solvent
         if self.solvent_name == 'itself':
             # Write the XML and PDB files for the solute
-            if self.write_pdb_only == False:
+            if not self.write_pdb_only:
                 self.solute_ff.write_openmm_files('liquid', 'MOL')
                 self.ostream.print_info("liquid.xml file written")
                 self.ostream.flush()
@@ -625,14 +627,14 @@ class SolvationBuilder:
 
         else:
             # Solute
-            if self.write_pdb_only == False:
+            if not self.write_pdb_only:
                 self.solute_ff.write_openmm_files('solute', 'MOL')
-                self.ostream.print_info("system.pdb, solute.pdb, and solute.xml files written")
+                self.ostream.print_info("solute.pdb, and solute.xml files written")
                 self.ostream.flush()
 
             for i, solvent_ff in enumerate(self.solvent_ffs):
-                solvent_ff.write_openmm_files(f'solvent_{i+1}', f'S{i+1:02d}')
-                self.ostream.print_info(f"solvent_{i+1}.pdb and solvent_{i+1}.xml files written")
+                solvent_ff.generate_residue_xml(f'solvent_{i+1}.xml', f'S{i+1:02d}')
+                self.ostream.print_info(f"solvent_{i+1}.xml file written")
                 self.ostream.flush()
 
             filename = 'system.pdb'
@@ -669,15 +671,14 @@ class SolvationBuilder:
 
         if self.solvent_name in ['itself']:
             solvent_ffs = None
-        
-        elif self.solvent_name in ['spce', 'tip3p']:
+
+        elif self.solvent_name.lower() in list(self.water_parameters.keys()):
             solvent_ffs = []
-            for i in range(len(self.solvents)):
-                solvent_ff = MMForceFieldGenerator()
-                solvent_ff.ostream.mute()
-                solvent_ff.partial_charges = self.solvents[i].get_partial_charges(self.solvents[i].get_charge())
-                solvent_ff.create_topology(self.solvents[i], resp=False, water_model=self.solvent_name, use_xml=False)
-                solvent_ffs.append(solvent_ff)
+            solvent_ff = MMForceFieldGenerator()
+            solvent_ff.ostream.mute()
+            solvent_ff.create_water(self.solvent_name)
+            solvent_ffs.append(solvent_ff)
+                
         else:
             solvent_ffs = []
             for i in range(len(self.solvents)):
@@ -958,12 +959,7 @@ class SolvationBuilder:
             The name of the solvent
         '''
 
-        if solvent == 'spce':
-            mols_per_nm3 = 33.3
-            density = 1000
-            smiles_code = 'O'
-
-        elif solvent == 'tip3p':
+        if solvent.lower() in self.water_parameters.keys():
             mols_per_nm3 = 33.3
             density = 1000
             smiles_code = 'O'
@@ -1116,9 +1112,7 @@ class SolvationBuilder:
                 self.ostream.print_info('Generating the ForceField for the solute')
                 self.ostream.flush()
             self.solute_ff.create_topology(self.solute)
-            if not equilibration:
-                self.ostream.print_info('Generated the ForceField for the solute')
-                self.ostream.flush()
+
         else:
             self.solute_ff = solute_ff
 
@@ -1139,8 +1133,8 @@ class SolvationBuilder:
                         self.ostream.print_info(f'Generating the ForceField for the solvent')
                         self.ostream.flush()
                     
-                    if self.solvent_name in ['spce', 'tip3p']:
-                        solvent_ff.create_topology(solvent, resp=False, water_model=self.solvent_name, use_xml=False)
+                    if self.solvent_name.lower() in self.water_parameters.keys():
+                        solvent_ff.create_water(self.solvent_name)
                     else:
                         solvent_ff.create_topology(solvent)
 
