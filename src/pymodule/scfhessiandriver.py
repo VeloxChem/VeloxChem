@@ -442,11 +442,11 @@ class ScfHessianDriver(HessianDriver):
         # TODO: use alternative way to partition atoms
         local_atoms = atoms[self.rank::self.nodes]
 
-        for i in atoms:
+        for idx_i, i in enumerate(atoms):
             for x in range(3):
-                dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
+                dist_cphf_ov_ix_data = dist_cphf_ov[idx_i * 3 + x].data
 
-                for j in atoms:
+                for idx_j, j in enumerate(atoms):
                     if j < i:
                         continue
                     if atom_pairs is not None:
@@ -456,7 +456,7 @@ class ScfHessianDriver(HessianDriver):
                     for y in range(3):
                         hess_ijxy = 4.0 * (np.dot(
                             dist_cphf_ov_ix_data,
-                            dist_cphf_rhs[j * 3 + y].data))
+                            dist_cphf_rhs[idx_j * 3 + y].data))
 
                         hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
                         if i != j:
@@ -1119,11 +1119,11 @@ class ScfHessianDriver(HessianDriver):
         # TODO: use alternative way to partition atoms
         local_atoms = atoms[self.rank::self.nodes]
 
-        for i in atoms:
+        for idx_i, i in enumerate(atoms):
             for x in range(3):
-                dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
+                dist_cphf_ov_ix_data = dist_cphf_ov[idx_i * 3 + x].data
 
-                for j in atoms:
+                for idx_j, j in enumerate(atoms):
                     if j < i:
                         continue
                     if atom_pairs is not None:
@@ -1133,10 +1133,10 @@ class ScfHessianDriver(HessianDriver):
                     for y in range(3):
                         hess_ijxy = 2.0 * (np.dot(
                             dist_cphf_ov_ix_data[:nov_a],
-                            dist_cphf_rhs[j * 3 + y].data[:nov_a])
+                            dist_cphf_rhs[idx_j * 3 + y].data[:nov_a])
                            + np.dot(
                             dist_cphf_ov_ix_data[nov_a:],
-                            dist_cphf_rhs[j * 3 + y].data[nov_a:])
+                            dist_cphf_rhs[idx_j * 3 + y].data[nov_a:])
                             )
 
                         hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
