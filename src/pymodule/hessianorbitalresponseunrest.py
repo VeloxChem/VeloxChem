@@ -166,8 +166,6 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         omega_ao_b = -1.0 * np.linalg.multi_dot([mo_occ_b, np.diag(eocc_b), mo_occ_b.T])
 
         # partition atoms for parallellisation
-        # TODO: use partition_atoms in e.g. scfgradientdriver
-
         if atom_pairs is None:
             local_atoms = partition_atoms(natm, self.rank, self.nodes)
         else:
@@ -177,9 +175,11 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                     atoms_in_pairs.append(i)
                 if j not in atoms_in_pairs:
                     atoms_in_pairs.append(j)
+            # Note: sort the list for consistency with scfhessiandriver
             atoms_in_pairs = sorted(atoms_in_pairs)
-            natm_in_pairs = len(atoms_in_pairs)
+            # Note: keep this consistent with scfhessiandriver
             local_atoms = atoms_in_pairs[self.rank::self.nodes]
+            natm_in_pairs = len(atoms_in_pairs)
 
         # Gathers information of which rank has which atom,
         # and then broadcasts this to all ranks
@@ -247,7 +247,6 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         }
 
         for iatom in local_atoms:
-            # TODO: the derivatives are saved in a tuple. Is this a good idea?
             fock_deriv_ao_i = self._compute_fmat_deriv_unrestricted(molecule, basis,
                                                        density_a, density_b,
                                                        iatom, eri_dict,
@@ -415,10 +414,10 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                             (jatom, iatom) not in atom_pairs and
                                 iatom != jatom):
                             continue
+
                     # These are the contributions from the OO block of the
                     # CPHF coefficients/orbital rsp. multipliers to the Hessian.
                     # uij = -1/2 Sij
-                    # TODO: Check if these terms are correct!
                     for y in range(3):
                         key_jy = (jatom, y)
 
@@ -519,7 +518,6 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                 # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
                 # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
                 # response
-                # TODO: Check if these are correct!
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
@@ -744,7 +742,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
 
             gmats_100 = Matrices()
 
-        # TODO: check if this actually works in the unrestricted case
+        # TODO: double check unrestricted
         if self._embedding_hess_drv is not None:
             pe_fock_grad_contr = (
                 self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
@@ -793,7 +791,6 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
 
         # Fock gradient
         fock_grad_drv = FockGeom1000Driver()
-        # TODO: should we set_block_size_factor?
 
         gmats_eri_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
                                           Dab_for_fock, i, 'j',
@@ -837,7 +834,6 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
 
         return (fmat_deriv_a, fmat_deriv_b)
 
-    # TODO: move to parent class?
     def print_cphf_header(self, title):
         """
         Prints information on the solver setup

@@ -150,8 +150,6 @@ class HessianOrbitalResponse(CphfSolver):
         omega_ao = -1.0 * np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
         # partition atoms for parallellisation
-        # TODO: use partition_atoms in e.g. scfgradientdriver
-
         if atom_pairs is None:
             local_atoms = partition_atoms(natm, self.rank, self.nodes)
         else:
@@ -161,9 +159,11 @@ class HessianOrbitalResponse(CphfSolver):
                     atoms_in_pairs.append(i)
                 if j not in atoms_in_pairs:
                     atoms_in_pairs.append(j)
+            # Note: sort the list for consistency with scfhessiandriver
             atoms_in_pairs = sorted(atoms_in_pairs)
-            natm_in_pairs = len(atoms_in_pairs)
+            # Note: keep this consistent with scfhessiandriver
             local_atoms = atoms_in_pairs[self.rank::self.nodes]
+            natm_in_pairs = len(atoms_in_pairs)
 
         # Gathers information of which rank has which atom,
         # and then broadcasts this to all ranks

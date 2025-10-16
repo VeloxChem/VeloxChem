@@ -395,6 +395,7 @@ class ScfHessianDriver(HessianDriver):
             cphf_solver.embedding = self.scf_driver.embedding
             pe_sanity_check(cphf_solver, molecule=molecule)
 
+            # TODO: unrestricted
             from .embedding import PolarizableEmbeddingHess
             cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
@@ -435,13 +436,17 @@ class ScfHessianDriver(HessianDriver):
                     atoms.append(i)
                 if j not in atoms:
                     atoms.append(j)
+            # Note: sort the list for consistency with hessianorbitalresponse
             atoms = sorted(atoms)
         else:
             atoms = list(range(natm))
 
-        # TODO: use alternative way to partition atoms
+        # Note: keep this consistent with hessianorbitalresponseunrest
         local_atoms = atoms[self.rank::self.nodes]
 
+        # In case of atom_pairs, dist_cphf_ov and dist_cphf_rhs do not contain
+        # vectors for all atoms. So we need to use idx_i and idx_j to keep
+        # track of the actual indices in dist_cphf_ov and dist_cphf_rhs
         for idx_i, i in enumerate(atoms):
             for x in range(3):
                 dist_cphf_ov_ix_data = dist_cphf_ov[idx_i * 3 + x].data
@@ -1112,13 +1117,17 @@ class ScfHessianDriver(HessianDriver):
                     atoms.append(i)
                 if j not in atoms:
                     atoms.append(j)
+            # Note: sort the list for consistency with hessianorbitalresponseunrest
             atoms = sorted(atoms)
         else:
             atoms = list(range(natm))
 
-        # TODO: use alternative way to partition atoms
+        # Note: keep this consistent with hessianorbitalresponseunrestunrest
         local_atoms = atoms[self.rank::self.nodes]
 
+        # In case of atom_pairs, dist_cphf_ov and dist_cphf_rhs do not contain
+        # vectors for all atoms. So we need to use idx_i and idx_j to keep
+        # track of the actual indices in dist_cphf_ov and dist_cphf_rhs
         for idx_i, i in enumerate(atoms):
             for x in range(3):
                 dist_cphf_ov_ix_data = dist_cphf_ov[idx_i * 3 + x].data
