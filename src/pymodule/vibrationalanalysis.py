@@ -1052,6 +1052,8 @@ class VibrationalAnalysis:
                                            data=np.array(Q).reshape(natm, 3))
 
         hf.create_dataset(vib_group + 'hessian', data=self.hessian)
+        hf.create_dataset(vib_group + 'dipole_gradient',
+                          data=self.dipole_gradient)
         hf.create_dataset(vib_group + 'vib_frequencies',
                           data=np.array(self.vib_frequencies))
         hf.create_dataset(vib_group + 'force_constants',
