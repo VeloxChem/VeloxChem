@@ -1,6 +1,6 @@
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
   if(WIN32) # clang-cl
-    set(VLX_CXX_FLAGS "/W3 /EHsc /bigobj /wd4101")
+    set(VLX_CXX_FLAGS "/W3 /EHsc /bigobj -Wno-unused-variable")
     set(CMAKE_CXX_FLAGS_RELEASE "/O2")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/O2")
     set(CMAKE_CXX_FLAGS_DEBUG "/Od /W4")
