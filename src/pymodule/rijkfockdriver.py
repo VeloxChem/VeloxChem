@@ -196,6 +196,59 @@ class RIJKFockDriver:
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
+            
+    def compute_screened_bq_vectors(self,
+                                    screener,
+                                    molecule,
+                                    auxiliary_basis,
+                                    ithreshold,
+                                    verbose=True):
+        """
+        Computes B^Q vectors (sreened, distributed) for the RI-JK Fock driver.
+        
+        :param screener:
+            The two-electron ERI screener data.
+        :param molecule:
+            The molecule to compute three-center integrals.
+        :param auxiliary_basis:
+            The auxiliary basis to compute three-center integrals.
+        :param ithreshold: 
+            The integer threshold of screening important integral pairs.
+        :param verbose:
+            The information printout level.
+        """
+        
+        if verbose:
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if isinstance(auxiliary_basis, str):
+            if self.rank == mpi_master():
+                basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
+            else:
+                basis_ri = None
+            basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
+        else:
+            basis_ri = MolecularBasis(auxiliary_basis)
+
+        if verbose:
+            self.ostream.print_info('Dimension of RI auxiliary basis set ' +
+                                    f'({basis_ri.get_label().upper()}): ' +
+                                    f'{basis_ri.get_dimensions_of_basis()}')
+            self.ostream.print_blank()
+            self.ostream.flush()
+        
+        ri_prep_t0 = time.time()
+        
+        self._ri_drv.compute_screened_bq_vectors(screener, molecule, basis_ri, self.metric, ithreshold, self.rank, self.nodes)
+        
+        if verbose:
+            self.ostream.print_info('Screened B^Q vectors for RI done in ' +
+                                    f'{time.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
         
     def compute_j_fock(self,
                        density,

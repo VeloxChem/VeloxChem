@@ -38,6 +38,7 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 #include "T3FlatBuffer.hpp"
+#include "T4CScreener.hpp"
 
 #include <string>
 
@@ -93,6 +94,22 @@ class CRIJKFockDriver
                             const CSubMatrix&       metric,
                             const int               rank,
                             const int               nodes) -> void;
+    
+    /// @brief Computes B^Q vectors in screened, distributed form.
+    /// @param screener The ERIs screener.
+    /// @param molecule The molecule.
+    /// @param aux_basis The auxilary molecular  basis.
+    /// @param metric The B^Q vector transformation metric.
+    /// @param ithreshold The integer threshold of significant pairs screening.
+    /// @param rank The rank of MPI process to store batch of B^Q vectors.
+    /// @param nodes The number of MPI nodes in communicator.
+    auto compute_screened_bq_vectors(const CT4CScreener&     screener,
+                                     const CMolecule&        molecule,
+                                     const CMolecularBasis&  aux_basis,
+                                     const CSubMatrix&       metric,
+                                     const int               ithreshold,
+                                     const int               rank,
+                                     const int               nodes) -> void;
     
     /// @brief Computes Coulomb Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.

@@ -77,6 +77,27 @@ class CT3FlatBuffer
     }
     
     /// @brief The default constructor.
+    /// @param indices The vector of indices along x axis of tensor.
+    /// @param dimensions The dimensions of reduced tensor along  y,z axes.
+    CT3FlatBuffer(const std::vector<size_t>& indices, const std::array<size_t, 4>& dimensions)
+    {
+        _indices = indices;
+        
+        _width = dimensions[2] + dimensions[3];
+        
+        _reduced = true;
+        
+        _data.reserve(_indices.size());
+        
+        if (_width > 0)
+        {
+            std::ranges::for_each(_indices, [&](const auto& index) {
+                _data.push_back(std::vector<T>(_width, T{0.0}));
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
     /// @param mask_indices The map of indices along x axis of tensor.
     /// @param width The width of tensor along  y,z axes.
     CT3FlatBuffer(const std::map<size_t, size_t>& mask_indices, const size_t width)
