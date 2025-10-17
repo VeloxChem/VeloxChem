@@ -646,9 +646,6 @@ class PolOrbitalResponse(CphfSolver):
             orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
             orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
 
-            if not self.use_subspace_solver:
-                orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
-
             return orbrsp_rhs
         else:
             return {
@@ -965,8 +962,6 @@ class PolOrbitalResponse(CphfSolver):
             orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
             orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
             orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
-            if not self.use_subspace_solver:
-                orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
 
             return orbrsp_rhs
         else:
@@ -1621,10 +1616,6 @@ class PolOrbitalResponse(CphfSolver):
             # number of frequencies
             n_freqs = len(self.frequencies)
 
-            if not self.use_subspace_solver:
-                all_cphf_red = self.cphf_results['cphf_ov']
-                all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
-
         # timings
         loop_start_time = tm.time()
 
@@ -1640,26 +1631,24 @@ class PolOrbitalResponse(CphfSolver):
                 for x in self.vector_components
             ]
 
-            # cphf subspace solver returns the solution as distributed array
-            if self.use_subspace_solver:
+            if self.rank == mpi_master():
+                cphf_ov = np.zeros((dof, dof, nocc * nvir))
+            else:
+                cphf_ov = None
+
+            for idx, xy in enumerate(xy_pairs):
+                # get lambda multipliers from distributed array
+                tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+
                 if self.rank == mpi_master():
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
-                else:
-                    cphf_ov = None
+                    x = xy[0]
+                    y = xy[1]
 
-                for idx, xy in enumerate(xy_pairs):
-                    # get lambda multipliers from distributed array
-                    tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+                    cphf_ov[x, y] += tmp_cphf_ov
 
-                    if self.rank == mpi_master():
-                        x = xy[0]
-                        y = xy[1]
-
-                        cphf_ov[x, y] += tmp_cphf_ov
-
-                        if y != x:
-                            cphf_ov[y, x] += cphf_ov[x, y]
-                del tmp_cphf_ov
+                    if y != x:
+                        cphf_ov[y, x] += cphf_ov[x, y]
+            del tmp_cphf_ov
 
             if self.rank == mpi_master():
 
@@ -1673,24 +1662,6 @@ class PolOrbitalResponse(CphfSolver):
                 # lists for reading Fock matrices from distributed arrays
                 fock_ao_rhs = []
                 fock_gxc_ao = []
-
-                # note: conjugate gradient solver returns array in dictionary
-                # and the coefficients are therefore imported differently
-                # from subspace solver
-                if not self.use_subspace_solver:
-                    cphf_ov_red = all_cphf_red[f]
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
-
-                    for idx, xy in enumerate(xy_pairs):
-                        x = xy[0]
-                        y = xy[1]
-
-                        cphf_ov[x, y] = cphf_ov_red[idx]
-
-                        if y != x:
-                            cphf_ov[y, x] += cphf_ov[x, y]
-
-                    del cphf_ov_red
 
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
@@ -1921,11 +1892,6 @@ class PolOrbitalResponse(CphfSolver):
             # number of frequencies
             n_freqs = len(self.frequencies)
 
-            # get CPHF results from conj. gradient solver
-            if not self.use_subspace_solver:
-                all_cphf_red = self.cphf_results['cphf_ov']
-                all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
-
         # timings
         loop_start_time = tm.time()
 
@@ -1941,28 +1907,26 @@ class PolOrbitalResponse(CphfSolver):
                 for x in self.vector_components
             ]
 
-            # cphf subspace solver returns the solution as distributed array
-            if self.use_subspace_solver:
+            if self.rank == mpi_master():
+                cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype=np.dtype('complex128'))
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
+                    2 * dof_red * f + idx].get_full_vector()
+
+                tmp_cphf_im = self.cphf_results['dist_cphf_ov'][
+                    2 * dof_red * f + dof_red + idx].get_full_vector()
+
                 if self.rank == mpi_master():
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype=np.dtype('complex128'))
+                    x = xy[0]
+                    y = xy[1]
 
-                for idx, xy in enumerate(xy_pairs):
-                    tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
-                        2 * dof_red * f + idx].get_full_vector()
+                    cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
 
-                    tmp_cphf_im = self.cphf_results['dist_cphf_ov'][
-                        2 * dof_red * f + dof_red + idx].get_full_vector()
+                    if y != x:
+                        cphf_ov[y, x] += cphf_ov[x, y]
 
-                    if self.rank == mpi_master():
-                        x = xy[0]
-                        y = xy[1]
-
-                        cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
-
-                        if y != x:
-                            cphf_ov[y, x] += cphf_ov[x, y]
-
-                del tmp_cphf_re, tmp_cphf_im
+            del tmp_cphf_re, tmp_cphf_im
 
             if self.rank == mpi_master():
 
@@ -1981,24 +1945,6 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_imim = []
                 fock_gxc_ao_reim = []
                 fock_gxc_ao_imre = []
-
-                # get Lagrangian lambda multipliers
-                if not self.use_subspace_solver:
-                    cphf_ov_red = all_cphf_red[f]
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir),
-                                       dtype=np.dtype('complex128'))
-
-                    tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
-
-                    for idx, xy in enumerate(xy_pairs):
-                        x = xy[0]
-                        y = xy[1]
-
-                        cphf_ov[x, y] = tmp_cphf_ov[idx]
-
-                        if y != x:
-                            cphf_ov[y, x] += cphf_ov[x, y]
-                    del cphf_ov_red
 
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
@@ -2549,10 +2495,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # print general info
         cur_str = 'Solver Type                     : '
-        if self.use_subspace_solver:
-            cur_str += 'Iterative Subspace Algorithm'
-        else:
-            cur_str += 'Conjugate Gradient'
+        cur_str += 'Iterative Subspace Algorithm'
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = f'Max. Number of Iterations       : {self.max_iter}'

@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<ForceField>
+    <AtomTypes>
+        <Type name="O_MOL" class="1_MOL" element="O" mass="15.994915"/>
+        <Type name="H1_MOL" class="2_MOL" element="H" mass="1.007825"/>
+        <Type name="H2_MOL" class="3_MOL" element="H" mass="1.007825"/>
+    </AtomTypes>
+    <Residues>
+        <Residue name="MOL">
+            <Atom name="O" type="O_MOL" charge="-0.8476"/>
+            <Atom name="H1" type="H1_MOL" charge="0.4238"/>
+            <Atom name="H2" type="H2_MOL" charge="0.4238"/>
+            <Bond atomName1="O" atomName2="H1"/>
+            <Bond atomName1="O" atomName2="H2"/>
+        </Residue>
+    </Residues>
+    <HarmonicBondForce>
+        <Bond class1="1_MOL" class2="2_MOL" length="0.1" k="345000"/>
+        <Bond class1="1_MOL" class2="3_MOL" length="0.1" k="345000"/>
+    </HarmonicBondForce>
+    <HarmonicAngleForce>
+        <Angle class1="2_MOL" class2="1_MOL" class3="3_MOL" angle="1.9106119321581925" k="383"/>
+    </HarmonicAngleForce>
+    <PeriodicTorsionForce/>
+    <NonbondedForce coulomb14scale="0.8333333333333334" lj14scale="0.5">
+        <Atom type="O_MOL" charge="-0.8476" sigma="0.31658" epsilon="0.649775"/>
+        <Atom type="H1_MOL" charge="0.4238" sigma="0.11658" epsilon="0.064978"/>
+        <Atom type="H2_MOL" charge="0.4238" sigma="0.11658" epsilon="0.064978"/>
+    </NonbondedForce>
+</ForceField>

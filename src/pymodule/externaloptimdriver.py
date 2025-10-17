@@ -405,11 +405,22 @@ conda activate vlxenv_simd_master
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
 
                 with open(input_file, 'w') as file:
-                    if self.solvation[0] is True:
-                        file.write(f'!{self.xc_func} {self.basis_set_label} OPT {self.solvation[1]}({self.solvation[2]})\n')
+                    if not self.qm_driver.libxc:
+                        if self.solvation[0] is True:
+                            file.write(f'!{self.xc_func} {self.basis_set_label} OPT {self.solvation[1]}({self.solvation[2]})\n')
+                        else:
+                            file.write(f'!{self.xc_func} {self.basis_set_label} OPT\n')
                     else:
-                        file.write(f'!{self.xc_func} {self.basis_set_label} OPT\n')
+                        if self.solvation[0] is True:
+                            file.write(f'!{self.basis_set_label} OPT {self.solvation[1]}({self.solvation[2]})\n')
+                        else:
+                            file.write(f'!{self.basis_set_label} OPT\n')
                     if isinstance(self.qm_driver, ExternalExcitedStatesScfDriver):
+                        if self.qm_driver.libxc:
+                            file.write(f'%method \n')
+                            file.write(f'method dft\n')
+                            file.write(f'functional {self.qm_driver.xc_func}\n')
+                            file.write('END\n')
                         file.write('%TDDFT\n')
                         file.write(f'sf {self.qm_driver.spin_flip}\n')
                         file.write(f'    NROOTS {self.roots_to_check}\n')

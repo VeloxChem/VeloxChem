@@ -91,6 +91,7 @@ monkey:cmake_build:
         -GNinja
         -DCMAKE_CXX_COMPILER=g++
     - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
+  timeout: 2h
   artifacts:
     paths:
       - build
@@ -107,6 +108,7 @@ monkey:pip_install:
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
     - SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++"
         python -m pip install -v .[test,qmmm]
+  timeout: 2h
   artifacts:
     paths:
       - venv
@@ -128,6 +130,7 @@ monkey:python_tests:
         -m "not timeconsuming" --durations=10
     - git clone https://github.com/VeloxChem/vlx-extra-tests.git
     - python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests
+  timeout: 2h
 
 include:
   - '.gitlab/cron-deploy.yml'

@@ -1039,7 +1039,8 @@ class EvbSystemBuilder():
             solvent_system_atom_count = 0
             solvent_chain = topology.addChain()
             solvent_ff = MMForceFieldGenerator()
-            solvent_ff.create_topology(vlx_solvent_molecule)
+
+            solvent_ff.create_topology(vlx_solvent_molecule,water_model=self.water_model)
 
             atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
             if 'ow' in atom_types and 'hw' in atom_types and len(
@@ -1249,8 +1250,8 @@ class EvbSystemBuilder():
         if self.decompose_bonded:
             rea_bond_decomp = self._add_bonded_decompositions(rea_system)
             pro_bond_decomp = self._add_bonded_decompositions(pro_system)
-            systems['reactant_bonded'] = rea_bond_decomp
-            systems['product_bonded'] = pro_bond_decomp
+            systems['reactant_bonded_decomp'] = rea_bond_decomp
+            systems['product_bonded_decomp'] = pro_bond_decomp
 
         # rea_system = self._split_nb_force(rea_system)
         # pro_system = self._split_nb_force(pro_system)
@@ -2313,6 +2314,8 @@ class EvbSystemBuilder():
         path = Path().cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
         self.ostream.flush()
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
         for name, system in systems.items():
             if isinstance(name, float) or isinstance(name, int):
                 filename = f"{name:.3f}_sys.xml"

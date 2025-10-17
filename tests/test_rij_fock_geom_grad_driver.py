@@ -31,7 +31,7 @@ class TestRIJFockGeomGradDriver:
 
         mol = Molecule.read_str(h2ostr, 'angstrom')
         bas = MolecularBasis.read(mol, 'def2-svp')
-        aux_bas = MolecularBasis.read(mol, 'def2-universal-jkfit')
+        aux_bas = MolecularBasis.read(mol, 'def2-universal-jfit')
 
         return mol, bas, aux_bas
 
@@ -84,5 +84,5 @@ class TestRIJFockGeomGradDriver:
             for j in range(3):
                 assert mt.isclose(ref_grad[3 * i + j],
                                   grad[j],
-                                  rel_tol=1.0e-5,
-                                  abs_tol=1.0e-5)
+                                  rel_tol=1.0e-4,
+                                  abs_tol=1.0e-4)

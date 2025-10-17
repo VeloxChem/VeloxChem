@@ -528,10 +528,16 @@ conda activate vlxenv_new_compile
                 root_str = ', '.join(map(str, self.roots_to_follow))
                 full_path = os.path.abspath(self.xyz_filename)
                 with open(input_file, 'w') as file:
-                    if self.qm_driver.solvation[0] is True:
-                        file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
+                    if not self.qm_driver.libxc:
+                        if self.qm_driver.solvation[0] is True:
+                            file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
+                        else:
+                            file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD\n')
                     else:
-                        file.write(f'!{self.qm_driver.xc_func} {self.qm_driver.dispersion} {self.qm_driver.basis_set_label} ENGRAD\n')
+                        if self.qm_driver.solvation[0] is True:
+                            file.write(f'!{self.qm_driver.basis_set_label} ENGRAD {self.qm_driver.solvation[1]}({self.qm_driver.solvation[2]})\n')
+                        else:
+                            file.write(f'!{self.qm_driver.basis_set_label} ENGRAD\n')
                     # file.write(f'%moinp "current_input_excited.gbw"\n')
                     file.write(f'%TDDFT NROOTS {self.qm_driver.roots_to_check}\n')
                     file.write(f'sf {self.qm_driver.spin_flip}\n')
@@ -540,6 +546,11 @@ conda activate vlxenv_new_compile
                     file.write('NACME\n')
                     file.write(f'{self.NAC}\n')
                     file.write('END\n')
+                    if self.qm_driver.libxc:
+                            file.write(f'%method \n')
+                            file.write(f'method dft\n')
+                            file.write(f'functional {self.qm_driver.xc_func}\n')
+                            file.write('END\n')
                     file.write('%METHOD STORECISGRAD TRUE END\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')

@@ -934,20 +934,21 @@ class SadGuessDriver:
             block_12 = S12[aoinds_1, :][:, aoinds_2]
             block_22 = S22[aoinds_2, :][:, aoinds_2]
 
-            mat_c1 = np.diag(np.ones(naodim_1))
-            mat_a = np.matmul(block_12.T, mat_c1)
+            # projection of C in minimal basis to target basis
+            # based on S_22 C_2 == S_21 C_1 and orthonormality
 
-            evals, evecs = np.linalg.eigh(block_22)
+            eigvals, eigvecs = np.linalg.eigh(block_22)
             block_22_inv = np.linalg.multi_dot(
-                [evecs, np.diag(1.0 / evals), evecs.T])
+                [eigvecs, np.diag(1.0 / eigvals), eigvecs.T])
 
-            mat_m = np.linalg.multi_dot([mat_a.T, block_22_inv, mat_a])
+            # overlap after direct projection using S_22^-1 S_21
+            mat_s = np.linalg.multi_dot([block_12, block_22_inv, block_12.T])
 
-            evals, evecs = np.linalg.eigh(mat_m)
-            mat_m_invsqrt = np.linalg.multi_dot(
-                [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
+            eigvals, eigvecs = np.linalg.eigh(mat_s)
+            mat_m = np.linalg.multi_dot(
+                [eigvecs, np.diag(1.0 / np.sqrt(eigvals)), eigvecs.T])
 
-            mat_c2 = np.linalg.multi_dot([block_22_inv, mat_a, mat_m_invsqrt])
+            mat_c2 = np.linalg.multi_dot([block_22_inv, block_12.T, mat_m])
 
             if scf_type.lower() == 'restricted':
 

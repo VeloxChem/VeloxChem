@@ -482,8 +482,8 @@ class ConformerGenerator:
         #if the user provides partial charges, then skip RESP charges calculation
         if self.resp_charges and (self.partial_charges is None):
             basis = MolecularBasis.read(molecule, "6-31g*")
-            self.partial_charges =self.resp_charges_driver.compute(
-                molecule, basis, 'resp')
+            self.partial_charges = self.resp_charges_driver.compute(
+                molecule, basis)
 
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
             self._get_dihedral_candidates(molecule, top_file_name,

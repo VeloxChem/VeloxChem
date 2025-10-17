@@ -8,7 +8,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
-@pytest.mark.solvers
 class TestGrad:
 
     def run_grad(self,
@@ -33,6 +32,7 @@ class TestGrad:
 
         assert np.max(np.abs(grad - ref_grad)) < tol
 
+    @pytest.mark.solvers
     def test_nh3_sto3g(self):
 
         molstr = """
@@ -79,6 +79,7 @@ class TestGrad:
 
         self.run_grad(mol, 'tpssh', 'sto-3g', ref_grad, 1.0e-3)
 
+    @pytest.mark.solvers
     def test_nh3_def2svp(self):
 
         molstr = """
@@ -134,6 +135,7 @@ class TestGrad:
 
         self.run_grad(mol, 'lrc-wpbeh', 'def2-svp', ref_grad, 1.0e-3)
 
+    @pytest.mark.solvers
     def test_nh3_def2tzvp(self):
 
         molstr = """
@@ -171,6 +173,7 @@ class TestGrad:
 
         self.run_grad(mol, 'b3lyp', 'def2-tzvp', ref_grad, 1.0e-3)
 
+    @pytest.mark.solvers
     def test_c2h4_sto3g(self):
 
         xyzstr = """
@@ -218,6 +221,7 @@ class TestGrad:
 
         self.run_grad(mol, 'b3lyp', 'sto-3g', ref_grad, 1.0e-4)
 
+    @pytest.mark.solvers
     def test_dimer_def2svp(self):
 
         molstr_au = """
@@ -289,6 +293,7 @@ class TestGrad:
 
         self.run_grad(mol, 'cam-b3lyp', 'def2-svp', ref_grad, 1.0e-4)
 
+    @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
     def test_dimer_def2svp_d4(self):
@@ -344,6 +349,7 @@ class TestGrad:
 
         self.run_grad(mol, 'tpssh', 'def2-svp', ref_grad, 1.0e-4, 'd4')
 
+    @pytest.mark.timeconsuming
     def test_dimer_def2tzvp(self):
 
         molstr_au = """

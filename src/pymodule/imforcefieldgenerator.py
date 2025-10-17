@@ -1141,7 +1141,7 @@ class IMForceFieldGenerator:
                         optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
 
                         current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
-                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
 
                         print(optimized_molecule.get_xyz_string())
 
@@ -1151,13 +1151,12 @@ class IMForceFieldGenerator:
                         optim_driver.constraints = self.use_minimized_structures[1]
                         opt_mol_string, energy = optim_driver.optimize(molecule)
                         optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
-
                         current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
-                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
+                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
 
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
 
-                    elif self.roots_to_follow[0] > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
+                    elif self.roots_to_follow[0] > 1 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
 
                         optim_driver = ExternalOptimDriver(self.drivers['es'][0])
                         optim_driver.constraints = self.use_minimized_structures[1]
@@ -1168,9 +1167,8 @@ class IMForceFieldGenerator:
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
 
                         current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
-                        molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
-
-                    print('before I am adding the ', molecules_to_add_info, self.states_interpolation_settings, self.symmetry_information)
+                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                        
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
 

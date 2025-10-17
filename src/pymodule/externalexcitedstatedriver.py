@@ -73,6 +73,7 @@ class ExternalExcitedStatesScfDriver:
         
         self.dispersion = 'D3'
         self.xc_func = 'pbe0'
+        self.libxc = False
         self.basis_set_label = 'def2-svp'
         self.add_ghost_atom = False
 
@@ -368,11 +369,13 @@ conda activate vlxenv_simd_master
                 print('Here is the spin_multi', spin_multplicity)
 
 
-            energies = sorted(energies)
+            
 
+            print('necessary orca info', energies, spin_s2_values)
             if self.spin_flip is True:
                 energies = [energies[i] for i in range(len(energies)) if spin_s2_values[i] < 0.1 or spin_s2_values[i] > 1.9]
 
+            energies = sorted(energies)
             # indices = np.argsort(energies)[:self.roots_to_check]
             # # Get the corresponding values of the n smallest elements
             # lowest_values = [(i, energies[i]) for i in indices]
@@ -429,14 +432,25 @@ conda activate vlxenv_simd_master
                 if self.path_on_cluster is not None:
                     full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
                 with open(input_file, 'w') as file:
-                    if self.solvation[0] is True:
-                        file.write(f'!{self.xc_func} {self.dispersion} {self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
+                    if not self.libxc:
+                        if self.solvation[0] is True:
+                            file.write(f'!{self.xc_func} {self.dispersion} {self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
+                        else:
+                            file.write(f'! {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
                     else:
-                        file.write(f'! {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
+                        if self.solvation[0] is True:
+                            file.write(f'!{self.dispersion} {self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
+                        else:
+                            file.write(f'!{self.dispersion} {self.basis_set_label}\n')
                     file.write(f'%{self.method}\n')
                     file.write(f'NROOTS {self.roots_to_check}\n')
                     file.write(f'sf {self.spin_flip}\n')
                     file.write('END\n')
+                    if self.libxc:
+                            file.write(f'%method \n')
+                            file.write(f'method dft\n')
+                            file.write(f'functional {self.xc_func}\n')
+                            file.write('END\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')

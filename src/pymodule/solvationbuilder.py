@@ -138,6 +138,7 @@ class SolvationBuilder:
         self.pcharge = 'Na'
         self.ncharge = 'Cl'
         self.counterion = None
+        self.added_counterions = 0
 
         # Standard forcefield
         self.parent_forcefield = 'amber03'
@@ -174,7 +175,7 @@ class SolvationBuilder:
         self.solvent_name = solvent
         self.constraint_solute = constraint_solute
         
-        header_msg = "VeloxChem System Builder"
+        header_msg = "VeloxChem Solvation Builder"
         self.ostream.print_header(header_msg)
         self.ostream.print_header("=" * (len(header_msg) + 2))
         self.ostream.print_blank()
@@ -218,6 +219,10 @@ class SolvationBuilder:
         # Accesible volume for the solvent
         self.ostream.print_info("The volume available for the solvent is: {:.2f} nm^3".format(volume_nm3))
         self.ostream.flush()
+
+        self._clear_system()
+        self._clear_solvent_molecules()
+        self._clear_counterions()
 
         if solvent == 'other':
 
@@ -315,16 +320,6 @@ class SolvationBuilder:
                 self.counterion = self._counterion_molecules()
                 number_of_solvents -= abs(charge)
 
-        # Insert the counterions
-        if self.counterion:
-            for _ in range(abs(charge)):
-                result = self._insert_molecule(self.counterion, tree)
-                if result:
-                    self.system.extend(result)
-                    existing_coords = np.array([atom[-1] for atom in self.system])
-                    # Update the KDTree with the counterion
-                    tree = cKDTree(existing_coords)
-                                
         # Solvate the solute with the solvent molecules
         # This dynamic batch size is used to avoid building too often the KDTree.
 
@@ -390,6 +385,16 @@ class SolvationBuilder:
             self.ostream.print_info(msg)
             self.ostream.flush()
 
+        # Insert the counterions
+        if self.counterion:
+            for _ in range(abs(charge)):
+                result = self._insert_molecule(self.counterion, tree)
+                if result:
+                    self.system.extend(result)
+                    existing_coords = np.array([atom[-1] for atom in self.system])
+                    # Update the KDTree with the counterion
+                    tree = cKDTree(existing_coords)
+
         end = time.time()
         self.ostream.print_info(f"Time to solvate the system: {end - start:.2f} s")
         self.ostream.flush()
@@ -423,7 +428,7 @@ class SolvationBuilder:
             self.ostream.flush()
 
 
-    def custom_solvate(self, solute, solvents, quantities, box):
+    def custom_solvate(self, solute, solvents, proportion, box_size):
         '''
         Solvate the solute
 
@@ -431,24 +436,57 @@ class SolvationBuilder:
             The VeloxChem molecule object of the solute
         :param solvents:
             The list of VeloxChem molecule objects of the solvent molecules
-        :param quantities:
-            The list of quantities of each solvent molecule. The order must match the order of the solvent molecules.
-        :param box:
+        :param proportion:
+            The proportion of solvent molecules in term of number of molecules.
+        :param box_size:
             The array with the dimensions of the box (x, y, z)
         '''
 
         from scipy.spatial import cKDTree
 
+        # Reset solvent name
+        self.solvent_name = None
+
         # Add the solute to the system
         self._load_solute_molecule(solute)
 
-        # Define the box
-        self._define_box(*box)
+        solute_nonh_count = 0
+        for atom_label in solute.get_labels():
+            if atom_label != 'H':
+                solute_nonh_count += 1
 
-        # Initialize solvent counts
-        self.added_solvent_counts = [0] * len(solvents)
+        # Define the box
+        self._define_box(*box_size)
+
+        # Estimate quantities
+        # normalize proportion
+        sum_proportion = sum(proportion)
+        normalized_proportion = [p / sum_proportion for p in proportion]
+        # Make rough estimation of quantities based on the empirical
+        # observation that the density of nonhydrogen atoms is around 30 per
+        # nm^3. To give the solvation builder a bit more room for insertion we
+        # use an approximate density of 28 nonhydrogen atoms per nm^3.
+        norm_nonh_count = 0
+        for solvent, norm_prop in zip(solvents, normalized_proportion):
+            for atom_label in solvent.get_labels():
+                if atom_label != 'H':
+                    norm_nonh_count += norm_prop
+        box_volume_nm3 = box_size[0] * box_size[1] * box_size[2] * 1e-3
+        max_nonh_count = box_volume_nm3 * 28 - solute_nonh_count
+        solvent_counts = [int(norm_prop * int(max_nonh_count / norm_nonh_count))
+                          for norm_prop in normalized_proportion]
+        solvent_min_idx = np.argmin(np.array(solvent_counts))
+        for solvent_idx in range(len(solvent_counts)):
+            solvent_counts[solvent_idx] = int(
+                solvent_counts[solvent_min_idx] * (
+                    normalized_proportion[solvent_idx] /
+                    normalized_proportion[solvent_min_idx]))
+        quantities = list(solvent_counts)
 
         # Load the solvent molecules
+        self._clear_system()
+        self._clear_solvent_molecules()
+        self._clear_counterions()
         for solvent, quantity in zip(solvents, quantities):
             self._load_solvent_molecule(solvent, quantity)
 
@@ -459,8 +497,7 @@ class SolvationBuilder:
         centroid = np.mean(solute_xyz, axis=0)
 
         # Create a box with the origin at the centroid
-        box_size = np.array(self.box)
-        box_center = box_size / 2
+        box_center = 0.5 * np.array(self.box)
 
         # Translate the solute to the center of the box
         molecule_id = 0
@@ -486,7 +523,7 @@ class SolvationBuilder:
                     # Update the KDTree with the new solvent
                     tree = cKDTree(existing_coords)
                     added_count += 1
-            self.added_solvent_counts[i] = added_count
+            self.added_solvent_counts.append(added_count)
             msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
             self.ostream.print_info(msg)
             self.ostream.flush()
@@ -613,7 +650,6 @@ class SolvationBuilder:
 
         # Generate the forcefields
         self._generate_forcefields(solute_ff, solvent_ffs)
-
         
         # Special case for 'itself' solvent
         if self.solvent_name == 'itself':
@@ -832,20 +868,44 @@ class SolvationBuilder:
 
         self.box = [dim_x, dim_y, dim_z]
 
+    def _clear_system(self):
+        """
+        Clear the registered system.
+        """
+
+        self.system.clear()
+
+    def _clear_solvent_molecules(self):
+        """
+        Clear the registered solvent molecules.
+        """
+
+        self.solvents.clear()
+        self.solvent_labels.clear()
+        self.quantities.clear()
+        self.added_solvent_counts.clear()
+
+    def _clear_counterions(self):
+        """
+        Clear the registered counter ions.
+        """
+
+        self.counterion = None
+        self.added_counterions = 0
+
     def _load_solvent_molecule(self, solvent, quantity):
-        '''
+        """
         Register the solvent molecule and its quantity to be added to the system
 
         :param solvent:
             The VeloxChem molecule object of the solvent
         :param quantity:
             The quantity of the solvent molecules to be added
-        '''
+        """
 
         self.solvents.append(solvent)
         self.quantities.append(quantity)
         self.solvent_labels.append(solvent.get_labels())
-    
 
     def _insert_molecule(self, new_molecule, tree):
         """
@@ -1174,12 +1234,38 @@ class SolvationBuilder:
                     if self.solvent_name in ['spce', 'tip3p']:
                         solvent_ff.create_topology(solvent, resp=False, water_model=self.solvent_name, use_xml=False)
                     else:
-                        solvent_ff.create_topology(solvent)
+                        if self._is_water_molecule(solvent):
+                            # auto-detect water molecule and use tip3p as default
+                            solvent_ff.create_topology(solvent, resp=False, water_model='tip3p', use_xml=False)
+                        else:
+                            solvent_ff.create_topology(solvent)
 
                     self.solvent_ffs.append(solvent_ff)
 
         else:
             self.solvent_ffs = solvent_ffs
+
+    @staticmethod
+    def _is_water_molecule(mol):
+        """
+        Checks if a molecule is a water molecule.
+        """
+
+        natoms = mol.number_of_atoms()
+
+        if natoms == 3:
+            atom_labels = mol.get_labels()
+            if sorted(atom_labels) == ['H','H','O']:
+                conn = mol.get_connectivity_matrix()
+                bond_labels = []
+                for atom_i in range(natoms):
+                    for atom_j in range(atom_i, natoms):
+                        if conn[atom_i, atom_j] == 1:
+                            bond_labels.append(sorted([atom_labels[atom_i], atom_labels[atom_j]]))
+                if bond_labels == [['H', 'O'], ['H', 'O']]:
+                    return True
+
+        return False
 
     def _write_system_gro(self, filename='system.gro'):
         """
@@ -1208,7 +1294,7 @@ class SolvationBuilder:
                         if residue_number > 9999:
                             residue_number -= 9999
                         for d in range(3):
-                            line_str += f'{coords_in_nm[residue_offset + i][d]:{8}.{3}f}'
+                            line_str += f'{coords_in_nm[residue_offset + i][d]:8.3f}'
                         line_str += '\n'
                         f.write(line_str)
                         atom_counter += 1
@@ -1220,7 +1306,8 @@ class SolvationBuilder:
 
                 # Box
                 for d in range(3):
-                    f.write(f'{self.box[d]*0.1:{10}.{5}f}')
+                    f.write(f'{0.1 * self.box[d]:10.5f}')
+                f.write('\n')
 
         else:
             with open(filename, 'w') as f:
@@ -1228,40 +1315,34 @@ class SolvationBuilder:
                 f.write('Generated by VeloxChem\n')
                 f.write(f'{self.system_molecule.number_of_atoms()}\n')
 
-                # Atoms
+                res_id_counter = 0
+                atom_id_counter = 0
+
                 # Solute
-                # It will be added a counter to keep track of the atom index 
-                # in order to write the correct coordinates in the GRO file.
-                # This first counter is for the size of the solute
-                counter_1 = 0
                 for i, atom in self.solute_ff.atoms.items():
                     atom_name = atom['name']
-                    line_str = f'{1:>5d}{"MOL":<5s}{atom_name:<5s}{i + 1:>5d}'
+                    line_str = f'{1:>5d}{"MOL":<5s}{atom_name:>5s}{i + 1:>5d}'
                     for d in range(3):
-                        line_str += f'{coords_in_nm[i][d]:{8}.{3}f}'
+                        line_str += f'{coords_in_nm[i][d]:8.3f}'
                     line_str += '\n'
                     f.write(line_str) 
-                    counter_1 += 1
+                    atom_id_counter += 1
+                res_id_counter += 1
 
                 # Solvents
-                # This second counter is for the size of the solvents
-                counter_2 = counter_1
-
                 for i, solvent in enumerate(self.solvent_ffs):
                     for k in range(self.added_solvent_counts[i]):
+                        resid_k = (res_id_counter + 1) % 100000
                         for j, atom in solvent.atoms.items():
                             atom_name = atom['name']
-                            if k > 9999:
-                                k -= 9999
-                            line_str = f'{k:>5d}{f"SOL{i+1}":<5s}{atom_name:<5s}{j + 1:>5d}'
+                            atomid_j = (atom_id_counter + 1) % 100000
+                            line_str = f'{resid_k:>5d}{f"SOL{i+1}":<5s}{atom_name:>5s}{atomid_j:>5d}'
                             for d in range(3):
-                                line_str += f'{coords_in_nm[counter_2][d]:{8}.{3}f}'
+                                line_str += f'{coords_in_nm[atom_id_counter][d]:8.3f}'
                             line_str += '\n'
                             f.write(line_str)
-                            counter_2 += 1
-                            if counter_2 > 99999:
-                                counter_2 -= 99999
-                        final_residx = k
+                            atom_id_counter += 1
+                        res_id_counter += 1
                 
                 # Counterions
                 if self.counterion:
@@ -1269,16 +1350,20 @@ class SolvationBuilder:
                     # In GROMACS the ion residues are named as the ion name in capital letters
                     for i in range(self.added_counterions):
                         atom_name = self.ion_name.upper()
-                        line_str = f'{final_residx + i + 2:>5d}{atom_name:<5s}{atom_name:<5s}{i + 1:>5d}'
+                        resid_i = (res_id_counter + 1) % 100000
+                        atomid_i = (atom_id_counter + 1) % 100000
+                        line_str = f'{resid_i:>5d}{atom_name:<5s}{atom_name:>5s}{atomid_i:>5d}'
                         for d in range(3):
-                            line_str += f'{coords_in_nm[counter_2][d]:{8}.{3}f}'
+                            line_str += f'{coords_in_nm[atom_id_counter][d]:8.3f}'
                         line_str += '\n'
                         f.write(line_str)
-                        counter_2 += 1
+                        atom_id_counter += 1
+                        res_id_counter += 1
 
                 # Box
                 for d in range(3):
-                    f.write(f'{self.box[d]*0.1:{10}.{5}f}')
+                    f.write(f'{0.1 * self.box[d]:10.5f}')
+                f.write('\n')
 
     def _write_system_pdb(self, filename='system.pdb'):
         """

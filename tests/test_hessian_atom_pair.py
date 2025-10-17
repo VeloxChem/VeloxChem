@@ -34,7 +34,7 @@ class TestHessianAtomPair:
 
         basis = MolecularBasis.read(mol, 'sto-3g')
 
-        atom_pairs = [(0, 3), (6, 9)]
+        atom_pairs = [(9, 6), (0, 3)]
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()

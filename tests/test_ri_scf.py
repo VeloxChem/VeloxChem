@@ -29,7 +29,7 @@ class TestScfRestrictedDriverWithRI:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = True
-        scf_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
+        scf_drv.ri_auxiliary_basis = 'def2-universal-jfit'
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
@@ -37,8 +37,8 @@ class TestScfRestrictedDriverWithRI:
 
     def test_ri_blyp(self):
 
-        self.run_scf_rest('blyp', -152.67303193674337, 1.0e-6)
+        self.run_scf_rest('blyp', -152.673164799, 1.0e-6)
 
     def test_ri_pbe(self):
 
-        self.run_scf_rest('pbe', -152.54403487682805, 1.0e-6)
+        self.run_scf_rest('pbe', -152.544167566, 1.0e-6)

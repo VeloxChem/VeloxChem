@@ -701,10 +701,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         # print general info
         cur_str = 'Solver Type                     : '
-        if self.use_subspace_solver:
-            cur_str += 'Iterative Subspace Algorithm'
-        else:
-            cur_str += 'Conjugate Gradient'
+        cur_str += 'Iterative Subspace Algorithm'
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
