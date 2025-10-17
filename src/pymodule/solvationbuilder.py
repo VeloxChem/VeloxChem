@@ -532,7 +532,7 @@ class SolvationBuilder:
 
     
     def write_gromacs_files(self, solute_ff=None, solvent_ffs=None, equilibration=False):
-        '''
+        """
         Generates the ForceField for the system
 
         :param solute_ff:
@@ -542,7 +542,7 @@ class SolvationBuilder:
         :param equilibration:
             Boolean flag to indicate if the gromacs files will be used for equilibration.
             If True, printouts will not be displayed.
-        '''
+        """
 
         self._generate_forcefields(solute_ff, solvent_ffs, equilibration)
 
@@ -573,6 +573,8 @@ class SolvationBuilder:
         else:
             # Write the itp files
             self.solute_ff.write_itp('solute.itp', 'MOL')
+            self.solute_ff.write_top('solute.top', 'solute.itp', 'MOL')
+            self.solute_ff.write_gro('solute.gro', 'MOL')
             
             if not equilibration:
                 self.ostream.print_info("solute.itp file written")
@@ -597,10 +599,19 @@ class SolvationBuilder:
             atomtypes = list(set(atomtypes))
 
             # Remove the atomtypes section from the itp files
-            self._remove_atomtypes_section('solute.itp')
+            solute_atomtypes_lines = self._remove_atomtypes_section('solute.itp')
             if self.solvent_ffs:
                 for i in range(len(self.solvent_ffs)):
                     self._remove_atomtypes_section(f'solvent_{i+1}.itp')
+
+            # Add atomtypes section to solute top file
+            with open('solute.top', 'r') as f:
+                solute_lines = f.readlines()
+            with open('solute.top', 'w') as f:
+                for line in solute_lines:
+                    if '"solute.itp"' in line:
+                        f.write(''.join(solute_atomtypes_lines) + '\n')
+                    f.write(line)
 
             # Write the top file based on the forcefields generated
             with open('system.top', 'w') as f:
@@ -990,15 +1001,23 @@ class SolvationBuilder:
         """
         Removes the [ atomtypes ] section from an ITP file.
         
-        :param itp_filename: The name of the ITP file from which to remove the atom types section.
+        :param itp_filename:
+            The name of the ITP file from which to remove the atom types
+            section.
+
+        :return:
+            The removed lines.
         """
+
         new_lines = []
+        removed_lines = []
         inside_atomtypes_block = False
         
         with open(itp_filename, 'r') as file:
             for line in file:
                 if line.strip().startswith('[ atomtypes ]'):
                     inside_atomtypes_block = True
+                    removed_lines.append(line)
                     continue  # Skip the [ atomtypes ] header line
 
                 if inside_atomtypes_block:
@@ -1006,12 +1025,16 @@ class SolvationBuilder:
                         # End of the atomtypes block, resume normal line processing
                         inside_atomtypes_block = False
                         new_lines.append(line)
+                    else:
+                        removed_lines.append(line)
                 else:
                     new_lines.append(line)
 
         # Rewrite the itp file without the atomtypes block
         with open(itp_filename, 'w') as file:
             file.writelines(new_lines)
+
+        return removed_lines
 
     def _solvent_properties(self, solvent):
         '''

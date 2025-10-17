@@ -123,13 +123,13 @@ class SolvationFepDriver:
 
         # Output stream
         self.ostream = ostream
-        
+
         # Create directory for storing all generated data
         self.output_folder = Path("solvation_fep_output")
 
         # Options for the SolvationBuilder
         self.padding = 1.0
-        self.solvent_name = 'spce'
+        self.solvent_name = 'cspce'
         self.resname = None 
         
         # Ensemble and MD options
@@ -137,6 +137,7 @@ class SolvationFepDriver:
         self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * self.temperature).in_units_of(unit.kilojoule_per_mole)
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
+        self.num_em_steps = 0  # no limit
         self.num_equil_steps = 5000 #10 ps
         self.num_steps = 500000 # 1 ns
         self.num_snapshots = 500
@@ -219,8 +220,17 @@ class SolvationFepDriver:
         delta_f = self._run_stages()
 
         return delta_f
+
+    def compute_solvation_free_energy(self, solute_ff, sol_builder, solute_name='solute'):
+
+        sol_builder.write_gromacs_files(solute_ff=solute_ff)
+
+        solute_gro = f'{solute_name}.gro'
+        solute_top = f'{solute_name}.top'
+
+        return self.compute_solvation_from_gromacs_files("system.gro", "system.top", solute_gro, solute_top)
         
-    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None):
+    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None):
         """
         Run the solvation free energy calculation using OpenMM.
         :param solute_pdb:
@@ -624,16 +634,26 @@ class SolvationFepDriver:
         """
         Run the simulation using OpenMM. Return simulated time in ns and real elapsed time in seconds.
         """
+
         integrator = mm.LangevinIntegrator(self.temperature, 1.0 / unit.picoseconds, self.timestep)
-        platform = mm.Platform.getPlatformByName(self.platform) if self.platform else None
-        simulation = app.Simulation(topology, system, integrator, platform=platform)
+        simulation = app.Simulation(topology, system, integrator, platform=self._create_platform())
         simulation.context.setPositions(positions)
 
+        em_t0 = time.time()
+
         # Minimize energy
-        simulation.minimizeEnergy()
+        simulation.minimizeEnergy(maxIterations=self.num_em_steps)
+
+        self.ostream.print_info(f'Time spent in energy minimization: {time.time() - em_t0:.2f} s')
+        self.ostream.flush()
+
+        equil_t0 = time.time()
 
         # Equilibration
         simulation.step(self.num_equil_steps)
+
+        self.ostream.print_info(f'Time spent in pre-equilibration: {time.time() - equil_t0:.2f} s')
+        self.ostream.flush()
 
         # Calculate production run time and interval
         interval = self.num_steps // self.num_snapshots
@@ -698,7 +718,7 @@ class SolvationFepDriver:
             time_start_forcefield = time.time()
 
             integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
-            simulation = app.Simulation(topology, forcefield, integrator)
+            simulation = app.Simulation(topology, forcefield, integrator, platform=self._create_platform())
 
             for n, snapshot in enumerate(snapshots):
                 simulation.context.setPositions(snapshot)
@@ -763,3 +783,18 @@ class SolvationFepDriver:
 
         return alchemical_region, chemical_region
 
+    def _create_platform(self):
+        """
+        Creates an OpenMM platform.
+
+        Returns:
+            The OpenMM Platform.
+        """
+
+        if self.platform is None:
+            return None
+        else:
+            platform = mm.Platform.getPlatformByName(self.platform)
+            # if self.platform == "CPU":
+            #     platform.setPropertyDefaultValue("Threads", "1")
+            return platform

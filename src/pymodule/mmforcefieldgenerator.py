@@ -1385,6 +1385,10 @@ class MMForceFieldGenerator:
         self.bonds = {}
         self.angles = {}
 
+        # update unique atom types
+        self.unique_atom_types = [water_params['hw']['type'],
+                                  water_params['ow']['type']]
+
         # update atom parameters
         label_to_atomtype_mapping = {'O': 'ow', 'H': 'hw'}
         for i, label in enumerate(labels):
@@ -3092,7 +3096,7 @@ class MMForceFieldGenerator:
             # Atoms
             for i, atom in self.atoms.items():
                 atom_name = atom['name']
-                line_str = f'{1:>5d}{res_name:<5s}{atom_name:<5s}{i + 1:>5d}'
+                line_str = f'{1:>5d}{res_name:<5s}{atom_name:>5s}{i + 1:>5d}'
                 for d in range(3):
                     line_str += f'{coords_in_nm[i][d]:{ndec + 5}.{ndec}f}'
                 line_str += '\n'
