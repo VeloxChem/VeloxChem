@@ -122,7 +122,6 @@ class MMForceFieldGenerator:
         self.scan_xyz_files = None
         self.atom_types = None
         self.rotatable_bonds = []
-        self.excited_states_rot_bond = []
 
         # topology settings
         self.eq_param = True
@@ -137,6 +136,7 @@ class MMForceFieldGenerator:
         self.force_field_data = None
         self.force_field_data_extension = None
         self.topology_update_flag = False
+        self.excited_states_rot_bond = []
 
         # number of rounds for fitting dihedral potentials
         self.n_rounds = 3
@@ -2172,244 +2172,10 @@ class MMForceFieldGenerator:
         updated_rotatable_bonds, excitited_state_rot_bonds = self.check_rotatable_bonds(rotatable_bonds_types)
 
         # Create a 1-indexed list of rotatable bonds without duplicates
-        self.rotatable_bonds = [[bond[0] + 1, bond[1] + 1] for bond in updated_rotatable_bonds.keys()]
+        rotatable_bonds = [[bond[0] + 1, bond[1] + 1] for bond in updated_rotatable_bonds.keys()]
         self.excited_states_rot_bond = [[bond[0] + 1, bond[1] + 1] for bond in excitited_state_rot_bonds.keys()]
-        # Impropers
 
-        self.impropers = {}
-
-        sp2_atom_types = [
-            'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf', 'cu',
-            'cv', 'cz', 'n ', 'ns', 'nt', 'n2', 'na', 'nb', 'nc', 'nd', 'ne',
-            'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
-        ]
-
-        improper_atom_inds = []
-
-        for i, j, k in angle_indices:
-            at_1 = self.atom_types[i]
-            at_2 = self.atom_types[j]
-            at_3 = self.atom_types[k]
-
-            if at_2 not in sp2_atom_types:
-                continue
-
-            if j not in improper_atom_inds:
-                improper_atom_inds.append(j)
-            else:
-                continue
-
-            for l in range(n_atoms):
-                if (l in [i, j, k]) or (self.connectivity_matrix[l, j] != 1):
-                    continue
-                at_4 = self.atom_types[l]
-
-                patterns = [
-                    re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
-                    re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
-                    re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
-                    re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
-                    re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
-                    re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
-                ]
-                target_dihedral_types = [
-                    (at_2.strip(), at_3.strip(), at_4.strip(), at_1.strip()),
-                    (at_2.strip(), at_1.strip(), at_4.strip(), at_3.strip()),
-                    (at_2.strip(), at_4.strip(), at_1.strip(), at_3.strip()),
-                    (at_2.strip(), at_3.strip(), at_1.strip(), at_4.strip()),
-                    (at_2.strip(), at_4.strip(), at_3.strip(), at_1.strip()),
-                    (at_2.strip(), at_1.strip(), at_3.strip(), at_4.strip()),
-                ]
-                target_orderings = [
-                    (2, 3, 4, 1),
-                    (2, 1, 4, 3),
-                    (2, 4, 1, 3),
-                    (2, 3, 1, 4),
-                    (2, 4, 3, 1),
-                    (2, 1, 3, 4),
-                ]
-
-                dihedral_found = False
-                barrier, phase, periodicity, comment = None, None, None, None
-                improper_ordering = None
-
-                if use_xml:
-                    for dihedral_data in ff_data_dict['impropers']:
-                        for target_dihedral, ordering in zip(
-                                target_dihedral_types, target_orderings):
-                            if target_dihedral == (dihedral_data['class1'],
-                                                   dihedral_data['class2'],
-                                                   dihedral_data['class3'],
-                                                   dihedral_data['class4']):
-                                periodicity = int(dihedral_data['periodicity1'])
-                                barrier = float(dihedral_data['k1'])
-                                phase = float(
-                                    dihedral_data['phase1']) / np.pi * 180.0
-                                comment = self.get_dihedral_type_string(
-                                    target_dihedral)
-                                improper_ordering = ordering
-                                dihedral_found = True
-                                break
-                else:
-                    for line in ff_data_lines:
-                        for p, ordering in zip(patterns, target_orderings):
-                            m = re.search(p, line)
-                            if m is not None:
-                                dihedral_ff = line[11:60].strip().split()
-                                if len(dihedral_ff) == 3:
-                                    barrier = float(dihedral_ff[0]) * 4.184
-                                    phase = float(dihedral_ff[1])
-                                    periodicity = int(float(dihedral_ff[2]))
-                                    comment = m.group(0)
-                                    improper_ordering = ordering
-                                    dihedral_found = True
-                                    break
-
-                if not dihedral_found:
-                    patterns = [
-                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
-                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
-                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
-                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
-                    ]
-                    target_dihedral_types = [
-                        (at_2.strip(), '', at_3.strip(), at_1.strip()),
-                        (at_2.strip(), '', at_1.strip(), at_3.strip()),
-                        (at_2.strip(), '', at_4.strip(), at_3.strip()),
-                        (at_2.strip(), '', at_3.strip(), at_4.strip()),
-                        (at_2.strip(), '', at_4.strip(), at_1.strip()),
-                        (at_2.strip(), '', at_1.strip(), at_4.strip()),
-                    ]
-                    target_orderings = [
-                        (2, 4, 3, 1),
-                        (2, 4, 1, 3),
-                        (2, 1, 4, 3),
-                        (2, 1, 3, 4),
-                        (2, 3, 4, 1),
-                        (2, 3, 1, 4),
-                    ]
-
-                    if use_xml:
-                        for dihedral_data in ff_data_dict['impropers']:
-                            for target_dihedral, ordering in zip(
-                                    target_dihedral_types, target_orderings):
-                                if target_dihedral == (dihedral_data['class1'],
-                                                       dihedral_data['class2'],
-                                                       dihedral_data['class3'],
-                                                       dihedral_data['class4']):
-                                    periodicity = int(
-                                        dihedral_data['periodicity1'])
-                                    barrier = float(dihedral_data['k1'])
-                                    phase = float(
-                                        dihedral_data['phase1']) / np.pi * 180.0
-                                    comment = self.get_dihedral_type_string(
-                                        target_dihedral)
-                                    improper_ordering = ordering
-                                    dihedral_found = True
-                                    break
-                    else:
-                        for line in ff_data_lines:
-                            for p, ordering in zip(patterns, target_orderings):
-                                m = re.search(p, line)
-                                if m is not None:
-                                    dihedral_ff = line[11:60].strip().split()
-                                    if len(dihedral_ff) == 3:
-                                        barrier = float(dihedral_ff[0]) * 4.184
-                                        phase = float(dihedral_ff[1])
-                                        periodicity = int(float(dihedral_ff[2]))
-                                        comment = m.group(0)
-                                        improper_ordering = ordering
-                                        dihedral_found = True
-                                        break
-
-                if not dihedral_found:
-                    patterns = [
-                        re.compile(r'\A' + f'X -X -{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
-                        re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
-                    ]
-                    target_dihedral_types = [
-                        (at_2.strip(), '', '', at_3.strip()),
-                        (at_2.strip(), '', '', at_1.strip()),
-                        (at_2.strip(), '', '', at_4.strip()),
-                    ]
-                    target_orderings = [
-                        (2, 4, 1, 3),
-                        (2, 3, 4, 1),
-                        (2, 1, 3, 4),
-                    ]
-
-                    if use_xml:
-                        for dihedral_data in ff_data_dict['impropers']:
-                            for target_dihedral, ordering in zip(
-                                    target_dihedral_types, target_orderings):
-                                if target_dihedral == (dihedral_data['class1'],
-                                                       dihedral_data['class2'],
-                                                       dihedral_data['class3'],
-                                                       dihedral_data['class4']):
-                                    periodicity = int(
-                                        dihedral_data['periodicity1'])
-                                    barrier = float(dihedral_data['k1'])
-                                    phase = float(
-                                        dihedral_data['phase1']) / np.pi * 180.0
-                                    comment = self.get_dihedral_type_string(
-                                        target_dihedral)
-                                    improper_ordering = ordering
-                                    dihedral_found = True
-                                    break
-                    else:
-                        for line in ff_data_lines:
-                            for p, ordering in zip(patterns, target_orderings):
-                                m = re.search(p, line)
-                                if m is not None:
-                                    dihedral_ff = line[11:60].strip().split()
-                                    if len(dihedral_ff) == 3:
-                                        barrier = float(dihedral_ff[0]) * 4.184
-                                        phase = float(dihedral_ff[1])
-                                        periodicity = int(float(dihedral_ff[2]))
-                                        comment = m.group(0)
-                                        improper_ordering = ordering
-                                        dihedral_found = True
-                                        break
-
-                if not dihedral_found:
-                    # Default values for impropers
-                    barrier, phase, periodicity = 1.1 * 4.184, 180.0, 2
-                    comment = 'Guessed'
-
-                assert_msg_critical(
-                    phase == 180.0,
-                    'MMForceFieldGenerator: invalid improper dihedral phase')
-
-                assert_msg_critical(
-                    periodicity == 2,
-                    'MMForceFieldGenerator: invalid improper dihedral periodicity'
-                )
-
-                # The ordering of the atoms in improper dihedral: the first
-                # atom is connected to all the other three atoms. See e.g.
-                # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
-
-                if improper_ordering is None:
-                    dih_atom_inds_tuple = (j, i, k, l)
-                elif improper_ordering[-1] == 4:
-                    dih_atom_inds_tuple = (j, i, k, l)
-                elif improper_ordering[-1] == 3:
-                    dih_atom_inds_tuple = (j, l, i, k)
-                elif improper_ordering[-1] == 1:
-                    dih_atom_inds_tuple = (j, k, l, i)
-
-                self.impropers[dih_atom_inds_tuple] = {
-                    'type': 'Fourier',
-                    'barrier': barrier,
-                    'phase': phase,
-                    'periodicity': periodicity,
-                    'comment': comment
-                }
-
-        self.ostream.flush()
+        return dihedrals, rotatable_bonds
 
     @staticmethod
     def get_dihedral_type_string(target_dihedral):
@@ -2708,10 +2474,9 @@ class MMForceFieldGenerator:
             if bond in non_rotatable_bonds:
                 bonds_to_delete.append((i, j))
                 continue
-
+            
             # Check if any side atom of the bond is involved in a triple bond
-            if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+            if (bond[0] in ['c1','n1','cg','ch']) or (bond[1] in ['c1', 'n1','cg','ch']):
                 bonds_to_delete.append((i, j))
                 es_bond_to_delete.append((i, j))
 
