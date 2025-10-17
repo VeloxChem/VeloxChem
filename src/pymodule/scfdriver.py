@@ -346,6 +346,7 @@ class ScfDriver:
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'cpcm_custom_vdw_radii':
                     ('seq_fixed_str', 'custom vdw radii for C-PCM'),
+                'smd_solvent': ('str', 'solvent name for SMD model'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
