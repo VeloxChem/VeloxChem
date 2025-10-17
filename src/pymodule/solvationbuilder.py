@@ -708,13 +708,13 @@ class SolvationBuilder:
         if self.solvent_name in ['itself']:
             solvent_ffs = None
 
-        elif self.solvent_name.lower() in list(self.water_parameters.keys()):
+        elif self.solvent_name.lower() in self.water_parameters:
             solvent_ffs = []
             solvent_ff = MMForceFieldGenerator()
             solvent_ff.ostream.mute()
             solvent_ff.create_water(self.solvent_name)
             solvent_ffs.append(solvent_ff)
-                
+
         else:
             solvent_ffs = []
             for i in range(len(self.solvents)):
@@ -1019,7 +1019,7 @@ class SolvationBuilder:
             The name of the solvent
         '''
 
-        if solvent.lower() in self.water_parameters.keys():
+        if solvent.lower() in self.water_parameters:
             mols_per_nm3 = 33.3
             density = 1000
             smiles_code = 'O'
@@ -1193,7 +1193,7 @@ class SolvationBuilder:
                         self.ostream.print_info(f'Generating the ForceField for the solvent')
                         self.ostream.flush()
                     
-                    if self.solvent_name.lower() in self.water_parameters.keys():
+                    if self.solvent_name.lower() in self.water_parameters:
                         solvent_ff.create_water(self.solvent_name)
                     else:
                         if self._is_water_molecule(solvent):
