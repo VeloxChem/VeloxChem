@@ -54,7 +54,7 @@ def get_water_parameters():
                 'equilibrium': 109.47,
                 'comment': 'SPC/E water'
                 },
-        'O' : {
+        'ow' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
@@ -64,7 +64,7 @@ def get_water_parameters():
                 'equivalent_atom': 'ow_00',
                 'comment': 'SPC/E water'
                 },
-        'H' : {
+        'hw' : {
                 'type': 'hw',
                 'name': 'H',
                 'mass': 1.007825,
@@ -90,7 +90,7 @@ def get_water_parameters():
                 'equilibrium': 109.47,
                 'comment': 'cSPC/E water'
                 },
-        'O' : {
+        'ow' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
@@ -100,7 +100,7 @@ def get_water_parameters():
                 'equivalent_atom': 'ow_00',  
                 'comment': 'cSPC/E water'
                 },
-        'H' : {
+        'hw' : {
                 'type': 'hw',
                 'name': 'H',
                 'mass': 1.007825,
@@ -127,7 +127,7 @@ def get_water_parameters():
                 'equilibrium': 104.52,
                 'comment': 'TIP-3P water'
                 },
-        'O' : {
+        'ow' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
@@ -137,7 +137,7 @@ def get_water_parameters():
                 'equivalent_atom': 'ow_00',        
                 'comment': 'TIP-3P water'
                 },
-        'H' : {    
+        'hw' : {
                 'type': 'hw',
                 'name': 'H',
                 'mass': 1.007825,
@@ -164,7 +164,7 @@ def get_water_parameters():
                 'equilibrium': 104.52,
                 'comment': 'cTIP-3P water'
                 },
-        'O' : {
+        'ow' : {
                 'type': 'ow',
                 'name': 'O',
                 'mass': 15.994915,
@@ -174,7 +174,7 @@ def get_water_parameters():
                 'equivalent_atom': 'ow_00',        
                 'comment': 'cTIP-3P water'
                 },
-        'H' : {    
+        'hw' : {
                 'type': 'hw',
                 'name': 'H',
                 'mass': 1.007825,

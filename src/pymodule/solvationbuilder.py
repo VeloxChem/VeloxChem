@@ -705,15 +705,10 @@ class SolvationBuilder:
         solute_ff.partial_charges = self.solute.get_partial_charges(self.solute.get_charge())
         solute_ff.create_topology(self.solute)
 
+        use_water_model = (self.solvent_name in self.water_parameters)
+
         if self.solvent_name in ['itself']:
             solvent_ffs = None
-
-        elif self.solvent_name.lower() in self.water_parameters:
-            solvent_ffs = []
-            solvent_ff = MMForceFieldGenerator()
-            solvent_ff.ostream.mute()
-            solvent_ff.create_water(self.solvent_name)
-            solvent_ffs.append(solvent_ff)
 
         else:
             solvent_ffs = []
@@ -721,7 +716,14 @@ class SolvationBuilder:
                 solvent_ff = MMForceFieldGenerator()
                 solvent_ff.ostream.mute()
                 solvent_ff.partial_charges = self.solvents[i].get_partial_charges(self.solvents[i].get_charge())
-                solvent_ff.create_topology(self.solvents[i])
+                if use_water_model:
+                    solvent_ff.create_topology(self.solvents[i], water_model=self.solvent_name)
+                else:
+                    if self.solvents[i].is_water_molecule():
+                        # auto-detect water molecule and use ctip3p as default
+                        solvent_ff.create_topology(self.solvents[i], water_model='ctip3p')
+                    else:
+                        solvent_ff.create_topology(self.solvents[i])
                 solvent_ffs.append(solvent_ff)
 
         self.write_gromacs_files(solute_ff, solvent_ffs, equilibration=True)
@@ -1179,6 +1181,8 @@ class SolvationBuilder:
         # Solvents
         # Special case for itself
         if not solvent_ffs:
+            use_water_model = (self.solvent_name in self.water_parameters)
+
             if self.solvent_name == 'itself':
                 self.solvent_ffs = []
                 self.solvent_ffs.append(self.solute_ff)
@@ -1193,12 +1197,12 @@ class SolvationBuilder:
                         self.ostream.print_info(f'Generating the ForceField for the solvent')
                         self.ostream.flush()
                     
-                    if self.solvent_name.lower() in self.water_parameters:
-                        solvent_ff.create_water(self.solvent_name)
+                    if use_water_model:
+                        solvent_ff.create_topology(solvent, water_model=self.solvent_name)
                     else:
-                        if self._is_water_molecule(solvent):
-                            # auto-detect water molecule and use tip3p as default
-                            solvent_ff.create_topology(solvent, resp=False, water_model='tip3p', use_xml=False)
+                        if solvent.is_water_molecule():
+                            # auto-detect water molecule and use ctip3p as default
+                            solvent_ff.create_topology(solvent, water_model='ctip3p')
                         else:
                             solvent_ff.create_topology(solvent)
 
@@ -1206,28 +1210,6 @@ class SolvationBuilder:
 
         else:
             self.solvent_ffs = solvent_ffs
-
-    @staticmethod
-    def _is_water_molecule(mol):
-        """
-        Checks if a molecule is a water molecule.
-        """
-
-        natoms = mol.number_of_atoms()
-
-        if natoms == 3:
-            atom_labels = mol.get_labels()
-            if sorted(atom_labels) == ['H','H','O']:
-                conn = mol.get_connectivity_matrix()
-                bond_labels = []
-                for atom_i in range(natoms):
-                    for atom_j in range(atom_i, natoms):
-                        if conn[atom_i, atom_j] == 1:
-                            bond_labels.append(sorted([atom_labels[atom_i], atom_labels[atom_j]]))
-                if bond_labels == [['H', 'O'], ['H', 'O']]:
-                    return True
-
-        return False
 
     def _write_system_gro(self, filename='system.gro'):
         """

@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from pathlib import Path, PurePath
+from copy import deepcopy
 import numpy as np
 import tempfile
 import sys
@@ -1066,6 +1067,7 @@ class MMForceFieldGenerator:
                         basis=None,
                         scf_results=None,
                         resp=True,
+                        water_model=None,
                         use_xml=True):
         """
         Analyzes the topology of the molecule and create dictionaries
@@ -1149,7 +1151,10 @@ class MMForceFieldGenerator:
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
-        if not resp:
+        use_water_model = ((water_model is not None) and
+                           molecule.is_water_molecule())
+
+        if (not resp) or use_water_model:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
@@ -1285,6 +1290,10 @@ class MMForceFieldGenerator:
             angle_indices,
         )
 
+        # Process water model if requested
+        if use_water_model:
+            self.apply_water_model(water_model)
+
         self.ostream.flush()
 
     def generate_topology_indices(self, n_atoms):
@@ -1350,15 +1359,15 @@ class MMForceFieldGenerator:
             pairs[(i, j)] = {'comment': None}
 
         return bond_indices, angle_indices, dihedral_indices, pairs
-    
-    def create_water(self, water_model):
+
+    def apply_water_model(self, water_model):
         """
         Creates the topology for water based on predefined parameters.
         
         :param water_model:
             The water model to use.
-        
         """
+
         assert_msg_critical(water_model.lower() in self.water_parameters,
         f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}")
         
@@ -1366,34 +1375,35 @@ class MMForceFieldGenerator:
         self.ostream.print_reference('Reference: ' + self.water_parameters[water_model.lower()]['ref'])
         self.ostream.flush()
 
-        water_parameters = self.water_parameters[water_model.lower()]
-        
-        self.molecule = Molecule.read_smiles('O')
-        self.unique_atom_types = [water_parameters['H']['type'], water_parameters['O']['type']]
-        self.connectivity_matrix = self.molecule.get_connectivity_matrix()
-        bond_indices, angle_indices, _, self.pairs = self.generate_topology_indices(n_atoms=3)
-        atom_names = self.get_atom_names()
+        water_params = self.water_parameters[water_model.lower()]
 
-        atoms = {}
-        bonds = {}
-        angles = {}
+        labels = self.molecule.get_labels()
+        hydrogen_indices = [idx for idx, label in enumerate(labels) if label == 'H']
+        oxygen_indices = [idx for idx, label in enumerate(labels) if label == 'O']
 
-        for i, label in enumerate(self.molecule.get_labels()):
-            atoms[i] = water_parameters[label].copy()
-            atoms[i]['name'] = atom_names[i]
-        for i, j in bond_indices:
-            bonds[(i, j)] = water_parameters['bonds']
-        for i, j, k in angle_indices:
-            angles[(i, j, k)] = water_parameters['angles']
+        self.atoms = {}
+        self.bonds = {}
+        self.angles = {}
 
-        self.atoms = atoms
-        self.bonds = bonds
-        self.angles = angles
-        self.dihedrals = {}
-        self.impropers = {}
-        
-        return
-    
+        # update atom parameters
+        label_to_atomtype_mapping = {'O': 'ow', 'H': 'hw'}
+        for i, label in enumerate(labels):
+            self.atoms[i] = deepcopy(water_params[label_to_atomtype_mapping[label]])
+
+        # update hydrogen atom names to 'H1' and 'H2'
+        for idx, h_ind in enumerate(hydrogen_indices):
+            self.atoms[h_ind]['name'] = f'H{idx + 1}'
+
+        # update O-H bonds
+        i = oxygen_indices[0]
+        for j in hydrogen_indices:
+            self.bonds[(i, j)] = deepcopy(water_params['bonds'])
+
+        # update H-O-H angle
+        j = oxygen_indices[0]
+        i, k = hydrogen_indices
+        self.angles[(i, j, k)] = deepcopy(water_params['angles'])
+
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
         impropers = {}

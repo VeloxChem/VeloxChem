@@ -24,7 +24,7 @@
     <PeriodicTorsionForce/>
     <NonbondedForce coulomb14scale="0.8333333333333334" lj14scale="0.5">
         <Atom type="O_MOL" charge="-0.8476" sigma="0.31658" epsilon="0.649775"/>
-        <Atom type="H1_MOL" charge="0.4238" sigma="1.0" epsilon="0.0"/>
-        <Atom type="H2_MOL" charge="0.4238" sigma="1.0" epsilon="0.0"/>
+        <Atom type="H1_MOL" charge="0.4238" sigma="0.11658" epsilon="0.064978"/>
+        <Atom type="H2_MOL" charge="0.4238" sigma="0.11658" epsilon="0.064978"/>
     </NonbondedForce>
 </ForceField>

@@ -745,7 +745,7 @@ class OpenMMDynamics:
                                 save_pdb = False,
                                 k = 1000,
                                 r0 = 0.5,
-                                water_model = 'tip3p'
+                                water_model = 'ctip3p'
                                 ):
         """
         Runs high-temperature conformational sampling for multiple residues in the system.
@@ -796,7 +796,7 @@ class OpenMMDynamics:
                 duplicate = False
                 is_water = False
                 
-                if sorted(mol.get_labels()) == ['H','H','O']: 
+                if mol.is_water_molecule():
                     is_water = True
                     water_msg = True
 
@@ -804,7 +804,7 @@ class OpenMMDynamics:
                     if (mol.get_labels() == molecules[j].get_labels() and
                         mol.get_connectivity_matrix().shape == molecules[j].get_connectivity_matrix().shape and
                         (mol.get_connectivity_matrix() == molecules[j].get_connectivity_matrix()).all()):
-                        ff_gen.create_water(water_model) if is_water else ff_gen.create_topology(mol, resp=False)
+                        ff_gen.create_topology(mol, resp=False, water_model=water_model)
                         self.atom_dict[f'{i}'] = ff_gen.atoms
                         duplicate = True
                         break
@@ -812,7 +812,7 @@ class OpenMMDynamics:
                 if not duplicate:
                     if partial_charges:
                         ff_gen.partial_charges = partial_charges[i]
-                    ff_gen.create_water(water_model) if is_water else ff_gen.create_topology(mol)
+                    ff_gen.create_topology(mol, water_model=water_model)
                     ff_gen.generate_residue_xml(f'molecule_{i+1}.xml', f'M{i+1:02d}')
                     xml_files.append(f'molecule_{i+1}.xml')
                 
