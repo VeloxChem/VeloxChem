@@ -3048,34 +3048,35 @@ class IMDatabasePointCollecter:
                         print(new_sorted_items, sorted_items, same)
                         int_diff = []
                         elem_list = []
-                        for element_idx, element in enumerate(self.z_matrix):
+                        if not same:
+                            for element_idx, element in enumerate(self.z_matrix):
 
-                            if len(element) == 4 and element not in constraints:
+                                if len(element) == 4 and element not in constraints:
 
-                                diff = np.sin(interpolation_driver.impes_coordinate.internal_coordinates_values[element_idx] - self.impes_drivers[state_to_optim].impes_coordinate.internal_coordinates_values[element_idx])
-                                if abs(diff) > 1e-5:
-                                    elem_list.append(element)
-                                    int_diff.append(diff)
-                            
-                        ordered_diif = sorted(zip(elem_list, int_diff), key=lambda x:x[1], reverse=True)
-                        if old_list_change is None:
-                            old_list_change = elem_list.copy()
-                        print('Len ordered list', ordered_diif)
-                        if len(ordered_diif) > 0:
-                            for spec_elem in range(counter):
-                                if spec_elem == len(ordered_diif):
-                                    break
+                                    diff = np.sin(interpolation_driver.impes_coordinate.internal_coordinates_values[element_idx] - self.impes_drivers[state_to_optim].impes_coordinate.internal_coordinates_values[element_idx])
+                                    if abs(diff) > 1e-5:
+                                        elem_list.append(element)
+                                        int_diff.append(diff)
                                 
-                                dihedral_val_to_reset = molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1))
-                                # print(dihedral_val_to_reset, ordered_diif[spec_elem][0])
-                                optimized_molecule.set_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1), dihedral_val_to_reset)
-                                # print(optimized_molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1)))      
-                                if ordered_diif[spec_elem][0] in old_list_change:
-                                    same = True
-                        else:
-                            same = True
-                        
-                        counter +=1
+                            ordered_diif = sorted(zip(elem_list, int_diff), key=lambda x:x[1], reverse=True)
+                            if old_list_change is None:
+                                old_list_change = elem_list.copy()
+                            print('Len ordered list', ordered_diif)
+                            if len(ordered_diif) > 0:
+                                for spec_elem in range(counter):
+                                    if spec_elem == len(ordered_diif):
+                                        break
+                                    
+                                    dihedral_val_to_reset = molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1))
+                                    # print(dihedral_val_to_reset, ordered_diif[spec_elem][0])
+                                    optimized_molecule.set_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1), dihedral_val_to_reset)
+                                    # print(optimized_molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1)))      
+                                    if ordered_diif[spec_elem][0] in old_list_change:
+                                        same = True
+                            else:
+                                same = True
+                            
+                            counter +=1
                     state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim]))
 
                 print('New optimized molecule \n', optimized_molecule.get_xyz_string())
