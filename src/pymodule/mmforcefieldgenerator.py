@@ -1249,7 +1249,7 @@ class MMForceFieldGenerator:
             ff_data_dict,
             ff_data_lines,
             gaff_version,
-            list(atomtypeidentifier.equivalent_atoms)
+            list(atomtypeidentifier.equivalent_atoms),
         )
 
         self.bonds = self.populate_bonds(
@@ -1257,7 +1257,7 @@ class MMForceFieldGenerator:
             ff_data_dict,
             ff_data_lines,
             coords,
-            bond_indices
+            bond_indices,
         )
 
         self.angles = self.populate_angles(
@@ -1265,7 +1265,7 @@ class MMForceFieldGenerator:
             ff_data_dict,
             ff_data_lines,
             coords,
-            angle_indices
+            angle_indices,
         )
 
         # Dihedrals analysis
@@ -1631,7 +1631,8 @@ class MMForceFieldGenerator:
                 }
         return impropers
 
-    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines, gaff_version, equivalent_atoms):
+    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines, gaff_version,
+                       equivalent_atoms):
 
         use_gaff = False
         use_uff = False
@@ -1748,7 +1749,8 @@ class MMForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords, bond_indices):
+    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                       bond_indices):
         bonds = {}
         for i, j in bond_indices:
             r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
@@ -1810,7 +1812,8 @@ class MMForceFieldGenerator:
             }
         return bonds
 
-    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords, angle_indices):
+    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                        angle_indices):
         angles = {}
 
         for i, j, k in angle_indices:
