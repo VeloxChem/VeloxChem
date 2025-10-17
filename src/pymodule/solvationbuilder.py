@@ -442,6 +442,8 @@ class SolvationBuilder:
 
         from scipy.spatial import cKDTree
 
+        # Reset solvent name
+        self.solvent_name = None
 
         # Add the solute to the system
         self._load_solute_molecule(solute)
@@ -646,7 +648,6 @@ class SolvationBuilder:
 
         # Generate the forcefields
         self._generate_forcefields(solute_ff, solvent_ffs)
-
         
         # Special case for 'itself' solvent
         if self.solvent_name == 'itself':
