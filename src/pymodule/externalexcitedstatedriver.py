@@ -439,9 +439,9 @@ conda activate vlxenv_simd_master
                             file.write(f'! {self.xc_func} {self.dispersion} {self.basis_set_label}\n')
                     else:
                         if self.solvation[0] is True:
-                            file.write(f'!{self.dispersion} {self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
+                            file.write(f'!{self.basis_set_label} {self.solvation[1]}({self.solvation[2]})\n')
                         else:
-                            file.write(f'!{self.dispersion} {self.basis_set_label}\n')
+                            file.write(f'!{self.basis_set_label}\n')
                     file.write(f'%{self.method}\n')
                     file.write(f'NROOTS {self.roots_to_check}\n')
                     file.write(f'sf {self.spin_flip}\n')
