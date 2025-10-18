@@ -1472,9 +1472,10 @@ class ScfDriver:
             self._ri_drv = RIJKFockDriver(self.comm, self.ostream)
             self._ri_drv.compute_metric(molecule, self.ri_auxiliary_basis,
                                         verbose=True)
-            self._ri_drv.compute_bq_vectors(molecule, ao_basis,
-                                            self.ri_auxiliary_basis,
-                                            verbose=False)
+            self._ri_drv.compute_screened_bq_vectors(screener,
+                                                     molecule,
+                                                     self.ri_auxiliary_basis,
+                                                     12, verbose=True)
 
         e_grad = None
 
@@ -2094,8 +2095,8 @@ class ScfDriver:
                 fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
                 fock_mat_np = fock_mat.to_numpy()
             elif self.ri_jk and fock_type != 'j' and (self.molecular_orbitals._orbitals is not None):
-                fock_mat_j = self._ri_drv.compute_j_fock(den_mat_for_fock, 'j', verbose=False)
-                fock_mat_k = self._ri_drv.compute_k_fock(den_mat_for_fock, self.molecular_orbitals, verbose=False)
+                fock_mat_j = self._ri_drv.compute_screened_j_fock(den_mat_for_fock, 'j', verbose=False)
+                fock_mat_k = self._ri_drv.compute_screened_k_fock(den_mat_for_fock, self.molecular_orbitals, verbose=False)
                 fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
                                fock_mat_k.to_numpy() * exchange_scaling_factor)
             else:

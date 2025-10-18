@@ -315,7 +315,7 @@ CRIJKFockDriver::compute_screened_k_fock(const CMatrix &density, const CSubMatri
     
     // set up batch size for OMP region
     
-    const size_t bsize = 200;
+    const size_t bsize = 100;
     
     #pragma omp parallel shared(ptr_bq_vectors, ptr_bq_mask, ptr_molorbs, ptr_kmat, naux, naos, nmos, bsize)
     {
