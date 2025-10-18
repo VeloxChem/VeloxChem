@@ -183,7 +183,7 @@ class SolvationFepDriver:
             The force field generator for the solute. If None, it will be calculated.
         :param solvent:
             The solvent to use for solvation. Default is spce water.
-            Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
+            Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform',
             'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf','other' or 'itself'.
         :param solvent_molecule:
             The VeloxChem molecule object for the solvent. Mandatory for 'other'.
@@ -243,7 +243,7 @@ class SolvationFepDriver:
             The PDB file with the solvated system coordinates. If not provided, the system will be built. 
         :param solvent:
             The solvent to use for solvation. Default is spce water.
-            Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
+            Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform',
             'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf', 'other' or 'itself'.
         :param solvent_molecule:
             The VeloxChem molecule object for the solvent. Mandatory for 'other'.

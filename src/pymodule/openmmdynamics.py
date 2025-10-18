@@ -379,7 +379,7 @@ class OpenMMDynamics:
         :param ff_gen:
             VeloxChem forcefield generator object.
         :param solvent:
-            Available options:'gas', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 
+            Available options:'gas', 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
             'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
             'acetonitrile', 'other' or 'itself'.
         :param qm_atoms:

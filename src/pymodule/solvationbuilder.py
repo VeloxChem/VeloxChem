@@ -144,7 +144,7 @@ class SolvationBuilder:
         # Standard forcefield
         self.parent_forcefield = 'amber03'
 
-    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False, box = None):
+    def solvate(self, solute, solvent='cspce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False, box = None):
         """
         Create a solvated system with the most typical solvent molecules.
 
@@ -152,7 +152,7 @@ class SolvationBuilder:
             The VeloxChem molecule object of the solute.
         :param solvent:
             The name of the solvent molecule. The default is 'water'.
-            Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 
+            Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
             'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
             'acetonitrile', 'dmf', 'other' or 'itself'.
                 * 'other': The solvent molecule must be provided.
@@ -1440,6 +1440,7 @@ class SolvationBuilder:
                 f.write(f"CONECT{pdb_i:>5d}{pdb_j:>5d}\n")
 
             # Solvent bonds
+            # TODO: double check
             # If the solvent is SPCE or TIP3P, the bonds are predefined as (0, 1) and (0, 2)
             # and do not require CONECT records.
 
