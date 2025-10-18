@@ -373,7 +373,7 @@ conda activate vlxenv_simd_master
 
             print('necessary orca info', energies, spin_s2_values)
             if self.spin_flip is True:
-                energies = [energies[i] for i in range(len(energies)) if spin_s2_values[i] < 0.2 or spin_s2_values[i] > 1.9]
+                energies = [energies[i] for i in range(len(energies)) if spin_s2_values[i] < 0.28 or spin_s2_values[i] > 1.9 and spin_s2_values[i] < 2.28]
 
             energies = sorted(energies)
             # indices = np.argsort(energies)[:self.roots_to_check]
