@@ -303,23 +303,72 @@ CRIJKFockDriver::compute_screened_k_fock(const CMatrix &density, const CSubMatri
     
     auto kmat = CSubMatrix({0, 0, naos, naos}, 0.0);
     
-    // set up full B^Q matrices
+    // set up pointers for OMP region
     
-    auto bqao = CSubMatrix({0, 0, naos, naos});
+    auto ptr_bq_vectors = &_bq_vectors;
     
-    auto bqmo = CSubMatrix({0, 0, nmos, naos});
+    auto ptr_molorbs = &molorbs;
     
-    for (size_t i = 0; i < naux; i++)
+    auto ptr_kmat = kmat.data();
+    
+    auto ptr_bq_mask = &_bq_mask;
+    
+    // set up batch size for OMP region
+    
+    const size_t bsize = 200;
+    
+    #pragma omp parallel shared(ptr_bq_vectors, ptr_bq_mask, ptr_molorbs, ptr_kmat, naux, naos, nmos, bsize)
     {
-        _bq_vectors.reduced_unpack_data(bqao, _bq_mask, i);
+        #pragma omp single nowait
+        {
+            const auto nbatches = batch::number_of_batches(naux, bsize);
         
-        bqmo.zero();
-        
-        sdenblas::serialMultAtB(bqmo, molorbs, bqao);
-        
-        sdenblas::serialMultAtB(kmat, bqmo, bqmo);
+            for (size_t i = 0; i < nbatches; i++)
+            {
+                const auto bpair = batch::batch_range(i, naux, bsize);
+            
+                #pragma omp task firstprivate(bpair)
+                {
+                    // set up full B^Q matrices
+                    
+                    auto bqao = CSubMatrix({0, 0, naos, naos});
+                    
+                    auto bqmo = CSubMatrix({0, 0, nmos, naos});
+                    
+                    auto lmat = CSubMatrix({0, 0, naos, naos}, 0.0);
+                    
+                    auto lmask = *ptr_bq_mask;
+                    
+                    auto lmos = *ptr_molorbs;
+                    
+                    for (auto j = bpair.first; j < bpair.second; j++)
+                    {
+                        ptr_bq_vectors->reduced_unpack_data(bqao, lmask, j);
+                        
+                        bqmo.zero();
+                        
+                        sdenblas::serialMultAtB(bqmo, lmos, bqao);
+                        
+                        sdenblas::serialMultAtB(lmat, bqmo, bqmo);
+                    }
+                    
+                    #pragma omp critical
+                    {
+                        const auto nelems = naos * naos;
+                        
+                        auto ptr_lmat = lmat.data();
+                        
+                        #pragma omp simd
+                        for (size_t j = 0; j < nelems; j++)
+                        {
+                            ptr_kmat[j] += ptr_lmat[j];
+                        }
+                    }
+                }
+            }
+        }
     }
-    
+   
     fmat.assign_values(kmat);
     
     return fmat;
