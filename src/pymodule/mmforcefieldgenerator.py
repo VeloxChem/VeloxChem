@@ -2473,7 +2473,7 @@ class MMForceFieldGenerator:
             # Check if the bond is non-rotatable due to atom types
             if bond in non_rotatable_bonds:
                 bonds_to_delete.append((i, j))
-                continue
+    
             
             # Check if any side atom of the bond is involved in a triple bond
             if (bond[0] in ['c1','n1','cg','ch']) or (bond[1] in ['c1', 'n1','cg','ch']):
@@ -2483,10 +2483,12 @@ class MMForceFieldGenerator:
                 continue
 
             # Check if the bond is part of a ring
+
             if self.is_bond_in_ring(i, j):
                 bonds_to_delete.append((i, j))
                 es_bond_to_delete.append((i, j))
                 continue
+        
 
         # Remove identified non-rotatable bonds
         for key in bonds_to_delete:
@@ -2494,7 +2496,8 @@ class MMForceFieldGenerator:
 
         for key in es_bond_to_delete:
             es_rot_bond_type.pop(key, None)
-
+        
+        print('Es bond type before terminal check', es_rot_bond_type)
         # Exclude bonds involving terminal atoms
         bonds_to_delete = []
         for (i, j), bond in rotatable_bonds_types.items():

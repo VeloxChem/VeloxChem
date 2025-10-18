@@ -238,6 +238,7 @@ class IMDatabasePointCollecter:
         self.interpolation_settings = None
         self.allowed_molecules = None
         self.reference_struc_energies_file = None
+        self.all_rot_bonds = None
 
         self.starting_temperature = None
 
@@ -3021,6 +3022,38 @@ class IMDatabasePointCollecter:
 
                     old_list_change = None
                     while not same:
+                        from typing import Iterable, Tuple, Set
+
+                        def _norm_pair(pair: Tuple[int, int]) -> Tuple[int, int]:
+                            """Order-insensitive bond key."""
+                            a, b = pair
+                            return (a, b) if a < b else (b, a)
+
+                        def _to_rotset(rotatable_pairs: Iterable[Tuple[int, int]]) -> Set[Tuple[int, int]]:
+                            """Normalize a list/set of rotatable (j,k) pairs to an order-insensitive set."""
+                            return {_norm_pair(p) for p in rotatable_pairs}
+
+                        def dihedral_center_pair(dihedral: Tuple[int, int, int, int]) -> Tuple[int, int]:
+                            """Return the central bond (j,k) of a dihedral (i,j,k,l), order-insensitive."""
+                            _, j, k, _ = dihedral
+                            return _norm_pair((j, k))
+
+                        def is_dihedral_rotatable(
+                            dihedral: Tuple[int, int, int, int],
+                            rotatable_pairs: Iterable[Tuple[int, int]]
+                        ) -> bool:
+                            """True if the dihedral's central bond is in the rotatable list."""
+                            rotset = _to_rotset(rotatable_pairs)
+                            return dihedral_center_pair(dihedral) in rotset
+
+                        def filter_rotatable_dihedrals(
+                            dihedrals: Iterable[Tuple[int, int, int, int]],
+                            rotatable_pairs: Iterable[Tuple[int, int]]
+                        ) -> list[Tuple[int, int, int, int]]:
+                            """Keep only dihedrals whose central bond is rotatable."""
+                            rotset = _to_rotset(rotatable_pairs)
+                            return [d for d in dihedrals if dihedral_center_pair(d) in rotset]
+
                         interpolation_driver = InterpolationDriver(self.z_matrix)
                         interpolation_driver.update_settings(self.interpolation_settings[state_to_optim])
                         interpolation_driver.symmetry_information = self.impes_drivers[state_to_optim].symmetry_information
@@ -3051,7 +3084,7 @@ class IMDatabasePointCollecter:
                         if not same:
                             for element_idx, element in enumerate(self.z_matrix):
 
-                                if len(element) == 4 and element not in constraints:
+                                if len(element) == 4 and element not in constraints and is_dihedral_rotatable(element, self.all_rot_bonds):
 
                                     diff = np.sin(interpolation_driver.impes_coordinate.internal_coordinates_values[element_idx] - self.impes_drivers[state_to_optim].impes_coordinate.internal_coordinates_values[element_idx])
                                     if abs(diff) > 1e-5:

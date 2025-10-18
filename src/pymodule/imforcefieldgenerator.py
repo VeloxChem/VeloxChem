@@ -194,6 +194,7 @@ class IMForceFieldGenerator:
         self.z_matrix = None
         self.symmetry_information = None
         self.symmetry_dihedral_lists = {}
+        self.all_rotatable_bonds = None
 
         self.drivers = {'gs': None, 'es':None}
 
@@ -520,6 +521,7 @@ class IMForceFieldGenerator:
         rotatable_bonds.extend(es_rotatable_bonds)
 
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
+        self.all_rotatable_bonds = rotatable_bonds_zero_based
         all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
 
         symmetry_groups_ref = [groups for groups in symmetry_groups[1] if not any(item in all_exclision for item in groups)]
@@ -908,6 +910,7 @@ class IMForceFieldGenerator:
                         im_database_driver.distance_thrsh = self.distance_thrsh
                         im_database_driver.non_core_symmetry_groups = self.symmetry_information
                         im_database_driver.starting_state = state
+                        im_database_driver.all_rot_bonds = self.all_rotatable_bonds
                     
                         im_database_driver.platform = 'CUDA'
 
@@ -1290,6 +1293,7 @@ class IMForceFieldGenerator:
                         im_database_driver.distance_thrsh = self.distance_thrsh
                         im_database_driver.non_core_symmetry_groups = self.symmetry_information
                         im_database_driver.platform = 'CUDA'
+                        im_database_driver.all_rot_bonds = self.all_rotatable_bonds
                         
                         # set optimization features in the construction run
 
