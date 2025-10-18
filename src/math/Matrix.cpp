@@ -509,7 +509,7 @@ CMatrix::flat_values() const -> std::vector<double>
 }
 
 auto
-CMatrix::reduced_flat_values(std::vector<std::pair<size_t, size_t>>& mask) const -> std::vector<double>
+CMatrix::reduced_flat_values(const std::vector<std::pair<size_t, size_t>>& mask) const -> std::vector<double>
 {
     if (const auto nrows = number_of_rows(); nrows > 0)
     {

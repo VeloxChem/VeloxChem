@@ -41,6 +41,8 @@
 #include "T4CScreener.hpp"
 
 #include <string>
+#include <vector>
+#include <utility>
 
 /// Class CRIJKFockDriver provides methods for computing Coulomb/Exchange Fock matrices
 /// using three center electron repulsion integrals.
@@ -120,11 +122,27 @@ class CRIJKFockDriver
     
     /// @brief Computes Coulomb Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
+    /// @param label The label of Fock matrix type.
+    /// @return The Fock matrix.
+    auto compute_screened_j_fock(const CMatrix     &density,
+                                 const std::string &label) const -> CMatrix;
+    
+    /// @brief Computes Coulomb Fock matrix for given density.
+    /// @param density The density matrix to construct Fock matrix.
     /// @param molorbs The occupied molecular orbitals to construct Fock matrix.
     /// @return The Fock matrix in submatrix storage.
     auto compute_k_fock(const CMatrix &density, const CSubMatrix &molorbs) const -> CMatrix;
     
+    /// @brief Computes screened Coulomb Fock matrix for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param molorbs The occupied molecular orbitals to construct Fock matrix.
+    /// @return The Fock matrix in submatrix storage.
+    auto compute_screened_k_fock(const CMatrix &density, const CSubMatrix &molorbs) const -> CMatrix;
+    
     private:
+    
+    /// The reduced indices mask for screened B^Q vectors.
+    std::vector<std::pair<size_t, size_t>> _bq_mask;
     
     /// @brief The distributed B^Q vectors.
     CT3FlatBuffer<double> _bq_vectors;

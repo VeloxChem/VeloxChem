@@ -110,7 +110,9 @@ export_t3cintegrals(py::module& m)
         .def("compute_bq_vectors", &CRIJKFockDriver::compute_bq_vectors, "Computes B^Q vectors in batches.")
         .def("compute_screened_bq_vectors", &CRIJKFockDriver::compute_screened_bq_vectors, "Computes B^Q vectors in batches.")
         .def("compute_j_fock", &CRIJKFockDriver::compute_j_fock, "Computes Coulomb Fock matrix.")
-        .def("compute_k_fock", &CRIJKFockDriver::compute_k_fock, "Computes exchange Fock matrix."); 
+        .def("compute_screened_j_fock", &CRIJKFockDriver::compute_screened_j_fock, "Computes screened Coulomb Fock matrix.")
+        .def("compute_k_fock", &CRIJKFockDriver::compute_k_fock, "Computes exchange Fock matrix.")
+        .def("compute_screened_k_fock", &CRIJKFockDriver::compute_screened_k_fock, "Computes screened exchange Fock matrix.");
     
     // CRIFockGradDriver class
     PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")

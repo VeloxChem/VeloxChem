@@ -143,6 +143,8 @@ CRIJKFockDriver::compute_screened_bq_vectors(const CT4CScreener&     screener,
     
     const auto bra_indices = omp::partition_flat_buffer(screener.gto_pair_blocks(), ithreshold);
     
+    _bq_mask = omp::generate_flat_buffer_mask(screener.gto_pair_blocks(), bra_indices);
+    
     _bq_vectors = CT3FlatBuffer<double>(lindices, bra_indices.back());
     
     const auto nelems = _bq_vectors.elements(); 
@@ -221,6 +223,35 @@ CRIJKFockDriver::compute_j_fock(const CMatrix     &density,
 }
 
 auto
+CRIJKFockDriver::compute_screened_j_fock(const CMatrix     &density,
+                                         const std::string &label) const -> CMatrix
+{
+    if ((label == "2jk") || (label == "2jkx") || (label == "j") || (label == "j_rs"))
+    {
+        CMatrix fmat(density);
+        
+        fmat.zero(); 
+        
+        const auto naos = fmat.number_of_rows();
+    
+        fmat.assign_values(CSubMatrix(_comp_j_vector(_comp_m_vector(density)), _bq_mask, {0, 0, naos, naos}));
+        
+        // rescale Fock matrix for closed shell case
+        
+        if ((label == "2jk") || (label == "2jkx"))
+        {
+            fmat.scale(2.0);
+        }
+        
+        return fmat;
+    }
+    else
+    {
+        return CMatrix();
+    }
+}
+
+auto
 CRIJKFockDriver::compute_k_fock(const CMatrix &density, const CSubMatrix &molorbs) const -> CMatrix
 {
     CMatrix fmat(density);
@@ -258,17 +289,52 @@ CRIJKFockDriver::compute_k_fock(const CMatrix &density, const CSubMatrix &molorb
 }
 
 auto
+CRIJKFockDriver::compute_screened_k_fock(const CMatrix &density, const CSubMatrix &molorbs) const -> CMatrix
+{
+    CMatrix fmat(density);
+    
+    // set up dimensions
+    
+    const auto naos = molorbs.number_of_rows();
+    
+    const auto nmos = molorbs.number_of_columns();
+    
+    const auto naux = _bq_vectors.aux_width();
+    
+    auto kmat = CSubMatrix({0, 0, naos, naos}, 0.0);
+    
+    // set up full B^Q matrices
+    
+    auto bqao = CSubMatrix({0, 0, naos, naos});
+    
+    auto bqmo = CSubMatrix({0, 0, nmos, naos});
+    
+    for (size_t i = 0; i < naux; i++)
+    {
+        _bq_vectors.reduced_unpack_data(bqao, _bq_mask, i);
+        
+        bqmo.zero();
+        
+        sdenblas::serialMultAtB(bqmo, molorbs, bqao);
+        
+        sdenblas::serialMultAtB(kmat, bqmo, bqmo);
+    }
+    
+    fmat.assign_values(kmat);
+    
+    return fmat;
+}
+
+auto
 CRIJKFockDriver::_comp_m_vector(const CMatrix &density) const -> std::vector<double>
 {
     const auto ndim = _bq_vectors.aux_width();
     
-    const auto nrows = _bq_vectors.width();
-    
-    const auto nelems = nrows * (nrows + 1) / 2;
+    const auto nelems = _bq_vectors.elements();
     
     std::vector<double> mvec(ndim, 0.0);
     
-    const auto dvec = density.flat_values();
+    const auto dvec = _bq_vectors.is_reduced() ? density.reduced_flat_values(_bq_mask) : density.flat_values();
     
     // set up pointers for OMP region
     
@@ -293,16 +359,14 @@ CRIJKFockDriver::_comp_m_vector(const CMatrix &density) const -> std::vector<dou
         
         mvec_ptr[i] = fsum;
     }
-    
+        
     return mvec;
 }
 
 auto
 CRIJKFockDriver::_comp_j_vector(const std::vector<double>& mvector) const -> std::vector<double>
 {
-    const auto nrows = _bq_vectors.width();
-    
-    const auto nelems = nrows * (nrows + 1) / 2;
+    const auto nelems = _bq_vectors.elements();
     
     std::vector<double> jvec(nelems, 0.0);
     

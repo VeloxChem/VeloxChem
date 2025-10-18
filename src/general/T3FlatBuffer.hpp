@@ -272,7 +272,7 @@ class CT3FlatBuffer
     /// @param indices The vector of reduction indices.
     /// @param index The index of tensor slice.
     auto
-    reduced_unpack_data(CSubMatrix& matrix, std::vector<std::pair<size_t, size_t>>& indices, const size_t index) const -> void
+    reduced_unpack_data(CSubMatrix& matrix, const std::vector<std::pair<size_t, size_t>>& indices, const size_t index) const -> void
     {
         matrix.zero();
         
@@ -353,6 +353,14 @@ class CT3FlatBuffer
         {
             return _data.size() / _mask_indices.size();
         }
+    }
+    
+    /// @brief Checks if  tensor slice along y,z axes.
+    /// @return The flag of tensor slice reduction along  y,z axes.
+    inline auto
+    is_reduced() const -> bool
+    {
+        return _reduced;
     }
     
    private:
