@@ -55,6 +55,7 @@ from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kjpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .griddriver import GridDriver
+from .dispersionmodel import DispersionModel
 from .scfgradientdriver import ScfGradientDriver
 from .hessiandriver import HessianDriver
 from .firstorderprop import FirstOrderProperties
@@ -767,6 +768,19 @@ class ScfHessianDriver(HessianDriver):
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
+        # dft-d4 contribution
+        if self.scf_driver.dispersion or (
+                self.scf_driver._dft and
+                'D4' in self.scf_driver.xcfun.get_func_label().upper()):
+            disp = DispersionModel()
+            if self.scf_driver._dft:
+                xcfun_label = self.scf_driver.xcfun.get_func_label()
+            else:
+                xcfun_label = 'HF'
+            dftd4_hessian = disp.compute_numerical_hessian(
+                molecule, xcfun_label, local_atoms)
+            dftd4_hessian = self.comm.reduce(dftd4_hessian, root=mpi_master())
+
         # nuclei-point charges contribution
         if self.scf_driver.point_charges is not None:
 
@@ -869,6 +883,11 @@ class ScfHessianDriver(HessianDriver):
 
             if self.scf_driver.point_charges is not None:
                 self.hessian += hessian_point_charges.transpose(0, 2, 1, 3)
+
+            if self.scf_driver.dispersion or (
+                    self.scf_driver._dft and
+                    'D4' in self.scf_driver.xcfun.get_func_label().upper()):
+                self.hessian += dftd4_hessian
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 

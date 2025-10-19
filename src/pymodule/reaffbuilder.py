@@ -112,6 +112,7 @@ class ReactionForceFieldBuilder():
         self.product_hessians: np.ndarray | list[np.ndarray
                                                  | None] | None = None
         self.breaking_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
+        self.forming_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
         self.reactant_total_multiplicity: int = -1
         self.product_total_multiplicity: int = -1
 
@@ -123,6 +124,7 @@ class ReactionForceFieldBuilder():
             "reactant_total_multiplicity": int,
             "product_total_multiplicity": int,
             "breaking_bonds": set | tuple,
+            "forming_bonds": set | tuple,
         }
 
     def read_keywords(self, **kwargs):
@@ -161,22 +163,28 @@ class ReactionForceFieldBuilder():
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
         if not self.skip_reaction_matching and self.product_mapping is None:
-            breaking_bonds_insert = "no breaking bonds"
+            breaking_bonds_insert = "no forced breaking bonds"
             if len(self.breaking_bonds) > 0:
-                breaking_bonds_insert = f"breaking bonds: {self.breaking_bonds}"
+                breaking_bonds_insert = f"forced breaking bonds: {self.breaking_bonds}"
+                
+            forming_bonds_insert = "no forced forming bonds"
+            if len(self.forming_bonds) > 0:
+                forming_bonds_insert = f"forced forming bonds: {self.forming_bonds}"
             self.ostream.print_info(
                 "Matching reactant and product force fields with " +
-                breaking_bonds_insert)
+                breaking_bonds_insert + " and " + forming_bonds_insert + ".")
             self.ostream.flush()
             # adjust for 1-indexed input of breaking bonds
             self.breaking_bonds = {(bond[0] - 1, bond[1] - 1)
                                    for bond in self.breaking_bonds}
+            self.forming_bonds = {(bond[0] - 1, bond[1] - 1) for bond in self.forming_bonds}
             self.product, self.product_mapping = self._match_reactant_and_product(
                 self.reactant,
                 self.reactant.molecule.get_element_ids(),
                 self.product,
                 self.product.molecule.get_element_ids(),
                 self.breaking_bonds,
+                self.forming_bonds,
             )
         elif self.product_mapping is not None:
             self.ostream.print_info(
@@ -491,7 +499,6 @@ class ReactionForceFieldBuilder():
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
-            combined_molecule.write_xyz_file(f"combined_{name}_{i}")
         combined_molecule.set_charge(charge)
         if total_multiplicity > -1:
             combined_molecule.set_multiplicity(total_multiplicity)
@@ -580,6 +587,7 @@ class ReactionForceFieldBuilder():
         product_ff: MMForceFieldGenerator,
         pro_elems: list,
         breaking_bonds: set[tuple[int, int]],
+        forming_bonds: set[tuple[int, int]],
     ):
         assert len(reactant_ff.atoms) == len(
             product_ff.atoms
@@ -593,6 +601,7 @@ class ReactionForceFieldBuilder():
             product_ff,
             pro_elems,
             breaking_bonds,
+            forming_bonds,
         )  # type: ignore
         if total_mapping is None:
             raise ValueError(
@@ -618,7 +627,7 @@ class ReactionForceFieldBuilder():
         atom_count = 0
         forcefield.unique_atom_types = []
         forcefield.pairs = {}
-
+        forcefield.atom_info_dict = {}
         for l, ff in enumerate(forcefields):
             # Shift all atom keys by the current atom count so that every atom has a unique ID
             shift = atom_count
@@ -627,6 +636,7 @@ class ReactionForceFieldBuilder():
             atom_count += len(ff.atoms)
             for atom in ff.atoms.values():
                 atom['name'] = f"{atom['name']}{l+1}"
+            forcefield.atom_info_dict.update(ff.atom_info_dict)
             forcefield.atoms.update(ff.atoms)
             forcefield.bonds.update(ff.bonds)
             forcefield.angles.update(ff.angles)
@@ -644,14 +654,25 @@ class ReactionForceFieldBuilder():
     def _apply_mapping_to_forcefield(
             forcefield: MMForceFieldGenerator,
             mapping: dict[int, int]) -> MMForceFieldGenerator:
-        new_product_atoms = {}
+        new_ff_atoms = {}
         for atom_key in forcefield.atoms:
             key = mapping[atom_key]
             val = forcefield.atoms[atom_key]
-            new_product_atoms.update({key: val})
+            new_ff_atoms.update({key: val})
 
+        new_atom_info = {}
+        for atom_info_key in forcefield.atom_info_dict.keys():
+            key = mapping[atom_info_key-1]+1
+            val = forcefield.atom_info_dict[atom_info_key]
+            val['ConnectedAtomsNumbers'] = [
+                mapping[key-1]+1 for key in val['ConnectedAtomsNumbers']
+            ]
+            val['AtomNumber'] = mapping[val['AtomNumber']-1]+1
+            new_atom_info.update({key: val})
+        
         # Sort the atoms by index
-        forcefield.atoms = dict(sorted(new_product_atoms.items()))
+        forcefield.atoms = dict(sorted(new_ff_atoms.items()))
+        forcefield.atom_info_dict = dict(sorted(new_atom_info.items()))
 
         forcefield.bonds = ReactionForceFieldBuilder._apply_mapping_to_parameters(
             forcefield.bonds, mapping)

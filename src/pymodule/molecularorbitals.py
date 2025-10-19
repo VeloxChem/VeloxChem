@@ -393,6 +393,13 @@ class MolecularOrbitals:
             errmsg += " Invalid molecular orbitals type"
             assert_msg_critical(False, errmsg)
 
+    def is_empty(self):
+        """
+        Checks if the molecular orbitals object is empty.
+        """
+
+        return (self._orbitals is None)
+
     def broadcast(self, comm, root=mpi_master()):
         """
         Broadcasts the molecular orbitals object.

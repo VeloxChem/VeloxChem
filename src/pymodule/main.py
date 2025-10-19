@@ -35,11 +35,13 @@ from datetime import datetime, timedelta
 
 from .veloxchemlib import mpi_master
 from .mpitask import MpiTask
+from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
+from .espchargesdriver import EspChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .rixsdriver import RixsDriver
 from .numerovdriver import NumerovDriver
@@ -588,7 +590,8 @@ def main():
             loc_drv.localize_and_write(task.molecule, task.ao_basis, scf_drv, rsp_dict['localize_mos'], write_hdf5 = True)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream,
+        rsp_prop.init_driver(task.mpi_comm,
+                             task.ostream,
                              method_type=scf_drv.scf_type)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
@@ -733,7 +736,7 @@ def main():
         pe_ff_gen = PEForceFieldGenerator(task.mpi_comm, task.ostream)
         pe_ff_gen.compute(task.molecule, task.ao_basis, scf_results)
 
-    # RESP and ESP charges
+    # RESP/ESP charges
 
     if task_type in ['resp charges', 'esp charges']:
         if (task_type == 'resp charges' and 'resp_charges' in task.input_dict):
@@ -745,15 +748,23 @@ def main():
 
         charges_dict['filename'] = task.input_dict['filename']
 
-        chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        if task_type == 'resp charges':
+            chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
+        elif task_type == 'esp charges':
+            chg_drv = EspChargesDriver(task.mpi_comm, task.ostream)
+
         chg_drv.update_settings(charges_dict, method_dict)
 
-        if task_type == 'resp charges':
-            # TODO: use scf_results
-            chg_drv.compute(task.molecule, task.ao_basis, 'resp')
-        elif task_type == 'esp charges':
-            # TODO: use scf_results
-            chg_drv.compute(task.molecule, task.ao_basis, 'esp')
+        if task.molecule.number_of_atoms() == 0:
+            molecules = chg_drv.read_multiple_molecules()
+            basis_name = task.input_dict['method_settings']['basis'].upper()
+            basis_sets = [
+                MolecularBasis.read(mol, basis_name, verbose=False)
+                for mol in molecules
+            ]
+            chg_drv.compute(molecules, basis_sets)
+        else:
+            chg_drv.compute(task.molecule, task.ao_basis)
 
     # All done
 

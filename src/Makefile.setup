@@ -30,8 +30,8 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # OpenMP interface
 
-OPENMP_INC := -I /opt/homebrew/Cellar/libomp/18.1.8/include 
-OPENMP_LD  := -L /opt/homebrew/Cellar/libomp/18.1.8/lib -lomp
+OPENMP_INC := -I /opt/homebrew/Cellar/libomp/21.1.1/include 
+OPENMP_LD  := -L /opt/homebrew/Cellar/libomp/21.1.1/lib -lomp
 
 CXX_REL_FLG += $(OPENMP_INC)
 CXX_DEB_FLG += $(OPENMP_INC)

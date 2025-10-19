@@ -17,6 +17,7 @@ Contributors
 ------------
 
 * Josefine H. Andersen
+* Bastiaan van Hoorn
 * Iulia E. Brumboiu
 * Roberto Di Remigio
 * Manuel Hodecker
@@ -24,28 +25,29 @@ Contributors
 * Karan Ahmadazdeh
 * Olav Vahtras
 * Juan de Gracia
-* Bastiaan van Hoorn
+* Chenxi Li
 * Manuel Brand
+* Julia Rune
 * Jonas Vester
+* Valentin Lindfeld
 * Erik Vitols
 * Nanna H. List
+* Magnus Johansen
 * Carl Svennerstedt
 * Xiaoyu Chen
-* Lukas Lampe
-* Chenxi Li
-* Julia Rune
 * Mathieu Linares
+* Lukas Lampe
 * Noah Deveaux
 * Magnus Ringholm
-* Valentin LindFeld
+* Harun Gürhan
 * Thomas Fransson
 * Rasmine Knudsen
-* Magnus Johansen
 * Gabriel L. S. Rodrigues
+* David Carrasco de Busturia
 * Mikael T. Scott
 * Maximilian Scheurer
 * Vanda Le
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2025-04-04 by ``git shortlog -sn``
+The list of contributors was obtained 2025-10-12 by ``git shortlog -sn``
