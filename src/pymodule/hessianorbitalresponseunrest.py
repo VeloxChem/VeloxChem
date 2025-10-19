@@ -43,6 +43,7 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .matrices import Matrices
+from .matrix import Matrix
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
@@ -50,10 +51,10 @@ from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 
 
-class HessianOrbitalResponse(CphfSolver):
+class UnrestrictedHessianOrbitalResponse(CphfSolver):
     """
     Implements solver for the coupled-perturbed Hartree-Fock (CPHF) equations
-    for the Hessian orbital response
+    for the unrestricted Hessian orbital response
 
     :param comm:
         The MPI communicator.
@@ -70,6 +71,7 @@ class HessianOrbitalResponse(CphfSolver):
         super().__init__(comm, ostream)
 
         self.orbrsp_type = 'hessian'
+        self._method_type = 'unrestricted'
         self._embedding_hess_drv = None
 
     def update_settings(self, cphf_dict, method_dict=None):
@@ -117,37 +119,51 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.set_timing_key('RHS')
 
         natm = molecule.number_of_atoms()
-        nocc = molecule.number_of_alpha_electrons()
+        nocc_a = molecule.number_of_alpha_electrons()
+        nocc_b = molecule.number_of_beta_electrons()
 
         if self.rank == mpi_master():
-            density = scf_tensors['D_alpha']
-            eocc = scf_tensors['E_alpha'][:nocc]
-            mo = scf_tensors['C_alpha']
+            density_a = scf_tensors['D_alpha']
+            density_b = scf_tensors['D_beta']
+            eocc_a = scf_tensors['E_alpha'][:nocc_a]
+            eocc_b = scf_tensors['E_beta'][:nocc_b]
+            mo_a = scf_tensors['C_alpha']
+            mo_b = scf_tensors['C_beta']
             point_charges = scf_tensors.get('point_charges', None)
             qm_vdw_params = scf_tensors.get('qm_vdw_params', None)
         else:
-            density = None
-            eocc = None
-            mo = None
+            density_a = None
+            density_b = None
+            eocc_a = None
+            eocc_b = None
+            mo_a = None
+            mo_b = None
             point_charges = None
             qm_vdw_params = None
 
-        density = self.comm.bcast(density, root=mpi_master())
-        eocc = self.comm.bcast(eocc, root=mpi_master())
-        mo = self.comm.bcast(mo, root=mpi_master())
+        density_a = self.comm.bcast(density_a, root=mpi_master())
+        eocc_a = self.comm.bcast(eocc_a, root=mpi_master())
+        mo_a = self.comm.bcast(mo_a, root=mpi_master())
+        density_b = self.comm.bcast(density_b, root=mpi_master())
+        eocc_b = self.comm.bcast(eocc_b, root=mpi_master())
+        mo_b = self.comm.bcast(mo_b, root=mpi_master())
         point_charges = self.comm.bcast(point_charges, root=mpi_master())
         qm_vdw_params = self.comm.bcast(qm_vdw_params, root=mpi_master())
 
         # TODO: double check dft_dict['gs_density']
         mol_grid = dft_dict['molgrid']
-        gs_density = [density]
+        gs_density = [density_a, density_b]
 
         # MO coefficients
-        mo_occ = mo[:, :nocc].copy()
-        mo_vir = mo[:, nocc:].copy()
-        nvir = mo_vir.shape[1]
+        mo_occ_a = mo_a[:, :nocc_a].copy()
+        mo_vir_a = mo_a[:, nocc_a:].copy()
+        nvir_a = mo_vir_a.shape[1]
+        mo_occ_b = mo_b[:, :nocc_b].copy()
+        mo_vir_b = mo_b[:, nocc_b:].copy()
+        nvir_b = mo_vir_b.shape[1]
 
-        omega_ao = -1.0 * np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
+        omega_ao_a = -1.0 * np.linalg.multi_dot([mo_occ_a, np.diag(eocc_a), mo_occ_a.T])
+        omega_ao_b = -1.0 * np.linalg.multi_dot([mo_occ_b, np.diag(eocc_b), mo_occ_b.T])
 
         # partition atoms for parallellisation
         if atom_pairs is None:
@@ -223,33 +239,47 @@ class HessianOrbitalResponse(CphfSolver):
 
         profiler.start_timer('dFock')
 
-        fock_deriv_ao_dict = {
-            (iatom, x): None for iatom in range(natm) for x in range(3)
+        fock_deriv_ao_dict_a = {
+            (iatom, x): None for iatom in range(natm) for x in range(3) 
+        }
+        fock_deriv_ao_dict_b = {
+            (iatom, x): None for iatom in range(natm) for x in range(3) 
         }
 
         for iatom in local_atoms:
-
-            fock_deriv_ao_i = self._compute_fmat_deriv(molecule, basis, density,
+            fock_deriv_ao_i = self._compute_fmat_deriv_unrestricted(molecule, basis,
+                                                       density_a, density_b,
                                                        iatom, eri_dict,
                                                        point_charges,
                                                        qm_vdw_params)
 
-            fock_deriv_ao_dict[(iatom, 0)] = fock_deriv_ao_i[0]
-            fock_deriv_ao_dict[(iatom, 1)] = fock_deriv_ao_i[1]
-            fock_deriv_ao_dict[(iatom, 2)] = fock_deriv_ao_i[2]
+            fock_deriv_ao_dict_a[(iatom, 0)] = fock_deriv_ao_i[0][0]
+            fock_deriv_ao_dict_a[(iatom, 1)] = fock_deriv_ao_i[0][1]
+            fock_deriv_ao_dict_a[(iatom, 2)] = fock_deriv_ao_i[0][2]
 
-        dist_fock_deriv_ao = {}
+            fock_deriv_ao_dict_b[(iatom, 0)] = fock_deriv_ao_i[1][0]
+            fock_deriv_ao_dict_b[(iatom, 1)] = fock_deriv_ao_i[1][1]
+            fock_deriv_ao_dict_b[(iatom, 2)] = fock_deriv_ao_i[1][2]
+
+        dist_fock_deriv_ao_a = {}
+        dist_fock_deriv_ao_b = {}
 
         for iatom, root_rank in all_atom_idx_rank:
             for x in range(3):
                 key_ix = (iatom, x)
 
-                dist_fock_deriv_ao[key_ix] = DistributedArray(
-                    fock_deriv_ao_dict[key_ix], self.comm, root=root_rank)
+                dist_fock_deriv_ao_a[key_ix] = DistributedArray(
+                    fock_deriv_ao_dict_a[key_ix], self.comm, root=root_rank)
 
-                fock_deriv_ao_dict[key_ix] = None
+                fock_deriv_ao_dict_a[key_ix] = None
 
-        fock_deriv_ao_dict.clear()
+                dist_fock_deriv_ao_b[key_ix] = DistributedArray(
+                    fock_deriv_ao_dict_b[key_ix], self.comm, root=root_rank)
+
+                fock_deriv_ao_dict_b[key_ix] = None
+
+        fock_deriv_ao_dict_a.clear()
+        fock_deriv_ao_dict_b.clear()
 
         profiler.stop_timer('dFock')
 
@@ -301,15 +331,28 @@ class HessianOrbitalResponse(CphfSolver):
                 for vecind, (iatom, root_rank) in enumerate(
                         all_atom_idx_rank[batch_start:batch_end]):
 
+                    # alpha
                     for x in range(3):
                         vxc_deriv_ix = self.comm.reduce(
-                            vxc_deriv_batch[vecind * 3 + x])
+                            vxc_deriv_batch[vecind * 6 + 0 + x])
 
                         dist_vxc_deriv_ix = DistributedArray(
                             vxc_deriv_ix, self.comm)
 
                         key_ix = (iatom, x)
-                        dist_fock_deriv_ao[
+                        dist_fock_deriv_ao_a[
+                            key_ix].data += dist_vxc_deriv_ix.data
+
+                    # beta
+                    for x in range(3):
+                        vxc_deriv_ix = self.comm.reduce(
+                            vxc_deriv_batch[vecind * 6 + 3 + x])
+
+                        dist_vxc_deriv_ix = DistributedArray(
+                            vxc_deriv_ix, self.comm)
+
+                        key_ix = (iatom, x)
+                        dist_fock_deriv_ao_b[
                             key_ix].data += dist_vxc_deriv_ix.data
 
         profiler.stop_timer('dXC')
@@ -331,23 +374,36 @@ class HessianOrbitalResponse(CphfSolver):
                 key_ix = (iatom, x)
 
                 ovlp_deriv_ao_ix = dist_ovlp_deriv_ao[key_ix].get_full_matrix()
-                fock_deriv_ao_ix = dist_fock_deriv_ao[key_ix].get_full_matrix()
+                fock_deriv_ao_ix_a = dist_fock_deriv_ao_a[key_ix].get_full_matrix()
+                fock_deriv_ao_ix_b = dist_fock_deriv_ao_b[key_ix].get_full_matrix()
 
                 if self.rank == mpi_master():
-                    DFD_ix = np.linalg.multi_dot(
-                        [density, fock_deriv_ao_ix, density])
-                    DSD_ix = np.linalg.multi_dot(
-                        [density, ovlp_deriv_ao_ix, density])
-                    OmegaSD_ix = np.linalg.multi_dot(
-                        [omega_ao, ovlp_deriv_ao_ix, density])
+                    DFD_ix_a = np.linalg.multi_dot(
+                        [density_a, fock_deriv_ao_ix_a, density_a])
+                    DFD_ix_b = np.linalg.multi_dot(
+                        [density_b, fock_deriv_ao_ix_b, density_b])
+                    DSD_ix_a = np.linalg.multi_dot(
+                        [density_a, ovlp_deriv_ao_ix, density_a])
+                    DSD_ix_b = np.linalg.multi_dot(
+                        [density_b, ovlp_deriv_ao_ix, density_b])
+                    OmegaSD_ix_a = np.linalg.multi_dot(
+                        [omega_ao_a, ovlp_deriv_ao_ix, density_a])
+                    OmegaSD_ix_b = np.linalg.multi_dot(
+                        [omega_ao_b, ovlp_deriv_ao_ix, density_b])
                 else:
-                    DFD_ix = None
-                    DSD_ix = None
-                    OmegaSD_ix = None
+                    DFD_ix_a = None
+                    DSD_ix_a = None
+                    OmegaSD_ix_a = None
+                    DFD_ix_b = None
+                    DSD_ix_b = None
+                    OmegaSD_ix_b = None
 
-                dist_DFD_ix = DistributedArray(DFD_ix, self.comm)
-                dist_DSD_ix = DistributedArray(DSD_ix, self.comm)
-                dist_OmegaSD_ix = DistributedArray(OmegaSD_ix, self.comm)
+                dist_DFD_ix_a = DistributedArray(DFD_ix_a, self.comm)
+                dist_DSD_ix_a = DistributedArray(DSD_ix_a, self.comm)
+                dist_OmegaSD_ix_a = DistributedArray(OmegaSD_ix_a, self.comm)
+                dist_DFD_ix_b = DistributedArray(DFD_ix_b, self.comm)
+                dist_DSD_ix_b = DistributedArray(DSD_ix_b, self.comm)
+                dist_OmegaSD_ix_b = DistributedArray(OmegaSD_ix_b, self.comm)
 
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
@@ -359,22 +415,38 @@ class HessianOrbitalResponse(CphfSolver):
                                 iatom != jatom):
                             continue
 
+                    # These are the contributions from the OO block of the
+                    # CPHF coefficients/orbital rsp. multipliers to the Hessian.
+                    # uij = -1/2 Sij
                     for y in range(3):
                         key_jy = (jatom, y)
 
-                        Fix_Sjy = np.dot(
-                            dist_DFD_ix.data.reshape(-1),
+                        Fix_Sjy_a = np.dot(
+                            dist_DFD_ix_a.data.reshape(-1),
                             dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
-                        Fjy_Six = np.dot(
-                            dist_DSD_ix.data.reshape(-1),
-                            dist_fock_deriv_ao[key_jy].data.reshape(-1))
+                        Fjy_Six_a = np.dot(
+                            dist_DSD_ix_a.data.reshape(-1),
+                            dist_fock_deriv_ao_a[key_jy].data.reshape(-1))
 
-                        Six_Sjy = 2.0 * np.dot(
-                            dist_OmegaSD_ix.data.reshape(-1),
+                        Six_Sjy_a =  2.0 * np.dot(
+                            dist_OmegaSD_ix_a.data.reshape(-1),
                             dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
-                        hess_ijxy = -2.0 * (Fix_Sjy + Fjy_Six + Six_Sjy)
+                        Fix_Sjy_b = np.dot(
+                            dist_DFD_ix_b.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
+
+                        Fjy_Six_b = np.dot(
+                            dist_DSD_ix_b.data.reshape(-1),
+                            dist_fock_deriv_ao_b[key_jy].data.reshape(-1))
+
+                        Six_Sjy_b =  2.0 * np.dot(
+                            dist_OmegaSD_ix_b.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
+
+                        hess_ijxy = -1.0 * (Fix_Sjy_a + Fjy_Six_a + Six_Sjy_a
+                                          + Fix_Sjy_b + Fjy_Six_b + Six_Sjy_b)
                         hessian_first_integral_derivatives[iatom, x, jatom,
                                                            y] += hess_ijxy
                         if iatom != jatom:
@@ -396,43 +468,56 @@ class HessianOrbitalResponse(CphfSolver):
 
             # the oo part of the CPHF coefficients in AO basis
             if self.rank == mpi_master():
-                uij_ao_list = []
+                uij_ao_list_a = []
+                uij_ao_list_b = []
             else:
-                uij_ao_list = None
+                uij_ao_list_a = None
+                uij_ao_list_b = None
 
             for x in range(3):
                 key_ix = (iatom, x)
                 ovlp_deriv_ao_ix = dist_ovlp_deriv_ao[key_ix].get_full_matrix()
 
                 if self.rank == mpi_master():
-                    uij_ao_list.append(
+                    uij_ao_list_a.append(
                         np.linalg.multi_dot(
-                            [density, -0.5 * ovlp_deriv_ao_ix, density]))
+                            [density_a, -0.5 * ovlp_deriv_ao_ix, density_a]))
+                    uij_ao_list_b.append(
+                        np.linalg.multi_dot(
+                            [density_b, -0.5 * ovlp_deriv_ao_ix, density_b]))
 
             profiler.add_timing_info('UijAO', tm.time() - uij_t0)
 
             # create AODensity and Fock matrix objects, contract with ERI
-            fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis,
-                                          eri_dict, dft_dict, pe_dict, profiler)
+            # This term contributes to the RHS of the CPHF/CPKS equations.
+            # fock_uij is an array [(ax, bx), (ay, by), (az, bz)] where
+            # a is an alpha component and b is beta.
+            fock_uij = self._comp_lr_fock_unrestricted(
+                    (uij_ao_list_a, uij_ao_list_b), molecule, basis,
+                     eri_dict, dft_dict, pe_dict, profiler)
 
             if self.rank == mpi_master():
-                uij_ao_list.clear()
+                uij_ao_list_a.clear()
+                uij_ao_list_b.clear()
 
             uij_t0 = tm.time()
 
             for x in range(3):
                 if self.rank == mpi_master():
-                    DFD_ix = np.linalg.multi_dot(
-                        [density, fock_uij[x], density])
+                    DFD_ix_a = np.linalg.multi_dot(
+                        [density_a, fock_uij[x * 2 + 0], density_a])
+                    DFD_ix_b = np.linalg.multi_dot(
+                        [density_b, fock_uij[x * 2 + 1], density_b])
                 else:
-                    DFD_ix = None
+                    DFD_ix_a = None
+                    DFD_ix_b = None
 
-                dist_DFD_ix = DistributedArray(DFD_ix, self.comm)
+                dist_DFD_ix_a = DistributedArray(DFD_ix_a, self.comm)
+                dist_DFD_ix_b = DistributedArray(DFD_ix_b, self.comm)
 
                 # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
                 # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
                 # response
-
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
@@ -447,15 +532,19 @@ class HessianOrbitalResponse(CphfSolver):
                         key_jy = (jatom, y)
 
                         # 2.0 * (np.dot(DFD_ix_list[x], (-0.5 * ovlp_deriv_ao_jy)))
-                        hess_ijxy = -np.dot(
-                            dist_DFD_ix.data.reshape(-1),
+                        hess_ijxy_a = -np.dot(
+                            dist_DFD_ix_a.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
+                        hess_ijxy_b = -np.dot(
+                            dist_DFD_ix_b.data.reshape(-1),
                             dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
-                        hess_ijxy *= 4.0
+                        hess_ijxy_a *= 2.0
+                        hess_ijxy_b *= 2.0
 
-                        hessian_eri_overlap[iatom, x, jatom, y] += hess_ijxy
+                        hessian_eri_overlap[iatom, x, jatom, y] += hess_ijxy_a + hess_ijxy_b
                         if iatom != jatom:
-                            hessian_eri_overlap[jatom, y, iatom, x] += hess_ijxy
+                            hessian_eri_overlap[jatom, y, iatom, x] += hess_ijxy_a + hess_ijxy_b
 
             profiler.add_timing_info('UijDot', tm.time() - uij_t0)
 
@@ -467,13 +556,18 @@ class HessianOrbitalResponse(CphfSolver):
 
                 if self.rank == mpi_master():
                     # transform to MO basis
-                    fock_uij_ov_2 = 2.0 * np.linalg.multi_dot(
-                        [mo_occ.T, fock_uij[x], mo_vir])
-                    fock_uij_ov_2 = fock_uij_ov_2.reshape(nocc * nvir)
+                    fock_uij_ov_2_a =  2.0 * np.linalg.multi_dot(
+                        [mo_occ_a.T, fock_uij[x * 2 + 0], mo_vir_a])
+                    fock_uij_ov_2_a = fock_uij_ov_2_a.reshape(nocc_a * nvir_a)
+                    fock_uij_ov_2_b = 2.0 * np.linalg.multi_dot(
+                        [mo_occ_b.T, fock_uij[x * 2 + 1], mo_vir_b])
+                    fock_uij_ov_2_b = fock_uij_ov_2_b.reshape(nocc_b * nvir_b)
                 else:
-                    fock_uij_ov_2 = None
+                    fock_uij_ov_2_a = None
+                    fock_uij_ov_2_b = None
 
-                dist_fock_uij_ov_2 = DistributedArray(fock_uij_ov_2, self.comm)
+                fock_uij_ov_2_a = self.comm.bcast(fock_uij_ov_2_a, root=mpi_master())
+                fock_uij_ov_2_b = self.comm.bcast(fock_uij_ov_2_b, root=mpi_master())
 
                 # form dist_fock_deriv_ov_ix and dist_orben_ovlp_deriv_ov_ix
                 # from root_rank
@@ -481,41 +575,58 @@ class HessianOrbitalResponse(CphfSolver):
                 key_ix = (iatom, x)
                 ovlp_deriv_ao_ix = dist_ovlp_deriv_ao[key_ix].get_full_matrix(
                     root=root_rank)
-                fock_deriv_ao_ix = dist_fock_deriv_ao[key_ix].get_full_matrix(
+                fock_deriv_ao_ix_a = dist_fock_deriv_ao_a[key_ix].get_full_matrix(
+                    root=root_rank)
+                fock_deriv_ao_ix_b = dist_fock_deriv_ao_b[key_ix].get_full_matrix(
                     root=root_rank)
 
                 # TODO: do this on mpi_master
                 if self.rank == root_rank:
 
-                    fock_deriv_ov_dict_ix = np.linalg.multi_dot(
-                        [mo_occ.T, fock_deriv_ao_ix,
-                         mo_vir]).reshape(nocc * nvir)
+                    fock_deriv_ov_dict_ix_a = np.linalg.multi_dot(
+                        [mo_occ_a.T, fock_deriv_ao_ix_a,
+                         mo_vir_a]).reshape(nocc_a * nvir_a)
 
-                    ovlp_deriv_ov_ix = np.linalg.multi_dot(
-                        [mo_occ.T, ovlp_deriv_ao_ix, mo_vir])
+                    ovlp_deriv_ov_ix_a = np.linalg.multi_dot(
+                        [mo_occ_a.T, ovlp_deriv_ao_ix, mo_vir_a])
 
-                    orben_ovlp_deriv_ov_ix = (eocc.reshape(-1, 1) *
-                                              ovlp_deriv_ov_ix).reshape(nocc *
-                                                                        nvir)
+                    orben_ovlp_deriv_ov_ix_a = (eocc_a.reshape(-1, 1) *
+                                              ovlp_deriv_ov_ix_a).reshape(nocc_a *
+                                                                          nvir_a)
+                    fock_deriv_ov_dict_ix_b = np.linalg.multi_dot(
+                        [mo_occ_b.T, fock_deriv_ao_ix_b,
+                         mo_vir_b]).reshape(nocc_b * nvir_b)
+
+                    ovlp_deriv_ov_ix_b = np.linalg.multi_dot(
+                        [mo_occ_b.T, ovlp_deriv_ao_ix, mo_vir_b])
+
+                    orben_ovlp_deriv_ov_ix_b = (eocc_b.reshape(-1, 1) *
+                                              ovlp_deriv_ov_ix_b).reshape(nocc_b *
+                                                                          nvir_b)
 
                 else:
-                    fock_deriv_ov_dict_ix = None
-                    orben_ovlp_deriv_ov_ix = None
+                    fock_deriv_ov_dict_ix_a = None
+                    orben_ovlp_deriv_ov_ix_a = None
+                    fock_deriv_ov_dict_ix_b = None
+                    orben_ovlp_deriv_ov_ix_b = None
 
-                dist_fock_deriv_ov_ix = DistributedArray(fock_deriv_ov_dict_ix,
-                                                         self.comm,
-                                                         root=root_rank)
+                if self.rank == root_rank:
 
-                dist_orben_ovlp_deriv_ov_ix = DistributedArray(
-                    orben_ovlp_deriv_ov_ix, self.comm, root=root_rank)
+                    cphf_rhs_ix_data_a = (fock_uij_ov_2_a +
+                                          fock_deriv_ov_dict_ix_a -
+                                          orben_ovlp_deriv_ov_ix_a)
 
-                dist_cphf_rhs_ix_data = (dist_fock_uij_ov_2.data +
-                                         dist_fock_deriv_ov_ix.data -
-                                         dist_orben_ovlp_deriv_ov_ix.data)
+                    cphf_rhs_ix_data_b = (fock_uij_ov_2_b +
+                                          fock_deriv_ov_dict_ix_b -
+                                          orben_ovlp_deriv_ov_ix_b)
 
-                dist_cphf_rhs_ix = DistributedArray(dist_cphf_rhs_ix_data,
-                                                    self.comm,
-                                                    distribute=False)
+                    # stack alpha and beta
+                    cphf_rhs_ix_data = np.hstack((cphf_rhs_ix_data_a, cphf_rhs_ix_data_b))
+                else:
+                    cphf_rhs_ix_data = None
+
+                dist_cphf_rhs_ix = DistributedArray(
+                    cphf_rhs_ix_data, self.comm, root=root_rank)
 
                 dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
@@ -544,10 +655,11 @@ class HessianOrbitalResponse(CphfSolver):
             'hessian_eri_overlap': hessian_eri_overlap,
         }
 
-    def _compute_fmat_deriv(self,
+    def _compute_fmat_deriv_unrestricted(self,
                             molecule,
                             basis,
-                            density,
+                            density_a,
+                            density_b,
                             i,
                             eri_dict,
                             point_charges=None,
@@ -560,8 +672,10 @@ class HessianOrbitalResponse(CphfSolver):
             The molecule.
         :param basis:
             The basis set.
-        :param density:
-            The density matrix in AO basis.
+        :param density_a:
+            The density matrix in AO basis corresponding to spin alpha.
+        :param density_b:
+            The density matrix in AO basis corresponding to spin beta.
         :param i:
             The atom index.
         :param eri_dict:
@@ -575,7 +689,8 @@ class HessianOrbitalResponse(CphfSolver):
         nao = basis.get_dimensions_of_basis()
 
         # initialize fmat variable
-        fmat_deriv = np.zeros((3, nao, nao))
+        fmat_deriv_a = np.zeros((3, nao, nao))
+        fmat_deriv_b = np.zeros((3, nao, nao))
 
         # kinetic integral gadient
         kin_grad_drv = KineticEnergyGeom100Driver()
@@ -584,7 +699,8 @@ class HessianOrbitalResponse(CphfSolver):
 
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_kin = gmats_kin.matrix_to_numpy(label)
-            fmat_deriv[x] += gmat_kin + gmat_kin.T
+            fmat_deriv_a[x] += gmat_kin + gmat_kin.T
+            fmat_deriv_b[x] += gmat_kin + gmat_kin.T
 
         gmats_kin = Matrices()
 
@@ -598,7 +714,8 @@ class HessianOrbitalResponse(CphfSolver):
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
             gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
-            fmat_deriv[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
+            fmat_deriv_a[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
+            fmat_deriv_b[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
 
         gmats_npot_100 = Matrices()
         gmats_npot_010 = Matrices()
@@ -620,16 +737,19 @@ class HessianOrbitalResponse(CphfSolver):
 
             for x, label in enumerate(['X', 'Y', 'Z']):
                 gmat_100 = gmats_100.matrix_to_numpy(label)
-                fmat_deriv[x] -= gmat_100 + gmat_100.T
+                fmat_deriv_a[x] -= gmat_100 + gmat_100.T
+                fmat_deriv_b[x] -= gmat_100 + gmat_100.T
 
             gmats_100 = Matrices()
 
+        # TODO: double check unrestricted
         if self._embedding_hess_drv is not None:
             pe_fock_grad_contr = (
                 self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
                     i=i))
             for x in range(3):
-                fmat_deriv[x] += pe_fock_grad_contr[x]
+                fmat_deriv_a[x] += pe_fock_grad_contr[x]
+                fmat_deriv_b[x] += pe_fock_grad_contr[x]
 
         if self._dft:
             if self.xcfun.is_hybrid():
@@ -651,8 +771,14 @@ class HessianOrbitalResponse(CphfSolver):
         else:
             erf_k_coef, omega = None, None
 
-        den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
-        den_mat_for_fock.set_values(density)
+        Da_for_fock = make_matrix(basis, mat_t.symmetric)
+        Da_for_fock.set_values(density_a)
+
+        Db_for_fock = make_matrix(basis, mat_t.symmetric)
+        Db_for_fock.set_values(density_b)
+
+        Dab_for_fock = make_matrix(basis, mat_t.symmetric)
+        Dab_for_fock.set_values(density_a + density_b)
 
         # ERI threshold
         thresh_int = int(-math.log10(self.eri_thresh))
@@ -665,33 +791,48 @@ class HessianOrbitalResponse(CphfSolver):
 
         # Fock gradient
         fock_grad_drv = FockGeom1000Driver()
-        gmats_eri = fock_grad_drv.compute(basis, screener_atom, screener,
-                                          den_mat_for_fock, i, fock_type,
-                                          exchange_scaling_factor, 0.0,
-                                          thresh_int)
 
-        # scaling of Fock gradient for non-hybrid functionals
-        factor = 2.0 if fock_type == 'j' else 1.0
+        gmats_eri_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
+                                          Dab_for_fock, i, 'j',
+                                          0.0, 0.0, thresh_int)
+
+        if fock_type != 'j':
+            gmats_eri_Ka = fock_grad_drv.compute(basis, screener_atom, screener,
+                                          Da_for_fock, i, 'kx', exchange_scaling_factor,
+                                          0.0, thresh_int)
+            gmats_eri_Kb = fock_grad_drv.compute(basis, screener_atom, screener,
+                                          Db_for_fock, i, 'kx', exchange_scaling_factor,
+                                          0.0, thresh_int)
 
         if need_omega:
             # for range-separated functional
-            gmats_eri_rs = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                 den_mat_for_fock, i, 'kx_rs',
-                                                 erf_k_coef, omega, thresh_int)
+            gmats_eri_rs_a = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                  Da_for_fock, i, 'kx_rs',
+                                                  erf_k_coef, omega, thresh_int)
+            gmats_eri_rs_b = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                  Db_for_fock, i, 'kx_rs',
+                                                  erf_k_coef, omega, thresh_int)
 
         # calculate gradient contributions
         for x, label in enumerate(['X', 'Y', 'Z']):
-            gmat_eri = gmats_eri.matrix_to_numpy(label)
-            fmat_deriv[x] += gmat_eri * factor
+            gmat_eri_Jab = gmats_eri_Jab.matrix_to_numpy(label)
+            gmat_eri_Ka = gmats_eri_Ka.matrix_to_numpy(label)
+            gmat_eri_Kb = gmats_eri_Kb.matrix_to_numpy(label)
+            fmat_deriv_a[x] += gmat_eri_Jab - gmat_eri_Ka
+            fmat_deriv_b[x] += gmat_eri_Jab - gmat_eri_Kb
 
             if need_omega:
                 # range-separated functional contribution
-                gmat_eri_rs = gmats_eri_rs.matrix_to_numpy(label)
-                fmat_deriv[x] -= gmat_eri_rs
+                gmat_eri_rs_a = gmats_eri_rs_a.matrix_to_numpy(label)
+                gmat_eri_rs_b = gmats_eri_rs_b.matrix_to_numpy(label)
+                fmat_deriv_a[x] -= gmat_eri_rs_a
+                fmat_deriv_b[x] -= gmat_eri_rs_b
 
-        gmats_eri = Matrices()
+        Da_for_fock = Matrix()
+        Db_for_fock = Matrix()
+        Dab_for_fock = Matrix()
 
-        return fmat_deriv
+        return (fmat_deriv_a, fmat_deriv_b)
 
     def print_cphf_header(self, title):
         """

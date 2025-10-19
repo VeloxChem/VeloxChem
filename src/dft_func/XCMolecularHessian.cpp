@@ -76,9 +76,13 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
         {
             return xchesslda::integrateExcHessianForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xchessgga::integrateExcHessianForGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
         else
         {
-            std::string erropenshell("XCMolecularHessian.integrateExcHessian: Not implemented for open-shell GGA/meta-GGA");
+            std::string erropenshell("XCMolecularHessian.integrateExcHessian: Not implemented for open-shell meta-GGA");
 
             errors::assertMsgCritical(false, erropenshell);
         }
@@ -120,9 +124,13 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
         {
             return xchesslda::integrateVxcFockGradientForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xchessgga::integrateVxcFockGradientForGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
+        }
         else
         {
-            std::string erropenshell("XCMolecularHessian.integrateVxcFockGradient: Not implemented for open-shell GGA/meta-GGA");
+            std::string erropenshell("XCMolecularHessian.integrateVxcFockGradient: Not implemented for open-shell meta-GGA");
 
             errors::assertMsgCritical(false, erropenshell);
         }
