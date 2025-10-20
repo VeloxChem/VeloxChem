@@ -2182,13 +2182,12 @@ class ScfDriver:
             else:
                 if self.ri_jk and (self.molecular_orbitals._orbitals
                                    is not None):
-                    fock_mat = self._ri_drv.compute_j_fock(den_mat_for_Jab,
-                                                           'j',
-                                                           verbose=False)
+                    fock_mat = self._ri_drv.compute_screened_j_fock(
+                        den_mat_for_Jab, 'j', verbose=False)
                     J_ab_np = fock_mat.to_numpy()
                     fock_mat = Matrix()
 
-                    fock_mat = self._ri_drv.compute_k_fock(
+                    fock_mat = self._ri_drv.compute_screened_k_fock(
                         den_mat_for_Ka,
                         self.molecular_orbitals,
                         verbose=False,
@@ -2196,7 +2195,7 @@ class ScfDriver:
                     K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
                     fock_mat = Matrix()
 
-                    fock_mat = self._ri_drv.compute_k_fock(
+                    fock_mat = self._ri_drv.compute_screened_k_fock(
                         den_mat_for_Kb,
                         self.molecular_orbitals,
                         verbose=False,

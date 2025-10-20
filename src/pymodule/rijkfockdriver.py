@@ -307,7 +307,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_screened_j_fock(density, label)
         
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
+        # No reduction here. Reduction will be done in scfdriver.
         
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
@@ -315,7 +315,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
             
-        return gmat
+        return fmat
         
     def compute_k_fock(self, density, molorbs, verbose=True, spin='alpha'):
         """
@@ -360,7 +360,7 @@ class RIJKFockDriver:
 
         return fmat
         
-    def compute_screened_k_fock(self, density, molorbs, verbose=True):
+    def compute_screened_k_fock(self, density, molorbs, verbose=True, spin='alpha'):
         """
         Computes screened exchange Fock matrix.
         
@@ -382,13 +382,18 @@ class RIJKFockDriver:
         
         # retrieve occupied orbitals
         # TODO: make generic version in MolecularOrbitals class
-        nocc = int(np.sum(molorbs.occa_to_numpy()))
-        occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-        occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
+        if spin == 'alpha':
+            nocc = int(np.sum(molorbs.occa_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
+        elif spin == 'beta':
+            nocc = int(np.sum(molorbs.occb_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0:nocc])
         
         fmat = self._ri_drv.compute_screened_k_fock(density, occ_mos)
         
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
+        # No reduction here. Reduction will be done in scfdriver.
     
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
@@ -396,7 +401,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
             
-        return gmat
+        return fmat
 
     def compute_mo_bq_vectors(self, lambda_p, lambda_h, bstart, bend):
         """
