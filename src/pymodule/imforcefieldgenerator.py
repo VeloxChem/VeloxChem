@@ -959,7 +959,7 @@ class IMForceFieldGenerator:
                             self.unique_molecules.append(im_database_driver.allowed_molecules)
                     
                     entries = list(self.molecules_along_rp.values())
-                    self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
+                    # self.confirm_database_quality(molecule, self.imforcefieldfiles, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
                 
             for root in self.roots_to_follow:
                 density_of_datapoints = self.determine_datapoint_density(self.states_data_point_density[root], self.molecules_along_rp, self.states_interpolation_settings[root]['imforcefield_file'], self.dihedrals)
@@ -1352,7 +1352,7 @@ class IMForceFieldGenerator:
                             self.unique_molecules.append(im_database_driver.allowed_molecules)
                         
                         entries = list(self.molecules_along_rp.values())
-                        self.confirm_database_quality(molecule, self.states_interpolation_settings, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
+                        # self.confirm_database_quality(molecule, self.states_interpolation_settings, basis=basis, given_molecular_strucutres=self.state_specific_molecules)
 
             
             desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
