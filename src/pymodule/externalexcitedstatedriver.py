@@ -373,7 +373,7 @@ conda activate vlxenv_simd_master
 
             print('necessary orca info', energies, spin_s2_values)
             if self.spin_flip is True:
-                energies = [energies[i] for i in range(len(energies)) if spin_s2_values[i] < 0.28 or spin_s2_values[i] > 1.9 and spin_s2_values[i] < 2.28]
+                energies = [energies[i] for i in range(len(energies)) if spin_s2_values[i] < 0.5 or spin_s2_values[i] > 1.9 and spin_s2_values[i] < 2.5]
                 
                 if len(energies) == 0:
                     print('No proper spin states found based on <S^2> values thresholds are being lifted')
