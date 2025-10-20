@@ -70,6 +70,7 @@ class ExternalScfDriver:
         self.ostream = ostream
         self.charge = charge
         self.spin = multiplicity
+        self.libxc = False
 
         self.xc_func = 'b3lyp'
         self.dispersion = 'D3'

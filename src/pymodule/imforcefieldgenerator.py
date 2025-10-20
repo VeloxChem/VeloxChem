@@ -992,6 +992,13 @@ class IMForceFieldGenerator:
                                         'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow}
             
             files_to_add_conf = []
+            molecules_to_add_info = []
+            for root in self.roots_to_follow:
+                if os.path.exists(self.imforcefieldfiles[self.roots_to_follow[0]]):
+                    molecules_to_add_info.append((molecule, basis, [root]))
+
+
+                
 
             if not os.path.exists(self.imforcefieldfiles[self.roots_to_follow[0]]):
                     files_to_add_conf.append(self.roots_to_follow[0])
@@ -1182,7 +1189,7 @@ class IMForceFieldGenerator:
 
 
 
-            self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
+            self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecules_to_add_info, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
             self.states_data_point_density = density_of_datapoints
             
@@ -1383,7 +1390,7 @@ class IMForceFieldGenerator:
 
         return molecules_along_reaction_path
 
-    def determine_molecules_along_dihedral_scan(self, molecule, roots_to_follow, specific_dihedrals=None):
+    def determine_molecules_along_dihedral_scan(self, molecules_to_add_info, roots_to_follow, specific_dihedrals=None):
         """
 
         Sample molecular structures by rotating specific dihedrals if defined and determine the current density of 
@@ -1418,7 +1425,8 @@ class IMForceFieldGenerator:
         sampled_molecules = {root: {} for root in roots_to_follow}
         point_densities = {root: {} for root in roots_to_follow}
         allowed_deviation = {root: {} for root in roots_to_follow}
-
+        
+        molecules_info = {states[0]: molecule for molecule, _, states in molecules_to_add_info}
 
         if specific_dihedrals is not None:
             for entries in specific_dihedrals:
@@ -1426,7 +1434,8 @@ class IMForceFieldGenerator:
                 n_sampling = entries[1]
                 state = entries[2]
                 start = entries[3]
-
+                molecule = molecules_info[state]
+ 
                 rotation_values = np.linspace(0, 360, n_sampling, endpoint=False)
 
                 sampled_molecules[state][specific_dihedral] = ([], start)
@@ -1448,6 +1457,7 @@ class IMForceFieldGenerator:
 
         else:
             for root in roots_to_follow:
+                molecule = molecules_info[root]
                 sampled_molecules[root][None] = ([molecule], 0)
                 point_densities[root][None] = {360: 0}
                 
