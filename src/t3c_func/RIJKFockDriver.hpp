@@ -139,6 +139,14 @@ class CRIJKFockDriver
     /// @return The Fock matrix in submatrix storage.
     auto compute_screened_k_fock(const CMatrix &density, const CSubMatrix &molorbs) const -> CMatrix;
     
+    /// @brief Computes batch of MOs transformed Bq vectors.
+    /// @param lambda_p The MOs augmented by particle single excitations.
+    /// @param lambda_h The MOs augmented by hole single excitations.
+    /// @param bstart The batch start position.
+    /// @param bend The batch end position.
+    /// @return The batch of transformed B^Q vectors.
+    auto compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const size_t bstart, const size_t bend) const -> std::vector<CSubMatrix>;
+    
     private:
     
     /// The reduced indices mask for screened B^Q vectors.

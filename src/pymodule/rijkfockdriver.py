@@ -395,3 +395,19 @@ class RIJKFockDriver:
             self.ostream.flush()
             
         return gmat
+
+    def compute_mo_bq_vectors(self, lambda_p, lambda_h, bstart, bend):
+        """
+        Compute bq vectors in MO basis using the RI Fock driver.
+        
+        :param lambda_p:
+            The particle tranformation matrix for B^Q vectors.
+        :param lambda_h:
+            The hole tranformation matrix for B^Q vectors.    
+        :param bstart:
+            The batch start position.
+        :param bend:
+            The batch end position.    
+        """
+        
+        return self._ri_drv.compute_mo_bq_vectors(lambda_p, lambda_h, bstart, bend)

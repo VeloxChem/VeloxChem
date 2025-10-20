@@ -375,6 +375,57 @@ CRIJKFockDriver::compute_screened_k_fock(const CMatrix &density, const CSubMatri
 }
 
 auto
+CRIJKFockDriver::compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const size_t bstart, const size_t bend) const -> std::vector<CSubMatrix>
+{
+    if (const auto bdim = bend - bstart; bdim > 0)
+    {
+        std::vector<CSubMatrix> movecs(bend - bstart, CSubMatrix());
+        
+        // set up AOs, MOs indices
+           
+        const auto nmos = lambda_p.number_of_columns();
+               
+        const auto naos = lambda_p.number_of_rows();
+        
+        // set up pointers to OMP data
+        
+        auto ptr_matp = &lambda_p;
+        
+        auto ptr_math = &lambda_h;
+        
+        auto ptr_movecs = movecs.data();
+        
+        auto ptr_bq_vectors = &_bq_vectors;
+        
+        auto ptr_bq_mask = &_bq_mask;
+        
+        #pragma omp parallel for shared(ptr_matp, ptr_math, ptr_movecs, ptr_bq_vectors, ptr_bq_mask)
+        for (size_t i = bstart; i < bend; i++)
+        {
+            auto bqao = CSubMatrix({0, 0, naos, naos});
+            
+            ptr_bq_vectors->reduced_unpack_data(bqao, *ptr_bq_mask, i);
+            
+            auto tmat = CSubMatrix({0, 0, naos, nmos}, 0.0);
+            
+            sdenblas::serialMultAB(tmat, bqao, *ptr_math);
+            
+            auto lmat = CSubMatrix({0, 0, nmos, nmos}, 0.0);
+            
+            sdenblas::serialMultAtB(lmat, *ptr_matp, tmat);
+            
+            ptr_movecs[i - bstart] = lmat;
+        }
+        
+        return movecs;
+    }
+    else
+    {
+        return std::vector<CSubMatrix>();
+    }
+}
+
+auto
 CRIJKFockDriver::_comp_m_vector(const CMatrix &density) const -> std::vector<double>
 {
     const auto ndim = _bq_vectors.aux_width();
