@@ -1474,9 +1474,12 @@ class ScfDriver:
             self._ri_drv.compute_metric(molecule,
                                         self.ri_auxiliary_basis,
                                         verbose=True)
-            # TODO: use threshold based on self.eri_thresh
-            self._ri_drv.compute_screened_bq_vectors(
-                screener, molecule, self.ri_auxiliary_basis, 12, verbose=False)
+            thresh_int = int(-math.log10(self.eri_thresh))
+            self._ri_drv.compute_screened_bq_vectors(screener,
+                                                     molecule,
+                                                     self.ri_auxiliary_basis,
+                                                     thresh_int,
+                                                     verbose=False)
 
         e_grad = None
 
