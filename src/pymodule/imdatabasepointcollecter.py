@@ -2395,8 +2395,6 @@ class IMDatabasePointCollecter:
             self.state_specific_molecules[self.current_state].append(new_molecule)
             self.coordinates_xyz.append(qm_positions * 10)
             for i, atom_idx in enumerate(self.qm_atoms):
-                
-                print(atom_idx, force[i])
                 self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
             self.system.getForce(self.qm_force_index).updateParametersInContext(context)
 
@@ -2430,7 +2428,7 @@ class IMDatabasePointCollecter:
 
             context.setVelocities(velocities)
         
-        if self.swap_back == False and self.temperatures[-1] > 50:
+        if len(self.roots_to_follow) > 1 and self.swap_back == False and self.temperatures[-1] > 50:
             state = context.getState(getVelocities=True)
             velocities = state.getVelocities(asNumpy=True)  # unit: nanometers/picosecond
 
@@ -2438,7 +2436,7 @@ class IMDatabasePointCollecter:
             velocities *= 0.9
 
             context.setVelocities(velocities)
-        elif self.swap_back == False and self.temperatures[-1] < self.temperatures[0]:
+        elif len(self.roots_to_follow) > 1 and self.swap_back == False and self.temperatures[-1] < self.temperatures[0]:
             self.swap_back = True
             self.point_checker = 0
         
@@ -2499,9 +2497,9 @@ class IMDatabasePointCollecter:
             current_basis = MolecularBasis.read(molecule, self.basis_set_label)
             
    
-            qm_energy, scf_tensors = self.compute_energy(drivers[0], molecule, current_basis)
+            # qm_energy, scf_tensors = self.compute_energy(drivers[0], molecule, current_basis)
             
-            
+            qm_energy = [-645.2891002047487]
             # if scf_tensors is None and isinstance(drivers[0], ScfRestrictedDriver):
             #     if drivers[0].is_converged is False:
             #         print('the original scf is not converged', drivers[0].is_converged)
@@ -2514,7 +2512,29 @@ class IMDatabasePointCollecter:
             #     if emergency_qm_driver.is_converged is False:
             #         print('the original scf is not converged', emergency_qm_driver.is_converged)
             
-            gradients = self.compute_gradient(drivers[1], molecule, current_basis, scf_tensors)
+            # gradients = self.compute_gradient(drivers[1], molecule, current_basis, scf_tensors)
+            gradients = [np.array([[-9.2775000e-04, -5.2550230e-03, -4.2674040e-03],
+ [ 2.5168770e-03,  5.1488240e-03, -6.7343300e-04],
+ [-1.7544730e-03, -6.4244940e-03, -1.6283240e-03],
+ [-4.4426150e-03,  4.8529900e-04,  1.2024170e-03],
+ [ 1.7970450e-03,  3.6197000e-04,  6.9421010e-03],
+ [-1.4720769e-02, -1.7308550e-03, -3.5041340e-03],
+ [ 1.1841559e-02,  5.0314180e-03,  2.9388640e-03],
+ [-1.9322830e-03,  8.9809850e-03,  2.0624530e-03],
+ [-3.7073120e-03, -8.7615400e-03,  4.3934810e-03],
+ [ 7.1936450e-03,  1.1451360e-03,  1.7304050e-03],
+ [-7.3883790e-03, -2.6665800e-04, -3.4524670e-03],
+ [ 6.2108150e-03,  1.1080790e-03,  1.0873670e-03],
+ [ 2.8548910e-03,  9.2492200e-04, -4.6685100e-04],
+ [ 2.8465480e-03,  9.3491300e-04,  6.5159300e-04],
+ [ 3.6794860e-03,  2.6073380e-03, -2.5330110e-03],
+ [-1.4292000e-04, -5.4844000e-05,  5.4452900e-04],
+ [-2.6989800e-04,  4.0084000e-05, -6.8576700e-04],
+ [ 2.6449900e-04,  7.4393200e-04, -6.8877800e-04],
+ [ 9.7987800e-04, -5.9025450e-03, -5.7208440e-03],
+ [-4.3565710e-03,  7.4067700e-04,  2.0595700e-03],
+ [ 2.3945000e-05, -5.5358000e-05,  9.1122000e-05],
+ [-4.7983400e-04,  2.7670100e-04, -6.3536000e-05]])]
             # qm_energy = [1, 2]
             # gradients = [np.zeros((natms, 3)), np.zeros((natms, 3))]
             for e_idx in range(len(qm_energy)):
@@ -3005,7 +3025,32 @@ class IMDatabasePointCollecter:
                                 continue
                             constraints.append(constraint)
                         optim_driver.constraints = constraints
-                        opt_mol_string, energy = optim_driver.optimize(molecule)
+                        # opt_mol_string, energy = optim_driver.optimize(molecule)
+                        opt_mol_string = """ 22
+
+C             -1.053898039910        -1.166990108353         0.281567616502
+C              0.316390892008        -1.095839916577         0.220356625165
+C              0.949925863649         0.125858100144         0.003906967268
+C              0.182413027359         1.288197579174        -0.180885109189
+C             -1.176880900828         1.217448401198        -0.132095419750
+C             -1.864776344351        -0.008172859726         0.111997475570
+C             -3.270050454739        -0.014785449841         0.138091278217
+C             -4.088245279277        -1.075871904854         0.499294847057
+C             -3.866408496919        -2.368103173974         1.156022387477
+N             -4.984246511592        -3.047413781136         1.327660198528
+C             -6.001858732774        -2.289890929425         0.817420286313
+O             -7.182817049714        -2.497022663994         0.743907161711
+N             -5.420628779703        -1.067393726197         0.321371240331
+O              2.280488210172         0.260314794476        -0.039563789854
+H             -1.518650135987        -2.126255358043         0.395319762917
+H              0.907311509210        -1.990800827402         0.343180402154
+H              0.693382892220         2.219252998946        -0.356564104551
+H             -1.760213551206         2.112222538273        -0.274774439547
+H             -3.766312894257         0.899520685652        -0.145095586466
+H             -2.932882720046        -2.719335928505         1.545060695594
+H             -5.961870829075        -0.351021494077        -0.122122962045
+H              2.709721840337        -0.585573671226         0.103051644087
+"""
                         optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
                         current_basis = MolecularBasis.read(optimized_molecule, current_basis.get_main_basis_label())
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
@@ -3020,7 +3065,7 @@ class IMDatabasePointCollecter:
                         if sum_of_values > 0.8:       
                             break
 
-                    old_list_change = None
+                    old_list_change = []
                     while not same:
                         from typing import Iterable, Tuple, Set
 
@@ -3087,14 +3132,14 @@ class IMDatabasePointCollecter:
                                 if len(element) == 4 and element not in constraints and is_dihedral_rotatable(element, self.all_rot_bonds):
 
                                     diff = np.sin(interpolation_driver.impes_coordinate.internal_coordinates_values[element_idx] - self.impes_drivers[state_to_optim].impes_coordinate.internal_coordinates_values[element_idx])
-                                    if abs(diff) > 1e-5:
+                                    if abs(diff) > 1e-1:
                                         elem_list.append(element)
                                         int_diff.append(diff)
                                 
                             ordered_diif = sorted(zip(elem_list, int_diff), key=lambda x:x[1], reverse=True)
-                            if old_list_change is None:
-                                old_list_change = elem_list.copy()
+                            
                             print('Len ordered list', ordered_diif)
+                            
                             if len(ordered_diif) > 0:
                                 for spec_elem in range(counter):
                                     if spec_elem == len(ordered_diif):
@@ -3103,13 +3148,17 @@ class IMDatabasePointCollecter:
                                     dihedral_val_to_reset = molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1))
                                     # print(dihedral_val_to_reset, ordered_diif[spec_elem][0])
                                     optimized_molecule.set_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1), dihedral_val_to_reset)
-                                    # print(optimized_molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1)))      
+                                    
+                                    print(optimized_molecule.get_dihedral_in_degrees((ordered_diif[spec_elem][0][0] + 1, ordered_diif[spec_elem][0][1] + 1, ordered_diif[spec_elem][0][2] + 1, ordered_diif[spec_elem][0][3] + 1)))      
+                                    print('Orderd diff element', ordered_diif[spec_elem], old_list_change)
                                     if ordered_diif[spec_elem][0] in old_list_change:
                                         same = True
                             else:
                                 same = True
                             
                             counter +=1
+                            if len(old_list_change) == 0:
+                                old_list_change = elem_list.copy()
                     state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim]))
 
                 print('New optimized molecule \n', optimized_molecule.get_xyz_string())
