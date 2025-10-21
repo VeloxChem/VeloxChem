@@ -96,6 +96,7 @@ class TransitionStateGuesser():
         self.mute_ff_build = True
         self.mm_temperature = 600
         self.mm_steps = 1000
+        self.conformer_snapshots = 10
         self.mm_step_size = 0.001
         self.save_mm_traj = False
         self.scf_drv = None
@@ -105,9 +106,16 @@ class TransitionStateGuesser():
         self.peak_conformer_search = False
         self.peak_conformer_search_range = 1
         self.scf_scan = True
-        self.conformer_steps = 10000
-        self.conformer_snapshots = 10
+        
         self.results_file = 'ts_results.h5'
+        self.sys_builder_configuration = conf = {
+            "name": "vacuum",
+            "bonded_integration": True,
+            "soft_core_coulomb_pes": True,
+            "soft_core_lj_pes": True,
+            "soft_core_coulomb_int": False,
+            "soft_core_lj_int": False,
+        }
 
         self.ffbuilder = ReactionForceFieldBuilder()
 
@@ -194,14 +202,6 @@ class TransitionStateGuesser():
         self.mol_charge = self.molecule.get_charge()
         self.mol_multiplicity = self.molecule.get_multiplicity()
 
-        conf = {
-            "name": "vacuum",
-            "bonded_integration": True,
-            "soft_core_coulomb_pes": True,
-            "soft_core_lj_pes": True,
-            "soft_core_coulomb_int": False,
-            "soft_core_lj_int": False,
-        }
         sysbuilder = EvbSystemBuilder()
         if self.mute_ff_build:
             sysbuilder.ostream.mute()
@@ -224,7 +224,7 @@ class TransitionStateGuesser():
             self.reactant,
             self.product,
             list(self.lambda_vec),
-            conf,
+            self.sys_builder_configuration,
             constraints,
         )
         self.ostream.print_info(
@@ -244,7 +244,7 @@ class TransitionStateGuesser():
             'product': self.product,
         })
 
-        return
+        return self.results
 
     def scan_mm(self):
 
@@ -558,8 +558,9 @@ class TransitionStateGuesser():
             opm_dyn.system = system
             conformers_dict = opm_dyn.conformational_sampling(
                 ensemble='NVT',
-                nsteps=self.conformer_steps,
+                nsteps=self.mm_steps*self.conformer_snapshots,
                 snapshots=self.conformer_snapshots,
+                temperature=self.mm_temperature,
             )
             result = []
             for e_int, temp_mol in zip(conformers_dict['energies'],
@@ -716,7 +717,7 @@ class TransitionStateGuesser():
         # if there are scf energies, get the best scf energies and everything corresponding to that
         # otherwise, get the best mm energies
 
-        if ts_results['scan'][0][0]['scf_energy'] is not None:
+        if ts_results['scan'][0][0].get('scf_energy',None) is not None:
             final_lambda = ts_results.get('max_scf_lambda', None)
             scf_energies, scan_indices = TransitionStateGuesser._get_best_scf_E_from_scan_dict(
                 ts_results['scan'])
@@ -1088,7 +1089,7 @@ class TransitionStateGuesser():
         else:
             self.ostream.print_header("Starting MM scan")
         self.ostream.print_header(
-            f"conf. steps:           {self.conformer_steps:>10}")
+            f"MD steps:              {self.mm_steps:>10}")
         self.ostream.print_header(
             f"conf. snapshots:       {self.conformer_snapshots:>10}")
         self.ostream.print_header(

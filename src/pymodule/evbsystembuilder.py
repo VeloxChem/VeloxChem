@@ -131,6 +131,8 @@ class EvbSystemBuilder():
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
+        self.dynamic_bond_tightening = 3.0  # Power for tigthening breaking and forming bonds during the integration
+
         self.verbose = False
 
         self.constraints: list[dict] = []
@@ -172,6 +174,7 @@ class EvbSystemBuilder():
             "soft_core_coulomb_int": bool,
             "soft_core_lj_int": bool,
             "int_nb_const_exceptions": bool,
+            "dynamic_bond_tightening": float,
             "pressure": float,
             "solvent": str,
             "padding": float,
@@ -1040,7 +1043,8 @@ class EvbSystemBuilder():
             solvent_chain = topology.addChain()
             solvent_ff = MMForceFieldGenerator()
 
-            solvent_ff.create_topology(vlx_solvent_molecule,water_model=self.water_model)
+            solvent_ff.create_topology(vlx_solvent_molecule,
+                                       water_model=self.water_model)
 
             atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
             if 'ow' in atom_types and 'hw' in atom_types and len(
@@ -1275,6 +1279,7 @@ class EvbSystemBuilder():
         improper = self._create_improper_torsion_forces(lam)
 
         if not pes:
+            system.addForce(dynamic_bonded_harmonic)
             syslj, syscoul = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_int,
@@ -1286,6 +1291,7 @@ class EvbSystemBuilder():
             system.addForce(syslj)
             system.addForce(syscoul)
         else:
+            system.addForce(morse)
             syslj_static, syscoul_static = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_pes_static,
@@ -1313,10 +1319,7 @@ class EvbSystemBuilder():
 
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
-        if not pes:
-            system.addForce(dynamic_bonded_harmonic)
-        else:
-            system.addForce(morse)
+
         system.addForce(static_bonded_harmonic)
         system.addForce(angle)
         system.addForce(torsion)
@@ -1575,7 +1578,15 @@ class EvbSystemBuilder():
                 eqA = 0.5 * (s1 + s2)
 
                 fcA = fcB * self.bonded_integration_bond_fac
+            p = self.dynamic_bond_tightening
             eq = eqA * (1 - lam) + eqB * lam
+
+            # Apply bond tightening. This causes breaking and forming bonds to be more tightly bonded for intermediate lambda values
+            min_eq = min(eqA, eqB)
+            dif_eq = abs(eqA - eqB)
+            if dif_eq > 0:
+                eq = (((eq - min_eq) / dif_eq)**p * dif_eq) + min_eq
+
             fc = fcA * (1 - lam) + fcB * lam
             self._add_bond(harmonic_force, atom_ids, eq, fc)
 
@@ -2299,7 +2310,7 @@ class EvbSystemBuilder():
             return 180.0 * phi_in_radian / math.pi
         else:
             return phi_in_radian
-        
+
     def save_systems_as_xml(self, systems: dict, folder: str):
         """Save the systems as xml files to the given folder.
 
