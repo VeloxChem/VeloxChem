@@ -3258,9 +3258,10 @@ class IMDatabasePointCollecter:
             org_roots = drivers[0].roots
             label_counter = 0
             for mol_basis in entries:
-                drivers[0].roots = mol_basis[4]           
-                drivers[1].roots_to_follow = mol_basis[4]
-                drivers[2].roots_to_follow = mol_basis[4]
+                if any(root > 0 for root in self.roots_to_follow):
+                    drivers[0].roots = mol_basis[4]           
+                    drivers[1].roots_to_follow = mol_basis[4]
+                    drivers[2].roots_to_follow = mol_basis[4]
                 
                 energies, scf_results = self.compute_energy(drivers[0], mol_basis[0], mol_basis[1])
                 print('Energies one', energies)
@@ -3464,9 +3465,10 @@ class IMDatabasePointCollecter:
                                                             root)
                         self.last_added = len(self.allowed_molecules[root]['molecules'])
                 label_counter += 1
-            drivers[0].roots = org_roots           
-            drivers[1].roots_to_follow = org_roots
-            drivers[2].roots_to_follow = org_roots
+            if any(root > 0 for root in self.roots_to_follow):
+                drivers[0].roots = org_roots           
+                drivers[1].roots_to_follow = org_roots
+                drivers[2].roots_to_follow = org_roots
         
         
         # exit()
