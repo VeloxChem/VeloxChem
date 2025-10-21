@@ -3254,8 +3254,10 @@ class IMDatabasePointCollecter:
                 continue
             print(key, entries)
             drivers = self.drivers[key]
-
-            org_roots = drivers[0].roots
+            
+            org_roots = self.roots_to_follow[0]
+            if any(root > 0 for root in self.roots_to_follow):
+                org_roots = drivers[0].roots
             label_counter = 0
             for mol_basis in entries:
                 if any(root > 0 for root in self.roots_to_follow):
