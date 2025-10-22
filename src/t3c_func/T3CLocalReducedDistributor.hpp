@@ -46,7 +46,7 @@ class CT3CLocalReducedDistributor
    public:
     /// @brief Creates an integral shells distributor.
     /// @param values  The pointer to flat tensor.
-    /// @param origin The origin position in flat tensor.
+    /// @param origins The origin position in flat tensor.
     CT3CLocalReducedDistributor(CT3FlatBuffer<double>* values, const std::vector<size_t>& origins);
 
     /// @brief The default copy constructor.

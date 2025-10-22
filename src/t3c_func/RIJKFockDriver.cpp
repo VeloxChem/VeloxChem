@@ -198,6 +198,34 @@ CRIJKFockDriver::compute_screened_bq_vectors(const CT4CScreener&     screener,
 }
 
 auto
+CRIJKFockDriver::estimate_memory_for_bq_vectors(const CT4CScreener&     screener,
+                                                const CMolecule&        molecule,
+                                                const CMolecularBasis&  aux_basis,
+                                                const int               ithreshold,
+                                                const int               rank,
+                                                const int               nodes) const -> size_t
+{
+    // set up auxilary basis dimensions
+    
+    const auto naux = aux_basis.dimensions_of_basis();
+    
+    // set up active auxilary indices
+    
+    auto gindices = std::vector<size_t>(naux);
+    
+    std::iota(gindices.begin(), gindices.end(), 0);
+    
+    auto lindices = omp::partition_tasks(gindices, rank, nodes);
+    
+    // allocate B^Q vectors
+    
+    const auto bra_indices = omp::partition_flat_buffer(screener.gto_pair_blocks(), ithreshold);
+    
+    return lindices.size() * (bra_indices.back()[2] + bra_indices.back()[3]) * sizeof(double);
+}
+
+
+auto
 CRIJKFockDriver::compute_j_fock(const CMatrix     &density,
                                 const std::string &label) const -> CMatrix
 {

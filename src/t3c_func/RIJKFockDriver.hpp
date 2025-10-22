@@ -113,6 +113,21 @@ class CRIJKFockDriver
                                      const int               rank,
                                      const int               nodes) -> void;
     
+    /// @brief Estimates memory required to store B^Q vectors in screened, distributed form.
+    /// @param screener The ERIs screener.
+    /// @param molecule The molecule.
+    /// @param aux_basis The auxilary molecular  basis.
+    /// @param ithreshold The integer threshold of significant pairs screening.
+    /// @param rank The rank of MPI process to store batch of B^Q vectors.
+    /// @param nodes The number of MPI nodes in communicator.
+    /// @return The estimated memory requirements for screened B^Q vectors.
+    auto estimate_memory_for_bq_vectors(const CT4CScreener&     screener,
+                                        const CMolecule&        molecule,
+                                        const CMolecularBasis&  aux_basis,
+                                        const int               ithreshold,
+                                        const int               rank,
+                                        const int               nodes) const -> size_t;
+    
     /// @brief Computes Coulomb Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.
