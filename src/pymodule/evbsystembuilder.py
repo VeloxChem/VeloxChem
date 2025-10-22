@@ -1978,8 +1978,11 @@ class EvbSystemBuilder():
     # This causes all exceptdions to be constant. This will include constant 1-4 interactions between atoms that bonded in either the reactant or the product, but not in the other.
 
     # Broken exceptions will add exceptions for bonds that are changing between the reactant and product.
-    # This is weaker then merge_exceptions, as it will not include 1-4 interactions between atoms that are not bonded, even if they are bonded on the other side of the reaction.
+    # This is weaker then merge_exceptions, as it will not add 1-4 interactions between atoms that are not bonded, even if they are bonded on the other side of the reaction.
     # This is used to remove the nonbonded interactions that are modelled by other forces
+
+    # Only changing bonds will only add nonbonded interactions for atom pairs that are part of changing bonds.
+    # Exclude changing bonds will do the opposite
 
     # Turning both off gives the proper reactant or product for lam=0 or 1
     def _create_nonbonded_forces(

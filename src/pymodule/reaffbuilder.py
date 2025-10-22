@@ -55,6 +55,7 @@ from .outputstream import OutputStream
 from .veloxchemlib import Point
 from .waterparameters import get_water_parameters
 from .errorhandler import assert_msg_critical
+from .openmmdynamics import OpenMMDynamics
 
 try:
     import openmm as mm
@@ -88,6 +89,10 @@ class ReactionForceFieldBuilder():
         self.reparameterize_bonds: bool = False
         self.reparameterize_angles: bool = False
         self.optimize_ff: bool = True
+        self.optimize_steps: int = 1000
+        self.optimize_conformer_snapshots: int = 10
+        self.optimize_temp: int = 600
+        self.optimize_dist_restraint_offset = 0.5  # Angstrom
         self.mm_opt_constrain_bonds: bool = True
         self.water_model: str = 'spce'
         self.product_mapping: dict[int, int] | None = None  # one-indexed
@@ -190,20 +195,20 @@ class ReactionForceFieldBuilder():
 
         self.ostream.flush()
         if self.optimize_ff:
-            if len(reactant_ffs) > 1:
-                reactant_ff.molecule = self._optimize_molecule(
-                    reactant_ff.molecule.get_element_ids(),
-                    reactant_ff,
-                    forming_bonds,
-                    note='reactant',
-                )
-            if len(product_ffs) > 1:
-                product_ff.molecule = self._optimize_molecule(
-                    product_ff.molecule.get_element_ids(),
-                    product_ff,
-                    breaking_bonds,
-                    note='product',
-                )
+            reactant_ff.molecule = self._optimize_molecule(
+                reactant_ff.molecule.get_element_ids(),
+                reactant_ff,
+                forming_bonds,
+                note='reactant',
+            )
+            product_ff.molecule = self._optimize_molecule(
+                product_ff.molecule.get_element_ids(),
+                product_ff,
+                breaking_bonds,
+                note='product',
+            )
+            # if len(reactant_ffs) > 1:
+            # if len(product_ffs) > 1:
 
         return reactant_ff, product_ff, forming_bonds, breaking_bonds, reactant_ffs, product_ffs, product_mapping
 
@@ -485,72 +490,6 @@ class ReactionForceFieldBuilder():
         molecule_sanity_check(combined_molecule)
         return combined_molecule
 
-    def _add_reaction_bonds(self, forcefield, mmsys, changing_bonds, note):
-        self.ostream.print_info(
-            "Guessing intra-molecular constraints based on breaking bonds. This option can be turned off with mm_opt_constrain_bonds."
-        )
-        morse_expr = "D*(1-exp(-a*(r-re)))^2 + b*(r-re);"
-        morse_force = mm.CustomBondForce(morse_expr)
-        morse_force.setName("Reaction morse bond")
-        morse_force.addPerBondParameter("re")
-        D = 500
-        morse_force.addPerBondParameter("a")
-        morse_force.addGlobalParameter("D", D)
-        morse_force.addGlobalParameter("b", 50000)
-
-        harm_force = mm.HarmonicBondForce()
-
-        changing_atoms = []
-        for bond in changing_bonds:
-            s1 = forcefield.atoms[bond[0]]['sigma']
-            s2 = forcefield.atoms[bond[1]]['sigma']
-            e1 = forcefield.atoms[bond[0]]['epsilon']
-            e2 = forcefield.atoms[bond[1]]['epsilon']
-            if bond[0] not in changing_atoms:
-                changing_atoms.append(bond[0])
-            if bond[1] not in changing_atoms:
-                changing_atoms.append(bond[1])
-            s = (s1 + s2) / 2
-            e = math.sqrt(e1 * e2)
-
-            rmin = s * (2**(1 / 6))  # rmin = sigma * 2^(1/6)
-            fc = 250000 * e  # force constant in kJ/mol/angstrom^2
-            a = math.sqrt(fc / (2 * D))
-            # morse_force.addBond(bond[0], bond[1], [a, rmin])
-
-            harm_force.addBond(bond[0], bond[1], rmin, fc)
-            self.ostream.print_info(
-                f"Replacing nonbonded interaction for atoms {tuple(b+1 for b in bond)} with Harmonic bond  with r {rmin:.3f} and fc {fc:.3f} for MM equilibration of the {note}"
-            )
-            self.ostream.flush()
-        # mmsys.addForce(morse_force)
-        mmsys.addForce(harm_force)
-
-        nbforce = [
-            force for force in mmsys.getForces()
-            if isinstance(force, mm.NonbondedForce)
-        ][0]
-        existing_exceptions = {}
-        for i in range(nbforce.getNumExceptions()):
-            params = nbforce.getExceptionParameters(i)
-            if params[0] in changing_atoms or params[1] in changing_atoms:
-                sorted_tuple = (params[0], params[1])
-                existing_exceptions.update({sorted_tuple: i})
-        added_exceptions = {}
-        for bond in changing_bonds:
-            self.ostream.flush()
-            if bond in existing_exceptions.keys():
-                nbforce.setExceptionParameters(existing_exceptions[bond],
-                                               bond[0], bond[1], 0, 1, 0)
-            elif (bond[1], bond[0]) in existing_exceptions.keys():
-                nbforce.setExceptionParameters(
-                    existing_exceptions[(bond[1], bond[0])], bond[0], bond[1],
-                    0, 1, 0)
-            else:
-                index = nbforce.addException(bond[0], bond[1], 0, 1, 0)
-                added_exceptions.update({bond: index})
-        return mmsys
-
     #Match the indices of the reactant and product forcefield generators
     def _match_reactant_and_product(
         self,
@@ -766,32 +705,92 @@ class ReactionForceFieldBuilder():
 
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
+
+        opm_dyn = OpenMMDynamics()
+        opm_dyn.ostream.mute()
+        opm_dyn.openmm_platform = "CPU"
+
+        opm_dyn.pdb = pdb
+        opm_dyn.system = mmsys
+
+        self.ostream.print_info(
+            f"Running conformational sampling with {self.optimize_steps*self.optimize_conformer_snapshots} steps and {self.optimize_conformer_snapshots} snapshots at {self.optimize_temp} K for {note} molecule."
+        )
+        self.ostream.flush()
+        try:
+            conformers_dict = opm_dyn.conformational_sampling(
+                ensemble='NVT',
+                nsteps=self.optimize_steps * self.optimize_conformer_snapshots,
+                snapshots=self.optimize_conformer_snapshots,
+                temperature=self.optimize_temp,
+            )
+
+            min_arg = np.argmin(conformers_dict['energies'])
+            new_molecule = conformers_dict['molecules'][min_arg]
+            self.ostream.print_info(
+                f"Found {len(conformers_dict['molecules'])} conformers with energies {conformers_dict['energies']} during optimization of the {note} molecule."
+            )
+            self.ostream.flush()
+        except Exception as e:
+            self.ostream.print_warning(
+                f"OpenMM optimization of the {note} molecule failed with error: {e}. Reverting to original geometry."
+            )
+            new_molecule = forcefield.molecule
+
+        # integrator = mm.VerletIntegrator(0.001)
+        # sim = mmapp.Simulation(top, mmsys, integrator)
+        # sim.context.setPositions(pos)
+        # self.ostream.print_info(f"Minimizing {note} molecule.")
+        # sim.minimizeEnergy()
+        # # with open(f'{name}_optimized.pdb', 'w') as pdbfile:
+        # sim.context.setVelocitiesToTemperature(self.optimize_temp * mmunit.kelvin)
+        # self.ostream.print_info(
+        #     f"Running {self.optimize_steps} NVE steps with initial T at {self.optimize_temp} K for {note} molecule."
+        # )
+        # self.ostream.flush()
+        # sim.step(self.optimize_steps)
+        # self.ostream.print_info(f"Minimizing {note} molecule again.")
+        # self.ostream.flush()
+        # sim.minimizeEnergy()
+
+        # state = sim.context.getState(getPositions=True)
+
+        # pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
+
+        # new_molecule = Molecule()
+        # for i, elem in enumerate(elemental_ids):
+        #     point = Point(pos[i])
+        #     new_molecule.add_atom(int(elem), point, 'angstrom')
+        # new_molecule.set_charge(forcefield.molecule.get_charge())
+        # new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         os.unlink(f'{name}.xml')
         os.unlink(f'{name}.pdb')
         os.unlink(f'{name}_sys.xml')
-        integrator = mm.VerletIntegrator(0.001)
-        sim = mmapp.Simulation(top, mmsys, integrator)
-        sim.context.setPositions(pos)
-        self.ostream.print_info(f"Minimizing {note} molecule.")
-        sim.minimizeEnergy()
-        # with open(f'{name}_optimized.pdb', 'w') as pdbfile:
-        sim.context.setVelocitiesToTemperature(600 * mmunit.kelvin)
-        self.ostream.print_info(
-            f"Running 1000 NVE steps with initial T at 600 K for {note} molecule."
-        )
-        self.ostream.flush()
-        sim.step(1000)
-        self.ostream.print_info(f"Minimizing {note} molecule again.")
-        self.ostream.flush()
-        sim.minimizeEnergy()
-        state = sim.context.getState(getPositions=True)
-
-        pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
-
-        new_molecule = Molecule()
-        for i, elem in enumerate(elemental_ids):
-            point = Point(pos[i])
-            new_molecule.add_atom(int(elem), point, 'angstrom')
-        new_molecule.set_charge(forcefield.molecule.get_charge())
-        new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         return new_molecule
+
+    def _add_reaction_bonds(self, forcefield, mmsys, changing_bonds, note):
+        self.ostream.print_info(
+            "Guessing intra-molecular constraints based on breaking bonds. This option can be turned off with mm_opt_constrain_bonds."
+        )
+
+        dist_restraint_expr = "0.5 * k * (r - r0)^2*step(r-r0)"
+        dist_restraint_force = mm.CustomBondForce(dist_restraint_expr)
+        dist_restraint_force.addPerBondParameter("r0")
+        dist_restraint_force.addGlobalParameter("k", 250000)
+
+        for bond in changing_bonds:
+            s1 = forcefield.atoms[bond[0]]['sigma']
+            s2 = forcefield.atoms[bond[1]]['sigma']
+            s = (s1 + s2) / 2
+
+            r0 = s * (
+                2**(1 / 6)
+            ) + self.optimize_dist_restraint_offset * 0.1  # rmin = sigma * 2^(1/6)
+            dist_restraint_force.addBond(bond[0], bond[1], [r0])
+            self.ostream.print_info(
+                f"Adding distance restraint for atoms {tuple(b+1 for b in bond)} with r0 {r0:.3f} for MM equilibration of the {note}"
+            )
+            self.ostream.flush()
+
+        mmsys.addForce(dist_restraint_force)
+        return mmsys
