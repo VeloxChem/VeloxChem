@@ -268,6 +268,14 @@ class LinearResponseEigenSolver(LinearSolver):
                 self.nstates <= nocc * (norb - nocc),
                 'LinearResponseEigenSolver: too many excited states')
 
+            if self.core_excitation:
+                assert_msg_critical(
+                    self.num_core_orbitals > 0,
+                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid')
+                assert_msg_critical(
+                    self.num_core_orbitals < nocc,
+                    'LinearResponseEigenSolver: num_core_orbitals too large')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 

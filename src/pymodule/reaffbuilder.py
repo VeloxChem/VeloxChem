@@ -94,7 +94,7 @@ class ReactionForceFieldBuilder():
         self.optimize_temp: int = 600
         self.optimize_dist_restraint_offset = 0.5  # Angstrom
         self.mm_opt_constrain_bonds: bool = True
-        self.water_model: str = 'spce'
+        self.water_model: str = 'cspce'
         self.product_mapping: dict[int, int] | None = None  # one-indexed
         self.mute_scf: bool = True
         self.skip_reaction_matching: bool = False

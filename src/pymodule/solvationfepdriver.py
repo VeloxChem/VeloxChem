@@ -76,7 +76,7 @@ class SolvationFepDriver:
         - timestep: The timestep for the simulation.
         - num_equil_steps: The number of steps for the equilibration.
         - num_steps: The number of steps for the simulation.
-        - number_of_snapshots: The number of snapshots to save.
+        - num_snapshots: The number of snapshots to save.
         - cutoff: The cutoff for the nonbonded interactions.
         - constraints: The constraints for the simulation.
         - nonbondedMethod: The nonbonded method for the simulation.
@@ -123,13 +123,13 @@ class SolvationFepDriver:
 
         # Output stream
         self.ostream = ostream
-        
+
         # Create directory for storing all generated data
         self.output_folder = Path("solvation_fep_output")
 
         # Options for the SolvationBuilder
         self.padding = 1.0
-        self.solvent_name = 'spce'
+        self.solvent_name = 'cspce'
         self.resname = None 
         
         # Ensemble and MD options
@@ -137,9 +137,10 @@ class SolvationFepDriver:
         self.kT = (unit.AVOGADRO_CONSTANT_NA * unit.BOLTZMANN_CONSTANT_kB * self.temperature).in_units_of(unit.kilojoule_per_mole)
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
+        self.num_em_steps = 0  # no limit
         self.num_equil_steps = 5000 #10 ps
         self.num_steps = 500000 # 1 ns
-        self.number_of_snapshots = 1000
+        self.num_snapshots = 500
         self.cutoff = 1.0 * unit.nanometers
         self.constraints = app.HBonds  
         self.nonbondedMethod = app.PME  
@@ -172,7 +173,7 @@ class SolvationFepDriver:
         self.final_free_energy = 0.0
         self.delta_f = None
 
-    def compute_solvation(self, molecule, ff_gen_solute=None, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None):
+    def compute(self, molecule, ff_gen_solute=None, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None):
         """
         Run the solvation free energy calculation using OpenMM.
 
@@ -182,7 +183,7 @@ class SolvationFepDriver:
             The force field generator for the solute. If None, it will be calculated.
         :param solvent:
             The solvent to use for solvation. Default is spce water.
-            Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
+            Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform',
             'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf','other' or 'itself'.
         :param solvent_molecule:
             The VeloxChem molecule object for the solvent. Mandatory for 'other'.
@@ -206,7 +207,6 @@ class SolvationFepDriver:
                             equilibrate=True)
         
         self.solvent_name = solvent
-        # Note: GROMACS files will be used instead of OpenMM files.
         sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
         
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
@@ -217,11 +217,20 @@ class SolvationFepDriver:
         else:
             self.solute_ff = ff_gen_solute
 
-        delta_f, final_free_energy = self._run_stages()
+        delta_f = self._run_stages()
 
-        return delta_f, final_free_energy
+        return delta_f
+
+    def compute_solvation_free_energy(self, solute_ff, sol_builder, solute_name='solute'):
+
+        sol_builder.write_gromacs_files(solute_ff=solute_ff)
+
+        solute_gro = f'{solute_name}.gro'
+        solute_top = f'{solute_name}.top'
+
+        return self.compute_solvation_from_gromacs_files("system.gro", "system.top", solute_gro, solute_top)
         
-    def compute_solvation_from_omm_files(self, solute_pdb, solute_xml, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None):
+    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='cspce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None):
         """
         Run the solvation free energy calculation using OpenMM.
         :param solute_pdb:
@@ -234,7 +243,7 @@ class SolvationFepDriver:
             The PDB file with the solvated system coordinates. If not provided, the system will be built. 
         :param solvent:
             The solvent to use for solvation. Default is spce water.
-            Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
+            Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform',
             'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf', 'other' or 'itself'.
         :param solvent_molecule:
             The VeloxChem molecule object for the solvent. Mandatory for 'other'.
@@ -288,9 +297,9 @@ class SolvationFepDriver:
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
-        delta_f, final_free_energy = self._run_stages()
+        delta_f = self._run_stages()
 
-        return delta_f, final_free_energy
+        return delta_f
                 
     def compute_solvation_from_gromacs_files(self, system_gro, system_top, solute_gro, solute_top):
         """
@@ -319,9 +328,9 @@ class SolvationFepDriver:
         if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
-        delta_f, final_free_energy = self._run_stages()
+        delta_f = self._run_stages()
 
-        return delta_f, final_free_energy
+        return delta_f
 
     def _run_stages(self):
         """
@@ -348,7 +357,7 @@ class SolvationFepDriver:
         self.ostream.print_line("-"*len("Alchemical Parameters:"))
         self.ostream.print_line(f"Number of equilibration steps: {self.num_equil_steps}")
         self.ostream.print_line(f"Number of steps per lambda simulation: {self.num_steps}")
-        self.ostream.print_line(f"Number of snapshots per lambda simulation: {self.number_of_snapshots}")
+        self.ostream.print_line(f"Number of snapshots per lambda simulation: {self.num_snapshots}")
         # Simulation time per lambda in ns with 2 decimal places
         self.ostream.print_line(f"Simulation time per lambda: {simulation_time:.2f} ns")
         self.ostream.print_line(f"Lambdas in Stage 1: {self.lambdas_stage1}")
@@ -381,13 +390,15 @@ class SolvationFepDriver:
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
 
-        delta_f = {i+1: {'Delta_f': (self.delta_f[i]['Delta_f'][-1,0]*self.kT).value_in_unit(unit.kilojoule_per_mole),
+        delta_f = {f"Stage {i+1}": {'Delta_f': (self.delta_f[i]['Delta_f'][-1,0]*self.kT).value_in_unit(unit.kilojoule_per_mole),
                 'Uncertainty': (self.delta_f[i]['dDelta_f'][-1,0]*self.kT).value_in_unit(unit.kilojoule_per_mole)}
           for i in range(4)}
         
+        delta_f['free_energy'] = final_free_energy
+
         self.final_free_energy = final_free_energy
 
-        return delta_f, final_free_energy
+        return delta_f
 
     def _run_lambda_simulations(self, stage, vacuum=False):
         """
@@ -623,19 +634,29 @@ class SolvationFepDriver:
         """
         Run the simulation using OpenMM. Return simulated time in ns and real elapsed time in seconds.
         """
+
         integrator = mm.LangevinIntegrator(self.temperature, 1.0 / unit.picoseconds, self.timestep)
-        platform = mm.Platform.getPlatformByName(self.platform) if self.platform else None
-        simulation = app.Simulation(topology, system, integrator, platform=platform)
+        simulation = app.Simulation(topology, system, integrator, platform=self._create_platform())
         simulation.context.setPositions(positions)
 
+        em_t0 = time.time()
+
         # Minimize energy
-        simulation.minimizeEnergy()
+        simulation.minimizeEnergy(maxIterations=self.num_em_steps)
+
+        self.ostream.print_info(f'Time spent in energy minimization: {time.time() - em_t0:.2f} s')
+        self.ostream.flush()
+
+        equil_t0 = time.time()
 
         # Equilibration
         simulation.step(self.num_equil_steps)
 
+        self.ostream.print_info(f'Time spent in pre-equilibration: {time.time() - equil_t0:.2f} s')
+        self.ostream.flush()
+
         # Calculate production run time and interval
-        interval = self.num_steps // self.number_of_snapshots
+        interval = self.num_steps // self.num_snapshots
         simulated_ns = self.num_steps * self.timestep / unit.nanoseconds  # Simulated time in ns
 
         # Setup reporters
@@ -667,7 +688,7 @@ class SolvationFepDriver:
         conformations = []
         energies = []
         
-        for _ in range(self.number_of_snapshots):
+        for _ in range(self.num_snapshots):
             simulation.step(interval)
             state = simulation.context.getState(getPositions=True, getEnergy=True)
             positions = state.getPositions() 
@@ -697,15 +718,12 @@ class SolvationFepDriver:
             time_start_forcefield = time.time()
 
             integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
-            simulation = app.Simulation(topology, forcefield, integrator)
+            simulation = app.Simulation(topology, forcefield, integrator, platform=self._create_platform())
 
             for n, snapshot in enumerate(snapshots):
                 simulation.context.setPositions(snapshot)
                 state = simulation.context.getState(getEnergy=True)
                 u_kn[k, n] = state.getPotentialEnergy() / self.kT
-
-            assert_msg_critical(u_kn.shape[1] == sum(self.N_k),
-                f"Recalculated energies shape mismatch of u_kn and N_k")
 
             elapsed_time_trajectory = time.time() - time_start_forcefield
             self.ostream.print_info(f"Forcefield {k} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
@@ -721,7 +739,7 @@ class SolvationFepDriver:
         
         conformations_equil = conformations[t0:]
         
-        self.ostream.print_info(f"Equilibration detected at frame {t0} with g = {g} and Neff_max = {Neff_max}")
+        self.ostream.print_info(f"Equilibration detected at frame {t0} with Neff_max = {Neff_max:.2f}")
         self.ostream.flush()
 
         if g > g_threshold:
@@ -740,31 +758,9 @@ class SolvationFepDriver:
         self.ostream.print_info(f"Frames saved = {len(snapshots)} | {info}")
         self.ostream.flush()
 
-    def _detect_equilibration_subsampling(self, conformations, energies):
-        At = np.array(energies) 
-        
-        t0, g, Neff_max = timeseries.detect_equilibration(At)
-        
-        At_equil = At[t0:]
-        conformations_equil = conformations[t0:]
-        
-        self.ostream.print_info(f"Equilibration detected at time {t0} with g = {g} and Neff_max = {Neff_max}")
-        self.ostream.print_info(f"Number of snapshots after equilibration: {len(conformations_equil)}")
-        self.ostream.flush()
-
-        indices = timeseries.subsample_correlated_data(At_equil,g=g) 
-        
-        subsampled_snapshots = [conformations_equil[i] for i in indices]
-
-        self.snapshots.extend(subsampled_snapshots)
-        self.N_k.append(len(subsampled_snapshots))
-
-        self.ostream.print_info(f"Number of snapshots after subsampling: {len(subsampled_snapshots)}")
-        self.ostream.flush()
-
     def _calculate_free_energy(self, u_kn):
 
-        mbar = MBAR(u_kn, N_k = self.N_k, n_bootstraps=50) # if convergence error, use: solver_protocol='robust'
+        mbar = MBAR(u_kn, N_k = self.N_k, n_bootstraps=50, solver_protocol='robust') 
         delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
 
         return delta_f
@@ -787,3 +783,18 @@ class SolvationFepDriver:
 
         return alchemical_region, chemical_region
 
+    def _create_platform(self):
+        """
+        Creates an OpenMM platform.
+
+        Returns:
+            The OpenMM Platform.
+        """
+
+        if self.platform is None:
+            return None
+        else:
+            platform = mm.Platform.getPlatformByName(self.platform)
+            # if self.platform == "CPU":
+            #     platform.setPropertyDefaultValue("Threads", "1")
+            return platform

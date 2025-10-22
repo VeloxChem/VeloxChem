@@ -32,9 +32,9 @@
 
 from mpi4py import MPI
 from pathlib import Path, PurePath
+from copy import deepcopy
 import numpy as np
 import tempfile
-import time
 import sys
 import re
 import json
@@ -383,8 +383,9 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
-                                      for i, j, k, l in dihedral_indices]
+        dihedral_indices_one_based = [
+            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
+        ]
 
         # Print a header
         header = 'VeloxChem Dihedral Scan'
@@ -489,8 +490,8 @@ class MMForceFieldGenerator:
             error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
-        valid_input = ((scan_results is None and scan_file is not None)
-                       or (scan_results is not None and scan_file is None))
+        valid_input = ((scan_results is None and scan_file is not None) or
+                       (scan_results is not None and scan_file is None))
         assert_msg_critical(
             valid_input, 'MMForceFieldGenerator.reparameterize_dihedrals: ' +
             'Please provide either scan_results or scan_file')
@@ -503,8 +504,8 @@ class MMForceFieldGenerator:
                         # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
                         # Extract the dihedral indices
                         scanned_dih = [
-                            int(i) for i in line.split('Dihedral')[1].split()
-                            [0].split('-')
+                            int(i) for i in (
+                                line.split('Dihedral')[1].split()[0].split('-'))
                         ]
                         assert_msg_critical(
                             sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
@@ -525,8 +526,9 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
-                                      for i, j, k, l in dihedral_indices]
+        dihedral_indices_one_based = [
+            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
+        ]
 
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
@@ -738,9 +740,9 @@ class MMForceFieldGenerator:
         # Extract maxima for QM and MM energies
         if fit_extrema:
             qm_maxima_indices = extract_maxima(barriers, qm_energies)
-            args = (qm_maxima_indices, )
+            args = (qm_maxima_indices,)
         else:
-            args = (None, )
+            args = (None,)
 
         # Set as bound that the barriers should be positive
         bounds = (0, np.inf)
@@ -850,16 +852,14 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
         return {
-            'dihedral_angles':
-            np.array(fitted_dihedral_results['dihedral_angles']),
-            'qm_scan_kJpermol':
-            np.array(fitted_dihedral_results['qm_scan_kJpermol']),
-            'mm_scan_kJpermol':
-            np.array(fitted_dihedral_results['mm_scan_kJpermol']),
-            'maximum_difference':
-            self.fitting_summary['maximum_difference'],
-            'standard_deviation':
-            self.fitting_summary['standard_deviation'],
+            'dihedral_angles': np.array(
+                fitted_dihedral_results['dihedral_angles']),
+            'qm_scan_kJpermol': np.array(
+                fitted_dihedral_results['qm_scan_kJpermol']),
+            'mm_scan_kJpermol': np.array(
+                fitted_dihedral_results['mm_scan_kJpermol']),
+            'maximum_difference': self.fitting_summary['maximum_difference'],
+            'standard_deviation': self.fitting_summary['standard_deviation'],
         }
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
@@ -1151,8 +1151,10 @@ class MMForceFieldGenerator:
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
-        ## TODO: change this to skip when water is used
-        if not resp:
+        use_water_model = ((water_model is not None) and
+                           molecule.is_water_molecule())
+
+        if (not resp) or use_water_model:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
@@ -1181,8 +1183,7 @@ class MMForceFieldGenerator:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
                 resp_drv.ostream.mute()
-                self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        'resp')
+                self.partial_charges = resp_drv.compute(self.molecule, basis)
                 resp_drv.ostream.unmute()
 
                 self.partial_charges = self.comm.bcast(self.partial_charges,
@@ -1206,7 +1207,7 @@ class MMForceFieldGenerator:
 
                 resp_drv.ostream.mute()
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        scf_results, 'resp')
+                                                        scf_results)
                 resp_drv.ostream.unmute()
 
                 self.partial_charges = self.comm.bcast(self.partial_charges,
@@ -1248,13 +1249,12 @@ class MMForceFieldGenerator:
 
         # Atomtypes analysis
 
-        self.atoms, use_water_model, water_bonds, water_angles = self.populate_atoms(
+        self.atoms = self.populate_atoms(
             use_xml,
             ff_data_dict,
             ff_data_lines,
             gaff_version,
             list(atomtypeidentifier.equivalent_atoms),
-            water_model,
         )
 
         self.bonds = self.populate_bonds(
@@ -1263,8 +1263,6 @@ class MMForceFieldGenerator:
             ff_data_lines,
             coords,
             bond_indices,
-            use_water_model,
-            water_bonds,
         )
 
         self.angles = self.populate_angles(
@@ -1273,8 +1271,6 @@ class MMForceFieldGenerator:
             ff_data_lines,
             coords,
             angle_indices,
-            use_water_model,
-            water_angles,
         )
 
         # Dihedrals analysis
@@ -1293,6 +1289,10 @@ class MMForceFieldGenerator:
             n_atoms,
             angle_indices,
         )
+
+        # Process water model if requested
+        if use_water_model:
+            self.apply_water_model(water_model)
 
         self.ostream.flush()
 
@@ -1357,7 +1357,56 @@ class MMForceFieldGenerator:
         pairs = {}
         for i, j in pairs_14:
             pairs[(i, j)] = {'comment': None}
+
         return bond_indices, angle_indices, dihedral_indices, pairs
+
+    def apply_water_model(self, water_model):
+        """
+        Creates the topology for water based on predefined parameters.
+        
+        :param water_model:
+            The water model to use.
+        """
+
+        assert_msg_critical(water_model.lower() in self.water_parameters,
+        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}")
+        
+        self.ostream.print_info(f'Using water model parameters for {water_model}.')
+        self.ostream.print_reference('Reference: ' + self.water_parameters[water_model.lower()]['ref'])
+        self.ostream.flush()
+
+        water_params = self.water_parameters[water_model.lower()]
+
+        labels = self.molecule.get_labels()
+        hydrogen_indices = [idx for idx, label in enumerate(labels) if label == 'H']
+        oxygen_indices = [idx for idx, label in enumerate(labels) if label == 'O']
+
+        self.atoms = {}
+        self.bonds = {}
+        self.angles = {}
+
+        # update unique atom types
+        self.unique_atom_types = [water_params['hw']['type'],
+                                  water_params['ow']['type']]
+
+        # update atom parameters
+        label_to_atomtype_mapping = {'O': 'ow', 'H': 'hw'}
+        for i, label in enumerate(labels):
+            self.atoms[i] = deepcopy(water_params[label_to_atomtype_mapping[label]])
+
+        # update hydrogen atom names to 'H1' and 'H2'
+        for idx, h_ind in enumerate(hydrogen_indices):
+            self.atoms[h_ind]['name'] = f'H{idx + 1}'
+
+        # update O-H bonds
+        i = oxygen_indices[0]
+        for j in hydrogen_indices:
+            self.bonds[(i, j)] = deepcopy(water_params['bonds'])
+
+        # update H-O-H angle
+        j = oxygen_indices[0]
+        i, k = hydrogen_indices
+        self.angles[(i, j, k)] = deepcopy(water_params['angles'])
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
@@ -1427,11 +1476,10 @@ class MMForceFieldGenerator:
                                                    dihedral_data['class2'],
                                                    dihedral_data['class3'],
                                                    dihedral_data['class4']):
-                                periodicity = int(
-                                    dihedral_data[f'periodicity1'])
-                                barrier = float(dihedral_data[f'k1'])
+                                periodicity = int(dihedral_data['periodicity1'])
+                                barrier = float(dihedral_data['k1'])
                                 phase = float(
-                                    dihedral_data[f'phase1']) / np.pi * 180.0
+                                    dihedral_data['phase1']) / np.pi * 180.0
                                 comment = self.get_dihedral_type_string(
                                     target_dihedral)
                                 improper_ordering = ordering
@@ -1487,10 +1535,10 @@ class MMForceFieldGenerator:
                                                        dihedral_data['class3'],
                                                        dihedral_data['class4']):
                                     periodicity = int(
-                                        dihedral_data[f'periodicity1'])
-                                    barrier = float(dihedral_data[f'k1'])
-                                    phase = float(dihedral_data[f'phase1']
-                                                  ) / np.pi * 180.0
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(
                                         target_dihedral)
                                     improper_ordering = ordering
@@ -1537,10 +1585,10 @@ class MMForceFieldGenerator:
                                                        dihedral_data['class3'],
                                                        dihedral_data['class4']):
                                     periodicity = int(
-                                        dihedral_data[f'periodicity1'])
-                                    barrier = float(dihedral_data[f'k1'])
-                                    phase = float(dihedral_data[f'phase1']
-                                                  ) / np.pi * 180.0
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
                                     comment = self.get_dihedral_type_string(
                                         target_dihedral)
                                     improper_ordering = ordering
@@ -1598,16 +1646,12 @@ class MMForceFieldGenerator:
         return impropers
 
     def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines, gaff_version,
-                       equivalent_atoms, water_model):
+                       equivalent_atoms):
 
         use_gaff = False
         use_uff = False
         use_tm = False
-        use_water_model = False
-        sigmas = []
-        epsilons = []
-        water_bonds = None
-        water_angles = None
+
         # Atoms analysis
 
         atoms = {}
@@ -1617,11 +1661,13 @@ class MMForceFieldGenerator:
 
         for i, atom_type in enumerate(self.atom_types_dict.values()):
             atom_type_found = False
+
             if 'gaff' in atom_type:
+                # Note: need strip() for converting e.g. 'c ' to 'c'
                 gafftype = atom_type['gaff'].strip()
+
                 if use_xml:
                     for atom_type_data in ff_data_dict['atom_types']:
-                        # Note: need strip() for converting e.g. 'c ' to 'c'
                         if atom_type_data['class'] == gafftype:
                             sigma = float(atom_type_data['sigma'])
                             epsilon = float(atom_type_data['epsilon'])
@@ -1643,34 +1689,12 @@ class MMForceFieldGenerator:
                             atom_type = gafftype
                             break
 
-                if gafftype in ['ow', 'hw']:
-                    assert_msg_critical(
-                        water_model is not None,
-                        'MMForceFieldGenerator: water model not specified.')
-                    assert_msg_critical(
-                        water_model in self.water_parameters,
-                        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}"
-                    )
-
-                    sigma = self.water_parameters[water_model][atom_type][
-                        'sigma']
-                    epsilon = self.water_parameters[water_model][atom_type][
-                        'epsilon']
-
-                    self.partial_charges[i] = self.water_parameters[
-                        water_model][atom_type]['charge']
-
-                    atom_type_found = True
-                    use_water_model = True
-                    self.eq_param = False
-                    comment = water_model
-
             if not atom_type_found:
                 element = atom_type['uff'].strip()
 
                 if element in self.tm_parameters:
                     tmmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
-                    tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.'  ##TODO: rephrase
+                    tmmsg += ' Taking transition metal parameters from literature.'
                     self.ostream.print_info(tmmsg)
                     sigma = self.tm_parameters[element]['sigma']
                     epsilon = self.tm_parameters[element]['epsilon']
@@ -1694,8 +1718,6 @@ class MMForceFieldGenerator:
                         False,
                         f'MMForceFieldGenerator: atom type {atom_type} not found in GAFF or UFF.'
                     )
-            sigmas.append(sigma)
-            epsilons.append(epsilon)
 
             atoms[i] = {
                 'type': atom_type,
@@ -1708,16 +1730,11 @@ class MMForceFieldGenerator:
                 'comment': comment,
             }
 
-        if use_water_model:
-            water_bonds = self.water_parameters[water_model]['bonds']
-            water_angles = self.water_parameters[water_model]['angles']
-        self.print_references(water_model, gaff_version, use_gaff, use_uff,
-                              use_tm, use_water_model)
+        self.print_references(gaff_version, use_gaff, use_uff, use_tm)
 
-        return atoms, use_water_model, water_bonds, water_angles
+        return atoms
 
-    def print_references(self, water_model, gaff_version, use_gaff, use_uff,
-                         use_tm, use_water_model):
+    def print_references(self, gaff_version, use_gaff, use_uff, use_tm):
         if use_gaff:
             if gaff_version is not None:
                 self.ostream.print_info(
@@ -1739,24 +1756,15 @@ class MMForceFieldGenerator:
             self.ostream.flush()
 
         if use_tm:
-            self.ostream.print_info('Using TM parameters.')
+            self.ostream.print_info('Using transition metal parameters.')
             tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
-            tm_ref += 'J. Chem. Theory Comput. 2016 12 (8), 3681-3688.'
+            tm_ref += ' J. Chem. Theory Comput. 2016, 12, 3681-3688.'
             self.ostream.print_reference('Reference: ' + tm_ref)
             self.ostream.print_blank()
             self.ostream.flush()
 
-        if use_water_model:
-            self.ostream.print_info(
-                f'Using modified water model parameters for {water_model}.')
-            wff_ref = 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski,'
-            wff_ref += 'A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
-            self.ostream.print_reference('Reference: ' + wff_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
     def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
-                       bond_indices, use_water_model, water_bonds):
+                       bond_indices):
         bonds = {}
         for i, j in bond_indices:
             r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
@@ -1787,12 +1795,6 @@ class MMForceFieldGenerator:
                             bond_found = True
                             break
 
-            elif use_water_model:
-                r = water_bonds['equilibrium']
-                k_r = water_bonds['force_constant']
-                comment = 'ow-hw'
-                bond_found = True
-
             else:
                 for line in ff_data_lines:
                     for p in patterns:
@@ -1807,12 +1809,7 @@ class MMForceFieldGenerator:
 
             if not bond_found:
                 # Default value for bonds
-                labels = self.molecule.get_labels()
-                if labels[i] == 'H' or labels[j] == 'H':
-                    k_r = 1e+5
-                else:
-                    k_r = 2.5e+5
-                r, comment = r_eq, 'Guessed'
+                r, k_r, comment = r_eq, 2.5e+5, 'Guessed'
 
             if self.eq_param:
                 if abs(r - r_eq) > self.r_thresh:
@@ -1830,7 +1827,7 @@ class MMForceFieldGenerator:
         return bonds
 
     def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords,
-                        angle_indices, use_water_model, water_angles):
+                        angle_indices):
         angles = {}
 
         for i, j, k in angle_indices:
@@ -1868,13 +1865,6 @@ class MMForceFieldGenerator:
                             comment = '-'.join(target_angle)
                             angle_found = True
                             break
-
-            elif use_water_model:
-                k_theta = water_angles['force_constant']
-                theta = water_angles['equilibrium']
-                comment = water_angles['comment']
-                angle_found = True
-
             else:
                 for line in ff_data_lines:
                     for p in patterns:
@@ -2109,7 +2099,7 @@ class MMForceFieldGenerator:
                             dihedral_data[f'periodicity{dih_param_idx}'])
                         barrier = float(dihedral_data[f'k{dih_param_idx}'])
                         phase = float(dihedral_data[f'phase{dih_param_idx}']
-                                      ) / np.pi * 180.0
+                                     ) / np.pi * 180.0
 
                         dihedral_barriers.append(barrier)
                         dihedral_phases.append(phase)
@@ -2278,7 +2268,7 @@ class MMForceFieldGenerator:
             ('nt', 'ns'): 'n ',
             ('nu', 'nv'): 'nh',
             ('n7', 'n8', 'n5', 'n6'): 'n3',
-            ('cs', ): 'c ',
+            ('cs',): 'c ',
         }
         new_at_2, new_at_3 = at_2, at_3
         for key, val in atom_types_mapping.items():
@@ -2471,7 +2461,7 @@ class MMForceFieldGenerator:
 
             # Check if any side atom of the bond is involved in a triple bond
             if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                            ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -2503,11 +2493,11 @@ class MMForceFieldGenerator:
         """
         Determines if the bond between atom_i and atom_j is part of a ring.
 
-        :param atom_i: 
+        :param atom_i:
             Index of the first atom in the bond.
-        :param atom_j: 
+        :param atom_j:
             Index of the second atom in the bond.
-        :return: 
+        :return:
             True if the bond is part of a ring, False otherwise.
         """
 
@@ -2724,8 +2714,7 @@ class MMForceFieldGenerator:
                   top_file,
                   itp_file,
                   mol_name=None,
-                  amber_ff=None,
-                  water_model=None):
+                  amber_ff=None):
         """
         Writes a topology file.
 
@@ -2776,21 +2765,6 @@ class MMForceFieldGenerator:
 
             f_top.write('\n#include "' + Path(itp_fname).name + '"\n')
 
-            ##TODO: change this to fit with the self.water_parameters -- e.g., if water_model in self.water_parameters
-            if water_model is not None:
-                # very rudimentary check for water model names
-                assert_msg_critical(
-                    water_model.startswith('tip')
-                    or water_model.startswith('spc'),
-                    'MMForceFieldGenerator.write_top: Invalid water model name')
-                assert_msg_critical(
-                    amber_ff is not None, 'MMForceFieldGenerator.write_top: ' +
-                    'amber_ff is required for water_model')
-                water_include = str(
-                    PurePath(f'{amber_ff}.ff') / f'{water_model}.itp'
-                )  ##TODO: add maybe changed water model or similar
-                f_top.write(f'\n#include "{water_include}"\n')
-
             # system
 
             f_top.write('\n[ system ]\n')
@@ -2828,7 +2802,8 @@ class MMForceFieldGenerator:
 
             for at in self.unique_atom_types:
                 for i, atom in self.atoms.items():
-                    if atom['type'] == at:
+                    # Note: need strip() for converting e.g. 'c ' to 'c'
+                    if atom['type'].strip() == at.strip():
                         line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
                             at, at, 0., 0., 'A')
                         line_str += '{:16.5e}{:14.5e}\n'.format(
@@ -3045,12 +3020,11 @@ class MMForceFieldGenerator:
                 # Multiple sets of periodicity, phase, k
                 for i in range(len(dihedral_data['periodicity'])):
                     attributes.update({
-                        f"periodicity{i+1}":
-                        str(abs(dihedral_data['periodicity'][i])),
-                        f"phase{i+1}":
-                        str(dihedral_data['phase'][i] * np.pi / 180),
-                        f"k{i+1}":
-                        str(dihedral_data['barrier'][i])
+                        f"periodicity{i+1}": str(
+                            abs(dihedral_data['periodicity'][i])),
+                        f"phase{i+1}": str(dihedral_data['phase'][i] * np.pi /
+                                           180),
+                        f"k{i+1}": str(dihedral_data['barrier'][i])
                     })
 
                 ET.SubElement(Dihedrals, "Proper", **attributes)
@@ -3122,7 +3096,7 @@ class MMForceFieldGenerator:
             # Atoms
             for i, atom in self.atoms.items():
                 atom_name = atom['name']
-                line_str = f'{1:>5d}{res_name:<5s}{atom_name:<5s}{i + 1:>5d}'
+                line_str = f'{1:>5d}{res_name:<5s}{atom_name:>5s}{i + 1:>5d}'
                 for d in range(3):
                     line_str += f'{coords_in_nm[i][d]:{ndec + 5}.{ndec}f}'
                 line_str += '\n'
@@ -3212,7 +3186,6 @@ class MMForceFieldGenerator:
                             filename,
                             mol_name=None,
                             amber_ff=None,
-                            water_model=None,
                             gro_precision=3):
         """
         Writes all the needed files for a MD simulation with GROMACS.
@@ -3237,7 +3210,7 @@ class MMForceFieldGenerator:
         gro_file = Path(filename).with_suffix('.gro')
 
         self.write_itp(itp_file, mol_name)
-        self.write_top(top_file, itp_file, mol_name, amber_ff, water_model)
+        self.write_top(top_file, itp_file, mol_name, amber_ff)
         self.write_gro(gro_file, mol_name, gro_precision)
 
     def write_openmm_files(self, filename, mol_name=None):
@@ -3635,16 +3608,14 @@ class MMForceFieldGenerator:
             str: The JSON string representation of the forcefield data.
         """
         ff_data = {
-            "atoms":
-            forcefield.atoms,
-            "bonds":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
-            "angles":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
-            "dihedrals":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.dihedrals),
-            "impropers":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.impropers),
+            "atoms": forcefield.atoms,
+            "bonds": MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
+            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles
+                                                             ),
+            "dihedrals": MMForceFieldGenerator._tuple_to_str_key(
+                forcefield.dihedrals),
+            "impropers": MMForceFieldGenerator._tuple_to_str_key(
+                forcefield.impropers),
         }
         return json.dumps(ff_data, indent=4)
 
@@ -3688,7 +3659,7 @@ class MMForceFieldGenerator:
                 item = item.replace("(", "")
                 item = item.replace(")", "")
                 item = item.replace(" ", "")
-                tuple += (int(item), )
+                tuple += (int(item),)
             if len(tuple) == 1:
                 tuple = tuple[0]
             tup_keys.append(tuple)

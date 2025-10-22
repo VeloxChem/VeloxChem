@@ -175,9 +175,22 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
     }
     else
     {
-        std::string erropenshell("XCIntegrator.integrateFxcFock: Not implemented for open-shell");
+        if (xcfuntype == xcfun::lda)
+        {
+            xcintlda::integrateFxcFockForLdaOpenShell(
+                aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            xcintgga::integrateFxcFockForGgaOpenShell(
+                aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCIntegrator.integrateFxcFock: Only implemented for open-shell LDA/GGA");
 
-        errors::assertMsgCritical(false, erropenshell);
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
     }
 }
 

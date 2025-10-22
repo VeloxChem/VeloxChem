@@ -243,8 +243,9 @@ def _gen_basis_key(elem_name, basis_dict):
     """
 
     basis_key = 'atombasis_{}'.format(elem_name.lower())
+
     assert_msg_critical(
-        basis_key in basis_dict,
+        (basis_key == 'atombasis_bq') or (basis_key in basis_dict),
         'MolecularBasis.read: Unsupported chemical element ' +
         f'{elem_name} in ' + basis_dict['basis_set_name'].upper())
 
@@ -312,14 +313,20 @@ def _MolecularBasis_read(molecule,
         basis_key = _gen_basis_key(atom_basis_elements[idx],
                                    basis_dict[atom_bas_label])
 
-        if elem_id == 0:
-            basis_elem_id = chemical_element_identifier(
-                atom_basis_elements[idx])
+        if basis_key == 'atombasis_bq':
+            # dummy atom
+            atom_basis = AtomBasis()
+            atom_basis.set_identifier(0)
+            atom_basis.set_name('')
         else:
-            basis_elem_id = elem_id
+            if elem_id == 0:
+                basis_elem_id = chemical_element_identifier(
+                    atom_basis_elements[idx])
+            else:
+                basis_elem_id = elem_id
 
-        atom_basis = _read_atom_basis(basis_dict[atom_bas_label][basis_key],
-                                      basis_elem_id, atom_bas_label)
+            atom_basis = _read_atom_basis(basis_dict[atom_bas_label][basis_key],
+                                          basis_elem_id, atom_bas_label)
 
         mol_basis.add(atom_basis)
 
@@ -370,13 +377,25 @@ def _MolecularBasis_read_dict(molecule,
             lbasis_name = basis_dict[idxstr]
             lbasis_dict = _read_basis_file(lbasis_name, basis_path, ostream)
             basis_key = _gen_basis_key(atom_basis_elements[index], lbasis_dict)
-            atom_basis = _read_atom_basis(lbasis_dict[basis_key], elem_id,
-                                          lbasis_name)
+            if basis_key == 'atombasis_bq':
+                # dummy atom
+                atom_basis = AtomBasis()
+                atom_basis.set_identifier(0)
+                atom_basis.set_name('')
+            else:
+                atom_basis = _read_atom_basis(lbasis_dict[basis_key], elem_id,
+                                              lbasis_name)
             mol_basis.add(atom_basis)
         else:
             basis_key = _gen_basis_key(atom_basis_elements[index], mbasis_dict)
-            atom_basis = _read_atom_basis(mbasis_dict[basis_key], elem_id,
-                                          basis_name)
+            if basis_key == 'atombasis_bq':
+                # dummy atom
+                atom_basis = AtomBasis()
+                atom_basis.set_identifier(0)
+                atom_basis.set_name('')
+            else:
+                atom_basis = _read_atom_basis(mbasis_dict[basis_key], elem_id,
+                                              basis_name)
             mol_basis.add(atom_basis)
 
     ostream.print_block(mol_basis.info_str('Atomic Basis'))
