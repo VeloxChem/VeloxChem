@@ -74,6 +74,7 @@ class RIJKFockDriver:
         self.ostream = ostream
 
         self.metric = None
+        self.metric_threshold = 1.0e-12
 
         self._ri_drv = _RIJKFockDriver()
 
@@ -127,7 +128,7 @@ class RIJKFockDriver:
             # compute J^{-1/2}
             # for now, use hard-coded threshold
             eigvals, eigvecs = np.linalg.eigh(mat_j_np)
-            num_eigs = sum(eigvals > 1.0e-12)
+            num_eigs = sum(eigvals > self.metric_threshold)
             if num_eigs < eigvals.size:
                 eigvals = eigvals[-num_eigs:]
                 eigvecs = eigvecs[:, -num_eigs:]

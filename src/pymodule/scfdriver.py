@@ -221,10 +221,11 @@ class ScfDriver:
         # for open-shell system: unpaired electrons for initial guess
         self.guess_unpaired_electrons = ''
 
-        # RI-J
+        # RI
         self.ri_coulomb = False
         self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
         # dft
@@ -332,6 +333,8 @@ class ScfDriver:
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
+                'ri_metric_threshold':
+                    ('float', 'linear dependence threshold for RI-JK metric'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -1471,6 +1474,7 @@ class ScfDriver:
                                          verbose=True)
         elif self.ri_jk:
             self._ri_drv = RIJKFockDriver(self.comm, self.ostream)
+            self._ri_drv.metric_threshold = self.ri_metric_threshold
             self._ri_drv.compute_metric(molecule,
                                         self.ri_auxiliary_basis,
                                         verbose=True)
