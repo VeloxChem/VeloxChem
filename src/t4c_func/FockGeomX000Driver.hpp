@@ -35,6 +35,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "ElectronRepulsionGeom1000Func.hpp"
 #include "ElectronRepulsionGeom2000Func.hpp"
@@ -105,6 +106,46 @@ class CFockGeomX000Driver
                  const std::string&     label,
                  const double           exchange_factor,
                  const double           omega) const -> CMatrices;
+    
+    /// @brief Computes Fock matrix derivatives for given density, basis and molecule (N^4 scaling).
+    /// @param iatom The index of atom to compute derivatives of Fock matrix.
+    /// @param indices The density contraction indices to Fock matrix.
+    /// @param basis The molecular basis.
+    /// @param molecule The molecule.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param label The label of Fock matrix type.
+    /// @param exchange_factor The exchange-correlation factors.
+    /// @param omega The range separation factor.
+    /// @return The Fock matrices.
+    auto compute(const CMolecularBasis&     basis,
+                 const CMolecule&           molecule,
+                 const CMatrix&             density,
+                 const int                  iatom,
+                 const std::pair<int, int>& indices,
+                 const std::string&         label,
+                 const double               exchange_factor,
+                 const double               omega) const -> CMatrices;
+    
+    /// @brief Computes Fock matrix derivatives for given density, basis and molecule (N^4 scaling).
+    /// @param iatom The index of atom to compute derivatives of Fock matrix.
+    /// @param indices The density contraction indices to Fock matrix.
+    /// @param basis The molecular basis.
+    /// @param molecule The molecule.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param density2 The density matrix to contract Fock matrix.
+    /// @param label The label of Fock matrix type.
+    /// @param exchange_factor The exchange-correlation factors.
+    /// @param omega The range separation factor.
+    /// @return The Fock matrices.
+    auto compute(const CMolecularBasis&     basis,
+                 const CMolecule&           molecule,
+                 const CMatrix&             density,
+                 const CMatrix&             density2,
+                 const int                  iatom,
+                 const std::pair<int, int>& indices,
+                 const std::string&         label,
+                 const double               exchange_factor,
+                 const double               omega) const -> std::vector<double>;
 
     auto compute(const CMolecularBasis& basis,
                  const CT4CScreener&    screener_atom,
