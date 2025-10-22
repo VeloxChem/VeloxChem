@@ -2302,7 +2302,7 @@ class MMForceFieldGenerator:
         """
 
         # Extract indices from the list
-        i, j = bond
+        i, j = sorted(bond)
 
         # Convert to zero-based indices
         i = i - 1
