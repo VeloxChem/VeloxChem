@@ -127,7 +127,7 @@ class RIJKFockDriver:
             # compute J^{-1/2}
             # for now, use hard-coded threshold
             eigvals, eigvecs = np.linalg.eigh(mat_j_np)
-            num_eigs = sum(eigvals > 1.0e-6)
+            num_eigs = sum(eigvals > 1.0e-12)
             if num_eigs < eigvals.size:
                 eigvals = eigvals[-num_eigs:]
                 eigvecs = eigvecs[:, -num_eigs:]
