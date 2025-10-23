@@ -93,6 +93,7 @@ class ReactionForceFieldBuilder():
         self.optimize_conformer_snapshots: int = 10
         self.optimize_temp: int = 600
         self.optimize_dist_restraint_offset = 0.5  # Angstrom
+        self.optimize_dist_restraint_k = 250000.0  # kJ mol^-1 nm^-2
         self.mm_opt_constrain_bonds: bool = True
         self.water_model: str = 'cspce'
         self.product_mapping: dict[int, int] | None = None  # one-indexed
@@ -195,6 +196,7 @@ class ReactionForceFieldBuilder():
 
         self.ostream.flush()
         if self.optimize_ff:
+            # TODO this optimisation can likely be taken care of by the openmmdynamics class
             reactant_ff.molecule = self._optimize_molecule(
                 reactant_ff.molecule.get_element_ids(),
                 reactant_ff,
@@ -372,19 +374,6 @@ class ReactionForceFieldBuilder():
                 scf_results=scf_results,
                 water_model=self.water_model,
             )
-
-        # The atomtypeidentifier returns water with no Lennard-Jones on the hydrogens, which leads to unstable simulations
-        atom_types = [atom['type'] for atom in forcefield.atoms.values()]
-        if 'ow' in atom_types and 'hw' in atom_types and len(atom_types) == 3:
-            water_model = get_water_parameters()[self.water_model]
-            for atom_id, atom in forcefield.atoms.items():
-                forcefield.atoms[atom_id] = copy.copy(water_model[atom['type']])
-                forcefield.atoms[atom_id]['name'] = forcefield.atoms[atom_id][
-                    'name'][0] + str(atom_id)
-            for bond_id in forcefield.bonds.keys():
-                forcefield.bonds[bond_id] = copy.copy(water_model['bonds'])
-            for ang_id in forcefield.angles.keys():
-                forcefield.angles[ang_id] = copy.copy(water_model['angles'])
 
         #Reparameterize the forcefield if necessary and requested
         unknown_pairs = set()
@@ -735,6 +724,7 @@ class ReactionForceFieldBuilder():
             self.ostream.print_warning(
                 f"OpenMM optimization of the {note} molecule failed with error: {e}. Reverting to original geometry."
             )
+            self.ostream.flush()
             new_molecule = forcefield.molecule
 
         # integrator = mm.VerletIntegrator(0.001)
@@ -776,7 +766,8 @@ class ReactionForceFieldBuilder():
         dist_restraint_expr = "0.5 * k * (r - r0)^2*step(r-r0)"
         dist_restraint_force = mm.CustomBondForce(dist_restraint_expr)
         dist_restraint_force.addPerBondParameter("r0")
-        dist_restraint_force.addGlobalParameter("k", 250000)
+        dist_restraint_force.addGlobalParameter("k",
+                                                self.optimize_dist_restraint_k)
 
         for bond in changing_bonds:
             s1 = forcefield.atoms[bond[0]]['sigma']
@@ -788,7 +779,7 @@ class ReactionForceFieldBuilder():
             ) + self.optimize_dist_restraint_offset * 0.1  # rmin = sigma * 2^(1/6)
             dist_restraint_force.addBond(bond[0], bond[1], [r0])
             self.ostream.print_info(
-                f"Adding distance restraint for atoms {tuple(b+1 for b in bond)} with r0 {r0:.3f} for MM equilibration of the {note}"
+                f"Adding distance restraint for atoms {tuple(b+1 for b in bond)} with r0 {r0:.3f} and k {self.optimize_dist_restraint_k} for MM equilibration of the {note}"
             )
             self.ostream.flush()
 

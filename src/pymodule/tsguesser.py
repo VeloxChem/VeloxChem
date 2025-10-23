@@ -475,112 +475,51 @@ class TransitionStateGuesser():
         conformer_search,
     ):
         result = {}
-        if not conformer_search:
-            integrator = mm.VerletIntegrator(self.mm_step_size *
-                                             mmunit.picoseconds)
-            # TODO add more flexible options if we need them, coordinate with conformergenerator as well
-            # platform settings for small molecule
-            platform = mm.Platform.getPlatformByName("CPU")
-            platform.setPropertyDefaultValue("Threads", "1")
-            simulation = mmapp.Simulation(
-                topology,
-                system,
-                integrator,
-                platform,
-            )
+        # else:
+        opm_dyn = OpenMMDynamics()
+        opm_dyn.ostream.mute()
+        # platform settings for small molecule
+        opm_dyn.openmm_platform = "CPU"
+        # opm_dyn.create_system_from_molecule(mol, ff_gen)
+        pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
 
-            # units converted from angstrom to nm
-            init_pos_nm = init_pos * 0.1
-            simulation.context.setPositions(init_pos_nm)
-
-            simulation.minimizeEnergy()
-            simulation.context.setVelocitiesToTemperature(self.mm_temperature *
-                                                          mmunit.kelvin)
-            if self.save_mm_traj:
-                state_pos = simulation.context.getState(
-                    getPositions=True).getPositions(asNumpy=True)
-                mmapp.PDBFile.writeFile(
-                    topology,
-                    state_pos,
-                    str(self.folder / f'{l}_begin_minim.pdb'),
-                )
-                simulation.reporters.append(
-                    mmapp.XTCReporter(str(self.folder / f'{l}_traj.xtc'), 1))
-            simulation.step(self.mm_steps)
-            simulation.minimizeEnergy()
-            if self.save_mm_traj:
-                state_pos = simulation.context.getState(
-                    getPositions=True).getPositions(asNumpy=True)
-                mmapp.PDBFile.writeFile(
-                    topology,
-                    state_pos,
-                    str(self.folder / f'{l}_end_minim.pdb'),
-                )
-
-            state = simulation.context.getState(getEnergy=True,
-                                                getPositions=True)
-            e_int = state.getPotentialEnergy().value_in_unit(
-                mmunit.kilojoules_per_mole)
-            pos = state.getPositions(asNumpy=True).value_in_unit(
-                mmunit.angstrom)
-
-            n_conf = -1
+        pdb = mmapp.PDBFile.writeFile(
+            topology,
+            init_pos * mmunit.angstrom,
+            pdb_name,
+        )
+        opm_dyn.pdb = mmapp.PDBFile(pdb_name)
+        opm_dyn.system = system
+        
+        if conformer_search:
+            snapshots = self.conformer_snapshots
+        else:
+            snapshots = 1
+        conformers_dict = opm_dyn.conformational_sampling(
+            ensemble='NVT',
+            nsteps=self.mm_steps*snapshots,
+            snapshots=snapshots,
+            temperature=self.mm_temperature,
+        )
+        result = []
+        for e_int, temp_mol in zip(conformers_dict['energies'],
+                                    conformers_dict['molecules']):
+            pos = temp_mol.get_coordinates_in_angstrom()
             v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
             avg_x = np.mean(pos[:, 0])
             avg_y = np.mean(pos[:, 1])
             avg_z = np.mean(pos[:, 2])
             pos -= [avg_x, avg_y, avg_z]
-
-            tempmol = self._set_molecule_positions(self.molecule, pos)
-            xyz = tempmol.get_xyz_string()
-            result = [{
+            xyz = temp_mol.get_xyz_string()
+            temp_result = {
                 'v': v,
                 'e1': e1,
                 'e2': e2,
                 'e_int': e_int,
                 'pos': pos,
                 'xyz': xyz
-            }]
-        else:
-            opm_dyn = OpenMMDynamics()
-            opm_dyn.ostream.mute()
-            # platform settings for small molecule
-            opm_dyn.openmm_platform = "CPU"
-            # opm_dyn.create_system_from_molecule(mol, ff_gen)
-            pdb_name = self.folder_name + f'/conf_top_{l}.pdb'
-
-            pdb = mmapp.PDBFile.writeFile(
-                topology,
-                init_pos * mmunit.angstrom,
-                pdb_name,
-            )
-            opm_dyn.pdb = mmapp.PDBFile(pdb_name)
-            opm_dyn.system = system
-            conformers_dict = opm_dyn.conformational_sampling(
-                ensemble='NVT',
-                nsteps=self.mm_steps*self.conformer_snapshots,
-                snapshots=self.conformer_snapshots,
-                temperature=self.mm_temperature,
-            )
-            result = []
-            for e_int, temp_mol in zip(conformers_dict['energies'],
-                                       conformers_dict['molecules']):
-                pos = temp_mol.get_coordinates_in_angstrom()
-                v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
-                avg_x = np.mean(pos[:, 0])
-                avg_y = np.mean(pos[:, 1])
-                avg_z = np.mean(pos[:, 2])
-                pos -= [avg_x, avg_y, avg_z]
-                xyz = temp_mol.get_xyz_string()
-                temp_result = {
-                    'v': v,
-                    'e1': e1,
-                    'e2': e2,
-                    'e_int': e_int,
-                    'pos': pos,
-                    'xyz': xyz
-                }
-                result.append(temp_result)
+            }
+            result.append(temp_result)
 
         return result
 
