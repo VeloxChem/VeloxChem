@@ -109,6 +109,9 @@ class HessianDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # verbosity of output (1-3)
+        self.print_level = 1
+
         self._input_keywords = {
             'hessian': {
                 'numerical': ('bool', 'do numerical hessian'),

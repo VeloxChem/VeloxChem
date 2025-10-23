@@ -99,6 +99,9 @@ class GradientDriver:
 
         self.checkpoint_file = None
 
+        # verbosity of output (1-3)
+        self.print_level = 1
+
         self._input_keywords = {
             'gradient': {
                 'numerical': ('bool', 'do numerical integration'),

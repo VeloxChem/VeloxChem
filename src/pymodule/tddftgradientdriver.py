@@ -263,16 +263,15 @@ class TddftGradientDriver(GradientDriver):
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
-        # TODO: also check other options
-        if 'state_deriv_index' not in self.orbrsp_dict:
-            if hasattr(self, 'state_deriv_index'):
-                orbrsp_drv.state_deriv_index = self.state_deriv_index
-        if 'timing' not in self.orbrsp_dict:
-            if hasattr(self, 'timing'):
-                orbrsp_drv.timing = self.timing
-        if 'filename' not in self.orbrsp_dict:
-            if hasattr(self, 'filename'):
-                orbrsp_drv.filename = self.filename
+
+        # TODO: also check other attributes
+        orbrsp_keywords = [
+            'state_deriv_index', 'timing', 'filename', 'print_level'
+        ]
+        for key in orbrsp_keywords:
+            if (key not in self.orbrsp_dict) and hasattr(self, key):
+                setattr(orbrsp_drv, key, getattr(self, key))
+
         orbrsp_drv.compute(molecule, basis, scf_tensors, self._rsp_results)
 
         orbrsp_results = orbrsp_drv.cphf_results
@@ -335,13 +334,15 @@ class TddftGradientDriver(GradientDriver):
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
-        # TODO: also check other options
-        if 'state_deriv_index' not in self.orbrsp_dict:
-            orbrsp_drv.state_deriv_index = self.state_deriv_index
-        if 'timing' not in self.orbrsp_dict:
-            orbrsp_drv.timing = self.timing
-        if 'filename' not in self.orbrsp_dict:
-            orbrsp_drv.filename = self.filename
+
+        # TODO: also check other attributes
+        orbrsp_keywords = [
+            'state_deriv_index', 'timing', 'filename', 'print_level'
+        ]
+        for key in orbrsp_keywords:
+            if (key not in self.orbrsp_dict) and hasattr(self, key):
+                setattr(orbrsp_drv, key, getattr(self, key))
+
         orbrsp_drv.compute(molecule, basis, scf_tensors, self._rsp_results)
 
         omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
