@@ -201,6 +201,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
         assert_msg_critical(False,
                             f'Response: invalid response property {prop_type}')
 
+    # set print level for input file based calculation
+    rsp_prop.print_level = 2
+
     return rsp_prop
 
 

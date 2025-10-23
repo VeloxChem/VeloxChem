@@ -188,7 +188,7 @@ class LinearSolver:
         self.memory_tracing = False
 
         # verbosity of output (1-3)
-        self.print_level = 2
+        self.print_level = 1
 
         # program end time for graceful exit
         self.program_end_time = None

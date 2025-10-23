@@ -83,6 +83,9 @@ class ResponseProperty:
         self._rsp_driver = None
         self._rsp_property = None
 
+        # verbosity of output (1-3)
+        self.print_level = 1
+
     def init_driver(self, comm=None, ostream=None, method_type='restricted'):
         """
         Initializes response driver.
@@ -324,6 +327,9 @@ class ResponseProperty:
                 'only implemented for restricted case')
 
             self._rsp_driver = ThreePATransitionDriver(self.comm, self.ostream)
+
+        # Set driver print level
+        self._rsp_driver.print_level = self.print_level
 
         # Update driver settings
         self._rsp_driver.update_settings(self._rsp_dict, self._method_dict)
