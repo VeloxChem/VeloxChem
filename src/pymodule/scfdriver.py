@@ -978,7 +978,8 @@ class ScfDriver:
                     molecule, ao_basis,
                     (0, self.molecular_orbitals.number_of_mos()), self.ostream)
 
-            self._scf_prop.print_properties(molecule)
+            if self.print_level > 1:
+                self._scf_prop.print_properties(molecule)
 
             self.ostream.flush()
 

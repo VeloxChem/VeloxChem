@@ -758,7 +758,7 @@ def _Molecule_center_of_mass_in_angstrom(self):
     return self.center_of_mass_in_bohr() * bohr_in_angstrom()
 
 
-def _Molecule_get_string(self):
+def _Molecule_get_string(self, title='Molecular Geometry', sep='='):
     """
     Returns string representation of molecule.
 
@@ -766,8 +766,10 @@ def _Molecule_get_string(self):
         A string with representation of molecule.
     """
 
-    mol_str = 'Molecular Geometry (Angstroms)\n'
-    mol_str += '================================\n\n'
+    mol_str_title = f'{title} (Angstroms)'
+
+    mol_str = mol_str_title + '\n'
+    mol_str += sep * (len(mol_str_title) + 2) + '\n\n'
     mol_str += '  Atom'
     mol_str += '         Coordinate X '
     mol_str += '         Coordinate Y '

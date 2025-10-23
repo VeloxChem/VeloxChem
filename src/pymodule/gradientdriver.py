@@ -459,7 +459,7 @@ class GradientDriver:
             The molecule.
         """
 
-        self.ostream.print_block(molecule.get_string())
+        self.ostream.print_block(molecule.get_string(sep='-'))
         self.ostream.flush()
 
     def print_gradient(self, molecule, state_deriv_index=None):
