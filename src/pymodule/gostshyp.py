@@ -284,7 +284,7 @@ class GostshypDriver:
         if self.num_tes_points == 0:
             self.generate_tessellation(tessellation_settings)
 
-        print(np.shape(self.tessellation))
+        #print(np.shape(self.tessellation))
 
         # set up needed components:
 
