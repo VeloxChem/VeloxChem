@@ -95,10 +95,6 @@ class ScfHessianDriver(HessianDriver):
 
         self.perturbed_density = None
 
-        # TODO TEMPORARY FLAG
-        # Only run orbital response for performance testing
-        self.orbrsp_only = False
-
         # flag for printing the Hessian
         self.do_print_hessian = False
 
@@ -172,16 +168,6 @@ class ScfHessianDriver(HessianDriver):
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
-
-        # TODO TEMPORARY
-        if self.orbrsp_only:
-            self.ostream.print_header(
-                '*** WARNING only computing Hessian orbital response!')
-            self.compute_orbital_response(molecule, ao_basis)
-            self.ostream.print_header(
-                '*** Hessian orbital response only: DONE  ***')
-            self.ostream.flush()
-            return
 
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
@@ -1909,24 +1895,3 @@ class ScfHessianDriver(HessianDriver):
 
         if self.rank == mpi_master():
             self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
-
-    def compute_orbital_response(self, molecule, ao_basis):
-        """
-        TEMPORARY FUNCTION FOR PERFORMANCE TESTING
-        Computes the CPHF orbital response.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            Tha AO basis.
-        """
-
-        # get SCF tensors
-        scf_tensors = self.scf_driver.scf_tensors
-
-        # Set up a CPHF solver
-        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
-        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
-
-        # Solve the CPHF equations
-        cphf_solver.compute(molecule, ao_basis, scf_tensors, self.scf_driver)
