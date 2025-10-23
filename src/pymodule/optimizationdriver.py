@@ -273,7 +273,8 @@ class OptimizationDriver:
 
         # check that the args contain molecular basis and scf_results
         # note that we only check the type of scf_results on the master rank
-        if (len(args) >= 2) and isinstance(args[0], MolecularBasis):
+        if (isinstance(self.grad_drv, ScfGradientDriver) and
+                isinstance(args[0], MolecularBasis) and (len(args) >= 2)):
             args_filename = None
             if self.rank == mpi_master():
                 # read filename from scf_results
@@ -308,12 +309,9 @@ class OptimizationDriver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
-        if self.is_scf and self.grad_drv.scf_driver.checkpoint_file is None:
-            # make sure that the scfdriver has checkpoint_file
-            fpath = Path(base_fname)
-            fpath = fpath.with_name(f'{fpath.stem}_scf{fpath.suffix}')
-            fpath = fpath.with_suffix('.h5')
-            self.grad_drv.scf_driver.checkpoint_file = str(fpath)
+        if self.is_scf and self.grad_drv.scf_driver.filename is None:
+            # make sure that the scfdriver has filename
+            self.grad_drv.scf_driver.filename = base_fname
 
         if self.rank == mpi_master() and self.keep_files:
             filename = base_fname
@@ -370,7 +368,8 @@ class OptimizationDriver:
 
         if self.tmax is None:
             # from geomeTRIC params.py
-            default_tmax = 0.03 if self.transition else default_trust if self.irc else 0.3
+            default_tmax = (0.03 if self.transition else
+                            (default_trust if self.irc else 0.3))
         else:
             default_tmax = self.tmax
 
