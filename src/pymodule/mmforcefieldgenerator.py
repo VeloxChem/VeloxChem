@@ -1151,10 +1151,13 @@ class MMForceFieldGenerator:
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
+        contains_water = molecule.contains_water_molecule()
+        is_water = molecule.is_water_molecule()
         use_water_model = ((water_model is not None) and
-                           molecule.is_water_molecule())
+                           (is_water or contains_water))
+        skip_resp = (not resp) or ((water_model is not None) and is_water)
 
-        if (not resp) or use_water_model:
+        if skip_resp:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
@@ -1378,35 +1381,35 @@ class MMForceFieldGenerator:
         water_params = self.water_parameters[water_model.lower()]
 
         labels = self.molecule.get_labels()
-        hydrogen_indices = [idx for idx, label in enumerate(labels) if label == 'H']
-        oxygen_indices = [idx for idx, label in enumerate(labels) if label == 'O']
+        atoms = self.atoms
+        
+        hydrogen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'hw']
+        oxygen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'ow']
+        
+        water_bonds = [idx for idx, bond in self.bonds.items() if (idx[0] in oxygen_indices or idx[1] in oxygen_indices)]
+        water_angles = [idx for idx, angle in self.angles.items() if (idx[1] in oxygen_indices)]
+        
+        for hydrogen_idx in hydrogen_indices:
+            self.atoms[hydrogen_idx]['sigma'] = water_params['hw']['sigma']
+            self.atoms[hydrogen_idx]['epsilon'] = water_params['hw']['epsilon']
+            
+            # Do not overwrite partial charges if the molecule is part of a larger system
+            # This can cause the total charge to become a non-integer
+            if self.molecule.is_water_molecule():
+                self.atoms[hydrogen_idx]['charge'] = water_params['hw']['charge']
+        
+        for oxygen_idx in oxygen_indices:
+            self.atoms[oxygen_idx]['sigma'] = water_params['ow']['sigma']
+            self.atoms[oxygen_idx]['epsilon'] = water_params['ow']['epsilon']
+            
+            if self.molecule.is_water_molecule():
+                self.atoms[oxygen_idx]['charge'] = water_params['ow']['charge']
 
-        self.atoms = {}
-        self.bonds = {}
-        self.angles = {}
+        for bond_idx in water_bonds:
+            self.bonds[bond_idx].update(water_params['bonds'])
 
-        # update unique atom types
-        self.unique_atom_types = [water_params['hw']['type'],
-                                  water_params['ow']['type']]
-
-        # update atom parameters
-        label_to_atomtype_mapping = {'O': 'ow', 'H': 'hw'}
-        for i, label in enumerate(labels):
-            self.atoms[i] = deepcopy(water_params[label_to_atomtype_mapping[label]])
-
-        # update hydrogen atom names to 'H1' and 'H2'
-        for idx, h_ind in enumerate(hydrogen_indices):
-            self.atoms[h_ind]['name'] = f'H{idx + 1}'
-
-        # update O-H bonds
-        i = oxygen_indices[0]
-        for j in hydrogen_indices:
-            self.bonds[(i, j)] = deepcopy(water_params['bonds'])
-
-        # update H-O-H angle
-        j = oxygen_indices[0]
-        i, k = hydrogen_indices
-        self.angles[(i, j, k)] = deepcopy(water_params['angles'])
+        for angle_idx in water_angles:
+            self.angles[angle_idx].update(water_params['angles'])
 
     def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
                            angle_indices):
