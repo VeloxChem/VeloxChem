@@ -52,6 +52,7 @@ from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+from .gostshyp import GostshypDriver
 
 
 class LinearSolver:
@@ -125,6 +126,18 @@ class LinearSolver:
 
         # static electric field
         self.electric_field = None
+
+        # pressure with gostshyp
+        self._gostshyp = False
+        self.gostshyp_drv = None
+        self.pressure = 0.0
+        self.pressure_units = 'MPa'
+        self.num_leb_points = 110
+        self.tssf = 1.2
+        self.discretization = 'fixed'
+        self.homemade = False #TODO: remove (added for testing of gradient with fixed cavity)
+        self.tess_file = None #TODO: remove (added for testing of gradient with fixed cavity)
+        self.r_ext = 0.0
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -446,7 +459,54 @@ class LinearSolver:
         return {
             'potfile_text': potfile_text,
         }
+    
+    def _init_gostshyp(self, molecule, basis, scf_tensors):
+        """
+        Initializes GOSTSHYP.
 
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The ground state density
+        """
+
+        if self._gostshyp:
+
+            self.gostshyp_drv = GostshypDriver(molecule,
+                                               basis,
+                                               self.pressure,
+                                               self.pressure_units,
+                                               self.comm,
+                                               self.ostream)
+            
+            tessellation_settings = {
+                'num_leb_points': self.num_leb_points,
+                'tssf': self.tssf,
+                'discretization': self.discretization,
+                'filename': self.filename,
+                'homemade': self.homemade, #TODO: remove (added for testing of gradient with fixed cavity)
+                'tess_file': self.tess_file, #TODO: remove (added for testing of gradient with fixed cavity)
+                'r_ext': self.r_ext
+                }
+
+            if self.rank == mpi_master():
+                # Note: make gs_density a tuple
+                gs_density = (scf_tensors['D_alpha'].copy(),)
+            else:
+                gs_density = None
+            gs_density = self.comm.bcast(gs_density, root=mpi_master())
+
+        else:
+            gs_density = None
+            
+        return {'tess_info' : tessellation_settings, 
+                'gs_density' : gs_density}
+    
     def _read_checkpoint(self, rsp_vector_labels):
         """
         Reads distributed arrays from checkpoint file.
@@ -589,16 +649,17 @@ class LinearSolver:
                        eri_dict,
                        dft_dict,
                        pe_dict,
+                       gostshyp_dict,
                        profiler=None):
 
         if self.use_subcomms:
             self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
                                          scf_tensors, eri_dict, dft_dict,
-                                         pe_dict, profiler)
+                                         pe_dict, gostshyp_dict, profiler)
         else:
             self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule, basis,
                                             scf_tensors, eri_dict, dft_dict,
-                                            pe_dict, profiler)
+                                            pe_dict, gostshyp_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
                                 vecs_ger,
@@ -609,6 +670,7 @@ class LinearSolver:
                                 eri_dict,
                                 dft_dict,
                                 pe_dict,
+                                gostshyp_dict,
                                 profiler=None):
         """
         Computes the E2 b matrix vector product.
@@ -861,7 +923,7 @@ class LinearSolver:
                 self._print_mem_debug_info('before Fock build')
 
                 fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, profiler,
+                                          dft_dict, pe_dict, gostshyp_dict, profiler,
                                           local_comm)
 
                 self._print_mem_debug_info('after  Fock build')
@@ -983,6 +1045,7 @@ class LinearSolver:
                                    eri_dict,
                                    dft_dict,
                                    pe_dict,
+                                   gostshyp_dict,
                                    profiler=None):
         """
         Computes the E2 b matrix vector product.
@@ -1148,7 +1211,7 @@ class LinearSolver:
             self._print_mem_debug_info('before Fock build')
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, profiler)
+                                      pe_dict, gostshyp_dict, profiler)
 
             self._print_mem_debug_info('after  Fock build')
 
@@ -1257,6 +1320,7 @@ class LinearSolver:
                       eri_dict,
                       dft_dict,
                       pe_dict,
+                      gostshyp_dict,
                       profiler=None,
                       comm=None):
         """
@@ -1274,6 +1338,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
+        :param gostshyp_dict:
+            The dictionary containing GOSTSHYP information.
         :param profiler:
             The profiler.
 
@@ -1396,6 +1462,28 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
+
+        if self._gostshyp:
+
+            t0 = tm.time()
+
+            # Note: only closed shell density for now
+            gs_density = gostshyp_dict['gs_density'][0] * 2.0
+            tessellation_settings = gostshyp_dict['tess_info']
+
+            for idx in range(num_densities):
+                # Note: only closed shell density for now
+                dm = dens[idx] * 2.0
+
+                fock_gost = self.gostshyp_drv.get_resp_contrib_occ(
+                    gs_density,
+                    dm,
+                    tessellation_settings)
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += fock_gost
+
+            if profiler is not None:
+                profiler.add_timing_info('FockGOST', tm.time() - t0)
 
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())

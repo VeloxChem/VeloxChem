@@ -197,6 +197,9 @@ class LinearResponseSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
+        # GOSTSHYP information
+        gostshyp_dict = self._init_gostshyp(molecule, basis, scf_tensors)
+
         # right-hand side (gradient)
         if self.rank == mpi_master():
             self.has_external_rhs = (v_grad is not None)
@@ -270,7 +273,8 @@ class LinearResponseSolver(LinearSolver):
             profiler.set_timing_key('Preparation')
 
             self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict, profiler)
+                                eri_dict, dft_dict, pe_dict, gostshyp_dict, 
+                                profiler)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -440,8 +444,8 @@ class LinearResponseSolver(LinearSolver):
                                        rsp_vector_labels)
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                                profiler)
+                                scf_tensors, eri_dict, dft_dict, pe_dict, 
+                                gostshyp_dict, profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials

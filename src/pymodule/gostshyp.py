@@ -265,6 +265,194 @@ class GostshypDriver:
         
         return e_pr, V_pr
     
+    def get_resp_contrib_occ(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
+        """
+        Computes linear response contributions as double energy derivative
+        wrt to density matrix element. Can also be considered as first derivative of Fock matrix wrt to density matrix element.
+
+        :param gs_den_mat:
+            The ground state density matrix.
+        :param trans_den_mat:
+            The transition (perturbed) density matrix.
+        :param tessellation_settings:
+            The dictionary of tessellation settings
+
+        :return:
+            The GOSTSHYP response contribution.
+        """
+
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+
+        print(np.shape(self.tessellation))
+
+        # set up needed components:
+
+        # width parameters w_j
+        width_params = np.pi * np.log(2.0) / self.tessellation[3]
+
+        # compute f_tilde vector
+        f_tilde = compute_tco_p_values(self.molecule, 
+                                       self.basis, 
+                                       (self.tessellation[:3].T).copy(), 
+                                       width_params, 
+                                       np.full((self.num_tes_points), 1.0), 
+                                       (self.tessellation[8:11].T).copy(), 
+                                       gs_den_mat)
+        
+        # compute amplitudes and remove grid points associated with
+        # negative amplitudes
+        amplitudes = self.pressure * self.tessellation[3] / f_tilde
+
+        amplitudes_mask = amplitudes >= 0.0
+        
+        self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
+        num_points = np.sum(amplitudes_mask)
+
+        centers = (self.tessellation[:3].T[amplitudes_mask]).copy()
+        exponents = width_params[amplitudes_mask]
+        amps = amplitudes[amplitudes_mask]
+        norms = (self.tessellation[8:11].T[amplitudes_mask]).copy()
+        f_tilde = f_tilde[amplitudes_mask]
+
+        f_tilde_prime = compute_tco_p_values(self.molecule, 
+                                             self.basis, 
+                                             centers, 
+                                             exponents, 
+                                             np.full((num_points), 1.0), 
+                                             norms, 
+                                             trans_den_mat)
+        
+        g_tilde = compute_tco_s_values(self.molecule,
+                                       self.basis,
+                                       centers,
+                                       exponents,
+                                       np.full((num_points), 1.0),
+                                       gs_den_mat)
+
+        g_tilde_prime = compute_tco_s_values(self.molecule,
+                                             self.basis,
+                                             centers,
+                                             exponents,
+                                             np.full((num_points), 1.0),
+                                             trans_den_mat)
+        
+        prefac_g_mat = - amps * f_tilde_prime / f_tilde
+
+        g_mat_contrib = compute_tco_s_fock(self.molecule,
+                                           self.basis,
+                                           centers,
+                                           exponents,
+                                           prefac_g_mat)
+        
+        prefac_f_mat = amps / f_tilde * (2 * g_tilde * f_tilde_prime / f_tilde - g_tilde_prime)
+        
+        f_mat_contrib = compute_tco_p_fock(self.molecule,
+                                           self.basis,
+                                           centers,
+                                           exponents,
+                                           prefac_f_mat,
+                                           norms)
+        
+        resp_contrib = g_mat_contrib + f_mat_contrib
+        
+        return resp_contrib
+    
+    # def get_gostshyp_response_contribution_occ(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
+    #     """
+    #     Computes linear response contributions as double energy derivative
+    #     wrt to density matrix element. Can also be considered as first derivative of Fock matrix wrt to density matrix element.
+
+    #     :param gs_den_mat:
+    #         The ground state density matrix.
+    #     :param trans_den_mat:
+    #         The transition (perturbed) density matrix.
+    #     :param tessellation_settings:
+    #         The dictionary of tessellation settings
+
+    #     :return:
+    #         The GOSTSHYP response contribution.
+    #     """
+
+    #     if self.num_tes_points == 0:
+    #         self.generate_tessellation(tessellation_settings)
+
+    #     # set up needed components:
+
+    #     # width parameters w_j
+    #     width_params = np.pi * np.log(2.0) / self.tessellation[3]
+
+    #     #compute f_tilde vector
+    #     f_tilde = compute_tco_p_values(self.molecule, 
+    #                                    self.basis, 
+    #                                    (self.tessellation[:3].T).copy(), 
+    #                                    width_params, 
+    #                                    np.full((self.num_tes_points), 1.0), 
+    #                                    (self.tessellation[8:11].T).copy(), 
+    #                                    gs_den_mat)
+        
+    #     amplitudes = self.pressure * self.tessellation[3] / f_tilde
+
+    #     amplitudes_mask = amplitudes >= 0.0
+    #     #np.savetxt('amps_mask.txt', amplitudes_mask, fmt="%5i")
+        
+    #     self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
+
+    #     num_points = np.sum(amplitudes_mask)
+    #     n_basis = self.basis.get_dimensions_of_basis()
+    #     second_energy_deriv = np.zeros((n_basis, n_basis, n_basis, n_basis))
+
+    #     for j in range(num_points):
+
+    #         center = [(self.tessellation[:3].T[amplitudes_mask][j]).copy()]
+    #         exponent = [width_params[amplitudes_mask][j]]
+    #         amp = amplitudes[amplitudes_mask][j]
+    #         norm = [(self.tessellation[8:11].T[amplitudes_mask][j]).copy()]
+    #         f_tilde_j = f_tilde[amplitudes_mask][j]
+
+    #         prefac_term_1_and_2 = amp / f_tilde_j
+
+    #         term_1_and_2_g_mat = compute_tco_s_fock(self.molecule, 
+    #                                                 self.basis, 
+    #                                                 center, 
+    #                                                 exponent, 
+    #                                                 [prefac_term_1_and_2])
+            
+    #         f_mat = compute_tco_p_fock(self.molecule, 
+    #                                    self.basis, 
+    #                                    center, 
+    #                                    exponent, 
+    #                                    np.array([1]),
+    #                                    norm)
+            
+    #         prefac_term_3 = compute_tco_s_values(self.molecule,
+    #                                              self.basis,
+    #                                              center,
+    #                                              exponent,
+    #                                              [2 * amp / f_tilde_j**2],
+    #                                              gs_den_mat)
+            
+    #         term_3_f_mat = compute_tco_p_fock(self.molecule,
+    #                                           self.basis,
+    #                                           center,
+    #                                           exponent,
+    #                                           [prefac_term_3],
+    #                                           norm)
+
+    #         for mu in range(n_basis):
+    #             for nu in range(n_basis):
+    #                 for sigma in range(n_basis):
+    #                     for lambda_ in range (n_basis):
+    #                         second_energy_deriv[mu, nu, sigma, lambda_] += (- term_1_and_2_g_mat[mu, nu]
+    #                                                                         * f_mat[sigma, lambda_]
+    #                                                                         - f_mat[mu, nu] 
+    #                                                                         * term_1_and_2_g_mat[sigma, lambda_]
+    #                                                                         + term_3_f_mat[mu, nu] 
+    #                                                                         * f_mat[sigma, lambda_])
+                            
+    #     resp_contrib = np.einsum('ijkl,kl->ij', second_energy_deriv, trans_den_mat)
+        
+    #     return resp_contrib
 
     def get_gostshyp_grad_new_ints(self, den_mat, tessellation_settings=None):
         """
