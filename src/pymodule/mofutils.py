@@ -30,24 +30,21 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from pathlib import Path
-import numpy as np
-import networkx as nx
 import itertools
-import sys
 import re
+import sys
+from pathlib import Path
 
-from .molecule import Molecule
+import networkx as nx
+import numpy as np
+
 from .errorhandler import assert_msg_critical
-from .mofoptimizer import (
-    optimize_rotations_pre,
-    optimize_rotations_after,
-    apply_rotations_to_atom_positions,
-    apply_rotations_to_Xatoms_positions,
-    update_ccoords_by_optimized_cell_params,
-    optimize_cell_parameters,
-    expand_setrots,
-)
+from .mofoptimizer import (apply_rotations_to_atom_positions,
+                           apply_rotations_to_Xatoms_positions, expand_setrots,
+                           optimize_cell_parameters, optimize_rotations_after,
+                           optimize_rotations_pre,
+                           update_ccoords_by_optimized_cell_params)
+from .molecule import Molecule
 
 try:
     from scipy.optimize import linear_sum_assignment
@@ -1371,13 +1368,13 @@ def process_linker_molecule(molecule,
         rows, frag_Xs = lines_of_single_frag(subgraph_single_frag, Xs_indices)
         # single_frag_bonds = get_bonds_from_subgraph(subgraph_single_frag, Xs_indices)
         if linker_topic == 3:
-            print("linker_center_frag:", subgraph_center_frag.number_of_nodes(),
+            print("center_frag:", subgraph_center_frag.number_of_nodes(),
                   center_Xs)
-            print("linker_outer_frag:", subgraph_single_frag.number_of_nodes(),
+            print("outer_frag:", subgraph_single_frag.number_of_nodes(),
                   frag_Xs)
-            linker_center_node_pdb_name = Path(save_nodes_dir, "tricenter")
+            linker_center_node_pdb_name = str(Path(save_nodes_dir, "tricenter"))
             create_pdb(linker_center_node_pdb_name, lines)
-            linker_branch_pdb_name = Path(save_edges_dir, "triedge")
+            linker_branch_pdb_name = str(Path(save_edges_dir, "triedge"))
             create_pdb(linker_branch_pdb_name, rows)
             # create_cif(lines,center_frag_bonds,save_nodes_dir,'tricenter.cif')
             # create_cif(rows,single_frag_bonds,save_edges_dir,'triedge.cif')
