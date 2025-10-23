@@ -280,7 +280,7 @@ class ScfDriver:
         self.memory_tracing = False
 
         # verbosity of output (1-3)
-        self.print_level = 2
+        self.print_level = 1
 
         # program end time for graceful exit
         self.program_end_time = None
@@ -626,10 +626,7 @@ class ScfDriver:
             self.cpcm_drv.radii_scaling = 1.0
 
         # check print level (verbosity of output)
-        if self.print_level < 2:
-            self.print_level = 1
-        if self.print_level > 2:
-            self.print_level = 3
+        self.print_level = max(1, min(self.print_level, 3))
 
         if self.restart:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
@@ -647,10 +644,12 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             self._print_header()
-            valstr = 'Nuclear repulsion energy: {:.10f} a.u.'.format(
-                self._nuc_energy)
-            self.ostream.print_info(valstr)
-            self.ostream.print_blank()
+
+            if self.print_level > 1:
+                valstr = 'Nuclear repulsion energy: {:.10f} a.u.'.format(
+                    self._nuc_energy)
+                self.ostream.print_info(valstr)
+                self.ostream.print_blank()
 
         # generate integration grid
         if self._dft:
@@ -664,11 +663,13 @@ class ScfDriver:
             grid_t0 = tm.time()
             self._mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = self._mol_grid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
+
+            if self.print_level > 1:
+                self.ostream.print_info(
+                    'Molecular grid with {0:d} points generated in {1:.2f} sec.'
+                    .format(n_grid_points,
+                            tm.time() - grid_t0))
+                self.ostream.print_blank()
 
         # D4 dispersion correction
         if self.dispersion or (self._dft and
@@ -712,11 +713,12 @@ class ScfDriver:
             self.cpcm_drv.print_cpcm_info()
             self.cpcm_drv.init(molecule, do_nuclear=True)
 
-            self.ostream.print_info(
-                f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
-                + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
-            self.ostream.print_blank()
-            self.ostream.flush()
+            if self.print_level > 1:
+                self.ostream.print_info(
+                    f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points '
+                    + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
+                self.ostream.print_blank()
+                self.ostream.flush()
 
         # set up polarizable embedding
         if self._pe:
@@ -1403,10 +1405,11 @@ class ScfDriver:
             if self.rank != mpi_master():
                 self._V_es = np.zeros(V_es.shape)
 
-            self.ostream.print_info(
-                'Point charges one-electron integral computed in' +
-                ' {:.2f} sec.'.format(tm.time() - t0point_charges))
-            self.ostream.print_blank()
+            if self.print_level > 1:
+                self.ostream.print_info(
+                    'Point charges one-electron integral computed in' +
+                    ' {:.2f} sec.'.format(tm.time() - t0point_charges))
+                self.ostream.print_blank()
 
         linear_dependency = False
 
@@ -1421,9 +1424,10 @@ class ScfDriver:
                 eigvecs = eigvecs[:, -num_eigs:]
             oao_mat = eigvecs * (1.0 / np.sqrt(eigvals))
 
-            self.ostream.print_info('Orthogonalization matrix computed in' +
-                                    ' {:.2f} sec.'.format(tm.time() - t0))
-            self.ostream.print_blank()
+            if self.print_level > 1:
+                self.ostream.print_info('Orthogonalization matrix computed in' +
+                                        ' {:.2f} sec.'.format(tm.time() - t0))
+                self.ostream.print_blank()
 
             nrow = oao_mat.shape[0]
             ncol = oao_mat.shape[1]

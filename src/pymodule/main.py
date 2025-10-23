@@ -109,6 +109,9 @@ def select_scf_driver(task, scf_type):
     else:
         assert_msg_critical(False, f'SCF: invalid scf_type {scf_type}')
 
+    # set print level for input file based calculation
+    scf_drv.print_level = 2
+
     return scf_drv
 
 
