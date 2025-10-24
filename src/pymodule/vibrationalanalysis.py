@@ -117,6 +117,9 @@ class VibrationalAnalysis:
         # output stream
         self.ostream = drv.ostream
 
+        # verbosity of output (1-3)
+        self.print_level = 1
+
         # filenames
         self.filename = None
         self.vib_results_txt_file = None
@@ -288,6 +291,11 @@ class VibrationalAnalysis:
         :returns:
             The dictionary with vibrational analysis results.
         """
+
+        # check print level (verbosity of output)
+        self.print_level = max(1, min(self.print_level, 3))
+
+        self.hessian_driver.print_level = self.print_level
 
         if self.rank == mpi_master():
             self.print_header()

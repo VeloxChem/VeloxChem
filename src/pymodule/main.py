@@ -546,6 +546,8 @@ def main():
 
         if use_xtb:
             vibrational_drv = VibrationalAnalysis(xtb_drv)
+            # set print level for input file based calculation
+            vibrational_drv.print_level = 2
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
                                             hessian_dict=hessian_dict,
@@ -555,6 +557,8 @@ def main():
 
         else:
             vibrational_drv = VibrationalAnalysis(scf_drv)
+            # set print level for input file based calculation
+            vibrational_drv.print_level = 2
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
                                             hessian_dict=hessian_dict,
