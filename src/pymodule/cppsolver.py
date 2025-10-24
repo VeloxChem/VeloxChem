@@ -51,6 +51,12 @@ from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 from .inputparser import parse_seq_fixed
 
+try:
+    import matplotlib.pyplot as plt
+    from scipy.interpolate import make_interp_spline
+except ImportError:
+    pass
+
 
 class ComplexResponse(LinearSolver):
     """
@@ -334,6 +340,10 @@ class ComplexResponse(LinearSolver):
         self.nonlinear = False
         self._dist_fock_ger = None
         self._dist_fock_ung = None
+
+        # make sure that cpp_flag is properly set
+        if self.cpp_flag is not None:
+            self.set_cpp_flag(self.cpp_flag)
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -829,7 +839,8 @@ class ComplexResponse(LinearSolver):
                                 for aop in self.a_components
                             ]
                             write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x, self.group_label)
+                                final_h5_fname, solution_keys, x,
+                                self.group_label)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -1064,6 +1075,78 @@ class ComplexResponse(LinearSolver):
 
         return spectrum
 
+    def plot(self, cpp_results, x_unit='nm', plot_scatter=True):
+        """
+        Plot absorption or ECD spectrum from the CPP calculation.
+
+        :param cpp_results:
+            The dictionary containing CPP results.
+        :param x_unit:
+            The dictionary containing CPP results.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'ComplexResponse.plot: x_unit should be au, ev or nm')
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        assert_msg_critical('scipy' in sys.modules, 'scipy is required.')
+
+        cpp_spec = self.get_spectrum(cpp_results, x_unit)
+
+        if cpp_spec is None:
+            print('Nothing to plot for this complex response calculation.')
+            return
+
+        if x_unit.lower() == 'nm':
+            # make sure the values in x_data are strictly increasing
+            x_data = np.array(cpp_spec['x_data'][::-1])
+            y_data = np.array(cpp_spec['y_data'][::-1])
+        else:
+            x_data = np.array(cpp_spec['x_data'])
+            y_data = np.array(cpp_spec['y_data'])
+
+        spl = make_interp_spline(x_data, y_data, k=3)
+        x_spl = np.linspace(x_data[0], x_data[-1], x_data.size * 10)
+        y_spl = spl(x_spl)
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        if x_unit.lower() == 'nm':
+            ax.set_xlabel('Wavelength [nm]')
+        else:
+            ax.set_xlabel(f'Excitation Energy [{x_unit.lower()}]')
+
+        y_max = np.max(np.abs(np.array(cpp_spec['y_data'])))
+
+        if self.cpp_flag == 'absorption':
+            ax.set_ylabel(r'$\sigma (\omega)$ [a.u.]')
+            ax.set_title("Absorption Spectrum")
+
+            ax.set_ylim(0.0, y_max * 1.1)
+
+        elif self.cpp_flag == 'ecd':
+            ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
+            ax.set_title("ECD Spectrum")
+
+            ax.set_ylim(-y_max * 1.1, y_max * 1.1)
+
+            ax.axhline(y=0,
+                       marker=',',
+                       color='k',
+                       linestyle='-.',
+                       markersize=0,
+                       linewidth=0.2)
+
+        plt.plot(x_spl, y_spl, color='black', alpha=0.8, linewidth=2.0)
+
+        if plot_scatter:
+            plt.scatter(x_data, y_data, color='darkcyan', alpha=0.9, s=15)
+
+        plt.show()
+
     def _print_results(self, rsp_results, ostream=None):
         """
         Prints response results to output stream.
@@ -1074,7 +1157,8 @@ class ComplexResponse(LinearSolver):
             The output stream.
         """
 
-        self._print_response_functions(rsp_results, ostream)
+        if self.print_level > 1:
+            self._print_response_functions(rsp_results, ostream)
 
         if self.cpp_flag == 'absorption':
             self._print_absorption_results(rsp_results, ostream)

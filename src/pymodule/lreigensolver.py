@@ -268,7 +268,8 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.core_excitation:
                 assert_msg_critical(
                     self.num_core_orbitals > 0,
-                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid')
+                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid'
+                )
                 assert_msg_critical(
                     self.num_core_orbitals < nocc,
                     'LinearResponseEigenSolver: num_core_orbitals too large')
@@ -1315,7 +1316,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         x = (rpa_results['eigenvalues'])
         y = rpa_results['oscillator_strengths']
-        xmin = min(x) - 0.03
+        xmin = max(0.0, min(x) - 0.03)
         xmax = max(x) + 0.03
         xstep = 0.0001
 
@@ -1438,7 +1439,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         x = (rpa_results["eigenvalues"]) * au2ev
         y = rpa_results["rotatory_strengths"]
-        xmin = min(x) - 0.8
+        xmin = max(0.0, min(x) - 0.8)
         xmax = max(x) + 0.8
         xstep = 0.003
 
