@@ -30,7 +30,6 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from collections import Counter
 import numpy as np
 import time as tm
 import math
@@ -240,10 +239,10 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         profiler.start_timer('dFock')
 
         fock_deriv_ao_dict_a = {
-            (iatom, x): None for iatom in range(natm) for x in range(3) 
+            (iatom, x): None for iatom in range(natm) for x in range(3)
         }
         fock_deriv_ao_dict_b = {
-            (iatom, x): None for iatom in range(natm) for x in range(3) 
+            (iatom, x): None for iatom in range(natm) for x in range(3)
         }
 
         for iatom in local_atoms:
@@ -493,8 +492,8 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             # fock_uij is an array [(ax, bx), (ay, by), (az, bz)] where
             # a is an alpha component and b is beta.
             fock_uij = self._comp_lr_fock_unrestricted(
-                    (uij_ao_list_a, uij_ao_list_b), molecule, basis,
-                     eri_dict, dft_dict, pe_dict, profiler)
+                (uij_ao_list_a, uij_ao_list_b), molecule, basis,
+                eri_dict, dft_dict, pe_dict, profiler)
 
             if self.rank == mpi_master():
                 uij_ao_list_a.clear()
@@ -793,33 +792,39 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         fock_grad_drv = FockGeom1000Driver()
 
         gmats_eri_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
-                                          Dab_for_fock, i, 'j',
-                                          0.0, 0.0, thresh_int)
+                                              Dab_for_fock, i, 'j',
+                                              0.0, 0.0, thresh_int)
 
         if fock_type != 'j':
             gmats_eri_Ka = fock_grad_drv.compute(basis, screener_atom, screener,
-                                          Da_for_fock, i, 'kx', exchange_scaling_factor,
-                                          0.0, thresh_int)
+                                                 Da_for_fock, i, 'kx',
+                                                 exchange_scaling_factor,
+                                                 0.0, thresh_int)
             gmats_eri_Kb = fock_grad_drv.compute(basis, screener_atom, screener,
-                                          Db_for_fock, i, 'kx', exchange_scaling_factor,
-                                          0.0, thresh_int)
+                                                 Db_for_fock, i, 'kx',
+                                                 exchange_scaling_factor,
+                                                 0.0, thresh_int)
 
         if need_omega:
             # for range-separated functional
             gmats_eri_rs_a = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                  Da_for_fock, i, 'kx_rs',
-                                                  erf_k_coef, omega, thresh_int)
+                                                   Da_for_fock, i, 'kx_rs',
+                                                   erf_k_coef, omega, thresh_int)
             gmats_eri_rs_b = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                  Db_for_fock, i, 'kx_rs',
-                                                  erf_k_coef, omega, thresh_int)
+                                                   Db_for_fock, i, 'kx_rs',
+                                                   erf_k_coef, omega, thresh_int)
 
         # calculate gradient contributions
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_eri_Jab = gmats_eri_Jab.matrix_to_numpy(label)
-            gmat_eri_Ka = gmats_eri_Ka.matrix_to_numpy(label)
-            gmat_eri_Kb = gmats_eri_Kb.matrix_to_numpy(label)
-            fmat_deriv_a[x] += gmat_eri_Jab - gmat_eri_Ka
-            fmat_deriv_b[x] += gmat_eri_Jab - gmat_eri_Kb
+            fmat_deriv_a[x] += gmat_eri_Jab
+            fmat_deriv_b[x] += gmat_eri_Jab
+
+            if fock_type != 'j':
+                gmat_eri_Ka = gmats_eri_Ka.matrix_to_numpy(label)
+                gmat_eri_Kb = gmats_eri_Kb.matrix_to_numpy(label)
+                fmat_deriv_a[x] -= gmat_eri_Ka
+                fmat_deriv_b[x] -= gmat_eri_Kb
 
             if need_omega:
                 # range-separated functional contribution
