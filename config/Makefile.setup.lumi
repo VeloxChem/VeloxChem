@@ -39,8 +39,8 @@ CXX    := /opt/rocm/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shel
 PYTHON := python3
 DEVCC  := hipcc --offload-arch=gfx90a
 
-CXX_REL_FLG := -fopenmp -std=c++17
-CXX_DEB_FLG := -fopenmp -std=c++17
+CXX_REL_FLG := -fopenmp -std=c++17 -O3 -Wall
+CXX_DEB_FLG := -fopenmp -std=c++17 -O3 -Wall -g
 
 MATH_INC := -I$(MAGMA_HOME)/include
 MATH_LIB := -L$(MAGMA_HOME)/lib -lmagma
@@ -53,8 +53,8 @@ XC_LIB := -L$(LIBXC_HOME)/lib -lxc
 CXX_REL_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 
-DEVCC_REL_FLG := -fPIC -fopenmp -std=c++17 $(XC_INC)
-DEVCC_DEB_FLG := -fPIC -fopenmp -std=c++17 $(XC_INC)
+DEVCC_REL_FLG := -fPIC -fopenmp -std=c++17 -O3 $(XC_INC)
+DEVCC_DEB_FLG := -fPIC -fopenmp -std=c++17 -O3 $(XC_INC)
 DEVICE_LIB := -lhipblas
 #DEVICE_LIB := -lhipblas -lhipsolver
 
@@ -63,11 +63,6 @@ MACLIBS :=
 LTOFLAG :=
 
 # Generic settings
-
-# Compiler flags
-
-CXX_REL_FLG += -std=c++17 -O3 -Wall
-CXX_DEB_FLG += -std=c++17 -O3 -Wall -g
 
 # Preprocessor flags
 

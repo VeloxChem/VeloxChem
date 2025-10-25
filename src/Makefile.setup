@@ -39,8 +39,8 @@ CXX    := g++
 PYTHON := python3
 DEVCC  := nvcc -gencode arch=compute_80,code=sm_80
 
-CXX_REL_FLG := -fopenmp -std=c++17
-CXX_DEB_FLG := -fopenmp -std=c++17
+CXX_REL_FLG := -fopenmp -std=c++17 -O3 -Wall
+CXX_DEB_FLG := -fopenmp -std=c++17 -O3 -Wall -g
 
 PYTHON_INC += $(shell $(PYTHON) -m pybind11 --includes)
 
@@ -50,8 +50,8 @@ XC_LIB := -L$(LIBXC_HOME)/lib -lxc
 CXX_REL_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 
-DEVCC_REL_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 $(XC_INC)
-DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 $(XC_INC)
+DEVCC_REL_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC)
+DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC)
 DEVICE_LIB := -L$(CUDA_LIB_DIR) -lcudart -lcublas -lcusolver
 
 MACLIBS :=
@@ -59,11 +59,6 @@ MACLIBS :=
 LTOFLAG :=
 
 # Generic settings
-
-# Compiler flags
-
-CXX_REL_FLG += -std=c++17 -O3 -Wall
-CXX_DEB_FLG += -std=c++17 -O3 -Wall -g
 
 # Preprocessor flags
 
