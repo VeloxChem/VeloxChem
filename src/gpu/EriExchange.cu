@@ -15269,7 +15269,7 @@ computeExchangeFockPDDD6(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -15284,9 +15284,9 @@ computeExchangeFockPDDD6(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_pd[ik];
         k = pair_inds_k_for_K_pd[ik];
@@ -19883,7 +19883,7 @@ computeExchangeFockDPDD5(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -19898,9 +19898,9 @@ computeExchangeFockDPDD5(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_dd[ik];
         k = pair_inds_k_for_K_dd[ik];
@@ -24646,7 +24646,7 @@ computeExchangeFockDDDD9(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -24661,9 +24661,9 @@ computeExchangeFockDDDD9(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_dd[ik];
         k = pair_inds_k_for_K_dd[ik];
@@ -25818,7 +25818,7 @@ computeExchangeFockDDDD14(double*         mat_K,
     __shared__ uint32_t i, k, count_i, count_k, displ_i, displ_k;
     __shared__ double   a_i, r_i[3], a_k, r_k[3];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     const uint32_t ik = blockIdx.x;
 
@@ -25833,9 +25833,9 @@ computeExchangeFockDDDD14(double*         mat_K,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         i = pair_inds_i_for_K_dd[ik];
         k = pair_inds_k_for_K_dd[ik];
@@ -26193,10 +26193,10 @@ computeExchangeFockDDDD15(double*         mat_K,
             const auto PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
             const auto PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
             const auto PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
-            const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-            const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-            const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-            const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+            //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+            //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+            //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+            //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
             const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 

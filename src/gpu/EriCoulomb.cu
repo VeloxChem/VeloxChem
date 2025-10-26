@@ -11277,7 +11277,7 @@ computeCoulombFockDDPD2(double*         mat_J,
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double PA_0, PA_1, PB_0, PB_1;
+    //__shared__ double PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -11323,10 +11323,10 @@ computeCoulombFockDDPD2(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -12357,7 +12357,7 @@ computeCoulombFockDDPD7(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
@@ -12375,9 +12375,9 @@ computeCoulombFockDDPD7(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ij < dd_prim_pair_count_local)
         {
@@ -12549,7 +12549,7 @@ computeCoulombFockDDPD8(double*         mat_J,
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double PA_0, PA_1, PB_0, PB_1;
+    //__shared__ double PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -12595,10 +12595,10 @@ computeCoulombFockDDPD8(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            //PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            //PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            //PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            //PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -12657,9 +12657,9 @@ computeCoulombFockDDPD8(double*         mat_J,
 
         gpu::computeBoysFunction(F7_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16062,10 +16062,10 @@ computeCoulombFockDDDD15(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -16866,7 +16866,7 @@ computeCoulombFockDDDD20(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
@@ -16884,9 +16884,9 @@ computeCoulombFockDDDD20(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ij < dd_prim_pair_count_local)
         {
@@ -16978,10 +16978,10 @@ computeCoulombFockDDDD20(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        //const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        //const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        //const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        //const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -17038,7 +17038,7 @@ computeCoulombFockDDDD21(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
@@ -17056,9 +17056,9 @@ computeCoulombFockDDDD21(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ij < dd_prim_pair_count_local)
         {
@@ -17972,7 +17972,7 @@ computeCoulombFockDDDD26(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
@@ -17990,9 +17990,9 @@ computeCoulombFockDDDD26(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ij < dd_prim_pair_count_local)
         {
@@ -18342,7 +18342,7 @@ computeCoulombFockDDDD28(double*         mat_J,
 
     __shared__ double   ERIs[TILE_DIM_LARGE + 1];
     __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    //__shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
     __shared__ double PA_0, PA_1, PB_0, PB_1;
@@ -18360,9 +18360,9 @@ computeCoulombFockDDDD28(double*         mat_J,
         d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
         d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
 
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+        //delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+        //delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+        //delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
 
         if (ij < dd_prim_pair_count_local)
         {
