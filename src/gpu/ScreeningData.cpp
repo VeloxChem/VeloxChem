@@ -3367,12 +3367,12 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
     // TODO: use uint2 for pair indices
 
-    std::vector<std::tuple<double, int64_t, int64_t>> sorted_ss_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> sorted_sp_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> sorted_sd_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> sorted_pp_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> sorted_pd_Qp_ik;
-    std::vector<std::tuple<double, int64_t, int64_t>> sorted_dd_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> ss_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> sp_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> sd_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> pp_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> pd_Qp_ik;
+    std::vector<std::tuple<double, int64_t, int64_t>> dd_Qp_ik;
 
     // ss, sp, sd blocks
 
@@ -3382,21 +3382,21 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
         {
             const auto Qp_ik = std::fabs(Q_prime.row(i)[k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_ss_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) ss_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
 
         for (int64_t k = 0; k < p_prim_count * 3; k++)
         {
             const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_sp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) sp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
 
         for (int64_t k = 0; k < d_prim_count * 6; k++)
         {
             const auto Qp_ik = std::fabs(Q_prime.row(i)[s_prim_count + p_prim_count * 3 + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_sd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) sd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
     }
 
@@ -3408,14 +3408,14 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
         {
             const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_pp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) pp_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
 
         for (int64_t k = 0; k < d_prim_count * 6; k++)
         {
             const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + p_prim_count * 3 + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_pd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) pd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
     }
 
@@ -3427,23 +3427,16 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
         {
             const auto Qp_ik = std::fabs(Q_prime.row(s_prim_count + p_prim_count * 3 + i)[s_prim_count + p_prim_count * 3 + k]);
 
-            if (Qp_ik > Q_prime_thresh) sorted_dd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
+            if (Qp_ik > Q_prime_thresh) dd_Qp_ik.push_back(std::make_tuple(Qp_ik, i, k));
         }
     }
 
-    std::sort(sorted_ss_Qp_ik.begin(), sorted_ss_Qp_ik.end());
-    std::sort(sorted_sp_Qp_ik.begin(), sorted_sp_Qp_ik.end());
-    std::sort(sorted_sd_Qp_ik.begin(), sorted_sd_Qp_ik.end());
-    std::sort(sorted_pp_Qp_ik.begin(), sorted_pp_Qp_ik.end());
-    std::sort(sorted_pd_Qp_ik.begin(), sorted_pd_Qp_ik.end());
-    std::sort(sorted_dd_Qp_ik.begin(), sorted_dd_Qp_ik.end());
-
-    const auto ss_pair_count_for_K = static_cast<int64_t>(sorted_ss_Qp_ik.size());
-    const auto sp_pair_count_for_K = static_cast<int64_t>(sorted_sp_Qp_ik.size());
-    const auto sd_pair_count_for_K = static_cast<int64_t>(sorted_sd_Qp_ik.size());
-    const auto pp_pair_count_for_K = static_cast<int64_t>(sorted_pp_Qp_ik.size());
-    const auto pd_pair_count_for_K = static_cast<int64_t>(sorted_pd_Qp_ik.size());
-    const auto dd_pair_count_for_K = static_cast<int64_t>(sorted_dd_Qp_ik.size());
+    const auto ss_pair_count_for_K = static_cast<int64_t>(ss_Qp_ik.size());
+    const auto sp_pair_count_for_K = static_cast<int64_t>(sp_Qp_ik.size());
+    const auto sd_pair_count_for_K = static_cast<int64_t>(sd_Qp_ik.size());
+    const auto pp_pair_count_for_K = static_cast<int64_t>(pp_Qp_ik.size());
+    const auto pd_pair_count_for_K = static_cast<int64_t>(pd_Qp_ik.size());
+    const auto dd_pair_count_for_K = static_cast<int64_t>(dd_Qp_ik.size());
 
     // std::stringstream ss;
     // ss << "preLinK screening\n";
@@ -3529,7 +3522,7 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
             for (int64_t ik = gpu_rank, idx = 0; ik < ss_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                const auto& vals = sorted_ss_Qp_ik[ss_pair_count_for_K - 1 - ik];
+                const auto& vals = ss_Qp_ik[ik];
 
                 // auto Qp_ik = std::get<0>(vals);
                 auto i = std::get<1>(vals);
@@ -3541,7 +3534,7 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
             for (int64_t ik = gpu_rank, idx = 0; ik < sp_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                const auto& vals = sorted_sp_Qp_ik[sp_pair_count_for_K - 1 - ik];
+                const auto& vals = sp_Qp_ik[ik];
 
                 // auto Qp_ik = std::get<0>(vals);
                 auto i = std::get<1>(vals);
@@ -3553,7 +3546,7 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
             for (int64_t ik = gpu_rank, idx = 0; ik < sd_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                const auto& vals = sorted_sd_Qp_ik[sd_pair_count_for_K - 1 - ik];
+                const auto& vals = sd_Qp_ik[ik];
 
                 // auto Qp_ik = std::get<0>(vals);
                 auto i = std::get<1>(vals);
@@ -3565,7 +3558,7 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
             for (int64_t ik = gpu_rank, idx = 0; ik < pp_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                const auto& vals = sorted_pp_Qp_ik[pp_pair_count_for_K - 1 - ik];
+                const auto& vals = pp_Qp_ik[ik];
 
                 // auto Qp_ik = std::get<0>(vals);
                 auto i = std::get<1>(vals);
@@ -3577,7 +3570,7 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
             for (int64_t ik = gpu_rank, idx = 0; ik < pd_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                const auto& vals = sorted_pd_Qp_ik[pd_pair_count_for_K - 1 - ik];
+                const auto& vals = pd_Qp_ik[ik];
 
                 // auto Qp_ik = std::get<0>(vals);
                 auto i = std::get<1>(vals);
@@ -3589,7 +3582,7 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
             for (int64_t ik = gpu_rank, idx = 0; ik < dd_pair_count_for_K; ik+=gpu_count, idx++)
             {
-                const auto& vals = sorted_dd_Qp_ik[dd_pair_count_for_K - 1 - ik];
+                const auto& vals = dd_Qp_ik[ik];
 
                 // auto Qp_ik = std::get<0>(vals);
                 auto i = std::get<1>(vals);
