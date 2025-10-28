@@ -99,10 +99,6 @@ class GradientDriver:
 
         self.checkpoint_file = None
 
-        # flag to enable unrelaxed analytical gradient
-        # for debugging
-        self.unrelaxed = False
-
         # verbosity of output (1-3)
         self.print_level = 1
 
@@ -112,7 +108,6 @@ class GradientDriver:
                 'do_four_point':
                     ('bool', 'do four-point numerical integration'),
                 'delta_h': ('float', 'the displacement for finite difference'),
-                'unrelaxed': ('bool', 'calculate the unrelaxed gradient'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -480,10 +475,7 @@ class GradientDriver:
         if self.numerical:
             title = 'Numerical '
         else:
-            if self.unrelaxed:
-                title = 'Unrelaxed Analytical '
-            else:
-                title = 'Analytical '
+        	title = 'Analytical '
 
         title += 'Gradient (Hartree/Bohr)'
         self.ostream.print_header(title)
@@ -552,10 +544,7 @@ class GradientDriver:
             cur_str3 = 'Finite Difference Step Size     : '
             cur_str3 += str(self.delta_h) + ' a.u.'
         else:
-            if self.unrelaxed:
-                cur_str += 'Unrelaxed Analytical'
-            else:
-                cur_str += 'Analytical'
+        	cur_str += 'Analytical'
 
         self.ostream.print_blank()
         self.ostream.print_header(cur_str.ljust(str_width))
