@@ -32,7 +32,7 @@ class TestPolgrad:
 
         # test real analytical gradient
         an_polgrad_drv = PolarizabilityGradient(scf_drv)
-        cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'yes'}
+        cphf_settings = {'conv_thresh':2e-7}
         polgrad_settings = {'frequencies': (0.0, 0.4)}
         an_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
         an_polgrad_drv.ostream.mute()
@@ -96,7 +96,7 @@ class TestPolgrad:
 
         # test complex analytical gradient
         an_polgrad_drv = PolarizabilityGradient(scf_drv)
-        cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'yes'}
+        cphf_settings = {'conv_thresh':2e-7}
         polgrad_settings = {'frequencies': (0.0, 0.4), 'is_complex': 'yes',
                             'damping': 0.5}
         an_polgrad_drv.update_settings(polgrad_settings, cphf_settings)

@@ -218,6 +218,29 @@ CMatrix::assign_flat_values(const std::vector<double>& values) -> void
 }
 
 auto
+CMatrix::assign_values(const CSubMatrix& values) -> void
+{
+    if (const auto nrows = number_of_rows(); nrows > 0)
+    {
+        if (_mat_type == mat_t::symmetric)
+        {
+            std::ranges::for_each(_sub_matrices, [&](auto &mvalue) {
+                const auto dims = mvalue.second->get_dimensions();
+                std::ranges::for_each(views::rectangular(dims[2], dims[3]), [&](const auto &index) {
+                        const auto i = dims[0] + index.first;
+                        const auto j = dims[1] + index.second;
+                        mvalue.second->at(index) = values.at({i, j});
+                    });
+                });
+        }
+        else
+        {
+            // FIX ME:
+        }
+    }
+}
+
+auto
 CMatrix::scale(const double factor) -> void
 {
     for (auto &mvalue : _sub_matrices)
@@ -484,6 +507,40 @@ CMatrix::flat_values() const -> std::vector<double>
         return std::vector<double>();
     }
 }
+
+auto
+CMatrix::reduced_flat_values(const std::vector<std::pair<size_t, size_t>>& mask) const -> std::vector<double>
+{
+    if (const auto nrows = number_of_rows(); nrows > 0)
+    {
+        std::vector<double> values(mask.size(), 0.0);
+        
+        const auto mat = full_matrix();
+        
+        size_t idx = 0;
+        
+        for (const auto& index : mask)
+        {
+            if (index.first == index.second)
+            {
+                values[idx] = mat.at(index);
+            }
+            else
+            {
+                values[idx] = 2.0 * mat.at(index);
+            }
+            
+            idx++;
+        }
+        
+        return values;
+    }
+    else
+    {
+        return std::vector<double>();
+    }
+}
+
 
 auto
 CMatrix::_row_angular_keys() const -> std::set<int>

@@ -274,10 +274,7 @@ class C6Driver(LinearSolver):
                 type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
-        if self.print_level < 2:
-            self.print_level = 1
-        if self.print_level > 2:
-            self.print_level = 3
+        self.print_level = max(1, min(self.print_level, 3))
 
         # initialize profiler
         profiler = Profiler({
@@ -774,7 +771,8 @@ class C6Driver(LinearSolver):
                 output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
                 self.ostream.print_header(output_iter.ljust(width))
             self.ostream.print_blank()
-            self.ostream.flush()
+
+        self.ostream.flush()
 
     def _print_results(self, c6, rsp_funcs, ostream):
         """

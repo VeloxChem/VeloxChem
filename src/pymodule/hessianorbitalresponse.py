@@ -59,10 +59,6 @@ class HessianOrbitalResponse(CphfSolver):
         The MPI communicator.
     :param ostream:
         The output stream.
-
-    Instance variables
-        - use_subspace_solver: flag to use subspace solver
-          instead of conjugate gradient.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -154,8 +150,6 @@ class HessianOrbitalResponse(CphfSolver):
         omega_ao = -1.0 * np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
         # partition atoms for parallellisation
-        # TODO: use partition_atoms in e.g. scfgradientdriver
-
         if atom_pairs is None:
             local_atoms = partition_atoms(natm, self.rank, self.nodes)
         else:
@@ -165,12 +159,11 @@ class HessianOrbitalResponse(CphfSolver):
                     atoms_in_pairs.append(i)
                 if j not in atoms_in_pairs:
                     atoms_in_pairs.append(j)
+            # Note: sort the list for consistency with scfhessiandriver
+            atoms_in_pairs = sorted(atoms_in_pairs)
+            # Note: keep this consistent with scfhessiandriver
+            local_atoms = atoms_in_pairs[self.rank::self.nodes]
             natm_in_pairs = len(atoms_in_pairs)
-            local_atoms = []
-            # todo atompairs, is this the best way to go about the ordering here?
-            for at in atoms_in_pairs:
-                if at % self.nodes == self.rank:
-                    local_atoms.append(at)
 
         # Gathers information of which rank has which atom,
         # and then broadcasts this to all ranks
@@ -270,9 +263,9 @@ class HessianOrbitalResponse(CphfSolver):
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
-            if atom_pairs is None:
-                naos = basis.get_dimensions_of_basis()
+            naos = basis.get_dimensions_of_basis()
 
+            if atom_pairs is None:
                 batch_size = get_batch_size(None, natm * 3, naos, self.comm)
                 batch_size = batch_size // 3
 
@@ -280,15 +273,8 @@ class HessianOrbitalResponse(CphfSolver):
                 if natm % batch_size != 0:
                     num_batches += 1
             else:
-                ao_map = basis.get_ao_basis_map(molecule)
-                # Create a dictionary of the amount of AOs per atom
-                aos_per_atom = dict(
-                    Counter(int(ao.strip().split()[0]) - 1 for ao in ao_map))
-                # Calculate total number of AOs for atoms in atoms_in_pairs
-                naos_in_pairs = sum(
-                    aos_per_atom.get(atom, 0) for atom in atoms_in_pairs)
-                batch_size = get_batch_size(None, natm_in_pairs * 3,
-                                            naos_in_pairs, self.comm)
+                batch_size = get_batch_size(None, natm_in_pairs * 3, naos,
+                                            self.comm)
                 batch_size = batch_size // 3
 
                 num_batches = natm_in_pairs // batch_size
@@ -535,18 +521,6 @@ class HessianOrbitalResponse(CphfSolver):
 
             profiler.add_timing_info('distRHS', tm.time() - uij_t0)
 
-        # fill up the missing values in dist_cphf_rhs with zeros
-        # so later indexing does not fail
-        if atom_pairs is not None:
-            for i in range(molecule.number_of_atoms()):
-                if i not in atoms_in_pairs:
-                    zer = np.zeros(len(dist_cphf_rhs[0].data))
-                    for j in range(3):
-                        empty_dist_arr = DistributedArray(zer,
-                                                          self.comm,
-                                                          distribute=False)
-                        dist_cphf_rhs.insert(i * 3 + j, empty_dist_arr)
-
         hessian_eri_overlap = self.comm.reduce(hessian_eri_overlap,
                                                root=mpi_master())
 
@@ -733,10 +707,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         # print general info
         cur_str = 'Solver Type                     : '
-        if self.use_subspace_solver:
-            cur_str += 'Iterative Subspace Algorithm'
-        else:
-            cur_str += 'Conjugate Gradient'
+        cur_str += 'Iterative Subspace Algorithm'
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)

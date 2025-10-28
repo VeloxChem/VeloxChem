@@ -213,10 +213,7 @@ class TdaUnrestrictedEigenSolver(LinearSolver):
         solvation_model_sanity_check(self)
 
         # check print level (verbosity of output)
-        if self.print_level < 2:
-            self.print_level = 1
-        if self.print_level > 2:
-            self.print_level = 3
+        self.print_level = max(1, min(self.print_level, 3))
 
         # initialize profiler
         profiler = Profiler({

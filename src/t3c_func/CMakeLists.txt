@@ -2,6 +2,7 @@ target_sources(vlxobjs
   PRIVATE
     RIFockDriver.cpp
     RIFockGradDriver.cpp
+    RIJKFockDriver.cpp
     T3CDistributor.cpp
     T3CGeom010SumDistributor.cpp
     T3CGeom0X0Distributor.cpp
@@ -9,6 +10,7 @@ target_sources(vlxobjs
     T3CGeomX00Distributor.cpp
     T3CLocalDistributor.cpp
     T3CUtils.cpp
+    T3CLocalReducedDistributor.cpp
   )
 
 target_include_directories(vlxobjs

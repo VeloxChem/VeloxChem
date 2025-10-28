@@ -226,7 +226,9 @@ export_general(py::module &m) -> void
           "Gets work group for ERIs.");
     m.def("make_bra_ket_work_group", &omp::make_bra_ket_work_group, "Gets work group for ERIs.");
     m.def("partition_atoms", &omp::partition_atoms, "Get atomic indices of partitioned atoms list.");
-
+    m.def("partition_flat_buffer", &omp::partition_flat_buffer, "Creates vector of indices required for partitioning of flat buffer.");
+    m.def("generate_flat_buffer_mask", &omp::generate_flat_buffer_mask, "Generates mask for reduced flat buffer.");
+    
     // exposing functions from SphericalMomentum.hpp
     m.def("spherical_momentum_s_factors", spher_mom::transformation_factors<0>, "Gets transformation factors for S type spherical momentum.");
     m.def("spherical_momentum_p_factors", spher_mom::transformation_factors<1>, "Gets transformation factors for P type spherical momentum.");
@@ -398,11 +400,13 @@ export_general(py::module &m) -> void
         .def(py::init<const CT3FlatBuffer<double> &>())
         .def("indices", &CT3FlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
         .def("mask_indices", &CT3FlatBuffer<double>::mask_indices, "Gets mask of indices along x axis of tensor.")
+        .def("width", &CT3FlatBuffer<double>::width, "Gets width along y,z axis of tensor.")
+        .def("elements", &CT3FlatBuffer<double>::elements, "Gets number of elements in tensor slice along y,z axes.")
+        .def("aux_width", &CT3FlatBuffer<double>::aux_width, "Gets width along y,x axes of tensor.")
         .def(
             "values",
              [](const CT3FlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
-                 const auto ndim = self.width();
-                 const auto nelems = static_cast<py::ssize_t>(ndim * (ndim + 1) / 2);
+                 const auto nelems = static_cast<py::ssize_t>(self.elements());
                  const auto tdim  = static_cast<py::ssize_t>(sizeof(double));
                  return py::array_t<double>(
                                             std::vector<py::ssize_t>({nelems,}), std::vector<py::ssize_t>({tdim, }), self.data(index));
@@ -434,7 +438,7 @@ export_general(py::module &m) -> void
         .def(
             "values",
              [](const CT3RectFlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
-                 const auto nrows = self.mask_indices().size();
+                 const auto nrows = (self.mask_indices().size() == 0) ? self.width() : self.mask_indices().size();
                  const auto ncols = self.width();
                  const auto nelems = static_cast<py::ssize_t>(nrows * ncols);
                  const auto tdim  = static_cast<py::ssize_t>(sizeof(double));

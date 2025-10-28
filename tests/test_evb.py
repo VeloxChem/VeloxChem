@@ -27,7 +27,7 @@ class TestEvb:
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
 
         ffbuilder = ReactionForceFieldBuilder()
-        ffbuilder.water_model = 'spce'
+        ffbuilder.water_model = 'cspce'
         ethanol_xyz = """
         9
 
@@ -148,7 +148,7 @@ class TestEvb:
 
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
         Lambda = [0, 0.4, 1]
-        system_builder.water_model = 'spce'
+        system_builder.water_model = 'cspce'
         vac_systems, vac_topology, vac_positions = system_builder.build_systems(
             reactant,
             product,

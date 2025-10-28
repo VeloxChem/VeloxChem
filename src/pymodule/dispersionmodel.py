@@ -59,6 +59,8 @@ class DispersionModel:
         self._energy = None
         self._gradient = None
 
+        self.delta_h = 0.001
+
     @staticmethod
     def is_available():
         """
@@ -131,6 +133,53 @@ class DispersionModel:
 
         self._energy = disp_res.get("energy")
         self._gradient = disp_res.get("gradient")
+
+    def compute_numerical_hessian(self, molecule, xc_label, atom_indices):
+        """
+        Uses the dftd4-python interface to compute numerical hessian for
+        dispersion correction.
+
+        :param molecule:
+            The molecule.
+        :param xc_label:
+            The label of XC functional.
+        """
+
+        identifiers_np = np.array(molecule.get_identifiers())
+        net_charge = molecule.get_charge()
+        fd_coords = molecule.get_coordinates_in_bohr()
+
+        natm = molecule.number_of_atoms()
+        hessian = np.zeros((natm, 3, natm, 3))
+
+        disp_xc_label = self._xc_label_to_dftd4(xc_label)
+
+        for i in atom_indices:
+            for x in range(3):
+
+                fd_coords[i, x] += self.delta_h
+                fd_disp_model = D4Model(numbers=identifiers_np,
+                                        positions=fd_coords,
+                                        charge=net_charge,
+                                        model='d4')
+                fd_disp_res = fd_disp_model.get_dispersion(
+                    D4Param(method=disp_xc_label), grad=True)
+                grad_plus = fd_disp_res.get("gradient")
+
+                fd_coords[i, x] -= 2.0 * self.delta_h
+                fd_disp_model = D4Model(numbers=identifiers_np,
+                                        positions=fd_coords,
+                                        charge=net_charge,
+                                        model='d4')
+                fd_disp_res = fd_disp_model.get_dispersion(
+                    D4Param(method=disp_xc_label), grad=True)
+                grad_minus = fd_disp_res.get("gradient")
+
+                fd_coords[i, x] += self.delta_h
+                hessian[i, x, :, :] = ((grad_plus - grad_minus) /
+                                       (2.0 * self.delta_h))
+
+        return hessian
 
     def get_energy(self):
         """

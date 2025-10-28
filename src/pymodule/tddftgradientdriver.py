@@ -72,7 +72,6 @@ class TddftGradientDriver(GradientDriver):
         - tamm_dancoff: Flag if Tamm-Dancoff approximation is employed.
         - state_deriv_index: The excited state of interest.
         - do_first_order_prop: Controls the printout of first-order properties.
-        - relaxed_dipole_moment: The relaxed excited-state dipole moment.
         - delta_h: The displacement for finite difference.
         - do_four_point: Flag for four-point finite difference.
     """
@@ -253,6 +252,78 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
+    def compute_excited_state_densities(self, molecule, basis, rsp_results):
+        """
+        Performs calculation of analytical gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param rsp_results:
+            The results of the RPA or TDA calculation.
+        """
+
+        scf_tensors = self._scf_drv.scf_tensors
+        if self._rsp_results is None:
+            self._rsp_results = rsp_results
+
+        assert_msg_critical(
+            self._scf_drv.scf_type == 'restricted',
+            'compute_excited_state_densities: Not yet implemented for open-shell'
+        )
+
+        # compute orbital response
+        orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
+        orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+
+        # TODO: also check other attributes
+        orbrsp_keywords = [
+            'state_deriv_index', 'timing', 'filename', 'print_level'
+        ]
+        for key in orbrsp_keywords:
+            if (key not in self.orbrsp_dict) and hasattr(self, key):
+                setattr(orbrsp_drv, key, getattr(self, key))
+
+        orbrsp_drv.compute(molecule, basis, scf_tensors, self._rsp_results)
+
+        orbrsp_results = orbrsp_drv.cphf_results
+
+        if self.rank == mpi_master():
+            # only alpha part
+            nocc = molecule.number_of_alpha_electrons()
+            mo = scf_tensors['C_alpha']
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            nvir = mo_vir.shape[1]
+
+        dist_cphf_ov = orbrsp_results['dist_cphf_ov']
+
+        cphf_ao = []
+        for x in range(len(dist_cphf_ov)):
+            cphf_ov_x = dist_cphf_ov[x].get_full_vector(0)
+
+            if self.rank == mpi_master():
+                # CPHF/CPKS coefficients (lambda Lagrange multipliers)
+                cphf_ao.append(
+                    np.linalg.multi_dot(
+                        [mo_occ,
+                         cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
+
+        if self.rank == mpi_master():
+            cphf_ao = np.array(cphf_ao)
+            unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao'].copy()
+            relaxed_density_ao = (unrelaxed_density_ao + 2.0 * cphf_ao +
+                                  2.0 * cphf_ao.transpose(0, 2, 1))
+        else:
+            unrelaxed_density_ao = None
+            relaxed_density_ao = None
+
+        return {
+            'unrelaxed_density': unrelaxed_density_ao,
+            'relaxed_density': relaxed_density_ao,
+        }
+
     def compute_analytical(self, molecule, basis, rsp_results):
         """
         Performs calculation of analytical gradient.
@@ -276,13 +347,15 @@ class TddftGradientDriver(GradientDriver):
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
-        # TODO: also check other options
-        if 'state_deriv_index' not in self.orbrsp_dict:
-            orbrsp_drv.state_deriv_index = self.state_deriv_index
-        if 'timing' not in self.orbrsp_dict:
-            orbrsp_drv.timing = self.timing
-        if 'filename' not in self.orbrsp_dict:
-            orbrsp_drv.filename = self.filename
+
+        # TODO: also check other attributes
+        orbrsp_keywords = [
+            'state_deriv_index', 'timing', 'filename', 'print_level'
+        ]
+        for key in orbrsp_keywords:
+            if (key not in self.orbrsp_dict) and hasattr(self, key):
+                setattr(orbrsp_drv, key, getattr(self, key))
+
         orbrsp_drv.compute(molecule, basis, scf_tensors, self._rsp_results)
 
         omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)

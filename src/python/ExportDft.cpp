@@ -433,9 +433,22 @@ CXCMolecularHessian_integrate_vxc_fock_gradient(CXCMolecularHessian&       self,
     py::list ret;
     for (int vecind = 0; vecind < static_cast<int>(atomIdxVec.size()); vecind++)
     {
-        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 0].values(), {nao, nao}));
-        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 1].values(), {nao, nao}));
-        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 2].values(), {nao, nao}));
+        if (num_gs_dens == 1)
+        {
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 0].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 1].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 2].values(), {nao, nao}));
+        }
+        else
+        {
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 0].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 1].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 2].values(), {nao, nao}));
+
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 3].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 4].values(), {nao, nao}));
+            ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 6 + 5].values(), {nao, nao}));
+        }
     }
     return ret;
 }

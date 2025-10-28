@@ -91,8 +91,8 @@ class RIFockDriver:
         Prepare buffers for the RI Fock driver.
         """
 
-        assert_msg_critical(basis.get_label().lower().startswith('def2-'),
-                            'RI Fock driver: Invalid basis set for RI-J')
+        #assert_msg_critical(basis.get_label().lower().startswith('def2-'),
+        #                    'RI Fock driver: Invalid basis set for RI-J')
 
         if verbose:
             self.ostream.print_info(

@@ -161,8 +161,12 @@ get_gto_values_for_3rd_order(const CGtoBlock&            gto_block,
     {
         return gtoval::get_3rd_order_values_rec_d(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
+    else if (gto_ang == 3)
+    {
+        return gtoval::get_3rd_order_values_rec_f(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
 
-    std::string errangmom("get_gto_values_for_3rd_order: Only implemented up to d-orbitals");
+    std::string errangmom("get_gto_values_for_3rd_order: Only implemented up to f-orbitals");
 
     errors::assertMsgCritical(false, errangmom);
 

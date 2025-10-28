@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from pathlib import Path, PurePath
+from copy import deepcopy
 import numpy as np
 import tempfile
 import sys
@@ -1142,11 +1143,18 @@ class MMForceFieldGenerator:
             self.connectivity_matrix = np.copy(
                 atomtypeidentifier.connectivity_matrix)
 
-        atomtypeidentifier.identify_equivalences()
-
+        # self.gaff_atom_types = atomtypeidentifier.gaff_atom_types
+        self.atom_types_dict = atomtypeidentifier.atom_types_dict
         self.atom_info_dict = atomtypeidentifier.atom_info_dict
-        # TODO: change this to skip when water is used
-        if not resp:
+
+        atomtypeidentifier.identify_equivalences()
+        self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
+        self.equivalent_charges = atomtypeidentifier.equivalent_charges
+
+        use_water_model = ((water_model is not None) and
+                           molecule.is_water_molecule())
+
+        if (not resp) or use_water_model:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
@@ -1175,8 +1183,7 @@ class MMForceFieldGenerator:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
                 resp_drv.ostream.mute()
-                self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        'resp')
+                self.partial_charges = resp_drv.compute(self.molecule, basis)
                 resp_drv.ostream.unmute()
 
                 self.partial_charges = self.comm.bcast(self.partial_charges,
@@ -1200,7 +1207,7 @@ class MMForceFieldGenerator:
 
                 resp_drv.ostream.mute()
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        scf_results, 'resp')
+                                                        scf_results)
                 resp_drv.ostream.unmute()
 
                 self.partial_charges = self.comm.bcast(self.partial_charges,
@@ -1235,8 +1242,61 @@ class MMForceFieldGenerator:
             self.atom_types[i] = f'{self.atom_types[i].strip():<2s}'
         self.unique_atom_types = sorted(list(set(self.atom_types)))
 
-        # Bonds
+        bond_indices, angle_indices, dihedral_indices, self.pairs = self.generate_topology_indices(
+            n_atoms)
 
+        # Read the force field and include the data in the topology dictionary.
+
+        # Atomtypes analysis
+
+        self.atoms = self.populate_atoms(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            gaff_version,
+            list(atomtypeidentifier.equivalent_atoms),
+        )
+
+        self.bonds = self.populate_bonds(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            coords,
+            bond_indices,
+        )
+
+        self.angles = self.populate_angles(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            coords,
+            angle_indices,
+        )
+
+        # Dihedrals analysis
+        self.dihedrals, self.rotatable_bonds = self.populate_dihedrals(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            dihedral_indices,
+            atomtypeidentifier,
+        )
+
+        self.impropers = self.populate_impropers(
+            use_xml,
+            ff_data_dict,
+            ff_data_lines,
+            n_atoms,
+            angle_indices,
+        )
+
+        # Process water model if requested
+        if use_water_model:
+            self.apply_water_model(water_model)
+
+        self.ostream.flush()
+
+    def generate_topology_indices(self, n_atoms):
         bond_indices = set()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
@@ -1294,106 +1354,387 @@ class MMForceFieldGenerator:
                 pairs_14.add((i, l))
         pairs_14 = sorted(list(pairs_14))
 
-        # Read the force field and include the data in the topology dictionary.
+        pairs = {}
+        for i, j in pairs_14:
+            pairs[(i, j)] = {'comment': None}
 
-        # Atomtypes analysis
+        return bond_indices, angle_indices, dihedral_indices, pairs
 
-        atom_type_params = {}
+    def apply_water_model(self, water_model):
+        """
+        Creates the topology for water based on predefined parameters.
+        
+        :param water_model:
+            The water model to use.
+        """
+
+        assert_msg_critical(water_model.lower() in self.water_parameters,
+        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}")
+        
+        self.ostream.print_info(f'Using water model parameters for {water_model}.')
+        self.ostream.print_reference('Reference: ' + self.water_parameters[water_model.lower()]['ref'])
+        self.ostream.flush()
+
+        water_params = self.water_parameters[water_model.lower()]
+
+        labels = self.molecule.get_labels()
+        hydrogen_indices = [idx for idx, label in enumerate(labels) if label == 'H']
+        oxygen_indices = [idx for idx, label in enumerate(labels) if label == 'O']
+
+        self.atoms = {}
+        self.bonds = {}
+        self.angles = {}
+
+        # update unique atom types
+        self.unique_atom_types = [water_params['hw']['type'],
+                                  water_params['ow']['type']]
+
+        # update atom parameters
+        label_to_atomtype_mapping = {'O': 'ow', 'H': 'hw'}
+        for i, label in enumerate(labels):
+            self.atoms[i] = deepcopy(water_params[label_to_atomtype_mapping[label]])
+
+        # update hydrogen atom names to 'H1' and 'H2'
+        for idx, h_ind in enumerate(hydrogen_indices):
+            self.atoms[h_ind]['name'] = f'H{idx + 1}'
+
+        # update O-H bonds
+        i = oxygen_indices[0]
+        for j in hydrogen_indices:
+            self.bonds[(i, j)] = deepcopy(water_params['bonds'])
+
+        # update H-O-H angle
+        j = oxygen_indices[0]
+        i, k = hydrogen_indices
+        self.angles[(i, j, k)] = deepcopy(water_params['angles'])
+
+    def populate_impropers(self, use_xml, ff_data_dict, ff_data_lines, n_atoms,
+                           angle_indices):
+        impropers = {}
+
+        sp2_atom_types = [
+            'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf', 'cu',
+            'cv', 'cz', 'n ', 'ns', 'nt', 'n2', 'na', 'nb', 'nc', 'nd', 'ne',
+            'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
+        ]
+
+        improper_atom_inds = []
+
+        for i, j, k in angle_indices:
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
+
+            if at_2 not in sp2_atom_types:
+                continue
+
+            if j not in improper_atom_inds:
+                improper_atom_inds.append(j)
+            else:
+                continue
+
+            for l in range(n_atoms):
+                if (l in [i, j, k]) or (self.connectivity_matrix[l, j] != 1):
+                    continue
+                at_4 = self.atom_types[l]
+
+                patterns = [
+                    re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
+                    re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
+                    re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
+                    re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
+                ]
+                target_dihedral_types = [
+                    (at_2.strip(), at_3.strip(), at_4.strip(), at_1.strip()),
+                    (at_2.strip(), at_1.strip(), at_4.strip(), at_3.strip()),
+                    (at_2.strip(), at_4.strip(), at_1.strip(), at_3.strip()),
+                    (at_2.strip(), at_3.strip(), at_1.strip(), at_4.strip()),
+                    (at_2.strip(), at_4.strip(), at_3.strip(), at_1.strip()),
+                    (at_2.strip(), at_1.strip(), at_3.strip(), at_4.strip()),
+                ]
+                target_orderings = [
+                    (2, 3, 4, 1),
+                    (2, 1, 4, 3),
+                    (2, 4, 1, 3),
+                    (2, 3, 1, 4),
+                    (2, 4, 3, 1),
+                    (2, 1, 3, 4),
+                ]
+
+                dihedral_found = False
+                barrier, phase, periodicity, comment = None, None, None, None
+                improper_ordering = None
+
+                if use_xml:
+                    # TODO restructure ff_data_dict so that python can natively do the lookup and the for loops can be eliminated here
+                    for dihedral_data in ff_data_dict['impropers']:
+                        for target_dihedral, ordering in zip(
+                                target_dihedral_types, target_orderings):
+                            if target_dihedral == (dihedral_data['class1'],
+                                                   dihedral_data['class2'],
+                                                   dihedral_data['class3'],
+                                                   dihedral_data['class4']):
+                                periodicity = int(dihedral_data['periodicity1'])
+                                barrier = float(dihedral_data['k1'])
+                                phase = float(
+                                    dihedral_data['phase1']) / np.pi * 180.0
+                                comment = self.get_dihedral_type_string(
+                                    target_dihedral)
+                                improper_ordering = ordering
+                                dihedral_found = True
+                                break
+                else:
+                    for line in ff_data_lines:
+                        for p, ordering in zip(patterns, target_orderings):
+                            m = re.search(p, line)
+                            if m is not None:
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 3:
+                                    barrier = float(dihedral_ff[0]) * 4.184
+                                    phase = float(dihedral_ff[1])
+                                    periodicity = int(float(dihedral_ff[2]))
+                                    comment = m.group(0)
+                                    improper_ordering = ordering
+                                    dihedral_found = True
+                                    break
+
+                if not dihedral_found:
+                    patterns = [
+                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
+                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
+                    ]
+                    target_dihedral_types = [
+                        (at_2.strip(), '', at_3.strip(), at_1.strip()),
+                        (at_2.strip(), '', at_1.strip(), at_3.strip()),
+                        (at_2.strip(), '', at_4.strip(), at_3.strip()),
+                        (at_2.strip(), '', at_3.strip(), at_4.strip()),
+                        (at_2.strip(), '', at_4.strip(), at_1.strip()),
+                        (at_2.strip(), '', at_1.strip(), at_4.strip()),
+                    ]
+                    target_orderings = [
+                        (2, 4, 3, 1),
+                        (2, 4, 1, 3),
+                        (2, 1, 4, 3),
+                        (2, 1, 3, 4),
+                        (2, 3, 4, 1),
+                        (2, 3, 1, 4),
+                    ]
+
+                    if use_xml:
+                        for dihedral_data in ff_data_dict['impropers']:
+                            for target_dihedral, ordering in zip(
+                                    target_dihedral_types, target_orderings):
+                                if target_dihedral == (dihedral_data['class1'],
+                                                       dihedral_data['class2'],
+                                                       dihedral_data['class3'],
+                                                       dihedral_data['class4']):
+                                    periodicity = int(
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
+                                    comment = self.get_dihedral_type_string(
+                                        target_dihedral)
+                                    improper_ordering = ordering
+                                    dihedral_found = True
+                                    break
+                    else:
+                        for line in ff_data_lines:
+                            for p, ordering in zip(patterns, target_orderings):
+                                m = re.search(p, line)
+                                if m is not None:
+                                    dihedral_ff = line[11:60].strip().split()
+                                    if len(dihedral_ff) == 3:
+                                        barrier = float(dihedral_ff[0]) * 4.184
+                                        phase = float(dihedral_ff[1])
+                                        periodicity = int(float(dihedral_ff[2]))
+                                        comment = m.group(0)
+                                        improper_ordering = ordering
+                                        dihedral_found = True
+                                        break
+
+                if not dihedral_found:
+                    patterns = [
+                        re.compile(r'\A' + f'X -X -{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
+                        re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
+                    ]
+                    target_dihedral_types = [
+                        (at_2.strip(), '', '', at_3.strip()),
+                        (at_2.strip(), '', '', at_1.strip()),
+                        (at_2.strip(), '', '', at_4.strip()),
+                    ]
+                    target_orderings = [
+                        (2, 4, 1, 3),
+                        (2, 3, 4, 1),
+                        (2, 1, 3, 4),
+                    ]
+
+                    if use_xml:
+                        for dihedral_data in ff_data_dict['impropers']:
+                            for target_dihedral, ordering in zip(
+                                    target_dihedral_types, target_orderings):
+                                if target_dihedral == (dihedral_data['class1'],
+                                                       dihedral_data['class2'],
+                                                       dihedral_data['class3'],
+                                                       dihedral_data['class4']):
+                                    periodicity = int(
+                                        dihedral_data['periodicity1'])
+                                    barrier = float(dihedral_data['k1'])
+                                    phase = float(
+                                        dihedral_data['phase1']) / np.pi * 180.0
+                                    comment = self.get_dihedral_type_string(
+                                        target_dihedral)
+                                    improper_ordering = ordering
+                                    dihedral_found = True
+                                    break
+                    else:
+                        for line in ff_data_lines:
+                            for p, ordering in zip(patterns, target_orderings):
+                                m = re.search(p, line)
+                                if m is not None:
+                                    dihedral_ff = line[11:60].strip().split()
+                                    if len(dihedral_ff) == 3:
+                                        barrier = float(dihedral_ff[0]) * 4.184
+                                        phase = float(dihedral_ff[1])
+                                        periodicity = int(float(dihedral_ff[2]))
+                                        comment = m.group(0)
+                                        improper_ordering = ordering
+                                        dihedral_found = True
+                                        break
+
+                if not dihedral_found:
+                    # Default values for impropers
+                    barrier, phase, periodicity = 1.1 * 4.184, 180.0, 2
+                    comment = 'Guessed'
+
+                assert_msg_critical(
+                    phase == 180.0,
+                    'MMForceFieldGenerator: invalid improper dihedral phase')
+
+                assert_msg_critical(
+                    periodicity == 2,
+                    'MMForceFieldGenerator: invalid improper dihedral periodicity'
+                )
+
+                # The ordering of the atoms in improper dihedral: the first
+                # atom is connected to all the other three atoms. See e.g.
+                # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
+
+                if improper_ordering is None:
+                    dih_atom_inds_tuple = (j, i, k, l)
+                elif improper_ordering[-1] == 4:
+                    dih_atom_inds_tuple = (j, i, k, l)
+                elif improper_ordering[-1] == 3:
+                    dih_atom_inds_tuple = (j, l, i, k)
+                elif improper_ordering[-1] == 1:
+                    dih_atom_inds_tuple = (j, k, l, i)
+
+                impropers[dih_atom_inds_tuple] = {
+                    'type': 'Fourier',
+                    'barrier': barrier,
+                    'phase': phase,
+                    'periodicity': periodicity,
+                    'comment': comment
+                }
+        return impropers
+
+    def populate_atoms(self, use_xml, ff_data_dict, ff_data_lines, gaff_version,
+                       equivalent_atoms):
 
         use_gaff = False
         use_uff = False
         use_tm = False
-        use_water_model = False
 
-        for at in self.unique_atom_types:
+        # Atoms analysis
+
+        atoms = {}
+
+        atom_names = self.get_atom_names()
+        atom_masses = self.molecule.get_masses()
+
+        for i, atom_type in enumerate(self.atom_types_dict.values()):
             atom_type_found = False
 
-            if use_xml:
-                for atom_type_data in ff_data_dict['atom_types']:
-                    # Note: need strip() for converting e.g. 'c ' to 'c'
-                    if atom_type_data['class'] == at.strip():
-                        sigma = float(atom_type_data['sigma'])
-                        epsilon = float(atom_type_data['epsilon'])
-                        comment = 'GAFF'
-                        atom_type_found = True
-                        use_gaff = True
-                        break
+            if 'gaff' in atom_type:
+                # Note: need strip() for converting e.g. 'c ' to 'c'
+                gafftype = atom_type['gaff'].strip()
 
-            else:
-                for line in ff_data_lines:
-                    if line.startswith(f'  {at}     '):
-                        atom_ff = line[5:].strip().split()
-                        sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
-                        epsilon = float(atom_ff[1]) * 4.184
-                        comment = 'GAFF'
-                        atom_type_found = True
-                        use_gaff = True
-                        break
+                if use_xml:
+                    for atom_type_data in ff_data_dict['atom_types']:
+                        if atom_type_data['class'] == gafftype:
+                            sigma = float(atom_type_data['sigma'])
+                            epsilon = float(atom_type_data['epsilon'])
+                            comment = 'GAFF'
+                            atom_type_found = True
+                            use_gaff = True
+                            atom_type = gafftype
+                            break
+
+                else:
+                    for line in ff_data_lines:
+                        if line.startswith(f'  {gafftype}     '):
+                            atom_ff = line[5:].strip().split()
+                            sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
+                            epsilon = float(atom_ff[1]) * 4.184
+                            comment = 'GAFF'
+                            atom_type_found = True
+                            use_gaff = True
+                            atom_type = gafftype
+                            break
 
             if not atom_type_found:
-                # Auxilary variable for finding parameters in UFF
-                element = ''
-                for i, c in enumerate(at):
-                    if c.isalpha() and not (c == 'x' and i > 0):
-                        element += c
-                    else:
-                        break
-                element = element.capitalize()
+                element = atom_type['uff'].strip()
 
-                if at in ['ow', 'hw']:
-                    assert_msg_critical(
-                        water_model is not None,
-                        'MMForceFieldGenerator: water model not specified.')
-                    assert_msg_critical(
-                        water_model in self.water_parameters,
-                        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}"
-                    )
-
-                    sigma = self.water_parameters[water_model][at]['sigma']
-                    epsilon = self.water_parameters[water_model][at]['epsilon']
-
-                    water_bonds = self.water_parameters[water_model]['bonds']
-                    water_angles = self.water_parameters[water_model]['angles']
-                    self.partial_charges = [
-                        self.water_parameters[water_model][a]['charge']
-                        for a in self.atom_types
-                    ]
-                    atom_type_found = True
-                    use_water_model = True
-                    self.eq_param = False
-                    comment = water_model
-
-                elif element in self.tm_parameters:
-                    tmmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
+                if element in self.tm_parameters:
+                    tmmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
                     tmmsg += ' Taking transition metal parameters from literature.'
                     self.ostream.print_info(tmmsg)
                     sigma = self.tm_parameters[element]['sigma']
                     epsilon = self.tm_parameters[element]['epsilon']
                     comment = 'TM'
                     use_tm = True
+                    atom_type = element
 
                 # Case for atoms in UFF but not in GAFF
                 elif element in self.uff_parameters:
-                    uffmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
+                    uffmsg = f'MMForceFieldGenerator: atom type {atom_type} is not in GAFF.'
                     uffmsg += ' Taking sigma and epsilon from UFF.'
                     self.ostream.print_info(uffmsg)
                     sigma = self.uff_parameters[element]['sigma']
                     epsilon = self.uff_parameters[element]['epsilon']
                     comment = 'UFF'
                     use_uff = True
+                    atom_type = element
 
                 else:
                     assert_msg_critical(
                         False,
-                        f'MMForceFieldGenerator: atom type {at} not found in GAFF or UFF.'
+                        f'MMForceFieldGenerator: atom type {atom_type} not found in GAFF or UFF.'
                     )
 
-            atom_type_params[at] = {
+            atoms[i] = {
+                'type': atom_type,
+                'name': atom_names[i],
+                'mass': atom_masses[i],
+                'charge': self.partial_charges[i],
                 'sigma': sigma,
                 'epsilon': epsilon,
-                'comment': comment
+                'equivalent_atom': equivalent_atoms[i],
+                'comment': comment,
             }
 
+        self.print_references(gaff_version, use_gaff, use_uff, use_tm)
+
+        return atoms
+
+    def print_references(self, gaff_version, use_gaff, use_uff, use_tm):
         if use_gaff:
             if gaff_version is not None:
                 self.ostream.print_info(
@@ -1422,41 +1763,10 @@ class MMForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        if use_water_model:
-            self.ostream.print_info(
-                f'Using modified water model parameters for {water_model}.')
-            wff_ref = 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski,'
-            wff_ref += 'A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
-            self.ostream.print_reference('Reference: ' + wff_ref)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        # Atoms analysis
-
-        self.atoms = {}
-
-        atom_names = self.get_atom_names()
-        atom_masses = self.molecule.get_masses()
-        equivalent_atoms = list(atomtypeidentifier.equivalent_atoms)
-
-        for i in range(n_atoms):
-            at = self.atom_types[i]
-            self.atoms[i] = {
-                'type': at,
-                'name': atom_names[i],
-                'mass': atom_masses[i],
-                'charge': self.partial_charges[i],
-                'sigma': atom_type_params[at]['sigma'],
-                'epsilon': atom_type_params[at]['epsilon'],
-                'equivalent_atom': equivalent_atoms[i],
-            }
-
-        # Bonds analysis
-
-        self.bonds = {}
-
+    def populate_bonds(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                       bond_indices):
+        bonds = {}
         for i, j in bond_indices:
-
             r_eq = np.linalg.norm(coords[i] - coords[j]) * 0.1
 
             at_1 = self.atom_types[i]
@@ -1485,12 +1795,6 @@ class MMForceFieldGenerator:
                             bond_found = True
                             break
 
-            elif use_water_model:
-                r = water_bonds['equilibrium']
-                k_r = water_bonds['force_constant']
-                comment = 'ow-hw'
-                bond_found = True
-
             else:
                 for line in ff_data_lines:
                     for p in patterns:
@@ -1514,27 +1818,19 @@ class MMForceFieldGenerator:
                     self.ostream.print_info(msg)
                 r = r_eq
 
-            self.bonds[(i, j)] = {
+            bonds[(i, j)] = {
                 'type': 'harmonic',
                 'force_constant': k_r,
                 'equilibrium': r,
                 'comment': comment
             }
+        return bonds
 
-        # Pairs writing
-
-        self.pairs = {}
-
-        for i, j in pairs_14:
-
-            self.pairs[(i, j)] = {'comment': None}
-
-        # Angles analysis
-
-        self.angles = {}
+    def populate_angles(self, use_xml, ff_data_dict, ff_data_lines, coords,
+                        angle_indices):
+        angles = {}
 
         for i, j, k in angle_indices:
-
             a = coords[i] - coords[j]
             b = coords[k] - coords[j]
             theta_eq = safe_arccos(
@@ -1558,6 +1854,7 @@ class MMForceFieldGenerator:
             theta, k_theta, comment = None, None, None
 
             if use_xml:
+                # TODO restructure ff_data_dict so that python can natively do the lookup and the for loops can be eliminated here
                 for angle_data in ff_data_dict['angles']:
                     for target_angle in target_angle_types:
                         if target_angle == (angle_data['class1'],
@@ -1568,13 +1865,6 @@ class MMForceFieldGenerator:
                             comment = '-'.join(target_angle)
                             angle_found = True
                             break
-
-            elif use_water_model:
-                k_theta = water_angles['force_constant']
-                theta = water_angles['equilibrium']
-                comment = water_angles['comment']
-                angle_found = True
-
             else:
                 for line in ff_data_lines:
                     for p in patterns:
@@ -1598,19 +1888,25 @@ class MMForceFieldGenerator:
                     self.ostream.print_info(msg)
                 theta = theta_eq
 
-            self.angles[(i, j, k)] = {
+            angles[(i, j, k)] = {
                 'type': 'harmonic',
                 'force_constant': k_theta,
                 'equilibrium': theta,
                 'comment': comment
             }
+        return angles
 
-        # Dihedrals analysis
-
-        self.dihedrals = {}
+    def populate_dihedrals(
+        self,
+        use_xml,
+        ff_data_dict,
+        ff_data_lines,
+        dihedral_indices,
+        atomtypeidentifier,
+    ):
+        dihedrals = {}
 
         for i, j, k, l in dihedral_indices:
-
             at_1 = self.atom_types[i]
             at_2 = self.atom_types[j]
             at_3 = self.atom_types[k]
@@ -1780,7 +2076,7 @@ class MMForceFieldGenerator:
                 warnmsg += ' is not available.'
                 self.ostream.print_warning(warnmsg)
                 # Default value for dihedrals
-                self.dihedrals[(i, j, k, l)] = {
+                dihedrals[(i, j, k, l)] = {
                     'type': 'Fourier',
                     'multiple': False,
                     'barrier': 0.0,
@@ -1834,8 +2130,7 @@ class MMForceFieldGenerator:
                         break
 
             if len(dihedral_barriers) == 1:
-
-                self.dihedrals[(i, j, k, l)] = {
+                dihedrals[(i, j, k, l)] = {
                     'type': 'Fourier',
                     'multiple': False,
                     'barrier': dihedral_barriers[0],
@@ -1845,8 +2140,7 @@ class MMForceFieldGenerator:
                 }
 
             elif len(dihedral_barriers) > 1:
-
-                self.dihedrals[(i, j, k, l)] = {
+                dihedrals[(i, j, k, l)] = {
                     'type': 'Fourier',
                     'multiple': True,
                     'barrier': dihedral_barriers,
@@ -1855,9 +2149,8 @@ class MMForceFieldGenerator:
                     'comment': dihedral_comments,
                 }
 
-        # Fetch the rotatable bonds from the molecule and the atom types involved
         rotatable_bonds_types = {}
-        for i, j, k, l in self.dihedrals:
+        for i, j, k, l in dihedrals:
             # Ensure consistent ordering of bond indices
             bond_indices = (min(j, k), max(j, k))
             bond_types = (self.atom_types[bond_indices[0]],
@@ -1869,245 +2162,10 @@ class MMForceFieldGenerator:
             rotatable_bonds_types)
 
         # Create a 1-indexed list of rotatable bonds without duplicates
-        self.rotatable_bonds = [[bond[0] + 1, bond[1] + 1]
-                                for bond in updated_rotatable_bonds.keys()]
+        rotatable_bonds = [[bond[0] + 1, bond[1] + 1]
+                           for bond in updated_rotatable_bonds.keys()]
 
-        # Impropers
-
-        self.impropers = {}
-
-        sp2_atom_types = [
-            'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf', 'cu',
-            'cv', 'cz', 'n ', 'ns', 'nt', 'n2', 'na', 'nb', 'nc', 'nd', 'ne',
-            'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
-        ]
-
-        improper_atom_inds = []
-
-        for i, j, k in angle_indices:
-            at_1 = self.atom_types[i]
-            at_2 = self.atom_types[j]
-            at_3 = self.atom_types[k]
-
-            if at_2 not in sp2_atom_types:
-                continue
-
-            if j not in improper_atom_inds:
-                improper_atom_inds.append(j)
-            else:
-                continue
-
-            for l in range(n_atoms):
-                if (l in [i, j, k]) or (self.connectivity_matrix[l, j] != 1):
-                    continue
-                at_4 = self.atom_types[l]
-
-                patterns = [
-                    re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
-                    re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
-                    re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
-                    re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
-                    re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
-                    re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
-                ]
-                target_dihedral_types = [
-                    (at_2.strip(), at_3.strip(), at_4.strip(), at_1.strip()),
-                    (at_2.strip(), at_1.strip(), at_4.strip(), at_3.strip()),
-                    (at_2.strip(), at_4.strip(), at_1.strip(), at_3.strip()),
-                    (at_2.strip(), at_3.strip(), at_1.strip(), at_4.strip()),
-                    (at_2.strip(), at_4.strip(), at_3.strip(), at_1.strip()),
-                    (at_2.strip(), at_1.strip(), at_3.strip(), at_4.strip()),
-                ]
-                target_orderings = [
-                    (2, 3, 4, 1),
-                    (2, 1, 4, 3),
-                    (2, 4, 1, 3),
-                    (2, 3, 1, 4),
-                    (2, 4, 3, 1),
-                    (2, 1, 3, 4),
-                ]
-
-                dihedral_found = False
-                barrier, phase, periodicity, comment = None, None, None, None
-                improper_ordering = None
-
-                if use_xml:
-                    for dihedral_data in ff_data_dict['impropers']:
-                        for target_dihedral, ordering in zip(
-                                target_dihedral_types, target_orderings):
-                            if target_dihedral == (dihedral_data['class1'],
-                                                   dihedral_data['class2'],
-                                                   dihedral_data['class3'],
-                                                   dihedral_data['class4']):
-                                periodicity = int(dihedral_data['periodicity1'])
-                                barrier = float(dihedral_data['k1'])
-                                phase = float(
-                                    dihedral_data['phase1']) / np.pi * 180.0
-                                comment = self.get_dihedral_type_string(
-                                    target_dihedral)
-                                improper_ordering = ordering
-                                dihedral_found = True
-                                break
-                else:
-                    for line in ff_data_lines:
-                        for p, ordering in zip(patterns, target_orderings):
-                            m = re.search(p, line)
-                            if m is not None:
-                                dihedral_ff = line[11:60].strip().split()
-                                if len(dihedral_ff) == 3:
-                                    barrier = float(dihedral_ff[0]) * 4.184
-                                    phase = float(dihedral_ff[1])
-                                    periodicity = int(float(dihedral_ff[2]))
-                                    comment = m.group(0)
-                                    improper_ordering = ordering
-                                    dihedral_found = True
-                                    break
-
-                if not dihedral_found:
-                    patterns = [
-                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
-                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
-                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
-                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
-                    ]
-                    target_dihedral_types = [
-                        (at_2.strip(), '', at_3.strip(), at_1.strip()),
-                        (at_2.strip(), '', at_1.strip(), at_3.strip()),
-                        (at_2.strip(), '', at_4.strip(), at_3.strip()),
-                        (at_2.strip(), '', at_3.strip(), at_4.strip()),
-                        (at_2.strip(), '', at_4.strip(), at_1.strip()),
-                        (at_2.strip(), '', at_1.strip(), at_4.strip()),
-                    ]
-                    target_orderings = [
-                        (2, 4, 3, 1),
-                        (2, 4, 1, 3),
-                        (2, 1, 4, 3),
-                        (2, 1, 3, 4),
-                        (2, 3, 4, 1),
-                        (2, 3, 1, 4),
-                    ]
-
-                    if use_xml:
-                        for dihedral_data in ff_data_dict['impropers']:
-                            for target_dihedral, ordering in zip(
-                                    target_dihedral_types, target_orderings):
-                                if target_dihedral == (dihedral_data['class1'],
-                                                       dihedral_data['class2'],
-                                                       dihedral_data['class3'],
-                                                       dihedral_data['class4']):
-                                    periodicity = int(
-                                        dihedral_data['periodicity1'])
-                                    barrier = float(dihedral_data['k1'])
-                                    phase = float(
-                                        dihedral_data['phase1']) / np.pi * 180.0
-                                    comment = self.get_dihedral_type_string(
-                                        target_dihedral)
-                                    improper_ordering = ordering
-                                    dihedral_found = True
-                                    break
-                    else:
-                        for line in ff_data_lines:
-                            for p, ordering in zip(patterns, target_orderings):
-                                m = re.search(p, line)
-                                if m is not None:
-                                    dihedral_ff = line[11:60].strip().split()
-                                    if len(dihedral_ff) == 3:
-                                        barrier = float(dihedral_ff[0]) * 4.184
-                                        phase = float(dihedral_ff[1])
-                                        periodicity = int(float(dihedral_ff[2]))
-                                        comment = m.group(0)
-                                        improper_ordering = ordering
-                                        dihedral_found = True
-                                        break
-
-                if not dihedral_found:
-                    patterns = [
-                        re.compile(r'\A' + f'X -X -{at_2}-{at_3} '),
-                        re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
-                        re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
-                    ]
-                    target_dihedral_types = [
-                        (at_2.strip(), '', '', at_3.strip()),
-                        (at_2.strip(), '', '', at_1.strip()),
-                        (at_2.strip(), '', '', at_4.strip()),
-                    ]
-                    target_orderings = [
-                        (2, 4, 1, 3),
-                        (2, 3, 4, 1),
-                        (2, 1, 3, 4),
-                    ]
-
-                    if use_xml:
-                        for dihedral_data in ff_data_dict['impropers']:
-                            for target_dihedral, ordering in zip(
-                                    target_dihedral_types, target_orderings):
-                                if target_dihedral == (dihedral_data['class1'],
-                                                       dihedral_data['class2'],
-                                                       dihedral_data['class3'],
-                                                       dihedral_data['class4']):
-                                    periodicity = int(
-                                        dihedral_data['periodicity1'])
-                                    barrier = float(dihedral_data['k1'])
-                                    phase = float(
-                                        dihedral_data['phase1']) / np.pi * 180.0
-                                    comment = self.get_dihedral_type_string(
-                                        target_dihedral)
-                                    improper_ordering = ordering
-                                    dihedral_found = True
-                                    break
-                    else:
-                        for line in ff_data_lines:
-                            for p, ordering in zip(patterns, target_orderings):
-                                m = re.search(p, line)
-                                if m is not None:
-                                    dihedral_ff = line[11:60].strip().split()
-                                    if len(dihedral_ff) == 3:
-                                        barrier = float(dihedral_ff[0]) * 4.184
-                                        phase = float(dihedral_ff[1])
-                                        periodicity = int(float(dihedral_ff[2]))
-                                        comment = m.group(0)
-                                        improper_ordering = ordering
-                                        dihedral_found = True
-                                        break
-
-                if not dihedral_found:
-                    # Default values for impropers
-                    barrier, phase, periodicity = 1.1 * 4.184, 180.0, 2
-                    comment = 'Guessed'
-
-                assert_msg_critical(
-                    phase == 180.0,
-                    'MMForceFieldGenerator: invalid improper dihedral phase')
-
-                assert_msg_critical(
-                    periodicity == 2,
-                    'MMForceFieldGenerator: invalid improper dihedral periodicity'
-                )
-
-                # The ordering of the atoms in improper dihedral: the first
-                # atom is connected to all the other three atoms. See e.g.
-                # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
-
-                if improper_ordering is None:
-                    dih_atom_inds_tuple = (j, i, k, l)
-                elif improper_ordering[-1] == 4:
-                    dih_atom_inds_tuple = (j, i, k, l)
-                elif improper_ordering[-1] == 3:
-                    dih_atom_inds_tuple = (j, l, i, k)
-                elif improper_ordering[-1] == 1:
-                    dih_atom_inds_tuple = (j, k, l, i)
-
-                self.impropers[dih_atom_inds_tuple] = {
-                    'type': 'Fourier',
-                    'barrier': barrier,
-                    'phase': phase,
-                    'periodicity': periodicity,
-                    'comment': comment
-                }
-
-        self.ostream.flush()
+        return dihedrals, rotatable_bonds
 
     @staticmethod
     def get_dihedral_type_string(target_dihedral):
@@ -2244,7 +2302,7 @@ class MMForceFieldGenerator:
         """
 
         # Extract indices from the list
-        i, j = bond
+        i, j = sorted(bond)
 
         # Convert to zero-based indices
         i = i - 1
@@ -2402,8 +2460,8 @@ class MMForceFieldGenerator:
                 continue
 
             # Check if any side atom of the bond is involved in a triple bond
-            if (bond[0] in ['c1', 'n1', 'cg', 'ch'] or
-                    bond[1] in ['c1', 'n1', 'cg', 'ch']):
+            if (bond[0] in ['c1', 'n1', 'cg', 'ch'
+                           ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -2656,8 +2714,7 @@ class MMForceFieldGenerator:
                   top_file,
                   itp_file,
                   mol_name=None,
-                  amber_ff=None,
-                  water_model=None):
+                  amber_ff=None):
         """
         Writes a topology file.
 
@@ -2708,22 +2765,6 @@ class MMForceFieldGenerator:
 
             f_top.write('\n#include "' + Path(itp_fname).name + '"\n')
 
-            # TODO: change this to fit with the self.water_parameters
-            # e.g., if water_model in self.water_parameters
-            if water_model is not None:
-                # very rudimentary check for water model names
-                assert_msg_critical(
-                    water_model.startswith('tip') or
-                    water_model.startswith('spc'),
-                    'MMForceFieldGenerator.write_top: Invalid water model name')
-                assert_msg_critical(
-                    amber_ff is not None, 'MMForceFieldGenerator.write_top: ' +
-                    'amber_ff is required for water_model')
-                water_include = str(
-                    PurePath(f'{amber_ff}.ff') / f'{water_model}.itp'
-                )  ##TODO: add maybe changed water model or similar
-                f_top.write(f'\n#include "{water_include}"\n')
-
             # system
 
             f_top.write('\n[ system ]\n')
@@ -2761,7 +2802,8 @@ class MMForceFieldGenerator:
 
             for at in self.unique_atom_types:
                 for i, atom in self.atoms.items():
-                    if atom['type'] == at:
+                    # Note: need strip() for converting e.g. 'c ' to 'c'
+                    if atom['type'].strip() == at.strip():
                         line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
                             at, at, 0., 0., 'A')
                         line_str += '{:16.5e}{:14.5e}\n'.format(
@@ -3054,7 +3096,7 @@ class MMForceFieldGenerator:
             # Atoms
             for i, atom in self.atoms.items():
                 atom_name = atom['name']
-                line_str = f'{1:>5d}{res_name:<5s}{atom_name:<5s}{i + 1:>5d}'
+                line_str = f'{1:>5d}{res_name:<5s}{atom_name:>5s}{i + 1:>5d}'
                 for d in range(3):
                     line_str += f'{coords_in_nm[i][d]:{ndec + 5}.{ndec}f}'
                 line_str += '\n'
@@ -3144,7 +3186,6 @@ class MMForceFieldGenerator:
                             filename,
                             mol_name=None,
                             amber_ff=None,
-                            water_model=None,
                             gro_precision=3):
         """
         Writes all the needed files for a MD simulation with GROMACS.
@@ -3169,7 +3210,7 @@ class MMForceFieldGenerator:
         gro_file = Path(filename).with_suffix('.gro')
 
         self.write_itp(itp_file, mol_name)
-        self.write_top(top_file, itp_file, mol_name, amber_ff, water_model)
+        self.write_top(top_file, itp_file, mol_name, amber_ff)
         self.write_gro(gro_file, mol_name, gro_precision)
 
     def write_openmm_files(self, filename, mol_name=None):
@@ -3579,7 +3620,7 @@ class MMForceFieldGenerator:
         return json.dumps(ff_data, indent=4)
 
     @staticmethod
-    def save_forcefield_as_json(forcefield, path: str):
+    def save_forcefield_as_json(forcefield, filename: str):
         """
         Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
 
@@ -3591,7 +3632,9 @@ class MMForceFieldGenerator:
             None
         """
         json = MMForceFieldGenerator.get_forcefield_as_json(forcefield)
-        folder = str(Path(path).parent)
+        cwd = Path().cwd()
+        path = cwd / Path(filename)
+        folder = str(path.parent)
         if not Path(folder).exists():
             Path(folder).mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as file:
