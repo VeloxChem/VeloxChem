@@ -2799,13 +2799,13 @@ class MMForceFieldGenerator:
             line_str = ';name   bond_type     mass     charge'
             line_str += '   ptype   sigma         epsilon\n'
             f_itp.write(line_str)
-
+            # TODO: Make unique_atom_types and atom['type'] more consistent
             for at in self.unique_atom_types:
                 for i, atom in self.atoms.items():
                     # Note: need strip() for converting e.g. 'c ' to 'c'
-                    if atom['type'].strip() == at.strip():
+                    if (atom['type'].strip() == at.strip()) or (atom['type'].strip() + '_unknown' == at.strip()):
                         line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
-                            at, at, 0., 0., 'A')
+                            atom['type'], atom['type'], 0., 0., 'A')
                         line_str += '{:16.5e}{:14.5e}\n'.format(
                             atom['sigma'], atom['epsilon'])
                         f_itp.write(line_str)
