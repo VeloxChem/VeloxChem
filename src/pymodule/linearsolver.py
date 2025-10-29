@@ -727,7 +727,10 @@ class LinearSolver:
                                         local_comm.Get_rank(), local_comm.Get_size())
 
         if profiler is not None:
-            profiler.add_timing_info('Prep', tm.time() - prep_t0)
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
+        vecs_e2_ger_data = None
+        vecs_e2_ung_data = None
 
         # go through batches
 
@@ -782,7 +785,7 @@ class LinearSolver:
             self.comm.barrier()
 
             if profiler is not None:
-                profiler.add_timing_info('Prep', tm.time() - prep_t0)
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
             if subcomm_index + batch_start < batch_end:
 
@@ -831,7 +834,7 @@ class LinearSolver:
                 dens = AODensityMatrix([den_mat_np], denmat.rest)
 
                 if profiler is not None:
-                    profiler.add_timing_info('Prep', tm.time() - prep_t0)
+                    profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
                 # form Fock matrices
 
@@ -933,29 +936,72 @@ class LinearSolver:
 
             prep_t0 = tm.time()
 
+            local_e2_ger_data = None
+            local_e2_ung_data = None
+
             for idx, local_master_rank in enumerate(local_master_ranks):
 
                 if idx + batch_start >= batch_end:
                     break
 
-                vecs_e2_ger = DistributedArray(e2_ger, self.comm, root=local_master_rank)
-                vecs_e2_ung = DistributedArray(e2_ung, self.comm, root=local_master_rank)
-                self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+                dist_e2_ger = DistributedArray(e2_ger, self.comm, root=local_master_rank)
+                dist_e2_ung = DistributedArray(e2_ung, self.comm, root=local_master_rank)
+
+                # Note: accumulate per-rank data to avoid incremental appending
+
+                if local_e2_ger_data is None:
+                    local_e2_ger_data = dist_e2_ger.data.copy()
+                else:
+                    local_e2_ger_data = np.hstack((local_e2_ger_data,
+                                                   dist_e2_ger.data))
+
+                if local_e2_ung_data is None:
+                    local_e2_ung_data = dist_e2_ung.data.copy()
+                else:
+                    local_e2_ung_data = np.hstack((local_e2_ung_data,
+                                                   dist_e2_ung.data))
 
                 if self.nonlinear:
                     dist_fock_ger = DistributedArray(fock_ger, self.comm, root=local_master_rank)
                     dist_fock_ung = DistributedArray(fock_ung, self.comm, root=local_master_rank)
+                    # TODO: avoid incremental append
                     self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+
+            # Note: accumulate per-batch data to avoid incremental appending
+
+            if vecs_e2_ger_data is None:
+                vecs_e2_ger_data = local_e2_ger_data.copy()
+            else:
+                vecs_e2_ger_data = np.hstack((vecs_e2_ger_data,
+                                              local_e2_ger_data))
+
+            if vecs_e2_ung_data is None:
+                vecs_e2_ung_data = local_e2_ung_data.copy()
+            else:
+                vecs_e2_ung_data = np.hstack((vecs_e2_ung_data,
+                                              local_e2_ung_data))
 
             if profiler is not None:
                 profiler.add_timing_info('PostProc', tm.time() - prep_t0)
 
         prep_t0 = tm.time()
 
+        # Note: append sigma and trial vectors only once
+
+        vecs_e2_ger = DistributedArray(vecs_e2_ger_data,
+                                       self.comm,
+                                       distribute=False)
+
+        vecs_e2_ung = DistributedArray(vecs_e2_ung_data,
+                                       self.comm,
+                                       distribute=False)
+
+        self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
         if profiler is not None:
-            profiler.add_timing_info('Prep', tm.time() - prep_t0)
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
         self.ostream.print_blank()
 
