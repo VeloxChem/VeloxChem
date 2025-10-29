@@ -134,6 +134,12 @@ class VibrationalAnalysis:
         self.rsp_dict = {}
         self.polgrad_dict = {}
 
+        self.do_ir = True
+        self.do_raman = False
+        self.do_resonance_raman = False
+        self.rr_damping = None
+        self.frequencies = (0,)
+
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
@@ -148,6 +154,9 @@ class VibrationalAnalysis:
                 self.is_tddft = True
                 self.scf_driver = drv
                 self.rsp_driver = rsp_drv
+                if self.do_ir:
+                    # Ensure that the excited state dipole moment is calculated
+                    grad_drv.do_first_order_prop = True
                 self.hessian_driver = TddftHessianDriver(drv, rsp_drv, grad_drv)
         elif isinstance(drv, XtbDriver):
             self.is_xtb = True
@@ -178,12 +187,6 @@ class VibrationalAnalysis:
         # flag for two-point or four-point approximation
         self.do_four_point_hessian = False
         self.do_four_point_raman = False
-
-        self.do_ir = True
-        self.do_raman = False
-        self.do_resonance_raman = False
-        self.rr_damping = None
-        self.frequencies = (0,)
 
         # flag for printing
         self.do_print_hessian = False

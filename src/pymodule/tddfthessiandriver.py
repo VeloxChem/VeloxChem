@@ -262,12 +262,12 @@ class TddftHessianDriver(HessianDriver):
         self.ostream.print_header(cur_str3.ljust(str_width))
         self.ostream.print_header(cur_str4.ljust(str_width))
 
-        if self._dft:
+        if self.scf_driver._dft:
             cur_str = 'Exchange-Correlation Functional : '
-            cur_str += self.xcfun.get_func_label().upper()
+            cur_str += self.scf_driver.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            grid_level = (get_default_grid_level(self.xcfun)
-                          if self.grid_level is None else self.grid_level)
+            grid_level = (get_default_grid_level(self.scf_driver.xcfun)
+                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
