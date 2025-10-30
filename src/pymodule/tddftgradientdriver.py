@@ -165,9 +165,6 @@ class TddftGradientDriver(GradientDriver):
         if self.tamm_dancoff:
             self.flag = 'TDA Gradient Driver'
 
-        if self.state_deriv_index is not None:
-            orbrsp_dict['state_deriv_index'] = self.state_deriv_index
-
         self.grad_dict = dict(grad_dict)
         self.rsp_dict = dict(rsp_dict)
         self.method_dict = dict(method_dict)

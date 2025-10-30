@@ -104,18 +104,8 @@ class TddftHessianDriver(HessianDriver):
 
         start_time = tm.time()
 
-        # mute ostreams
-        self.scf_driver.ostream.mute()
-        self.rsp_driver.ostream.mute()
-        self.tddft_gradient_driver.ostream.mute()
-
         # compute hessian
         self.compute_numerical(molecule, basis)
-
-        # unmute
-        self.scf_driver.ostream.unmute()
-        self.rsp_driver.ostream.unmute()
-        self.tddft_gradient_driver.ostream.unmute()
 
         if self.rank == mpi_master():
             if self.do_print_hessian:
@@ -186,12 +176,16 @@ class TddftHessianDriver(HessianDriver):
             The AO basis set.
         """
         self.scf_driver.restart = False
+        self.scf_driver.ostream.mute()
         scf_results = self.scf_driver.compute(molecule, basis)
+        self.scf_driver.ostream.unmute()
         assert_msg_critical(self.scf_driver.is_converged,
                             'TddftHessianDriver: SCF did not converge')
 
         self.rsp_driver.restart = False
+        self.rsp_driver.ostream.mute()
         rsp_results = self.rsp_driver.compute(molecule, basis, scf_results)
+        self.rsp_driver.ostream.unmute()
         assert_msg_critical(self.rsp_driver.is_converged,
                             'TddftHessianDriver: response did not converge')
 
@@ -200,18 +194,24 @@ class TddftHessianDriver(HessianDriver):
         # for the current molecular geometry.
         self.tddft_gradient_driver._scf_drv = self.scf_driver
         self.tddft_gradient_driver._rsp_results = None
-        self.tddft_gradient_driver.compute_analytical(molecule, basis,
-                                                      rsp_results)
+        self.tddft_gradient_driver.ostream.mute()
+        self.tddft_gradient_driver.compute(molecule, basis, self.scf_driver,
+                                           self.rsp_driver, rsp_results)
+        self.tddft_gradient_driver.ostream.unmute()
+
         if self.rank == mpi_master():
-            # Multiple excited states can be computed simultaneously.
+            # Multiple excited states can be computed simultaneously by TddftGradientDriver.
             # For the numerical Hessian, take the first excited state in the list
-            return self.tddft_gradient_driver.gradient[0].copy()
+            if isinstance(self.tddft_gradient_driver.state_deriv_index, int):
+                return self.tddft_gradient_driver.gradient.copy()
+            else:
+                return self.tddft_gradient_driver.gradient[0].copy()
         else:
             return None
 
-    # TODO: the relaxed dipole moment is calculated at the same time as
-    # the gradient, to avoid re-calculating everything, here the value
-    # is returned. Needed by compute_numerical in HessianDriver.
+    # The relaxed dipole moment is calculated at the same time as
+    # the gradient so, to avoid re-calculating everything, here the value
+    # is simply returned. Used by compute_numerical in HessianDriver.
     def compute_electric_dipole_moment(self, molecule, basis):
         """
         Returns the electric dipole moment calculated with the
@@ -224,7 +224,12 @@ class TddftHessianDriver(HessianDriver):
         """
 
         if self.rank == mpi_master():
-            return self.tddft_gradient_driver.relaxed_dipole_moment[0].copy()
+            # Multiple excited states can be computed simultaneously by TddftGradientDriver.
+            # Take the first excited state in the list
+            if isinstance(self.tddft_gradient_driver.state_deriv_index, int):
+                return self.tddft_gradient_driver.relaxed_dipole_moment.copy()
+            else:
+                return self.tddft_gradient_driver.relaxed_dipole_moment[0].copy()
         else:
             return None
 
