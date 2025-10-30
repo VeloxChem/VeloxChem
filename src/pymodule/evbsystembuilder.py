@@ -131,7 +131,8 @@ class EvbSystemBuilder():
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
-        self.dynamic_bond_tightening = 3.0  # Power for tigthening breaking and forming bonds during the integration
+        self.dynamic_bond_tightening = 3.25  # Power for tigthening breaking and forming bonds during the integration
+        self.dynamic_bond_fc_factor = 0.75  # Force constant factor for the dynamic bond tightening
 
         self.verbose = False
 
@@ -175,6 +176,7 @@ class EvbSystemBuilder():
             "soft_core_lj_int": bool,
             "int_nb_const_exceptions": bool,
             "dynamic_bond_tightening": float,
+            "dynamic_bond_fc_factor": float,
             "pressure": float,
             "solvent": str,
             "padding": float,
@@ -1578,6 +1580,7 @@ class EvbSystemBuilder():
                 eqA = 0.5 * (s1 + s2)
 
                 fcA = fcB * self.bonded_integration_bond_fac
+
             p = self.dynamic_bond_tightening
             eq = eqA * (1 - lam) + eqB * lam
 
@@ -1587,7 +1590,11 @@ class EvbSystemBuilder():
             if dif_eq > 0:
                 eq = (((eq - min_eq) / dif_eq)**p * dif_eq) + min_eq
 
+            gamma = self.dynamic_bond_fc_factor
+            fc_scaling = 4 * (lam - 0.5)**2 * (1 - gamma) + gamma
+
             fc = fcA * (1 - lam) + fcB * lam
+            fc = fc * fc_scaling
             self._add_bond(harmonic_force, atom_ids, eq, fc)
 
         return harmonic_force

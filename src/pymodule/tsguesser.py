@@ -89,6 +89,7 @@ class TransitionStateGuesser():
         self.molecule = None
         self.results = {}
 
+
         self.lambda_vec = list(np.round(np.linspace(0, 1, 21), 3))
         self.scf_xcfun = "b3lyp"
         self.scf_basis = 'def2-svp'
@@ -105,8 +106,10 @@ class TransitionStateGuesser():
         self.discont_conformer_search = False
         self.peak_conformer_search = False
         self.peak_conformer_search_range = 1
+        self.mm_scan_backward = False
         self.scf_scan = True
-        
+        self.mm_conformer_equivalence_threshold = 1e-1 # kJ/mol
+
         self.results_file = 'ts_results.h5'
         self.sys_builder_configuration = conf = {
             "name": "vacuum",
@@ -219,8 +222,8 @@ class TransitionStateGuesser():
         self.product.save_forcefield_as_json(
             self.product, f"{self.folder_name}/product.json")
 
-        # self.initial_positions in angstrom
-        self.systems, self.topology, self.initial_positions = sysbuilder.build_systems(
+        
+        self.systems, self.topology, _ = sysbuilder.build_systems(
             self.reactant,
             self.product,
             list(self.lambda_vec),
@@ -270,8 +273,10 @@ class TransitionStateGuesser():
         )
 
         # pos in angstrom
-        pos = self.initial_positions
-
+        # pos = self.initial_positions
+        rea_init_pos = self.reactant.molecule.get_coordinates_in_angstrom()
+        pro_init_pos = self.product.molecule.get_coordinates_in_angstrom()
+        scan_dict = {}
         try:
             if self.force_conformer_search:
                 self.ostream.print_info(
@@ -284,7 +289,8 @@ class TransitionStateGuesser():
                     rea_sim,
                     pro_sim,
                     conformer_search=True,
-                    init_pos=pos,
+                    forward_init_pos=rea_init_pos,
+                    backward_init_pos=pro_init_pos,
                 )
             else:
                 scan_dict = self._run_mm_scan(
@@ -292,7 +298,8 @@ class TransitionStateGuesser():
                     rea_sim,
                     pro_sim,
                     conformer_search=False,
-                    init_pos=pos,
+                    forward_init_pos=rea_init_pos,
+                    backward_init_pos=pro_init_pos,
                 )
 
                 #     # Find peak
@@ -322,14 +329,16 @@ class TransitionStateGuesser():
 
                     searched_conformers_indices.extend(
                         range(min_index, max_index + 1))
-                    init_pos = scan_dict[self.lambda_vec[min_index]][0]['pos']
+                    forward_init_pos = scan_dict[self.lambda_vec[min_index]][0]['pos']
+                    backward_init_pos = scan_dict[self.lambda_vec[max_index]][0]['pos']
 
                     scan_dict_peak_conf = self._run_mm_scan(
                         self.lambda_vec[min_index:max_index + 1],
                         rea_sim,
                         pro_sim,
                         conformer_search=True,
-                        init_pos=init_pos,
+                        forward_init_pos=forward_init_pos,
+                        backward_init_pos=backward_init_pos,
                     )
                     for l in scan_dict_peak_conf.keys():
                         scan_dict[l] += scan_dict_peak_conf[l]
@@ -358,14 +367,17 @@ class TransitionStateGuesser():
                             f"Performing conformer search at lambda values: {to_search_lambda}."
                         )
                         self.ostream.flush()
-                        init_pos = scan_dict[self.lambda_vec[
+                        forward_init_pos = scan_dict[self.lambda_vec[
                             to_search_indices[0]]][0]['pos']
+                        backward_init_pos = scan_dict[self.lambda_vec[
+                            to_search_indices[-1]]][0]['pos']
                         scan_dict_discont_conf = self._run_mm_scan(
                             to_search_lambda,
                             rea_sim,
                             pro_sim,
                             conformer_search=True,
-                            init_pos=init_pos,
+                            forward_init_pos=forward_init_pos,
+                            backward_init_pos=backward_init_pos,
                         )
                         for l in scan_dict_discont_conf.keys():
                             scan_dict[l] += scan_dict_discont_conf[l]
@@ -435,8 +447,8 @@ class TransitionStateGuesser():
         return discont_indices
 
     def _run_mm_scan(self, lambda_vals, rea_sim, pro_sim, conformer_search,
-                     init_pos):
-        pos = copy.copy(init_pos)
+                     forward_init_pos, backward_init_pos):
+        pos = copy.copy(forward_init_pos)
         results = {}
         self._print_mm_header(lambda_vals=lambda_vals,
                               conformer_search=conformer_search)
@@ -461,6 +473,58 @@ class TransitionStateGuesser():
             n_conf = len(result)
 
             self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
+            
+        if self.mm_scan_backward:
+            self.ostream.print_info("mm_scan_backward turned on. Scanning in reverse direction.")
+            self.ostream.flush()
+            lambda_vals_rev = list(reversed(lambda_vals))
+            self._print_mm_header(lambda_vals=lambda_vals,
+                              conformer_search=conformer_search)
+            pos = copy.copy(backward_init_pos)
+            for l in lambda_vals_rev:
+                result = self._get_mm_energy(
+                    self.topology,
+                    self.systems[l],
+                    l,
+                    pos,
+                    rea_sim,
+                    pro_sim,
+                    conformer_search,
+                )
+                results[l] += result
+                arg = np.argmin([res['v'] for res in result])
+                e1 = result[arg]['e1']
+                e2 = result[arg]['e2']
+                v = result[arg]['v']
+                e_int = result[arg]['e_int']
+                pos = result[arg]['pos']
+                n_conf = len(result)
+                self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
+                self.ostream.flush()
+                
+        self.ostream.print_blank()
+                
+        
+        for l, result in results.items():
+            # remove duplicate conformers with identical MM energy 'v'
+            unique_confs = []
+            seen_v = set()
+            for conf in result:
+                v_val  = conf['v']
+                seen = False
+                for v in seen_v:
+                    if abs(v - v_val) < self.mm_conformer_equivalence_threshold:
+                        seen = True
+                if not seen:
+                    seen_v.add(v_val)
+                    unique_confs.append(conf)
+            original_n_conf = len(result)
+            new_n_conf = len(unique_confs)
+            if original_n_conf != new_n_conf:
+                self.ostream.print_info(f"Lambda {l}: Reduced {original_n_conf} conformers to {new_n_conf} unique conformers using equivalence threshold of {self.mm_conformer_equivalence_threshold} kJ/mol.")
+                self.ostream.flush()
+            results[l] = unique_confs
+                
 
         return results
 
@@ -490,20 +554,20 @@ class TransitionStateGuesser():
         )
         opm_dyn.pdb = mmapp.PDBFile(pdb_name)
         opm_dyn.system = system
-        
+
         if conformer_search:
             snapshots = self.conformer_snapshots
         else:
             snapshots = 1
         conformers_dict = opm_dyn.conformational_sampling(
             ensemble='NVT',
-            nsteps=self.mm_steps*snapshots,
+            nsteps=self.mm_steps * snapshots,
             snapshots=snapshots,
             temperature=self.mm_temperature,
         )
         result = []
         for e_int, temp_mol in zip(conformers_dict['energies'],
-                                    conformers_dict['molecules']):
+                                   conformers_dict['molecules']):
             pos = temp_mol.get_coordinates_in_angstrom()
             v, e1, e2 = self._recalc_mm_energy(pos, l, reasim, prosim)
             avg_x = np.mean(pos[:, 0])
@@ -551,45 +615,52 @@ class TransitionStateGuesser():
         ref = None
         max_scf_energy = None
         min_scf_conf_index = 0
-        for l, scan in results['scan'].items():
-            min_scf_conf_E = None
-            min_conf_index = 0
-            for i, conformer in enumerate(scan):
-                scf_E = self._get_scf_energy(conformer['xyz'])
-                if min_scf_conf_E is None or scf_E < min_scf_conf_E:
-                    min_scf_conf_E = scf_E
-                    min_conf_index = i
+        try:
+            for l, scan in results['scan'].items():
+                min_scf_conf_E = None
+                min_conf_index = 0
+                for i, conformer in enumerate(scan):
+                    scf_E = self._get_scf_energy(conformer['xyz'])
+                    if math.isnan(scf_E):
+                        continue
+                    if min_scf_conf_E is None or scf_E < min_scf_conf_E:
+                        min_scf_conf_E = scf_E
+                        min_conf_index = i
 
-                if ref is None:
-                    ref = scf_E
-                dif = scf_E - ref
-                results['scan'][l][i]['scf_energy'] = scf_E
-                mm_E = results['scan'][l][i]['v']
+                    if ref is None:
+                        ref = scf_E
+                    dif = scf_E - ref
+                    results['scan'][l][i]['scf_energy'] = scf_E
+                    mm_E = results['scan'][l][i]['v']
 
-                self._print_scf_iter(l, scf_E, mm_E, dif, i)
+                    self._print_scf_iter(l, scf_E, mm_E, dif, i)
 
-            if max_scf_energy is None or min_scf_conf_E > max_scf_energy:
-                max_scf_energy = min_scf_conf_E
-                max_scf_lambda = l
-                min_scf_conf_index = min_conf_index
-                max_scf_xyz = scan[min_conf_index]['xyz']
+                if max_scf_energy is None or min_scf_conf_E > max_scf_energy:
+                    max_scf_energy = min_scf_conf_E
+                    max_scf_lambda = l
+                    min_scf_conf_index = min_conf_index
+                    max_scf_xyz = scan[min_conf_index]['xyz']
 
-        self.ostream.print_blank()
+            self.ostream.print_blank()
 
-        results = {
-            'max_scf_xyz': max_scf_xyz,
-            'max_scf_lambda': max_scf_lambda,
-            'min_scf_conformer_index': min_scf_conf_index,
-        }
-        self.ostream.print_info(
-            f"Found highest SCF E: {max_scf_energy:.3f} at Lambda: {max_scf_lambda} and conformer index: {min_scf_conf_index}."
-        )
-        self.ostream.flush()
-        self.results.update(results)
+            results = {
+                'max_scf_xyz': max_scf_xyz,
+                'max_scf_lambda': max_scf_lambda,
+                'min_scf_conformer_index': min_scf_conf_index,
+            }
+            self.ostream.print_info(
+                f"Found highest SCF E: {max_scf_energy:.3f} at Lambda: {max_scf_lambda} and conformer index: {min_scf_conf_index}."
+            )
+            self.ostream.flush()
+            self.results.update(results)
 
-        self.molecule = Molecule.read_xyz_string(max_scf_xyz)
-        self.molecule.set_multiplicity(self.mol_multiplicity)
-        self.molecule.set_charge(self.mol_charge)
+            self.molecule = Molecule.read_xyz_string(max_scf_xyz)
+            self.molecule.set_multiplicity(self.mol_multiplicity)
+            self.molecule.set_charge(self.mol_charge)
+        except Exception as e:
+            self.ostream.print_warning(f"Error in the SCF scan: {e}")
+            self.ostream.flush()
+            self.results.update(results)
         self._save_results(self.results_file, self.results)
         return self.results
 
@@ -615,6 +686,11 @@ class TransitionStateGuesser():
             self.scf_drv.conv_thresh = 1.0e-4
             self.scf_drv.max_iter = 200
             scf_results = self.scf_drv.compute(self.molecule, basis)
+
+            if not self.scf_drv.is_converged:
+                self.ostream.print_warning("SCF still did not converge. Returning NaN for current calculation")
+                self.ostream.flush()
+                return math.nan
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
     @staticmethod
@@ -656,7 +732,7 @@ class TransitionStateGuesser():
         # if there are scf energies, get the best scf energies and everything corresponding to that
         # otherwise, get the best mm energies
 
-        if ts_results['scan'][0][0].get('scf_energy',None) is not None:
+        if ts_results['scan'][0][0].get('scf_energy', None) is not None:
             final_lambda = ts_results.get('max_scf_lambda', None)
             scf_energies, scan_indices = TransitionStateGuesser._get_best_scf_E_from_scan_dict(
                 ts_results['scan'])
@@ -1027,10 +1103,13 @@ class TransitionStateGuesser():
                 )
         else:
             self.ostream.print_header("Starting MM scan")
+        self.ostream.print_header(f"MD steps:              {self.mm_steps:>10}")
+        if conformer_search:
+            conf_snapshots = self.conformer_snapshots
+        else:
+            conf_snapshots = 1
         self.ostream.print_header(
-            f"MD steps:              {self.mm_steps:>10}")
-        self.ostream.print_header(
-            f"conf. snapshots:       {self.conformer_snapshots:>10}")
+            f"conf. snapshots:       {conf_snapshots:>10}")
         self.ostream.print_header(
             f"MD temperature:        {self.mm_temperature:>8} K")
         self.ostream.print_header(

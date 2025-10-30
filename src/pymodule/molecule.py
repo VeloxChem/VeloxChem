@@ -443,7 +443,7 @@ def _Molecule_from_dict(mol_dict):
     return mol
 
 
-def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
+def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.8):
     """
     Gets connectivity matrix.
 

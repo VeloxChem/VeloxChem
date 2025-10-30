@@ -726,33 +726,9 @@ class ReactionForceFieldBuilder():
             )
             self.ostream.flush()
             new_molecule = forcefield.molecule
-
-        # integrator = mm.VerletIntegrator(0.001)
-        # sim = mmapp.Simulation(top, mmsys, integrator)
-        # sim.context.setPositions(pos)
-        # self.ostream.print_info(f"Minimizing {note} molecule.")
-        # sim.minimizeEnergy()
-        # # with open(f'{name}_optimized.pdb', 'w') as pdbfile:
-        # sim.context.setVelocitiesToTemperature(self.optimize_temp * mmunit.kelvin)
-        # self.ostream.print_info(
-        #     f"Running {self.optimize_steps} NVE steps with initial T at {self.optimize_temp} K for {note} molecule."
-        # )
-        # self.ostream.flush()
-        # sim.step(self.optimize_steps)
-        # self.ostream.print_info(f"Minimizing {note} molecule again.")
-        # self.ostream.flush()
-        # sim.minimizeEnergy()
-
-        # state = sim.context.getState(getPositions=True)
-
-        # pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
-
-        # new_molecule = Molecule()
-        # for i, elem in enumerate(elemental_ids):
-        #     point = Point(pos[i])
-        #     new_molecule.add_atom(int(elem), point, 'angstrom')
-        # new_molecule.set_charge(forcefield.molecule.get_charge())
-        # new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
+            
+        new_molecule.set_charge(forcefield.molecule.get_charge())
+        new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         os.unlink(f'{name}.xml')
         os.unlink(f'{name}.pdb')
         os.unlink(f'{name}_sys.xml')
