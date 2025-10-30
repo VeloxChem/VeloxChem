@@ -499,10 +499,12 @@ class LinearSolver:
                 gs_density = (scf_tensors['D_alpha'].copy(),)
             else:
                 gs_density = None
+            
             gs_density = self.comm.bcast(gs_density, root=mpi_master())
 
         else:
             gs_density = None
+            tessellation_settings = {}
             
         return {'tess_info' : tessellation_settings, 
                 'gs_density' : gs_density}
@@ -1360,6 +1362,8 @@ class LinearSolver:
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
+        gs_dm_gost = gostshyp_dict['gs_density']
+        tessellation_settings = gostshyp_dict['tess_info']
 
         if comm_rank == mpi_master():
             num_densities = len(dens)
@@ -1466,19 +1470,18 @@ class LinearSolver:
         if self._gostshyp:
 
             t0 = tm.time()
-
-            # Note: only closed shell density for now
-            gs_density = gostshyp_dict['gs_density'][0] * 2.0
-            tessellation_settings = gostshyp_dict['tess_info']
+            gs_dm = gs_dm_gost[0]
 
             for idx in range(num_densities):
+                
+                dm = dens[idx]
+                
                 # Note: only closed shell density for now
-                dm = dens[idx] * 2.0
-
                 fock_gost = self.gostshyp_drv.get_resp_contrib_occ(
-                    gs_density,
-                    dm,
+                    gs_dm * 2.0,
+                    dm * 2.0,
                     tessellation_settings)
+
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += fock_gost
 

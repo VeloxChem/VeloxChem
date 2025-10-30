@@ -265,10 +265,14 @@ class GostshypDriver:
         
         return e_pr, V_pr
     
-    def get_resp_contrib_occ(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
+    def get_resp_contrib_occ(self, 
+                             gs_den_mat, 
+                             trans_den_mat, 
+                             tessellation_settings=None):
         """
         Computes linear response contributions as double energy derivative
-        wrt to density matrix element. Can also be considered as first derivative of Fock matrix wrt to density matrix element.
+        wrt to density matrix element. Can also be considered as first 
+        derivative of Fock matrix wrt to density matrix element.
 
         :param gs_den_mat:
             The ground state density matrix.
@@ -283,8 +287,6 @@ class GostshypDriver:
 
         if self.num_tes_points == 0:
             self.generate_tessellation(tessellation_settings)
-
-        #print(np.shape(self.tessellation))
 
         # set up needed components:
 
@@ -309,12 +311,15 @@ class GostshypDriver:
         self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
         num_points = np.sum(amplitudes_mask)
 
+        # save grid information and auxiliary f_tilde vector 
+        # for kept grid points
         centers = (self.tessellation[:3].T[amplitudes_mask]).copy()
         exponents = width_params[amplitudes_mask]
         amps = amplitudes[amplitudes_mask]
         norms = (self.tessellation[8:11].T[amplitudes_mask]).copy()
         f_tilde = f_tilde[amplitudes_mask]
 
+        # compute f_tilde at perturbed density (hence prime)
         f_tilde_prime = compute_tco_p_values(self.molecule, 
                                              self.basis, 
                                              centers, 
@@ -323,6 +328,7 @@ class GostshypDriver:
                                              norms, 
                                              trans_den_mat)
         
+        # compute g_tilde at gs density
         g_tilde = compute_tco_s_values(self.molecule,
                                        self.basis,
                                        centers,
@@ -330,6 +336,7 @@ class GostshypDriver:
                                        np.full((num_points), 1.0),
                                        gs_den_mat)
 
+        # compute g_tilde at perturbed density (hence prime)
         g_tilde_prime = compute_tco_s_values(self.molecule,
                                              self.basis,
                                              centers,
@@ -337,6 +344,7 @@ class GostshypDriver:
                                              np.full((num_points), 1.0),
                                              trans_den_mat)
         
+        # compute s-type TCO contribution with prefactor
         prefac_g_mat = - amps * f_tilde_prime / f_tilde
 
         g_mat_contrib = compute_tco_s_fock(self.molecule,
@@ -345,7 +353,9 @@ class GostshypDriver:
                                            exponents,
                                            prefac_g_mat)
         
-        prefac_f_mat = amps / f_tilde * (2 * g_tilde * f_tilde_prime / f_tilde - g_tilde_prime)
+        # compute p-type TCO contribution with prefactor
+        prefac_f_mat = (amps / f_tilde * 
+                        (2 * g_tilde * f_tilde_prime / f_tilde - g_tilde_prime))
         
         f_mat_contrib = compute_tco_p_fock(self.molecule,
                                            self.basis,
@@ -358,6 +368,75 @@ class GostshypDriver:
         
         return resp_contrib
     
+    def get_resp_contrib_occ_2(self, trans_den_mat, tessellation_settings=None):
+        """
+        Computes linear response contributions as energy derivative
+        wrt to density matrix element computed with perturbed density.
+
+        :param trans_den_mat:
+            The transition (perturbed) density matrix.
+        :param tessellation_settings:
+            The dictionary of tessellation settings
+
+        :return:
+            The GOSTSHYP response contribution.
+        """
+
+        if self.num_tes_points == 0:
+            self.generate_tessellation(tessellation_settings)
+
+        # set up needed components:
+
+        # width parameters w_j
+        width_params = np.pi * np.log(2.0) / self.tessellation[3]
+
+        #compute f_tilde vector
+        f_tilde_prime = compute_tco_p_values(self.molecule, 
+                                             self.basis, 
+                                             (self.tessellation[:3].T).copy(), 
+                                             width_params, 
+                                             np.full((self.num_tes_points), 1.0), 
+                                             (self.tessellation[8:11].T).copy(), 
+                                             trans_den_mat)
+        
+        amplitudes = self.pressure * self.tessellation[3] / f_tilde_prime
+
+        amplitudes_mask = amplitudes >= 0.0
+        np.savetxt('amps_mask.txt', amplitudes_mask, fmt="%5i")
+        
+        self._neg_p_amp = self.num_tes_points - np.sum(amplitudes_mask)
+
+        centers = (self.tessellation[:3].T[amplitudes_mask]).copy()
+        exponents = width_params[amplitudes_mask]
+        amps = amplitudes[amplitudes_mask]
+        norms = (self.tessellation[8:11].T[amplitudes_mask]).copy()
+        
+        p_times_g_tilde_prime = compute_tco_s_values(self.molecule, 
+                                                     self.basis, 
+                                                     centers, 
+                                                     exponents, 
+                                                     amps, 
+                                                     trans_den_mat)
+
+        V1_pr = compute_tco_s_fock(self.molecule, 
+                                   self.basis, 
+                                   centers, 
+                                   exponents, 
+                                   amps)
+        
+        pre_fac_V2_pr = (p_times_g_tilde_prime / f_tilde_prime[amplitudes_mask])
+        
+        V2_pr = compute_tco_p_fock(self.molecule, 
+                                   self.basis, 
+                                   centers, 
+                                   exponents, 
+                                   pre_fac_V2_pr,
+                                   norms)
+        
+        V_pr = V1_pr - V2_pr
+        
+        return V_pr
+        
     # def get_gostshyp_response_contribution_occ(self, gs_den_mat, trans_den_mat, tessellation_settings=None):
     #     """
     #     Computes linear response contributions as double energy derivative
