@@ -53,8 +53,6 @@ class TestTddftHessianDriver:
                                  rsp_dict={'conv_thresh': 1e-8},
                                  orbrsp_dict=cphf_dict)
 
-        grad_drv.compute(molecule, basis, scf_drv, rsp_drv, rsp_results)
-
         hessian_drv = TddftHessianDriver(scf_drv,
                                          rsp_drv=rsp_drv,
                                          tddft_grad_drv=grad_drv)
@@ -96,6 +94,13 @@ class TestTddftHessianDriver:
         ref_label = "tda_pbe0"
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
 
+    @pytest.mark.timeconsuming
+    def test_tda_camb3lyp(self):
+        xcfun_label = "cam-b3lyp"
+        tamm_dancoff = True
+        ref_label = "tda_camb3lyp"
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+
     def test_rpa(self):
         xcfun_label = "hf"
         tamm_dancoff = False
@@ -114,4 +119,11 @@ class TestTddftHessianDriver:
         xcfun_label = "pbe0"
         tamm_dancoff = False
         ref_label = "rpa_pbe0"
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+
+    @pytest.mark.timeconsuming
+    def test_tddft_camb3lyp(self):
+        xcfun_label = "cam-b3lyp"
+        tamm_dancoff = False
+        ref_label = "rpa_camb3lyp"
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
