@@ -107,10 +107,12 @@ class TransitionStateGuesser():
         self.peak_conformer_search = False
         self.peak_conformer_search_range = 1
         self.mm_scan_backward = False
-        self.scf_scan = True
+        self.scf_scan = False
         self.mm_conformer_equivalence_threshold = 1e-1 # kJ/mol
+        self.calculate_resp = False
 
         self.results_file = 'ts_results.h5'
+
         self.sys_builder_configuration = conf = {
             "name": "vacuum",
             "bonded_integration": True,
@@ -121,6 +123,8 @@ class TransitionStateGuesser():
         }
 
         self.ffbuilder = ReactionForceFieldBuilder()
+        # override default options in the ffbuilder
+        self.ffbuilder.calculate_resp = False
 
     def find_transition_state(
         self,
@@ -156,6 +160,7 @@ class TransitionStateGuesser():
         """
         self.results = {}
         # Build forcefields and systems
+
         self.build_forcefields(reactant, product, **build_forcefields_kwargs)
 
         # Scan MM
@@ -422,7 +427,7 @@ class TransitionStateGuesser():
             self.molecule = Molecule.read_xyz_string(max_mm_xyz)
             self.molecule.set_multiplicity(self.mol_multiplicity)
             self.molecule.set_charge(self.mol_charge)
-            self._save_results(self.results_file, self.results)
+            self.save_results(self.results_file, self.results)
             return self.results
         else:
             self.ostream.flush()
@@ -661,7 +666,7 @@ class TransitionStateGuesser():
             self.ostream.print_warning(f"Error in the SCF scan: {e}")
             self.ostream.flush()
             self.results.update(results)
-        self._save_results(self.results_file, self.results)
+        self.save_results(self.results_file, self.results)
         return self.results
 
     def _get_scf_energy(self, xyz):
@@ -945,7 +950,7 @@ class TransitionStateGuesser():
             molecule.set_atom_coordinates(i, positions_au[i])
         return molecule
 
-    def _save_results(self, fname, results):
+    def save_results(self, fname, results):
         self.ostream.print_info(f"Saving results to {fname}")
         self.ostream.flush()
         with h5py.File(fname, 'w') as hf:

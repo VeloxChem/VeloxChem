@@ -84,7 +84,9 @@ class ReactionForceFieldBuilder():
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-
+        
+        
+        self.calculate_resp: bool = True
         self.optimize_mol: bool = False
         self.reparameterize_bonds: bool = False
         self.reparameterize_angles: bool = False
@@ -307,9 +309,11 @@ class ReactionForceFieldBuilder():
                 scf_drv.ostream.mute()
             opt_results = opt_drv.compute(molecule)
 
+            charge = molecule.get_charge()
+            multiplicity = molecule.get_multiplicity()
             molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
-            molecule.set_charge(molecule.get_charge())
-            molecule.set_multiplicity(molecule.get_multiplicity())
+            molecule.set_charge(charge)
+            molecule.set_multiplicity(multiplicity)
 
         forcefield = MMForceFieldGenerator(ostream=self.ostream)
 
@@ -329,53 +333,61 @@ class ReactionForceFieldBuilder():
             self.ostream.flush()
             forcefield.create_topology(molecule, water_model=self.water_model)
         else:
-            if max(molecule.get_masses()) > 84:
-                basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
-                self.ostream.print_info(
-                    f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
-                )
-            else:
-                basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
-            if molecule.get_multiplicity() == 1:
-                scf_drv = ScfRestrictedDriver()
-            else:
-                scf_drv = ScfUnrestrictedDriver()
+            if self.calculate_resp:
+                if max(molecule.get_masses()) > 84:
+                    basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
+                    self.ostream.print_info(
+                        f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
+                    )
+                else:
+                    basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
+                if molecule.get_multiplicity() == 1:
+                    scf_drv = ScfRestrictedDriver()
+                else:
+                    scf_drv = ScfUnrestrictedDriver()
 
-            self.ostream.print_info("Calculating SCF for RESP charges")
-            self.ostream.flush()
-            if self.mute_scf:
-                scf_drv.ostream.mute()
-            scf_results = scf_drv.compute(molecule, basis)
-            if not scf_drv.is_converged:
-                self.ostream.print_warning(
-                    "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
-                )
+                self.ostream.print_info("Calculating SCF for RESP charges")
                 self.ostream.flush()
-                scf_drv.conv_thresh = 1.0e-4
-                scf_drv.max_iter = 200
+                if self.mute_scf:
+                    scf_drv.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
-            # self.ostream.unmute()
-            assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
-            resp_drv = RespChargesDriver()
-            self.ostream.flush()
-            if self.mute_scf:
-                resp_drv.ostream.mute()
-                self.ostream.print_info("Calculating RESP charges")
+                if not scf_drv.is_converged:
+                    self.ostream.print_warning(
+                        "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
+                    )
+                    self.ostream.flush()
+                    scf_drv.conv_thresh = 1.0e-4
+                    scf_drv.max_iter = 200
+                    scf_results = scf_drv.compute(molecule, basis)
+                # self.ostream.unmute()
+                assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
+                resp_drv = RespChargesDriver()
                 self.ostream.flush()
-            forcefield.partial_charges = resp_drv.compute(
-                molecule, basis, scf_results, 'resp')
-            self.ostream.print_info(
-                f"RESP charges: {forcefield.partial_charges}")
-            self.ostream.flush()
-            self.ostream.print_info("Creating topology")
-            forcefield.create_topology(
-                molecule,
-                basis,
-                scf_results=scf_results,
-                water_model=self.water_model,
-            )
+                if self.mute_scf:
+                    resp_drv.ostream.mute()
+                    self.ostream.print_info("Calculating RESP charges")
+                    self.ostream.flush()
+                forcefield.partial_charges = resp_drv.compute(
+                    molecule, basis, scf_results, 'resp')
+                self.ostream.print_info(
+                    f"RESP charges: {forcefield.partial_charges}")
+                self.ostream.flush()
+                self.ostream.print_info("Creating topology")
+                forcefield.create_topology(
+                    molecule,
+                    basis,
+                    scf_results=scf_results,
+                    water_model=self.water_model,
+                )
+            else:
+                self.ostream.print_info("Assigning partial charges based on electronegativity")
+                partial_charges = molecule.get_partial_charges(molecule.get_charge())
+                forcefield.partial_charges = partial_charges
+                self.ostream.print_info("Creating topology")
+                self.ostream.flush()
+                forcefield.create_topology(molecule, water_model=self.water_model)
 
-        #Reparameterize the forcefield if necessary and requested
+        # Reparameterize the forcefield if necessary and requested
         unknown_pairs = set()
         unknown_params = set()
         if self.reparameterize_bonds:
