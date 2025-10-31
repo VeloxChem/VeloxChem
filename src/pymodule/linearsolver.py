@@ -758,25 +758,64 @@ class LinearSolver:
 
             prep_t0 = tm.time()
 
-            for idx, local_master_rank in enumerate(local_master_ranks):
+            # sendbuf data (including both gerade and ungerade vectors)
+            sendbuf = vecs_ger.data[:, batch_start:batch_end].copy()
+            if batch_start < n_ger and batch_end >= n_ger:
+                sendbuf = np.hstack((
+                    sendbuf,
+                    vecs_ung.data[:, :batch_end - n_ger]))
+            elif batch_start >= n_ger:
+                sendbuf = np.hstack((
+                    sendbuf,
+                    vecs_ung.data[:, batch_start - n_ger:batch_end - n_ger]))
 
-                if idx + batch_start >= batch_end:
-                    break
+            # sendbuf counts and displacements
+            sendbuf_counts = []
+            for p in range(self.nodes):
+                if p in local_master_ranks:
+                    idx = local_master_ranks.index(p)
+                    if idx + batch_start < batch_end:
+                        sendbuf_counts.append(sendbuf.shape[0])
+                    else:
+                        sendbuf_counts.append(0)
+                else:
+                    sendbuf_counts.append(0)
+            sendbuf_displs = [sum(sendbuf_counts[:p]) for p in range(self.nodes)]
 
+            # recvbuf counts and displacements
+            vec_counts = self.comm.allgather(sendbuf.shape[0])
+            if self.rank in local_master_ranks:
+                idx = local_master_ranks.index(self.rank)
+                if idx + batch_start < batch_end:
+                    recvbuf_counts = vec_counts
+                else:
+                    recvbuf_counts = [0 for x in vec_counts]
+            else:
+                recvbuf_counts = [0 for x in vec_counts]
+            recvbuf_displs = [sum(recvbuf_counts[:p]) for p in range(self.nodes)]
+            recvbuf = np.zeros(sum(recvbuf_counts))
+
+            # Alltoallv
+            sendbuf = sendbuf.T.copy()
+            self.comm.Alltoallv(
+                [sendbuf, sendbuf_counts, sendbuf_displs, MPI.DOUBLE],
+                [recvbuf, recvbuf_counts, recvbuf_displs, MPI.DOUBLE])
+
+            if subcomm_index + batch_start < batch_end:
+                idx = subcomm_index
                 col = idx + batch_start
-
                 if col < n_ger:
-                    v_ger = vecs_ger.get_full_vector(col, root=local_master_rank)
-                    if self.rank == local_master_rank:
+                    if is_local_master:
                         # full-size gerade trial vector
+                        v_ger = recvbuf
                         vec_list[idx] = np.hstack((v_ger, v_ger))
                     # Note: antisymmetric density matrix from gerade vector
                     # due to commut_mo_density
                     symm_flags[idx] = 'antisymm'
                 else:
-                    v_ung = vecs_ung.get_full_vector(col - n_ger, root=local_master_rank)
-                    if self.rank == local_master_rank:
+                    if is_local_master:
                         # full-size ungerade trial vector
+                        v_ung = recvbuf
                         vec_list[idx] = np.hstack((v_ung, -v_ung))
                     # Note: symmetric density matrix from ungerade vector
                     # due to commut_mo_density
