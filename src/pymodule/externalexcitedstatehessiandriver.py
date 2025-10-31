@@ -149,8 +149,6 @@ conda deactivate
             script_content = f"""#!/bin/bash
 
 # Run the orca command
-source $(conda info --base)/etc/profile.d/conda.sh
-conda deactivate
 export OMP_NUM_THREADS={self.qm_driver.nprocs * 3}
 export OPENQP_ROOT={self.qm_driver.open_qp_path}
 export MKL_INTERFACE_LAYER="@_MKL_INTERFACE_LAYER@"

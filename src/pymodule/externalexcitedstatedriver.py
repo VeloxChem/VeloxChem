@@ -164,8 +164,6 @@ conda deactivate
             script_content = f"""#!/bin/bash
 
 # Run the orca command
-source $(conda info --base)/etc/profile.d/conda.sh
-conda deactivate
 export OMP_NUM_THREADS={self.nprocs}
 export OPENQP_ROOT={self.open_qp_path}
 export LD_LIBRARY_PATH=$OPENQP_ROOT/lib:$LD_LIBRARY_PATH
