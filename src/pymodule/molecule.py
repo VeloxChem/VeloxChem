@@ -41,7 +41,7 @@ from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
 from .pubchemfetcher import (get_data_from_name, get_all_conformer_IDs,
                              get_conformer_data, get_pubchem_sketcher_reference)
-
+import pyframe
 
 @staticmethod
 def _Molecule_smiles_formal_charge(smiles_str):
@@ -264,7 +264,7 @@ def _Molecule_read_gro_file(grofile):
 
 
 @staticmethod
-def _Molecule_read_pdb_file(pdbfile):
+def _Molecule_read_pdb_file(pdbfile, qm_label):
     """
     Reads molecule from file in PDB format.
 
@@ -298,6 +298,26 @@ def _Molecule_read_pdb_file(pdbfile):
                 [float(line[30:38]),
                  float(line[38:46]),
                  float(line[46:54])])
+            
+    system = pyframe.MolecularSystem(input_file=pdbfile, bond_threshold=0.20)
+    print (system)
+    core = system.get_fragments_by_identifier(identifiers=[qm_label])
+    system.set_core_region(fragments=core)
+
+    water = system.get_fragments_by_name(names=['SOL', 'WAT', 'HOH', 'TIP3'])
+
+    system.add_region(name='water', fragments=water,
+                         use_standard_potentials=True, 
+                         standard_potential_model='SEP')
+    print(f'Number of water molecules: {len(water)}')
+
+    ions = system.get_fragments_by_name(names=['SOD', 'CLA'])
+
+    system.add_region(name='ions', fragments=ions,
+                      use_standard_potentials=True,
+                      standard_potential_model="SEP")
+
+    print(f'Number of ions: {len(ions)}')
 
     return Molecule(labels, coordinates, 'angstrom')
 
