@@ -157,6 +157,7 @@ class InterpolationDriver():
         self.averaged_int_dist = None
         # Name lables for the QM data points
         self.labels = None
+        self.use_inverse_bond_length = True
 
         self._input_keywords = {
             'im_settings': {
@@ -169,6 +170,7 @@ class InterpolationDriver():
                 'confidence_radius': ('float', 'the confidence radius'),
                 'imforcefield_file':
                     ('str', 'the name of the chk file with QM data'),
+                    'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
@@ -276,6 +278,7 @@ class InterpolationDriver():
             :param coordinates:
                 a numpy array of Cartesian coordinates.
         """
+
         self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
 
     def compute(self, molecule, qm_data_points=None, chk_file=None, labels=None):
@@ -302,7 +305,7 @@ class InterpolationDriver():
         
         # for dihedral in self.symmetry_information[7]:
         #     self.distance_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 0.0, 'degree')
-        
+   
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
 
         if labels:
@@ -559,7 +562,7 @@ class InterpolationDriver():
 
         else:
             for i, data_point in enumerate(self.qm_data_points[:]):
-                
+
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_distance(data_point)
               
 
@@ -581,9 +584,8 @@ class InterpolationDriver():
             sum_weights_cart += weight_cart
             sum_weight_gradients_cart += weight_grad_cart
 
-
             potential, gradient, r_i = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
-           
+            
             gradients.append(gradient)
             averaged_int_dists.append(qm_data_point.internal_coordinates_values)
 
@@ -908,19 +910,20 @@ class InterpolationDriver():
             hessian = data_point.internal_hessian.copy()
             dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
             dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
-
+        
             # for bond_idx, element_bond in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][0]]):
             #     dist_check[bond_idx] = (1.0 / org_int_coords[bond_idx]) - (1.0 / data_point.internal_coordinates_values[bond_idx])
             for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
-                                       
+
                 dist_check[i] = np.sin(dist_org[i])
 
-
+  
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
             self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
             self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[self.symmetry_information[-1][1]:]**2))))
             pes = (energy + np.matmul(dist_check.T, grad) +
                         0.5 * np.linalg.multi_dot([dist_check.T, hessian, dist_check]))
+            
             
             dist_hessian = np.matmul(dist_check.T, hessian)
             
@@ -933,6 +936,7 @@ class InterpolationDriver():
                 
                 grad[i] *= np.cos(dist_org[i])
                 dist_hessian[i] *= np.cos(dist_org[i])
+            
             
             # bond_break_idx = self.z_matrix.index([2,6])
             
@@ -1217,6 +1221,7 @@ class InterpolationDriver():
 
         distance_vector = np.zeros_like(reference_coordinates)   # (natms,3)
         distance_vector[self.symmetry_information[3]] = distance_vector_sub
+  
 
 
         dihedral_dist = 0.0
@@ -1243,7 +1248,7 @@ class InterpolationDriver():
         
         weight_gradient = np.zeros_like(reference_coordinates)   # (natms,3)
         weight_gradient[self.symmetry_information[3]] = weight_gradient_sub
-        
+
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
 
     def cartesian_hessian_distance(self, data_point):
@@ -1342,7 +1347,7 @@ class InterpolationDriver():
         rotated_current = (R_x @ Xc.T).T
         distance_vector =  rotated_current - Yc
         distance = np.linalg.norm(distance_vector) 
-        
+        # print('carteisna distance', distance)
         H_full = data_point.hessian                          # (3N,3N)
 
         idx3 = np.concatenate([3*active_atoms[:,None] + np.array([0,1,2])], axis=1).ravel()
@@ -1364,10 +1369,13 @@ class InterpolationDriver():
         lam_hi  = 10.0 * lam_med
         w_clip  = np.clip(w, lam_lo, lam_hi)
         H_clip  = (U * w_clip) @ U.T
+        H_clip = H_spd
  
         distance_2     = (distance_vector.reshape(-1) @ ((1.0 * H_clip) @ distance_vector.reshape(-1)))
         distance = np.sqrt(distance_2)
-
+        if distance < 1e-8:
+            distance = 1e-8
+            distance_vector[:] = 0
         y = ((1.0 * H_clip) @ distance_vector.reshape(-1)).reshape(-1, 3)      # (Nc,3)
 
         rigid = y @ R_x                           # (Nc,3)
@@ -1383,11 +1391,16 @@ class InterpolationDriver():
         grad_s = np.zeros_like(reference_coordinates)   # (natms,3)
         grad_s[self.symmetry_information[3]] = grad_s_sub
 
+        # components in the eigenbasis
+        c = U.T @ distance_vector.reshape(-1)      # projections (u_k · d)
+        contrib = w_clip * (c**2)                   # λ_k * (u_k·d)^2
+        # print("Top contributing modes (λ_k * c_k^2):")
+        # idx = np.argsort(contrib)[::-1]
+        # for j in idx[:5]:
+        #     print(f"k={j:2d}  λ={w_clip[j]:.3e}  (u·d)^2={c[j]**2:.3e}  term={contrib[j]:.3e}")
+
+
         dihedral_dist = 0.0
-        if distance < 1e-8:
-            distance = 1e-8
-            distance_vector[:] = 0
-            s = 1e-8
 
         if self.interpolation_type == 'shepard':
             denominator, weight_gradient = self.shepard_weight_gradient_hessian(distance, data_point.confidence_radius, grad_s)  

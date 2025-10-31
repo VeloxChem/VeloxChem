@@ -36,6 +36,7 @@ import subprocess
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
 import re
+import json
 import shutil
 from .veloxchemlib import mpi_master
 from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
@@ -142,8 +143,19 @@ source $(conda info --base)/etc/profile.d/conda.sh
 conda deactivate
 # Run the orca command
 {orca_path} $1 > $2
-conda activate vlxenv_new_compile
 
+"""
+        elif self.program == 'OpenQP':
+            script_content = f"""#!/bin/bash
+
+# Run the orca command
+source $(conda info --base)/etc/profile.d/conda.sh
+conda deactivate
+export OMP_NUM_THREADS={self.qm_driver.nprocs * 3}
+export OPENQP_ROOT={self.qm_driver.open_qp_path}
+export MKL_INTERFACE_LAYER="@_MKL_INTERFACE_LAYER@"
+export MKL_THREADING_LAYER=SEQUENTIAL
+openqp $1 > $2
 """
         else:
             raise ValueError("Unsupported program or ORCA executable not found")
@@ -226,6 +238,31 @@ conda activate vlxenv_new_compile
                             print('No hessian data found')
                             exit()
                 
+            elif self.program == 'OpenQP':
+
+                hessians_orca = {f'excited_state_{i+1}': None for i in self.roots_to_follow}
+
+                for root_idx, root in enumerate(self.roots_to_follow):
+                    p_in = Path(self.input_files[root_idx])    
+                    new_output_file = str(Path(p_in).with_suffix(".hess.json"))
+                    with open(new_output_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+
+                    H = np.array(data['hessian'], dtype=float)
+
+                    # If it was saved flattened (just in case), reshape to square
+                    if H.ndim == 1:
+                        n = int(round(H.size ** 0.5))
+                        if n * n != H.size:
+                            raise ValueError(f"{'hessian'} has length {H.size}, not a perfect square.")
+                        H = H.reshape(n, n)
+
+                    # Optional: enforce symmetry (useful if minor numeric noise exists)
+                    if not np.allclose(H, H.T, atol=1e-10):
+                        H = 0.5 * (H + H.T)
+                    hessians_orca[f'excited_state_{self.roots_to_follow[root_idx]}'] = H
+                    hessians.append(hessians_orca[f'excited_state_{self.roots_to_follow[root_idx]}'])
+            
             elif self.program == 'QCHEM':
 
                 
@@ -308,13 +345,20 @@ conda activate vlxenv_new_compile
         
             pattern = os.path.join(current_path, 'current_*')
             files_to_remove = glob.glob(pattern)
-
-            for file in files_to_remove:
+            
+            for path in files_to_remove:
                 try:
-                    os.remove(file)
-                    print(f'Removed file: {file}')
+                    if os.path.isfile(path):
+                        os.remove(path)
+                        print(f"Removed file: {path}")
+                    elif os.path.isdir(path):
+                        shutil.rmtree(path)   # removes folder and all its contents
+                        print(f"Removed folder: {path}")
+                    else:
+                        print(f"Path not found: {path}")
                 except Exception as e:
-                    print(f'Error removing file {file} : {e}')
+                    print(f"Could not remove {path}: {e}")
+
             return hessians
         except Exception as e:
             print(f"Error extracting gradients: {e}")
@@ -338,7 +382,7 @@ conda activate vlxenv_new_compile
         
         else:
             self.full_output_filename = self.output_files[0]
-        if self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is None:
+        if self.program in ['MOLCAS', 'ORCA', 'OpenQP'] and self.cluster_manager is None:
             if self.program == 'MOLCAS':
                 self.create_input_file_gradient(self.roots)
 
@@ -394,7 +438,46 @@ conda activate vlxenv_new_compile
                         print(f"Error executing command: {e}")
                         #return e.stderr.decode('utf-8')
                 jobs_finished = 0
-        
+
+            elif self.program == 'OpenQP':
+
+                script_path = None
+                for root_idx, root in enumerate(self.roots_to_follow):
+                    # p_in = Path(self.input_files[0])
+                    # p_out = Path(self.output_files[0])
+                    # new_input_file = p_in.with_suffix(".inp").with_stem(f"{p_in.stem}_{root}")
+                    # new_output_file = p_out.with_suffix(".out").with_stem(f"{p_out.stem}_{root}")
+                    inp0 = Path(self.input_files[root_idx]).resolve()
+                    out0 = Path(self.output_files[root_idx]).resolve()
+                    self.create_input_file_hessian(inp0, root)
+                    script_path = os.path.join(os.getcwd(), "run_openqp.sh")
+                    script_path = Path(script_path).resolve()
+                    self.create_shell_script(script_path)
+                    bash_command = f"'{script_path} {inp0} {out0}'"
+
+                    cmd = f"source /etc/profile; source ~/.bashrc >/dev/null 2>&1 || true; /bin/bash '{script_path}' '{inp0}' '{out0}'"
+
+                    # Start from the current environment; only strip conda if you *must*
+                    env = os.environ.copy()
+
+                    try:
+                        result = subprocess.run(
+                            ["/bin/bash", "-lc", cmd],
+                            cwd=str(script_path.parent),
+                            env=env,
+                            check=True,
+                            text=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
+                        print(result.stdout)
+                    except subprocess.CalledProcessError as e:
+                        print("Command failed.")
+                        print("STDOUT:\n", e.stdout)
+                        print("STDERR:\n", e.stderr)
+                        raise
+                jobs_finished = 0
+                
         elif self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is not None:
             for root in range(self.roots + 1):
 
@@ -433,7 +516,7 @@ conda activate vlxenv_new_compile
                 jobs_finished = self.cluster_manager.check_queue(self.qm_driver.job_ids)
 
         print('calcualtion is over')
-
+ 
         return jobs_finished 
     
     # def compute_numerical_hessian(self, molecule):
@@ -698,6 +781,61 @@ conda activate vlxenv_new_compile
                     file.write(f'nprocs {self.qm_driver.nprocs * 3}\n')
                     file.write('END\n')
                     file.write(f'* xyzfile {self.qm_driver.charge} {self.qm_driver.spin} {full_path}\n')
+            
+            elif self.program == 'OpenQP':
+                '''[input]
+                    system = opt.xyz
+                    charge = 0
+                    functional = cam-b3lyp
+                    basis = def2-svp
+                    method = tdhf
+                    runtype = hess
+
+                    [scf]
+                    type = rohf
+                    maxit = 300
+                    multiplicity = 3
+
+                    [tdhf]
+                    type = mrsf
+                    nstate = 10
+
+                    [hess]
+                    state = 2'''
+                
+                full_path = os.path.abspath(self.xyz_filename)
+                root_str = ', '.join(map(str, [root]))
+                with open(input_file, "w") as f:
+                    # [input]
+                    f.write("[input]\n")
+                    # Many tools want just the filename; if OpenQP expects a path, we pass the resolved path.
+                    # If you prefer only the basename, switch to os.path.basename(system_path).
+                    f.write(f"system={full_path}\n")
+                    f.write(f"charge={self.qm_driver.charge}\n")
+                    f.write(f"runtype=hess\n")
+                    f.write(f"basis={self.qm_driver.basis_set_label}\n")
+                    f.write(f"functional={self.qm_driver.xc_func}\n")
+                    f.write(f"method={self.qm_driver.method}\n")
+                    f.write("\n")
+
+                    # [guess]
+                    f.write("[guess]\n")
+                    f.write(f"type=huckel\n")
+                    f.write("\n")
+
+                    # [scf]
+                    f.write("[scf]\n")
+                    f.write(f"multiplicity={self.qm_driver.spin}\n")
+                    f.write(f"type=rohf\n")
+                    f.write("\n")
+
+                    # Method-specific block: use the method name as the section header (e.g., [tdhf] or [tddft])
+                    f.write(f"[tdhf]\n")
+                    f.write(f"type=mrsf\n")
+                    f.write(f"nstate={root_str}\n")
+
+                    f.write(f"[hess]\n")
+                    f.write(f"state={root_str}\n")
             
             elif self.program == 'QCHEM':
 

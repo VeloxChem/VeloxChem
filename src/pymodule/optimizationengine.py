@@ -108,6 +108,7 @@ class OptimizationEngine(geometric.engine.Engine):
             A dictionary containing energy and gradient.
         """
 
+
         start_time = tm.time()
 
         labels = self.molecule.get_labels()

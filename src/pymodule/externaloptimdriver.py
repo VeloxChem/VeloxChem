@@ -28,6 +28,9 @@
 
 from mpi4py import MPI
 import numpy as np
+from contextlib import redirect_stdout, redirect_stderr
+from io import StringIO
+import tempfile
 from pathlib import Path
 from sys import stdout
 from time import time
@@ -43,10 +46,14 @@ from .clustermanager import ClusterManager
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
+from .optimizationengine import OptimizationEngine
+
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 class ExternalOptimDriver:
 
-    def __init__(self, qm_driver, comm=None, ostream=None):
+    def __init__(self, qm_driver, qm_grad_driver=None, comm=None, ostream=None):
         """
         Initializes the class with default simulation parameters.
         """
@@ -77,6 +84,7 @@ class ExternalOptimDriver:
         self.method = qm_driver.method
         
         self.qm_driver = qm_driver
+        self.qm_grad_driver = qm_grad_driver
         self.root_to_optim = 0
         self.roots_to_check = 10
 
@@ -86,6 +94,10 @@ class ExternalOptimDriver:
         self.NAC = False
         self.cluster = False
         self.add_ghost_atom = qm_driver.add_ghost_atom
+
+        self.transition = False
+        self.irc = False
+        self.hessian = 'never'
         
         self.xyz_filename = None
         self.input_files = []
@@ -215,7 +227,7 @@ conda activate vlxenv_simd_master
         """
         Run the pymolcas command with the input file and redirect output to the output file.
         """
-        if self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is None:
+        if self.program in ['MOLCAS', 'ORCA', 'OpenQP'] and self.cluster_manager is None:
             if self.program == 'MOLCAS':
                 self.create_input_file_energy(self.roots)
                 script_path = os.path.join(os.getcwd(), "run_pymolcas.sh")
@@ -237,32 +249,144 @@ conda activate vlxenv_simd_master
                 self.create_shell_script(script_path)
                 bash_command = f"bash -c '{script_path} {self.input_files[0]} {self.output_files[0]}'"
 
-            try:
-                clean_env = os.environ.copy()
+                try:
+                    clean_env = os.environ.copy()
 
-                # Remove Conda-specific environment variables
-                conda_vars = ["CONDA_PREFIX", "CONDA_SHLVL", "CONDA_DEFAULT_ENV"]
-                for var in conda_vars:
-                    clean_env.pop(var, None)  # Remove if exists
+                    # Remove Conda-specific environment variables
+                    conda_vars = ["CONDA_PREFIX", "CONDA_SHLVL", "CONDA_DEFAULT_ENV"]
+                    for var in conda_vars:
+                        clean_env.pop(var, None)  # Remove if exists
 
-                # Adjust PATH to remove Conda-specific paths
-                if "PATH" in clean_env:
-                    clean_env["PATH"] = ":".join(
-                        p for p in clean_env["PATH"].split(":") if "miniconda3" not in p
+                    # Adjust PATH to remove Conda-specific paths
+                    if "PATH" in clean_env:
+                        clean_env["PATH"] = ":".join(
+                            p for p in clean_env["PATH"].split(":") if "miniconda3" not in p
+                        )
+                    result = subprocess.run(
+                    bash_command,
+                    shell=True,
+                    executable="/bin/bash",
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    env=clean_env,  # Inherit the current environment
                     )
-                result = subprocess.run(
-                bash_command,
-                shell=True,
-                executable="/bin/bash",
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=clean_env,  # Inherit the current environment
-                )
 
-            except subprocess.CalledProcessError as e:
-                print(f"Error executing command: {e}")
+                except subprocess.CalledProcessError as e:
+                    print(f"Error executing command: {e}")
+            
+            elif self.program == 'OpenQP':
+
+                try:
+                    temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+                except TypeError:
+                    temp_dir = tempfile.TemporaryDirectory()
+                temp_path = Path(temp_dir.name)
+                constr_filename = None
+                print('Starting geomeTRIC optimization...', self.constraints)
+                if self.constraints:
+                    constr_file = Path(self.input_files[0] + '.constr.txt')
+                    constr_dict = {'freeze': [], 'set': [], 'scan': []}
+                    for line in self.constraints:
+                        content = line.strip().split()
+                        key, val = content[0], ' '.join(content[1:])
+                        assert_msg_critical(
+                            key in ['freeze', 'set', 'scan'],
+                            'OptimizationDriver: Invalid constraint {:s}'.format(key))
+                        constr_dict[key].append(val)
+                    with constr_file.open('w') as fh:
+                        for key in ['freeze', 'set', 'scan']:
+                            if constr_dict[key]:
+                                print(f'${key}', file=fh)
+                                for line in constr_dict[key]:
+                                    print(line, file=fh)
+                    constr_filename = constr_file.as_posix()
+                print(self.qm_grad_driver)
+                print(self.qm_grad_driver.roots_to_follow, self.qm_grad_driver.compute_energy(molecule))
+                
+                opt_engine = OptimizationEngine(self.qm_grad_driver, molecule, None)
+   
+                with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
+                        StringIO()) as fg_err:
+                    try:
+                        m = geometric.optimize.run_optimizer(
+                            customengine=opt_engine,
+                            coordsys='tric',
+                            constraints=constr_filename,
+                            transition=self.transition,
+                            irc=self.irc,
+                            hessian=self.hessian,
+                            input=self.input_files[0])
+                    except geometric.errors.HessianExit:
+                        hessian_exit = True
+
+                coords = m.xyzs[-1] / geometric.nifty.bohr2ang
+                labels = molecule.get_labels()
+                atom_basis_labels = molecule.get_atom_basis_labels()
+                if self.rank == mpi_master():
+                    final_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
+                                        atom_basis_labels)
+                    final_mol.set_charge(molecule.get_charge())
+                    final_mol.set_multiplicity(molecule.get_multiplicity())
+                else:
+                    final_mol = None
+                final_mol = self.comm.bcast(final_mol, root=mpi_master())
+
+                try:
+                    temp_dir.cleanup()
+                except (NotADirectoryError, PermissionError):
+                    pass
+                return final_mol.get_xyz_string()
+                # opt_results = {'final_geometry': final_mol.get_xyz_string()}
+                # if self.rank == mpi_master():
+                #     self.qm_grad_driver.ostream.print_info(
+                #         'Geometry optimization completed.')
+                #     self.ostream.print_blank()
+                #     self.ostream.print_block(final_mol.get_string())
+                #     is_scan_job = False
+                #     if self.constraints:
+                #         for line in self.constraints:
+                #             key = line.strip().split()[0]
+                #             is_scan_job = (key == 'scan')
+                #     if is_scan_job:
+  
+                #         all_energies = []
+                #         all_coords_au = []
+                #         for step, energy, xyz in zip(m.comms, m.qm_energies,
+                #                                     m.xyzs):
+                #             if step.split()[:2] == ['Iteration', '0']:
+                #                 all_energies.append([])
+                #                 all_coords_au.append([])
+                #             all_energies[-1].append(energy)
+                #             all_coords_au[-1].append(xyz / geometric.nifty.bohr2ang)
+                #         opt_results['scan_energies'] = [
+                #             opt_energies[-1] for opt_energies in all_energies
+                #         ]
+                #         opt_results['scan_geometries'] = []
+                #         labels = molecule.get_labels()
+                #         for opt_coords_au in all_coords_au:
+                #             mol = Molecule(labels, opt_coords_au[-1], 'au',
+                #                         atom_basis_labels)
+                #             opt_results['scan_geometries'].append(
+                #                 mol.get_xyz_string())
+                #     else:
+       
+                #         opt_results['opt_energies'] = list(m.qm_energies)
+                #         opt_results['opt_geometries'] = []
+                #         labels = molecule.get_labels()
+                #         for xyz in m.xyzs:
+                #             mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
+                #                         'au', atom_basis_labels)
+                #             opt_results['opt_geometries'].append(
+                #                 mol.get_xyz_string())
+                #     # Write opt results to final hdf5 file
+                #     # Note: use base_fname so that the final h5 file is kept even
+                #     # when keep_files is False
+
+                # opt_results = self.comm.bcast(opt_results, root=mpi_master())
+                # return opt_results
+            
         
         elif self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is not None:
             if self.program == 'ORCA':

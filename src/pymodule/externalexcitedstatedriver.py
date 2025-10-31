@@ -86,11 +86,12 @@ class ExternalExcitedStatesScfDriver:
         self.tracked_roots = None
         self.roots_to_check = 10
         self.energies = None
-        self.method = None
+        self.method = 'tddft'
         self.solvation = (False, 'CPCM', 'water')
         self.spin_flip = False
         self.NAC = False
         self.cluster = False
+        self.open_qp_path = None
         self.path_on_cluster = path_on_cluster
         
         self.xyz_filename = None
@@ -155,10 +156,22 @@ export LD_LIBRARY_PATH=~/minconda3/envs/vlxenv/lib/
             script_content = f"""#!/bin/bash
 
 # Run the orca command
-source /home/vlind06/miniconda3/etc/profile.d/conda.sh
+source $(conda info --base)/etc/profile.d/conda.sh
 conda deactivate
 {orca_path} $1 > $2
-conda activate vlxenv_simd_master
+"""
+        elif self.program == 'OpenQP':
+            script_content = f"""#!/bin/bash
+
+# Run the orca command
+source $(conda info --base)/etc/profile.d/conda.sh
+conda deactivate
+export OMP_NUM_THREADS={self.nprocs}
+export OPENQP_ROOT={self.open_qp_path}
+export LD_LIBRARY_PATH=$OPENQP_ROOT/lib:$LD_LIBRARY_PATH
+export MKL_INTERFACE_LAYER="@_MKL_INTERFACE_LAYER@"
+export MKL_THREADING_LAYER=SEQUENTIAL
+openqp $1 > $2
 """
 
         elif self.program == 'ORCA' and orca_path is not None and cluster == True:
@@ -176,7 +189,7 @@ conda activate vlxenv_simd_master
         os.chmod(script_path, 0o755)
      
     
-    def compute_energy(self, molecule, basis, method='TDDFT'):
+    def compute_energy(self, molecule, basis):
         
         self.basis_set_label = basis
         molecule.write_xyz_file('current_geometry.xyz')
@@ -187,12 +200,17 @@ conda activate vlxenv_simd_master
             f2.writelines(lines)
 
         self.xyz_filename = 'current_geometry.xyz'
-        self.method = method
 
         """
         Run the pymolcas command with the input file and redirect output to the output file.
         """
-        if self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is None:
+        if self.program in ['MOLCAS', 'ORCA', 'OpenQP'] and self.cluster_manager is None:
+
+            script_path = None
+            inp0 = Path(self.input_files[0]).resolve()
+            out0 = Path(self.output_files[0]).resolve()
+
+
             if self.program == 'MOLCAS':
                 self.create_input_file_energy(self.roots_to_check)
                 script_path = os.path.join(os.getcwd(), "run_pymolcas.sh")
@@ -211,35 +229,40 @@ conda activate vlxenv_simd_master
 
                 self.create_input_file_energy(self.input_files[0], self.roots_to_check)
                 script_path = os.path.join(os.getcwd(), "run_orca.sh")
+                script_path = Path(script_path).resolve()
                 self.create_shell_script(script_path)
-                bash_command = f"bash -c '{script_path} {self.input_files[0]} {self.output_files[0]}'"
+                bash_command = f"'{script_path} {inp0} {out0}'"
+            
+            elif self.program == 'OpenQP':
+                self.create_input_file_energy(inp0, self.roots_to_check)
+                script_path = os.path.join(os.getcwd(), "run_openqp.sh")
+                script_path = Path(script_path).resolve()
+                self.create_shell_script(script_path)
+                bash_command = f"'{script_path} {inp0} {out0}'"
+                
+
+            cmd = f"source /etc/profile; source ~/.bashrc >/dev/null 2>&1 || true; /bin/bash '{script_path}' '{inp0}' '{out0}'"
+
+            # Start from the current environment; only strip conda if you *must*
+            env = os.environ.copy()
 
             try:
-                clean_env = os.environ.copy()
-
-                # Remove Conda-specific environment variables
-                conda_vars = ["CONDA_PREFIX", "CONDA_SHLVL", "CONDA_DEFAULT_ENV"]
-                for var in conda_vars:
-                    clean_env.pop(var, None)  # Remove if exists
-
-                # Adjust PATH to remove Conda-specific paths
-                if "PATH" in clean_env:
-                    clean_env["PATH"] = ":".join(
-                        p for p in clean_env["PATH"].split(":") if "miniconda3" not in p
-                    )
                 result = subprocess.run(
-                bash_command,
-                shell=True,
-                executable="/bin/bash",
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=clean_env,  # Inherit the current environment
+                    ["/bin/bash", "-lc", cmd],
+                    cwd=str(script_path.parent),
+                    env=env,
+                    check=True,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
-
+                print(result.stdout)
             except subprocess.CalledProcessError as e:
-                print(f"Error executing command: {e}")
+                print("Command failed.")
+                print("STDOUT:\n", e.stdout)
+                print("STDERR:\n", e.stderr)
+                raise
+                    
         
         elif self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is not None:
             if self.program == 'ORCA':
@@ -330,7 +353,30 @@ conda activate vlxenv_simd_master
                     else:
                         print("Excited state energy not found.")
                     
+            elif self.program == 'OpenQP':
+                
+                new_output_file = str(Path(self.input_files[0]).with_suffix(".log"))
+                with open(new_output_file, 'r') as file:
+                    content = file.read()
+            
+                excited_state_match = re.search(r'TOTAL energy\s*=\s*([-0-9.]+)', content)
+                if excited_state_match:
+                    gs_energy = float(excited_state_match.group(1))
+                else:
+                    print("Excited state energy not found.")
+                s2_values = re.findall(r'<S\^2>\s+=\s+([-0-9.]+)', content)
+                # multi_values = re.findall(r'<S\*\*2>\s*=.*?Mult\s+([-0-9.]+)', content)
+                
+                spin_s2_values = [float(s2_value) for s2_value in s2_values]
+                spin_multplicity = []
+                state_energy_matches = re.findall(r'(?i)\bState\b.*?Energy\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*eV', content)
+                if state_energy_matches:
+                    # Convert all matched state energies to float and add to the list
+                    energies.extend([(float(energy) * 0.0367492929 + gs_energy) for energy in state_energy_matches])
+                else:
+                    print("Excited state energy not found.")
 
+       
             elif self.program == 'QCHEM':
                 energies = []
                 spin_multplicity = None
@@ -389,7 +435,8 @@ conda activate vlxenv_simd_master
             
             reordered_energies = [energies[idx] for idx in range(len(energies)) if (idx + 1) in self.roots]
             self.tracked_roots = [idx + 1 for idx in range(len(energies)) if idx in self.roots]
-
+            print(reordered_energies, self.roots)
+            
             return reordered_energies
         except Exception as e:
             print(f"Error extracting energies: {e}")
@@ -462,6 +509,41 @@ conda activate vlxenv_simd_master
                     file.write('END\n')
                     file.write(f'* xyzfile {self.charge} {self.spin} {full_path}\n')
 
+            elif self.program == 'OpenQP':
+                full_path = os.path.abspath(self.xyz_filename)
+                if self.path_on_cluster is not None:
+                    full_path = f'{self.path_on_cluster}/{self.xyz_filename}'
+
+                with open(input_file, "w") as f:
+                    # [input]
+                    f.write("[input]\n")
+                    # Many tools want just the filename; if OpenQP expects a path, we pass the resolved path.
+                    # If you prefer only the basename, switch to os.path.basename(system_path).
+                    f.write(f"system={full_path}\n")
+                    f.write(f"charge={self.charge}\n")
+                    f.write(f"runtype={'energy'}\n")
+                    f.write(f"basis={self.basis_set_label}\n")
+                    f.write(f"functional={self.xc_func}\n")
+                    f.write(f"method={self.method}\n")
+                    f.write("\n")
+
+                    # [guess]
+                    f.write("[guess]\n")
+                    f.write(f"type=huckel\n")
+                    f.write("\n")
+
+                    # [scf]
+                    f.write("[scf]\n")
+                    f.write(f"multiplicity={self.spin}\n")
+                    f.write(f"type=rohf\n")
+                    f.write("\n")
+
+                    # Method-specific block: use the method name as the section header (e.g., [tdhf] or [tddft])
+                    f.write(f"[tdhf]\n")
+                    f.write(f"type=mrsf\n")
+                    f.write(f"nstate={self.roots_to_check}\n")
+            
+            
             elif self.program == 'QCHEM':
                 functional = 'b3lyp'
                 if self.spin_flip is True:

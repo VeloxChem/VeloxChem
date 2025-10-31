@@ -224,6 +224,7 @@ class IMForceFieldGenerator:
             excited_state_gradient_driver = ExternalExcitedStatesGradientDriver(excited_state_driver)
             excited_state_hessian_driver = ExternalExcitedStatesHessianDriver(excited_state_driver)
             self.drivers['es'] = (excited_state_driver, excited_state_gradient_driver, excited_state_hessian_driver)
+        
 
         self.states_interpolation_settings = {root: None for root in roots_to_follow}
         self.states_data_point_density = {root: None for root in roots_to_follow}
@@ -232,8 +233,8 @@ class IMForceFieldGenerator:
         # variables for the interpolation
         self.interpolation_settings = None
         self.interpolation_type = 'shepard'
-        self.weightfunction_type = 'cartesian-hessian'
-        self.exponent_p = 4
+        self.weightfunction_type = 'cartesian'
+        self.exponent_p = 2
         self.exponent_q = 2
         self.confidence_radius = 0.5
         self.imforcefieldfiles = None
@@ -482,13 +483,22 @@ class IMForceFieldGenerator:
             dimer_coordinates = determine_dimer_fragments(molecule)
             if self.reaction_coordinates is not None:
                 self.reaction_coordinates.extend(dimer_coordinates)
+
             elif len(dimer_coordinates) > 0:
                 self.reaction_coordinates = dimer_coordinates
 
             self.z_matrix = self.define_z_matrix(molecule, self.reaction_coordinates)
-        else:
+        elif self.z_matrix is None:
             int_driver = InterpolationDriver()
-            int_driver.imforcefield_file = self.imforcefieldfiles[self.roots_to_follow[0]]
+            int_driver.update_settings({ 'interpolation_type':self.interpolation_type,
+                                    'weightfunction_type':self.weightfunction_type,
+                                    'exponent_p':self.exponent_p,
+                                    'exponent_q':self.exponent_q, 
+                                    'confidence_radius':self.confidence_radius,
+                                    'imforcefield_file':self.imforcefieldfiles[self.roots_to_follow[0]],
+                                    'use_inverse_bond_length':True
+                                })
+            # int_driver.imforcefield_file = self.imforcefieldfiles[self.roots_to_follow[0]]
             _, self.z_matrix = int_driver.read_labels()
 
         angle_index = next((i for i, x in enumerate(self.z_matrix) if len(x) == 3), len(self.z_matrix))
@@ -505,8 +515,6 @@ class IMForceFieldGenerator:
         # # symmetry_pairs = normalize_symmetry_pairs(symmetry_groups[1])
         # frags = build_fragments_from_symmetry_pairs(molecule.get_connectivity_matrix(), symmetry_groups[1])
         # print(f"Class fragments: {frags}")
-        
-        # exit()
 
         if not self.use_symmetry:
             symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
@@ -527,6 +535,7 @@ class IMForceFieldGenerator:
         symmetry_groups_ref = [groups for groups in symmetry_groups[1] if not any(item in all_exclision for item in groups)]
 
         regrouped, rot_groups = regroup_by_rotatable_connection(molecule, symmetry_groups_ref, rotatable_bonds_zero_based, molecule.get_connectivity_matrix())
+        
 
         self.symmetry_information = {'gs': (), 'es': ()}
         for root in self.roots_to_follow:
@@ -585,6 +594,7 @@ class IMForceFieldGenerator:
 
                     self.atom_transfer_reaction_path = {entry['root']: []}
                 self.atom_transfer_reaction_path[entry['root']].append(self.determine_atom_transfer_reaction_path(entry['reactants'], entry['products']))
+
 
         if self.add_conformal_structures:
 
@@ -732,6 +742,7 @@ class IMForceFieldGenerator:
                                         'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect, 'roots_to_follow':self.roots_to_follow, 'excitation_pulse':self.excitation_pulse}
             
             files_to_add_conf = []
+            molecules_to_add_info = []
             for root in self.roots_to_follow:
 
                 if not os.path.exists(self.imforcefieldfiles[root]):
@@ -820,6 +831,8 @@ class IMForceFieldGenerator:
                 if self.use_minimized_structures[0]:       
                     for opt_roots in self.roots_to_follow:
                         if opt_roots not in files_to_add_conf:
+                            current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
+                            molecules_to_add_info.append((molecule, current_basis, [opt_roots]))
                             continue
                         root_to_add = opt_roots
                         if opt_roots == 0 and isinstance(self.drivers['gs'][0], ScfRestrictedDriver):
@@ -863,15 +876,46 @@ class IMForceFieldGenerator:
 
                         
                         
-                        elif opt_roots > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
+                        elif opt_roots > 1 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver) and self.drivers['es'][0].program != 'OpenQP':
 
                             optim_driver = ExternalOptimDriver(self.drivers['es'][0])
                             optim_driver.constraints = self.use_minimized_structures[1]
-                            optim_driver.root_to_optim = opt_roots
+                            optim_driver.root_to_optim = [opt_roots]
                             opt_mol_string, energy = optim_driver.optimize(molecule)
                             optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+
+                            print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+
+                            molecule = optimized_molecule
+
+                        elif opt_roots > 1 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver) and self.drivers['es'][0].program == 'OpenQP':
+                            
+                            self.drivers['es'][1].root_to_optim = [opt_roots]
+                            optim_driver = ExternalOptimDriver(self.drivers['es'][0], self.drivers['es'][1])
+                            # optim_driver.root_to_optim = state_to_optim
+                            opt_constraint_list = []
+                            for constraint in self.use_minimized_structures[1]:
+                                if constraint in opt_constraint_list:
+                                    continue
+                                if len(constraint) == 2:
+                                    opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
+                                    opt_constraint_list.append(opt_constraint)
+                                
+                                elif len(constraint) == 3:
+                                    opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                                else:
+                                    opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
+                                    opt_constraint_list.append(opt_constraint)
+                            
+                            optim_driver.constraints = opt_constraint_list[:]
+                            opt_mol_string = optim_driver.optimize(molecule)
+                            optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                            
                             print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
                             molecule = optimized_molecule
+                            self.drivers['es'][1].root_to_optim = self.roots_to_follow
 
 
 
@@ -882,12 +926,20 @@ class IMForceFieldGenerator:
 
                     
                 else:
-                    current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
-                    molecules_to_add_info.append((molecule, current_basis, files_to_add_conf))
+                    for opt_roots in self.roots_to_follow:
+                        if opt_roots not in files_to_add_conf:
+                            continue
+                        current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
+                        molecules_to_add_info.append((molecule, current_basis, [opt_roots]))
+               
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
-                   
-
-            self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecule, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)    
+            
+            else:
+                for opt_roots in self.roots_to_follow:
+                    current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
+                    molecules_to_add_info.append((molecule, current_basis, [opt_roots]))
+            
+            self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecules_to_add_info, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)    
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
             self.states_data_point_density = density_of_datapoints
             
@@ -1119,6 +1171,7 @@ class IMForceFieldGenerator:
                         self.add_point(optimized_molecule, current_basis, self.states_interpolation_settings, symmetry_information=self.symmetry_information, files_to_add=files_to_add_conf)
             
             elif not self.add_conformal_structures and not os.path.exists(imforcefieldfile):
+        
                 molecules_to_add_info = []
                 if self.use_minimized_structures[0]:       
                     optimized_molecule = None
@@ -1166,7 +1219,7 @@ class IMForceFieldGenerator:
 
                         print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
 
-                    elif self.roots_to_follow[0] > 1 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver):
+                    elif self.roots_to_follow[0] > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver) and self.drivers['es'][0].program != 'OpenQP':
 
                         optim_driver = ExternalOptimDriver(self.drivers['es'][0])
                         optim_driver.constraints = self.use_minimized_structures[1]
@@ -1178,6 +1231,35 @@ class IMForceFieldGenerator:
 
                         current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
                         molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+
+                    elif self.roots_to_follow[0] > 0 and isinstance(self.drivers['es'][0], ExternalExcitedStatesScfDriver) and self.drivers['es'][0].program == 'OpenQP':
+                        
+                        self.drivers['es'][1].root_to_optim = self.roots_to_follow[0]
+                        optim_driver = ExternalOptimDriver(self.drivers['es'][0], self.drivers['es'][1])
+                        # optim_driver.root_to_optim = state_to_optim
+                        opt_constraint_list = []
+                        for constraint in self.use_minimized_structures[1]:
+                            if constraint in opt_constraint_list:
+                                continue
+                            if len(constraint) == 2:
+                                opt_constraint = f"freeze distance {constraint[0]} {constraint[1]}"
+                                opt_constraint_list.append(opt_constraint)
+                            
+                            elif len(constraint) == 3:
+                                opt_constraint = f"freeze angle {constraint[0]} {constraint[1]} {constraint[2]}"
+                                opt_constraint_list.append(opt_constraint)
+                        
+                            else:
+                                opt_constraint = f"freeze dihedral {constraint[0]} {constraint[1]} {constraint[2]} {constraint[3]}"
+                                opt_constraint_list.append(opt_constraint)
+                        
+                        optim_driver.constraints = opt_constraint_list[:]
+                        opt_mol_string = optim_driver.optimize(molecule)
+                        optimized_molecule = Molecule.from_xyz_string(opt_mol_string)
+                        current_basis = MolecularBasis.read(optimized_molecule, basis.get_main_basis_label())
+                        molecules_to_add_info.append((optimized_molecule, current_basis, self.roots_to_follow))
+                        print('Optimized Molecule', optimized_molecule.get_xyz_string(), '\n\n', molecule.get_xyz_string())
+                        self.drivers['es'][1].root_to_optim = self.roots_to_follow
                         
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
@@ -1187,7 +1269,10 @@ class IMForceFieldGenerator:
                     molecules_to_add_info.append((molecule, current_basis, self.roots_to_follow))
                     self.add_point(molecules_to_add_info, self.states_interpolation_settings, symmetry_information=self.symmetry_information)
 
-
+            else:
+            
+                current_basis = MolecularBasis.read(molecule, basis.get_main_basis_label())
+                molecules_to_add_info.append((molecule, current_basis, [self.roots_to_follow[0]]))
 
             self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_molecules_along_dihedral_scan(molecules_to_add_info, self.roots_to_follow, specific_dihedrals=self.dihedrals_dict)
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.states_interpolation_settings)
@@ -1558,11 +1643,12 @@ class IMForceFieldGenerator:
             qm_datapoints = []
             if imforcefieldfile[state]['imforcefield_file'] in os.listdir(os.getcwd()):
                 impes_driver = InterpolationDriver(self.z_matrix)
-                impes_driver.imforcefield_file = imforcefieldfile[state]['imforcefield_file']
+                impes_driver.update_settings(imforcefieldfile[state])
                 self.qmlabels, self.z_matrix = impes_driver.read_labels()
                 for label in self.qmlabels:
                     if '_symmetry' not in label:
                         qm_data_point = InterpolationDatapoint(self.z_matrix)
+                        qm_data_point.update_settings(imforcefieldfile[state])
                         qm_data_point.read_hdf5(imforcefieldfile[state]['imforcefield_file'], label)
                         qm_datapoints.append(qm_data_point)
             for specific_dihedral in point_densities_dict[state].keys():
@@ -2163,7 +2249,7 @@ class IMForceFieldGenerator:
                 if len(coord) == 4:
                     z_matrix.append(coord)
 
-
+        
         return z_matrix
     
 
@@ -2190,112 +2276,104 @@ class IMForceFieldGenerator:
         symmetry_mapping_groups = []
         symmetry_exclusion_groups = []
 
-
-        if len(symmetry_information) != 0:
-            
-            for entries in molecule_specific_information:
-                molecule = entries[0]
-                basis = entries[1]
-                states = entries[2]
-                symmetry_point = False
-                if 0 in states and len(symmetry_information['gs'][2]) != 0 or 1 in states and self.drivers['es'][0].spin_flip and len(symmetry_information['gs'][2]) != 0:
-                    symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
-                    symmetry_exclusion_groups = [item for element in symmetry_information['gs'][1] for item in element]
-                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['gs'][1], symmetry_information['gs'][5])
-                    
-                    # Generate all combinations
-                    keys = list(sym_dihedrals.keys())
-                    values = list(sym_dihedrals.values())
-                    combinations = list(itertools.product(*values))
-
-                    # Convert to list of dictionaries
-                    molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
-                    print('MOlecule configs', molecule_configs)
-                    for i, molecule_config in enumerate(molecule_configs):
-                        cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
-                        dihedral_to_change = []
-                        constraints = []
-                        for dihedral, angle in molecule_config.items():
-                            opt_dihedral_angle = molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
-                            print(molecule.get_xyz_string())
-                            print('Dihedral creation', dihedral, opt_dihedral_angle, angle)
-                            
-                            cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
-                            dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                            constraint = f"freeze dihedral {dihedral[0] + 1} {dihedral[1] + 1} {dihedral[2] + 1} {dihedral[3] + 1}"
-                            constraints.append(constraint)
-                            if self.symmetry_information is not None:
-                                print('opt_dihedral_angle', opt_dihedral_angle)
-                                self.symmetry_information['gs'][8][dihedral].append(opt_dihedral_angle)
-                        if i > 0:
-                            symmetry_point = True
-                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
-                        adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
-                if 1 in states and len(symmetry_information['es'][2]) != 0 and self.drivers['es'][0].spin_flip is False:
-                    symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
-                    symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
-                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['es'][1], symmetry_information['es'][5])
-                    
-                    # Generate all combinations
-                    keys = list(sym_dihedrals.keys())
-                    values = list(sym_dihedrals.values())
-                    combinations = list(itertools.product(*values))
-
-                    # Convert to list of dictionaries
-                    molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
-                    print('MOlecule configs', molecule_configs)
-                    for i, molecule_config in enumerate(molecule_configs):
-                        cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
-                        dihedral_to_change = []
-                        for dihedral, angle in molecule_config.items():
-                            print('Dihedral', dihedral)
-                            opt_dihedral_angle = cur_molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
-                            cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
-                            dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                            print('påt_dihedral', opt_dihedral_angle + angle)
-                            if self.symmetry_information is not None:
-                                self.symmetry_information['es'][8][dihedral].append(opt_dihedral_angle + angle)
-
-                        if i > 0:
-                            symmetry_point = True
-                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
-                        adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
-                elif any(x > 1 for x in states) and len(symmetry_information['es'][2]) != 0 and 1 in states and self.drivers['es'][0].spin_flip is True:
-                    symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
-                    symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
-                    sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['es'][1], symmetry_information['es'][5])
-                    
-                    # Generate all combinations
-                    keys = list(sym_dihedrals.keys())
-                    values = list(sym_dihedrals.values())
-                    combinations = list(itertools.product(*values))
-
-                    # Convert to list of dictionaries
-                    molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
-                    print('MOlecule configs', molecule_configs)
-                    for i, molecule_config in enumerate(molecule_configs):
-                        cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
-                        dihedral_to_change = []
-                        for dihedral, angle in molecule_config.items():
-                            print('Dihedral', dihedral)
-                            opt_dihedral_angle = cur_molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
-                            cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
-                            dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
-                            print('påt_dihedral', opt_dihedral_angle + angle)
-                            if self.symmetry_information is not None:
-                                self.symmetry_information['es'][8][dihedral].append(opt_dihedral_angle + angle)
-
-                        if i > 0:
-                            symmetry_point = True
-                        current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
-                        adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
+        for entries in molecule_specific_information:
+            molecule = entries[0]
+            basis = entries[1]
+            states = entries[2]
+            symmetry_point = False
+            if 0 in states and len(symmetry_information['gs']) != 0 and len(symmetry_information['gs'][2]) != 0 or 1 in states and len(symmetry_information['gs']) != 0 and self.drivers['es'][0].spin_flip and len(symmetry_information['gs'][2]) != 0:
+                symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
+                symmetry_exclusion_groups = [item for element in symmetry_information['gs'][1] for item in element]
+                sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['gs'][1], symmetry_information['gs'][5])
                 
-                else:
-                    if 0 in entries[2]:
-                        adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point)) 
-                    if any(x > 0 for x in entries[2]): 
-                        states = [state for state in entries[2] if state > 0]
-                        adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point)) 
+                # Generate all combinations
+                keys = list(sym_dihedrals.keys())
+                values = list(sym_dihedrals.values())
+                combinations = list(itertools.product(*values))
+                # Convert to list of dictionaries
+                molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
+                print('MOlecule configs', molecule_configs)
+                for i, molecule_config in enumerate(molecule_configs):
+                    cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                    dihedral_to_change = []
+                    constraints = []
+                    for dihedral, angle in molecule_config.items():
+                        opt_dihedral_angle = molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
+                        print(molecule.get_xyz_string())
+                        print('Dihedral creation', dihedral, opt_dihedral_angle, angle)
+                        
+                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
+                        dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+                        constraint = f"freeze dihedral {dihedral[0] + 1} {dihedral[1] + 1} {dihedral[2] + 1} {dihedral[3] + 1}"
+                        constraints.append(constraint)
+                        if self.symmetry_information is not None:
+                            print('opt_dihedral_angle', opt_dihedral_angle)
+                            self.symmetry_information['gs'][8][dihedral].append(opt_dihedral_angle)
+                    if i > 0:
+                        symmetry_point = True
+                    current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                    adjusted_molecule['gs'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
+            if 1 in states and len(symmetry_information['es']) != 0 and len(symmetry_information['es'][2]) != 0 and self.drivers['es'][0].spin_flip is False:
+                symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
+                symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
+                sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['es'][1], symmetry_information['es'][5])
+                
+                # Generate all combinations
+                keys = list(sym_dihedrals.keys())
+                values = list(sym_dihedrals.values())
+                combinations = list(itertools.product(*values))
+                # Convert to list of dictionaries
+                molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
+                print('MOlecule configs', molecule_configs)
+                for i, molecule_config in enumerate(molecule_configs):
+                    cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                    dihedral_to_change = []
+                    for dihedral, angle in molecule_config.items():
+                        print('Dihedral', dihedral)
+                        opt_dihedral_angle = cur_molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
+                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
+                        dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+                        print('påt_dihedral', opt_dihedral_angle + angle)
+                        if self.symmetry_information is not None:
+                            self.symmetry_information['es'][8][dihedral].append(opt_dihedral_angle + angle)
+                    if i > 0:
+                        symmetry_point = True
+                    current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                    adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
+            elif any(x > 1 for x in states) and len(symmetry_information['es']) != 0 and len(symmetry_information['es'][2]) != 0 and 1 in states and self.drivers['es'][0].spin_flip is True:
+                symmetry_mapping_groups = [item for item in range(len(molecule.get_labels()))]
+                symmetry_exclusion_groups = [item for element in symmetry_information['es'][1] for item in element]
+                sym_dihedrals, periodicites, _, _ = self.adjust_symmetry_dihedrals(molecule, symmetry_information['es'][1], symmetry_information['es'][5])
+                
+                # Generate all combinations
+                keys = list(sym_dihedrals.keys())
+                values = list(sym_dihedrals.values())
+                combinations = list(itertools.product(*values))
+                # Convert to list of dictionaries
+                molecule_configs = [dict(zip(keys, combo)) for combo in combinations] # if all(element == combo[0] for element in combo)
+                print('MOlecule configs', molecule_configs)
+                for i, molecule_config in enumerate(molecule_configs):
+                    cur_molecule = Molecule.from_xyz_string(molecule.get_xyz_string())
+                    dihedral_to_change = []
+                    for dihedral, angle in molecule_config.items():
+                        print('Dihedral', dihedral)
+                        opt_dihedral_angle = cur_molecule.get_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], 'radian')
+                        cur_molecule.set_dihedral([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1], opt_dihedral_angle + angle, 'radian')
+                        dihedral_to_change.append([dihedral[0] + 1, dihedral[1] + 1, dihedral[2] + 1, dihedral[3] + 1])
+                        print('påt_dihedral', opt_dihedral_angle + angle)
+                        if self.symmetry_information is not None:
+                            self.symmetry_information['es'][8][dihedral].append(opt_dihedral_angle + angle)
+                    if i > 0:
+                        symmetry_point = True
+                    current_basis = MolecularBasis.read(cur_molecule, basis.get_main_basis_label())
+                    adjusted_molecule['es'].append((cur_molecule, current_basis, periodicites[dihedral],  dihedral_to_change, entries[2], symmetry_point))
+            
+            else:
+                if 0 in entries[2]:
+                    adjusted_molecule['gs'].append((entries[0], entries[1], 1, None, [0], symmetry_point)) 
+                if any(x > 0 for x in entries[2]): 
+                    states = [state for state in entries[2] if state > 0]
+                    adjusted_molecule['es'].append((entries[0], entries[1], 1, None, states, symmetry_point)) 
         # else:
         #     adjusted_molecule['gs'].append((molecule, basis, 1, None))  
         #     adjusted_molecule['es'].append((molecule, basis, 1, None))  
@@ -2329,7 +2407,9 @@ class IMForceFieldGenerator:
                 # hessians = [np.zeros((3 * len(mol_basis[0].get_labels()), 3 * len(mol_basis[0].get_labels()))) for _ in range(len(energies))]
                 gradients = self.compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results)
                 hessians = self.compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
-        
+                masses = mol_basis[0].get_masses().copy()
+                masses_cart = np.repeat(masses, 3)
+                inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
                 for number in range(len(energies)):
     
                     interpolation_driver = InterpolationDriver()
@@ -2358,6 +2438,12 @@ class IMForceFieldGenerator:
                         grad = grad[indices].reshape(-1, 3) 
                         hess = hess[np.ix_(indices, indices)]  # shape will now be (15, 15)
                        
+                    grad_vec = grad.reshape(-1)         # (3N,)
+                    hess_mat = hess.reshape(grad_vec.size, grad_vec.size)
+                    mw_grad_vec = inv_sqrt_masses * grad_vec
+                    mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
+                    # inv_sqrt_masses = None
+                    
                     # grad_mw = grad / np.sqrt(masses)[:, None]
                     # H_mw = hess * inv_sqrt_masses[:, np.newaxis] * inv_sqrt_masses[np.newaxis, :]
                     
@@ -2369,12 +2455,15 @@ class IMForceFieldGenerator:
                     else:
                         label = f'{old_label}_symmetry_{label_counter}'
                     impes_coordinate = InterpolationDatapoint(self.z_matrix)
+                    impes_coordinate.update_settings(interpolation_settings[mol_basis[4][number]])
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
-                    # impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+                    impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
                     impes_coordinate.energy = energies[number]
-                    impes_coordinate.gradient = grad
-                    impes_coordinate.hessian = hess
+                    impes_coordinate.gradient =  mw_grad_vec.reshape(grad.shape)
+                    impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
                     impes_coordinate.transform_gradient_and_hessian()
+                    print(self.z_matrix)
+                    print('Here §§§§§§§§§')
                     # for i, element in enumerate(self.z_matrix[symmetry_information['gs'][-1][1]:], start=symmetry_information['gs'][-1][1]):
                         
                     #     if set([element[0] + 1, element[1] + 1, element[2] + 1, element[3] + 1]) == set(mol_basis[3][0]):
@@ -2485,7 +2574,7 @@ class IMForceFieldGenerator:
                     
                     print(f"Database expansion with {', '.join(labels)}")
 
-                drivers[0].roots_to_follow = org_roots
+                drivers[0].roots = org_roots
                 drivers[1].roots_to_follow = org_roots
                 drivers[2].roots_to_follow = org_roots
                 label_counter += 1

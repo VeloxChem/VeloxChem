@@ -135,8 +135,19 @@ source $(conda info --base)/etc/profile.d/conda.sh
 conda deactivate
 # Run the orca command
 {orca_path} $1 > $2
-conda activate vlxenv_new_compile
 
+"""
+        elif self.program == 'OpenQP':
+            script_content = f"""#!/bin/bash
+
+# Run the orca command
+source $(conda info --base)/etc/profile.d/conda.sh
+conda deactivate
+export OMP_NUM_THREADS={self.qm_driver.nprocs}
+export OPENQP_ROOT={self.qm_driver.open_qp_path}
+export MKL_INTERFACE_LAYER="@_MKL_INTERFACE_LAYER@"
+export MKL_THREADING_LAYER=SEQUENTIAL
+openqp $1 > $2
 """
         else:
             raise ValueError("Unsupported program or ORCA executable not found")
@@ -232,6 +243,66 @@ conda activate vlxenv_new_compile
                 for root in self.roots_to_follow:
                     gradients.append(gradients_orca[f'excited_state_{root}'])
                 
+            if self.program == 'OpenQP':
+                
+                exctracted_state_gradients = ({f'excited_state_{i}': None for i in self.roots_to_follow})
+                for root in self.roots_to_follow:
+                    p_in = Path(self.input_files[0])    
+                    new_output_file = p_in.with_suffix(".log").with_stem(f"{p_in.stem}_{root}")
+
+                    with open(new_output_file, 'r', encoding='utf-8', errors='ignore') as fh:
+                        lines = iter(fh.readlines())
+
+                    in_disp_block = False
+                    collecting = False
+                    current = []
+                    state_idx = None
+
+                    for line in lines:
+                        # look for the header of the block we want
+                        if not in_disp_block:
+                            if re.search(r'^\s*PyOQP\s+dispersion\s+corrected\s+gradients\s*$', line, flags=re.I):
+                                in_disp_block = True
+                            continue
+
+                        # inside the dispersion-corrected section, grab the 'PyOQP state N' line
+                        if in_disp_block and not collecting:
+                            m = re.search(r'^\s*PyOQP\s+state\s+(\d+)\s*$', line, flags=re.I)
+                            if m:
+                                state_idx = int(m.group(1))
+                                collecting = True
+                                current = []
+                            continue
+
+                        # collect atom lines until a blank line ends the block
+                        if collecting:
+                            if not line.strip():
+                                # end of this state's block
+                                if state_idx is not None and current:
+                                    exctracted_state_gradients[f'excited_state_{state_idx}'] = np.array(current, dtype=float)
+                                # reset for potential next block later in the file
+                                in_disp_block = False
+                                collecting = False
+                                state_idx = None
+                                current = []
+                                continue
+
+                            parts = line.split()
+                            # expect: Symbol  gx  gy  gz  (ignore the symbol, take last 3 numbers)
+                            if len(parts) >= 4:
+                                try:
+                                    x, y, z = map(float, parts[-3:])
+                                    current.append([x, y, z])
+                                except ValueError:
+                                    # line didn’t have three floats at the end; skip gracefully
+                                    pass
+                    
+           
+
+                for root in self.roots_to_follow:
+                    gradients.append(exctracted_state_gradients[f'excited_state_{root}'])
+
+            
             if self.program == 'QCHEM':
                 gradients_qchem = {'ground_state': None}
                 if self.roots > 0:
@@ -322,7 +393,7 @@ conda activate vlxenv_new_compile
         
         else:
             self.full_output_filename = self.output_files[0]
-        if self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is None:
+        if self.program in ['MOLCAS', 'ORCA', 'OpenQP'] and self.cluster_manager is None:
             if self.program == 'MOLCAS':
                 self.create_input_file_gradient(self.roots)
 
@@ -370,6 +441,45 @@ conda activate vlxenv_new_compile
                     print(f"Error executing command: {e}")
                     #return e.stderr.decode('utf-8')
         
+            elif self.program == 'OpenQP':
+                
+                script_path = None
+                for root in self.roots_to_follow:
+                    p_in = Path(self.input_files[0])
+                    p_out = Path(self.output_files[0])
+                    new_input_file = p_in.with_suffix(".inp").with_stem(f"{p_in.stem}_{root}")
+                    new_output_file = p_out.with_suffix(".log").with_stem(f"{p_out.stem}_{root}")
+                    inp0 = Path(new_input_file).resolve()
+                    out0 = Path(new_output_file).resolve()
+                    self.create_input_file_gradient(inp0, root)
+                    script_path = os.path.join(os.getcwd(), "run_openqp.sh")
+                    script_path = Path(script_path).resolve()
+                    self.create_shell_script(script_path)
+                    bash_command = f"'{script_path} {inp0} {out0}'"
+
+                    cmd = f"source /etc/profile; source ~/.bashrc >/dev/null 2>&1 || true; /bin/bash '{script_path}' '{inp0}' '{out0}'"
+
+                    # Start from the current environment; only strip conda if you *must*
+                    env = os.environ.copy()
+
+                    try:
+                        result = subprocess.run(
+                            ["/bin/bash", "-lc", cmd],
+                            cwd=str(script_path.parent),
+                            env=env,
+                            check=True,
+                            text=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
+                        print(result.stdout)
+                    except subprocess.CalledProcessError as e:
+                        print("Command failed.")
+                        print("STDOUT:\n", e.stdout)
+                        print("STDERR:\n", e.stderr)
+                        raise
+         
+        
         elif self.program in ['MOLCAS', 'ORCA'] and self.cluster_manager is not None:
 
             if self.program == 'ORCA':
@@ -398,7 +508,18 @@ conda activate vlxenv_new_compile
             self.qm_driver.job_ids.append(current_gradient_commit_id)
             print('commited jobs are finished')
 
-    
+    def compute(self, current_molecule, other_var=None):
+        """
+        Compute the gradients for the current molecule.
+        """
+        self.compute_gradient(current_molecule)
+
+    def get_gradient(self):
+        """
+        Return the extracted gradients.
+        """
+        gradients = self.extract_gradients()
+        return gradients[0]
     
     def extract_NACs(self):
 
@@ -481,7 +602,13 @@ conda activate vlxenv_new_compile
         except Exception as e:
             print(f"Error extracting gradients: {e}")
             return None
-    
+        
+    def compute_energy(self, molecule, other_var=None):
+        
+        qm_energy = self.qm_driver.compute_energy(molecule, self.qm_driver.basis_set_label)
+
+        return qm_energy[0]
+        
     def create_input_file_gradient(self, input_file, root):
         """
         Create the specific input file with the given content.
@@ -558,6 +685,44 @@ conda activate vlxenv_new_compile
                     file.write('END\n')
                     file.write(f'* xyzfile {self.qm_driver.charge} {self.qm_driver.spin} {full_path}\n')
         
+            elif self.program == 'OpenQP':
+                full_path = os.path.abspath(self.xyz_filename)
+                root_str = ', '.join(map(str, [root]))
+                root_str_n_states = ', '.join(map(str, [root + 1]))
+
+                with open(input_file, "w") as f:
+                    # [input]
+                    f.write("[input]\n")
+                    # Many tools want just the filename; if OpenQP expects a path, we pass the resolved path.
+                    # If you prefer only the basename, switch to os.path.basename(system_path).
+                    f.write(f"system={full_path}\n")
+                    f.write(f"charge={self.qm_driver.charge}\n")
+                    f.write(f"runtype=grad\n")
+                    f.write(f"basis={self.qm_driver.basis_set_label}\n")
+                    f.write(f"functional={self.qm_driver.xc_func}\n")
+                    f.write(f"method={self.method}\n")
+                    f.write("\n")
+
+                    # [guess]
+                    f.write("[guess]\n")
+                    f.write(f"type=huckel\n")
+                    f.write("\n")
+
+                    # [scf]
+                    f.write("[scf]\n")
+                    f.write(f"multiplicity={self.qm_driver.spin}\n")
+                    f.write(f"type=rohf\n")
+                    f.write("\n")
+
+                    # Method-specific block: use the method name as the section header (e.g., [tdhf] or [tddft])
+                    f.write(f"[tdhf]\n")
+                    f.write(f"type=mrsf\n")
+                    f.write(f"nstate={root_str_n_states}\n")
+
+                    f.write(f"[properties]\n")
+                    f.write(f"grad={root_str}\n")
+
+            
             elif self.program == 'QCHEM':
 
                 current_root = root
