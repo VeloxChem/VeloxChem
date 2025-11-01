@@ -188,7 +188,7 @@ class LinearSolver:
         self.memory_tracing = False
 
         # verbosity of output (1-3)
-        self.print_level = 2
+        self.print_level = 1
 
         # program end time for graceful exit
         self.program_end_time = None
@@ -442,7 +442,7 @@ class LinearSolver:
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
-            if not silent:
+            if (not silent) and (self.print_level > 1):
                 self.ostream.print_info(
                     'Molecular grid with {0:d} points generated in {1:.2f} sec.'
                     .format(n_grid_points,
@@ -540,11 +540,12 @@ class LinearSolver:
 
             self.cpcm_drv.init(molecule, do_nuclear=False)
 
-            self.ostream.print_info(
-                f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points generated '
-                + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
-            self.ostream.print_blank()
-            self.ostream.flush()
+            if self.print_level > 1:
+                self.ostream.print_info(
+                    f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points '
+                    + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
+                self.ostream.print_blank()
+                self.ostream.flush()
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -856,12 +857,15 @@ class LinearSolver:
 
         # go through batches
 
-        if self.rank == mpi_master():
-            batch_str = f'Processing {n_total} Fock builds'
+        if self.rank == mpi_master() and self.print_level > 1:
+            batch_str = f'Processing {n_total} Fock build'
+            if n_total > 1:
+                batch_str += 's'
             if batch_size > 1:
                 batch_str += f' on {batch_size} subcommunicators'
             batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         if self._debug:
@@ -1102,8 +1106,6 @@ class LinearSolver:
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
-        self.ostream.print_blank()
-
     def _e2n_half_size_single_comm(self,
                                    vecs_ger,
                                    vecs_ung,
@@ -1190,12 +1192,13 @@ class LinearSolver:
 
         # go through batches
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {n_total} Fock build'
             if n_total > 1:
                 batch_str += 's'
             batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         if self._debug:
@@ -1406,8 +1409,6 @@ class LinearSolver:
                 self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
-
-        self.ostream.print_blank()
 
     def _comp_lr_fock(self,
                       dens,
@@ -1907,12 +1908,13 @@ class LinearSolver:
 
         # go through batches
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {n_total} Fock build'
             if n_total > 1:
                 batch_str += 's'
             batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         if self._debug:
@@ -2183,8 +2185,6 @@ class LinearSolver:
                 pass
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
-
-        self.ostream.print_blank()
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """

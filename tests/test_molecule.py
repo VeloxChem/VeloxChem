@@ -2,8 +2,9 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import pickle
-import math
 import pytest
+import math
+import sys
 
 from veloxchem.veloxchemlib import Point
 from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
@@ -14,6 +15,11 @@ from veloxchem.molecule import Molecule
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.inputparser import get_random_string_serial
+
+try:
+    import rdkit
+except ImportError:
+    pass
 
 
 class TestMolecule:
@@ -737,3 +743,16 @@ class TestMolecule:
 
         mol.set_dihedral((2, 3, 4, 5), math.pi / 2.0, 'radian')
         assert abs(mol.get_dihedral_in_degrees((2, 3, 4, 5)) - 90.0) < 1e-4
+
+    @pytest.mark.skipif("rdkit" not in sys.modules,
+                        reason="rdkit not available")
+    def test_is_water_molecule(self):
+
+        mol = Molecule.read_smiles('O')
+        assert mol.is_water_molecule()
+
+        mol = Molecule.read_smiles('CO')
+        assert not mol.is_water_molecule()
+
+        mol = Molecule.read_smiles('OO')
+        assert not mol.is_water_molecule()

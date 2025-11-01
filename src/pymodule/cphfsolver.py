@@ -328,9 +328,8 @@ class CphfSolver(LinearSolver):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
+        # check print level (verbosity of output)
+        self.print_level = max(1, min(self.print_level, 3))
 
         self.cphf_results = self.compute_subspace_solver(
             molecule, basis, scf_tensors, *args)
@@ -501,14 +500,15 @@ class CphfSolver(LinearSolver):
                     '{:d} trial vectors in reduced space'.format(num_vecs))
                 self.ostream.print_blank()
 
-                profiler.print_memory_subspace(
-                    {
-                        'dist_trials': self.dist_trials,
-                        'dist_sigmas': self.dist_sigmas,
-                        'dist_precond': dist_precond,
-                        'solutions': solutions,
-                        'residuals': residuals,
-                    }, self.ostream)
+                if self.print_level > 1:
+                    profiler.print_memory_subspace(
+                        {
+                            'dist_trials': self.dist_trials,
+                            'dist_sigmas': self.dist_sigmas,
+                            'dist_precond': dist_precond,
+                            'solutions': solutions,
+                            'residuals': residuals,
+                        }, self.ostream)
 
                 profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
@@ -751,7 +751,7 @@ class CphfSolver(LinearSolver):
 
         # go through batches
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {n_total} Fock builds'
             if batch_size > 1:
                 batch_str += f' on {batch_size} subcommunicators'
@@ -877,7 +877,7 @@ class CphfSolver(LinearSolver):
         batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {num_vecs} Fock build'
             if num_vecs > 1:
                 batch_str += 's'
@@ -999,7 +999,7 @@ class CphfSolver(LinearSolver):
         batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {num_vecs} Fock build'
             if num_vecs > 1:
                 batch_str += 's'

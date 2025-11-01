@@ -37,6 +37,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "T3FlatBuffer.hpp"
+#include "T4CScreener.hpp"
 
 /// @brief Class CThreeCenterElectronRepulsionDriver provides methods for computing three-center electron repulsion integrals.
 class CThreeCenterElectronRepulsionDriver
@@ -90,6 +91,15 @@ class CThreeCenterElectronRepulsionDriver
     /// @param atoms The vector of atoms to compute three-center electron repulsion integrals.
     /// @return The electron repulsion matrix.
     auto compute(const CMolecularBasis &basis, const CMolecularBasis &aux_basis, const CMolecule &molecule, const std::vector<int>& atoms) const -> CT3FlatBuffer<double>;
+    
+    /// @brief Computes electron repulsion matrix for given molecule and molecular basis.
+    /// @param screener The screener with basis function pairs data.
+    /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
+    /// @param molecule The molecule.
+    /// @param atoms The vector of atoms to compute three-center electron repulsion integrals.
+    /// @param ithreshold The integrals screening threshold.
+    /// @return The electron repulsion matrix.
+    auto compute(const CT4CScreener& screener, const CMolecularBasis &aux_basis, const CMolecule &molecule, const std::vector<int>& atoms, const int ithreshold) const -> CT3FlatBuffer<double>;
 };
 
 

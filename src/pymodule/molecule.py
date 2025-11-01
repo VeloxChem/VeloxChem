@@ -465,15 +465,14 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
     for i in range(natoms):
         for j in range(i + 1, natoms):
             distance = np.linalg.norm(coords_in_au[j] - coords_in_au[i])
-            threshold = (covalent_radii_in_au[i] +
-                         covalent_radii_in_au[j])
-            
+            threshold = (covalent_radii_in_au[i] + covalent_radii_in_au[j])
+
             # Special case for H2 molecule
             if labels[i] == 'H' and labels[j] == 'H':
                 threshold *= H2_factor
             else:
                 threshold *= factor
-                
+
             if distance <= threshold:
                 connectivity_matrix[i, j] = 1
                 connectivity_matrix[j, i] = 1
@@ -759,7 +758,7 @@ def _Molecule_center_of_mass_in_angstrom(self):
     return self.center_of_mass_in_bohr() * bohr_in_angstrom()
 
 
-def _Molecule_get_string(self):
+def _Molecule_get_string(self, title='Molecular Geometry', sep='='):
     """
     Returns string representation of molecule.
 
@@ -767,8 +766,10 @@ def _Molecule_get_string(self):
         A string with representation of molecule.
     """
 
-    mol_str = 'Molecular Geometry (Angstroms)\n'
-    mol_str += '================================\n\n'
+    mol_str_title = f'{title} (Angstroms)'
+
+    mol_str = mol_str_title + '\n'
+    mol_str += sep * (len(mol_str_title) + 2) + '\n\n'
     mol_str += '  Atom'
     mol_str += '         Coordinate X '
     mol_str += '         Coordinate Y '
@@ -952,7 +953,8 @@ def _Molecule_show(self,
     :param atom_indices:
         The flag for showing atom indices (1-based).
     :param atom_labels:
-        The flag for showing atom labels. If provided with a list, will use that list as labels.
+        The flag for showing atom labels. If provided with a list, will use
+        that list as labels.
     :starting_index:
         The starting index for atom indices.
     :bonds:
@@ -1293,6 +1295,37 @@ def _Molecule_partition_atoms(self, comm):
     return list(list_atoms[rank::nnodes])
 
 
+def _Molecule_is_water_molecule(self):
+    """
+    Checks if a molecule is a water molecule.
+
+    :return:
+        True if the molecule is a water molecule, False otherwise.
+    """
+
+    natoms = self.number_of_atoms()
+    if natoms != 3:
+        return False
+
+    labels = self.get_labels()
+    if sorted(labels) != ['H', 'H', 'O']:
+        return False
+
+    conn = self.get_connectivity_matrix()
+
+    bond_labels = [
+        sorted([labels[i], labels[j]])
+        for i in range(natoms)
+        for j in range(i, natoms)
+        if conn[i, j] == 1
+    ]
+
+    if bond_labels != [['H', 'O'], ['H', 'O']]:
+        return False
+
+    return True
+
+
 @staticmethod
 def _Molecule_read_name(mol_name):
     """
@@ -1432,6 +1465,7 @@ Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
 Molecule.partition_atoms = _Molecule_partition_atoms
+Molecule.is_water_molecule = _Molecule_is_water_molecule
 
 Molecule.read_name = _Molecule_read_name
 Molecule.name_to_smiles = _Molecule_name_to_smiles

@@ -237,10 +237,7 @@ class LinearResponseEigenSolver(LinearSolver):
         solvation_model_sanity_check(self)
 
         # check print level (verbosity of output)
-        if self.print_level < 2:
-            self.print_level = 1
-        if self.print_level > 2:
-            self.print_level = 3
+        self.print_level = max(1, min(self.print_level, 3))
 
         # initialize profiler
         profiler = Profiler({
@@ -284,7 +281,8 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.core_excitation:
                 assert_msg_critical(
                     self.num_core_orbitals > 0,
-                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid')
+                    'LinearResponseEigenSolver: num_core_orbitals not set or invalid'
+                )
                 assert_msg_critical(
                     self.num_core_orbitals < nocc,
                     'LinearResponseEigenSolver: num_core_orbitals too large')
@@ -499,15 +497,16 @@ class LinearResponseEigenSolver(LinearSolver):
                         self._dist_bung.shape(1)))
                 self.ostream.print_blank()
 
-                profiler.print_memory_subspace(
-                    {
-                        'dist_bger': self._dist_bger,
-                        'dist_bung': self._dist_bung,
-                        'dist_e2bger': self._dist_e2bger,
-                        'dist_e2bung': self._dist_e2bung,
-                        'exc_solutions': exc_solutions,
-                        'exc_residuals': exc_residuals,
-                    }, self.ostream)
+                if self.print_level > 1:
+                    profiler.print_memory_subspace(
+                        {
+                            'dist_bger': self._dist_bger,
+                            'dist_bung': self._dist_bung,
+                            'dist_e2bger': self._dist_e2bger,
+                            'dist_e2bung': self._dist_e2bung,
+                            'exc_solutions': exc_solutions,
+                            'exc_residuals': exc_residuals,
+                        }, self.ostream)
 
                 profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
@@ -972,15 +971,18 @@ class LinearResponseEigenSolver(LinearSolver):
             min(relative_residual_norm.values()))
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
-        for k, w in enumerate(ws):
-            state_label = 'Excitation {}'.format(k + 1)
-            rel_res = relative_residual_norm[k]
-            output_iter = '{:<15s}: {:15.8f} '.format(state_label, w)
-            output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
-            if relative_residual_norm[k] < self.conv_thresh:
-                output_iter += '   converged'
-            self.ostream.print_header(output_iter.ljust(width))
-        self.ostream.print_blank()
+
+        if self.print_level > 1:
+            for k, w in enumerate(ws):
+                state_label = 'Excitation {}'.format(k + 1)
+                rel_res = relative_residual_norm[k]
+                output_iter = '{:<15s}: {:15.8f} '.format(state_label, w)
+                output_iter += 'Residual Norm: {:.8f}'.format(rel_res)
+                if relative_residual_norm[k] < self.conv_thresh:
+                    output_iter += '   converged'
+                self.ostream.print_header(output_iter.ljust(width))
+            self.ostream.print_blank()
+
         self.ostream.flush()
 
     def _initial_excitations(self, nstates, ea, nocc, norb, n_excl_states=0):
@@ -1352,7 +1354,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         x = (rpa_results['eigenvalues'])
         y = rpa_results['oscillator_strengths']
-        xmin = min(x) - 0.03
+        xmin = max(0.0, min(x) - 0.03)
         xmax = max(x) + 0.03
         xstep = 0.0001
 
@@ -1475,7 +1477,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         x = (rpa_results["eigenvalues"]) * au2ev
         y = rpa_results["rotatory_strengths"]
-        xmin = min(x) - 0.8
+        xmin = max(0.0, min(x) - 0.8)
         xmax = max(x) + 0.8
         xstep = 0.003
 

@@ -92,7 +92,7 @@ class ReactionForceFieldBuilder():
         self.reparameterize_angles: bool = False
         self.optimize_ff: bool = True
         self.mm_opt_constrain_bonds: bool = True
-        self.water_model: str = 'spce'
+        self.water_model: str = 'cspce'
         self.product_mapping: dict[int, int] | None = None  # one-indexed
         self.mute_scf: bool = True
         self.skip_reaction_matching: bool = False
