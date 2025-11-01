@@ -1126,21 +1126,71 @@ class ThgDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        inp_list = []
         for w in wi:
+            inp_list.append({'freq': w})
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+        self.ostream.print_info('Collecting response vectors for densities...')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
-            n_sig_xx = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xx', w), 2 * w)])
-            n_sig_yy = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yy', w), 2 * w)])
-            n_sig_zz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_zz', w), 2 * w)])
-            n_sig_xy = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xy', w), 2 * w)])
-            n_sig_xz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xz', w), 2 * w)])
-            n_sig_yz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yz', w), 2 * w)])
+        dens_t0 = time.time()
 
+        # determine counts and displacements for density tasks
+        n_tasks = len(inp_list)
+        ave, res = divmod(n_tasks, self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
 
-            if self.rank == mpi_master():
+        # create list of (task_id, rank) pairs
+        task_rank_pairs = []
+        for rank, (count, displ) in enumerate(zip(counts, displacements)):
+            for idx in range(count):
+                task_rank_pairs.append((displ + idx, rank))
+
+        # collect full solution vectors to their corresponding ranks
+        for task_id, rank in task_rank_pairs:
+            w = inp_list[task_id]['freq']
+
+            inp_list[task_id]['nx'] = ComplexResponse.get_full_solution_vector(Nx[('x', w)], root=rank)
+            inp_list[task_id]['ny'] = ComplexResponse.get_full_solution_vector(Nx[('y', w)], root=rank)
+            inp_list[task_id]['nz'] = ComplexResponse.get_full_solution_vector(Nx[('z', w)], root=rank)
+
+            inp_list[task_id]['n_sig_xx'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xx', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_yy'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yy', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_zz'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_zz', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_xy'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xy', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_xz'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xz', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_yz'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yz', w), 2 * w)], root=rank)
+
+        self.ostream.print_info(f'Time spent in collecting response vectors: {time.time() - dens_t0:.2f} sec')
+        self.ostream.print_blank()
+
+        self.ostream.print_info('Generating density matrices...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        dens_t0 = time.time()
+
+        mo = self.comm.bcast(mo, root=mpi_master())
+
+        for task_id, rank in task_rank_pairs:
+            # only go through the tasks that are associated with self.rank
+            if self.rank == rank:
+
+                w = inp_list[task_id]['freq']
+
+                nx = inp_list[task_id]['nx']
+                ny = inp_list[task_id]['ny']
+                nz = inp_list[task_id]['nz']
+
+                n_sig_xx = inp_list[task_id]['n_sig_xx']
+                n_sig_yy = inp_list[task_id]['n_sig_yy']
+                n_sig_zz = inp_list[task_id]['n_sig_zz']
+                n_sig_xy = inp_list[task_id]['n_sig_xy']
+                n_sig_xz = inp_list[task_id]['n_sig_xz']
+                n_sig_yz = inp_list[task_id]['n_sig_yz']
+
 
                 k_sig_xx = self.complex_lrvec2mat(n_sig_xx, nocc, norb)
                 k_sig_yy = self.complex_lrvec2mat(n_sig_yy, nocc, norb)
@@ -1286,8 +1336,8 @@ class ThgDriver(NonlinearSolver):
                 dist_den_1_freq = None
                 dist_den_2_freq = None
 
-            dist_den_1_freq = DistributedArray(dist_den_1_freq, self.comm)
-            dist_den_2_freq = DistributedArray(dist_den_2_freq, self.comm)
+            dist_den_1_freq = DistributedArray(dist_den_1_freq, self.comm, root=rank)
+            dist_den_2_freq = DistributedArray(dist_den_2_freq, self.comm, root=rank)
 
             if distributed_density_1 is None:
                 distributed_density_1 = DistributedArray(dist_den_1_freq.data,
@@ -1302,6 +1352,10 @@ class ThgDriver(NonlinearSolver):
                                                          distribute=False)
             else:
                 distributed_density_2.append(dist_den_2_freq, axis=1)
+
+        self.ostream.print_info(f'Time spent in generating densities: {time.time() - dens_t0:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         return distributed_density_1, distributed_density_2
 
