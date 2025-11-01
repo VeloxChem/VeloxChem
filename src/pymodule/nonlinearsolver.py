@@ -1200,7 +1200,7 @@ class NonlinearSolver:
 
         return S4_123
 
-    def _collect_vectors_in_columns(self, sendbuf):
+    def _collect_vectors_in_columns(self, sendbuf, root=mpi_master()):
         """
         Collects vectors into 2d array (column-wise).
 
@@ -1211,8 +1211,8 @@ class NonlinearSolver:
             A 2d array containing the full vectors in columns.
         """
 
-        counts = self.comm.gather(sendbuf.size, root=mpi_master())
-        if self.rank == mpi_master():
+        counts = self.comm.gather(sendbuf.size, root=root)
+        if self.rank == root:
             displacements = [sum(counts[:p]) for p in range(self.nodes)]
             recvbuf = np.zeros(sum(counts), dtype=sendbuf.dtype).reshape(
                 -1, sendbuf.shape[1])
@@ -1227,7 +1227,7 @@ class NonlinearSolver:
 
         self.comm.Gatherv(sendbuf,
                           [recvbuf, counts, displacements, mpi_data_type],
-                          root=mpi_master())
+                          root=root)
 
         return recvbuf
 

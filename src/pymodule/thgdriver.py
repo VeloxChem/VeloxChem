@@ -408,12 +408,6 @@ class ThgDriver(NonlinearSolver):
         # vector subspace to the fock_dict's.
         fock_dict_two.update(Focks_xy)
 
-        # computing the compounded E[3] contractions for the isotropic
-        # cubic response function
-        e3_dict = self.get_e3(w, Nx, Nxy_dict, fock_dict, fock_dict_two, nocc,norb)
-
-        profiler.check_memory_usage('E[3]')
-
         # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
         # cubic response function
         other_dict = self.get_other_terms(w, track, X, Nx, Nxy_dict, d_a_mo, nocc, norb)
@@ -424,7 +418,8 @@ class ThgDriver(NonlinearSolver):
         # function. For thg Full and reduced, see article
 
         t4_dict = self.get_t4(self.frequencies, e4_dict, Nx, self.comp, d_a_mo,nocc, norb)
-        t3_dict = self.get_t3(self.frequencies, e3_dict, Nx, self.comp, nocc,norb)
+        # E[3] contractions are evaluated in get_t3
+        t3_dict = self.get_t3(self.frequencies, Nx, Nxy_dict, fock_dict, fock_dict_two, nocc, norb)
 
         profiler.check_memory_usage('T[4],T[3]')
 
@@ -1405,9 +1400,17 @@ class ThgDriver(NonlinearSolver):
 
         return focks
 
-    def get_e3(self, wi, Nx, Nxy, fo, fo2, nocc, norb):
+    def get_t3(self, wi, Nx, Nxy, fo, fo2, nocc, norb):
         """
-        Contracts E[3]
+        Contracts E[3] and
+        computes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
+        the T[3] contraction for the isotropic cubic response function in terms
+        of compounded Fock matrices is given as:
+
+                             [(ζ_{α}^{σσ} + ζ_{α}^{λλ+ττ} + f_{α}^{λσ,τ})_is]
+        t3term = Σ_{α} N_{α} [(ζ_{α}^{σσ} + ζ_{α}^{λλ+ττ} + f_{α}^{λσ,τ})_si]
+
+        For more details see article
 
         :param wi:
             A list of freqs
@@ -1425,15 +1428,36 @@ class ThgDriver(NonlinearSolver):
             The total number of orbitals
 
         :return:
-            A dictonary of compounded E[3] tensors for the isotropic cubic
-            response function for TPA
+            A dictonary of the final values for the NaT[3]NxNyz contractions
         """
 
-        f_iso_x = {}
-        f_iso_y = {}
-        f_iso_z = {}
+        t3_term = {}
 
+        inp_list = []
         for w in wi:
+            inp_list.append({'freq': w})
+
+        self.ostream.print_info('Collecting response vectors for T3 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        t3_t0 = time.time()
+
+        # determine counts and displacements for t3 tasks
+        n_tasks = len(inp_list)
+        ave, res = divmod(n_tasks, self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        # create list of (task_id, rank) pairs
+        task_rank_pairs = []
+        for rank, (count, displ) in enumerate(zip(counts, displacements)):
+            for idx in range(count):
+                task_rank_pairs.append((displ + idx, rank))
+
+        # collect full solution vectors to their corresponding ranks
+        for task_id, rank in task_rank_pairs:
+            w = inp_list[task_id]['freq']
 
             vec_pack = np.array([
                 fo['Fb'][('x', w)].data,
@@ -1450,22 +1474,55 @@ class ThgDriver(NonlinearSolver):
                 fo2['F123_z'][w].data,
             ]).T.copy()
 
-            vec_pack = self._collect_vectors_in_columns(vec_pack)
+            inp_list[task_id]['vec_pack'] = self._collect_vectors_in_columns(vec_pack, root=rank)
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            inp_list[task_id]['nx'] = ComplexResponse.get_full_solution_vector(Nx[('x', w)], root=rank)
+            inp_list[task_id]['ny'] = ComplexResponse.get_full_solution_vector(Nx[('y', w)], root=rank)
+            inp_list[task_id]['nz'] = ComplexResponse.get_full_solution_vector(Nx[('z', w)], root=rank)
 
-            n_sig_xx = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xx', w), 2 * w)])
-            n_sig_yy = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yy', w), 2 * w)])
-            n_sig_zz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_zz', w), 2 * w)])
-            n_sig_xy = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xy', w), 2 * w)])
-            n_sig_xz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xz', w), 2 * w)])
-            n_sig_yz = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yz', w), 2 * w)])
+            inp_list[task_id]['n_sig_xx'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xx', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_yy'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yy', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_zz'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_zz', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_xy'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xy', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_xz'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_xz', w), 2 * w)], root=rank)
+            inp_list[task_id]['n_sig_yz'] = ComplexResponse.get_full_solution_vector(Nxy[(('N_sig_yz', w), 2 * w)], root=rank)
 
+            inp_list[task_id]['na_x'] = ComplexResponse.get_full_solution_vector(Nx[('x', 3.0 * w)], root=rank)
+            inp_list[task_id]['na_y'] = ComplexResponse.get_full_solution_vector(Nx[('y', 3.0 * w)], root=rank)
+            inp_list[task_id]['na_z'] = ComplexResponse.get_full_solution_vector(Nx[('z', 3.0 * w)], root=rank)
 
-            if self.rank != mpi_master():
+        self.ostream.print_info(f'Time spent in collecting response vectors: {time.time() - t3_t0:.2f} sec')
+        self.ostream.print_blank()
+
+        self.ostream.print_info('Computing T3 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        t3_t0 = time.time()
+
+        for task_id, rank in task_rank_pairs:
+            # only go through the tasks that are associated with self.rank
+            if self.rank != rank:
                 continue
+
+            w = inp_list[task_id]['freq']
+
+            nx = inp_list[task_id]['nx']
+            ny = inp_list[task_id]['ny']
+            nz = inp_list[task_id]['nz']
+
+            n_sig_xx = inp_list[task_id]['n_sig_xx']
+            n_sig_yy = inp_list[task_id]['n_sig_yy']
+            n_sig_zz = inp_list[task_id]['n_sig_zz']
+            n_sig_xy = inp_list[task_id]['n_sig_xy']
+            n_sig_xz = inp_list[task_id]['n_sig_xz']
+            n_sig_yz = inp_list[task_id]['n_sig_yz']
+
+            na_x = inp_list[task_id]['na_x']
+            na_y = inp_list[task_id]['na_y']
+            na_z = inp_list[task_id]['na_z']
+
+            vec_pack = inp_list[task_id]['vec_pack']
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
@@ -1508,7 +1565,7 @@ class ThgDriver(NonlinearSolver):
             X_terms = (zeta_sig_xx + zeta_sig_xy + zeta_sig_xz).T + (0.5 * F123_x).T
             Ff_x = -2 * LinearSolver.lrmat2vec(X_terms, nocc, norb)
             Ff_x = self.anti_sym(Ff_x)
-            f_iso_x[w] = Ff_x
+            f_iso_x = Ff_x
 
             # y
 
@@ -1520,7 +1577,7 @@ class ThgDriver(NonlinearSolver):
             Y_terms = (zeta_sig_yx + zeta_sig_yy + zeta_sig_yz).T + (0.5 * F123_y).T
             Ff_y = -2 * LinearSolver.lrmat2vec(Y_terms, nocc, norb)
             Ff_y = self.anti_sym(Ff_y)
-            f_iso_y[w] = Ff_y
+            f_iso_y = Ff_y
 
             # z
             zeta_sig_zx = self._xi(k_x, k_sig_xz, f_x, f_sig_xz, F0_a) + self._xi(k_x, 2.0 * k_sig_xz, f_x, 2.0 * f_sig_xz, F0_a) 
@@ -1531,9 +1588,31 @@ class ThgDriver(NonlinearSolver):
             Z_terms = (zeta_sig_zx + zeta_sig_zy + zeta_sig_zz).T + (0.5 * F123_z).T
             Ff_z = -2 * LinearSolver.lrmat2vec(Z_terms, nocc, norb)
             Ff_z = self.anti_sym(Ff_z)
-            f_iso_z[w] = Ff_z
+            f_iso_z = Ff_z
 
-        return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
+            # t3
+            t3val = (np.dot(na_x, f_iso_x) +
+                     np.dot(na_y, f_iso_y) +
+                     np.dot(na_z, f_iso_z))
+
+            t3_term[(w, w, w)] = 1. / 15 * t3val
+
+        self.ostream.print_info(f'Time spent in computing T3 terms: {time.time() - t3_t0:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        gathered_t3_terms = self.comm.gather(t3_term, root=mpi_master())
+
+        if self.rank == mpi_master():
+            # Collect per-frequency results
+            # We can simply update the dictionary since there are no
+            # duplicate keys in the gathered dictionaries
+            t3_term = {}
+            for local_t3_term in gathered_t3_terms:
+                t3_term.update(local_t3_term)
+            return t3_term
+        else:
+            return None
 
     def get_other_terms(self, wi, track, X, Nx, Nxy, da, nocc, norb):
         """
@@ -2104,55 +2183,6 @@ class ThgDriver(NonlinearSolver):
             return T4
         else:
             return None
-
-    def get_t3(self, freqs, e3_dict, Nx, track, nocc, norb):
-        """
-        Computes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
-        the T[3] contraction for the isotropic cubic response function in terms
-        of compounded Fock matrices is given as:
-
-                             [(ζ_{α}^{σσ} + ζ_{α}^{λλ+ττ} + f_{α}^{λσ,τ})_is]
-        t3term = Σ_{α} N_{α} [(ζ_{α}^{σσ} + ζ_{α}^{λλ+ττ} + f_{α}^{λσ,τ})_si]
-
-        For more details see article
-
-        :param freqs:
-            List of frequencies of the pertubations
-        :param e3_dict:
-            A dictonary that contains the contractions of E[3]
-        :param Nx:
-            A dictonray containng all the response vectors in distributed form
-        :param track:
-            A list containing information about what tensor components that are
-            being computed
-        :param nocc:
-            The number of occupied orbitals
-        :param norb:
-            The total number of orbitals
-
-        :return:
-            A dictonary of the final values for the NaT[3]NxNyz contractions
-        """
-
-        t3_term = {}
-
-        for i in range(len(freqs)):
-            w = float(track[i * (len(track) // len(freqs))].split(",")[1])
-
-            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', 3.0 * w)])
-            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', 3.0 * w)])
-            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', 3.0 * w)])
-
-            if self.rank == mpi_master():
-
-                t3val = (np.dot(na_x, e3_dict['f_iso_x'][w]) +
-                         np.dot(na_y, e3_dict['f_iso_y'][w]) +
-                         np.dot(na_z, e3_dict['f_iso_z'][w]))
-
-                t3_term[(w, w, w)] = 1. / 15 * t3val
-
-        return t3_term
-
 
     def get_x3_a3(self, inp_dict, da, nocc, norb):
         """
