@@ -768,7 +768,31 @@ class ThgDriver(NonlinearSolver):
         f_iso_y = {}
         f_iso_z = {}
 
+        inp_list = []
         for w in wi:
+            inp_list.append({'freq': w})
+
+        self.ostream.print_info('Collecting response vectors for E4 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        e4_t0 = time.time()
+
+        # determine counts and displacements for e4 tasks
+        n_tasks = len(inp_list)
+        ave, res = divmod(n_tasks, self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        # create list of (task_id, rank) pairs
+        task_rank_pairs = []
+        for rank, (count, displ) in enumerate(zip(counts, displacements)):
+            for idx in range(count):
+                task_rank_pairs.append((displ + idx, rank))
+
+        # collect full solution vectors to their corresponding ranks
+        for task_id, rank in task_rank_pairs:
+            w = inp_list[task_id]['freq']
 
             vec_pack = np.array([
                 fo['Fb'][('x', w)].data,
@@ -785,14 +809,33 @@ class ThgDriver(NonlinearSolver):
                 fo['F123_z'][w].data,
             ]).T.copy()
 
-            vec_pack = self._collect_vectors_in_columns(vec_pack)
+            inp_list[task_id]['vec_pack'] = self._collect_vectors_in_columns(vec_pack, root=rank)
 
-            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
+            inp_list[task_id]['nx'] = ComplexResponse.get_full_solution_vector(Nx[('x', w)], root=rank)
+            inp_list[task_id]['ny'] = ComplexResponse.get_full_solution_vector(Nx[('y', w)], root=rank)
+            inp_list[task_id]['nz'] = ComplexResponse.get_full_solution_vector(Nx[('z', w)], root=rank)
 
-            if self.rank != mpi_master():
+        self.ostream.print_info(f'Time spent in collecting response vectors: {time.time() - e4_t0:.2f} sec')
+        self.ostream.print_blank()
+
+        self.ostream.print_info('Computing E4 terms...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        e4_t0 = time.time()
+
+        for task_id, rank in task_rank_pairs:
+            # only go through the tasks that are associated with self.rank
+            if self.rank != rank:
                 continue
+
+            w = inp_list[task_id]['freq']
+
+            nx = inp_list[task_id]['nx']
+            ny = inp_list[task_id]['ny']
+            nz = inp_list[task_id]['nz']
+
+            vec_pack = inp_list[task_id]['vec_pack']
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
@@ -902,7 +945,36 @@ class ThgDriver(NonlinearSolver):
             f_z = self.anti_sym(f_z)
             f_iso_z[w] = f_z
 
-        return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
+        for task_id, rank in task_rank_pairs:
+            if rank != mpi_master():
+                # collect results associated with non-master rank
+                w = inp_list[task_id]['freq']
+                if self.rank == rank:
+                    self.comm.send(f_iso_x[w], dest=mpi_master(), tag=rank * 3 + 0)
+                    self.comm.send(f_iso_y[w], dest=mpi_master(), tag=rank * 3 + 1)
+                    self.comm.send(f_iso_z[w], dest=mpi_master(), tag=rank * 3 + 2)
+                elif self.rank == mpi_master():
+                    local_f_iso_x = self.comm.recv(source=rank, tag=rank * 3 + 0)
+                    local_f_iso_y = self.comm.recv(source=rank, tag=rank * 3 + 1)
+                    local_f_iso_z = self.comm.recv(source=rank, tag=rank * 3 + 2)
+                    f_iso_x[w] = local_f_iso_x
+                    f_iso_y[w] = local_f_iso_y
+                    f_iso_z[w] = local_f_iso_z
+
+        # clean up non-master ranks
+        if self.rank != mpi_master():
+            f_iso_x = {}
+            f_iso_y = {}
+            f_iso_z = {}
+
+        self.ostream.print_info(f'Time spent in computing E4 terms: {time.time() - e4_t0:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        if self.rank == mpi_master():
+            return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
+        else:
+            return None
 
     def get_Nxy(self, w, d_a_mo, X, fock_dict, Nx, nocc, norb, molecule,
                 ao_basis, scf_tensors):
