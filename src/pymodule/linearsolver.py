@@ -758,6 +758,10 @@ class LinearSolver:
 
             prep_t0 = tm.time()
 
+            # Here we need to collect the trial vectors (stored as distributed
+            # arrays) to local master ranks of the subcommunicators, using
+            # Alltoallv "transpose"
+
             # sendbuf data (including both gerade and ungerade vectors)
             sendbuf = vecs_ger.data[:, batch_start:batch_end].copy()
             if batch_start < n_ger and batch_end >= n_ger:
@@ -784,10 +788,10 @@ class LinearSolver:
 
             # recvbuf counts and displacements
             vec_counts = self.comm.allgather(sendbuf.shape[0])
-            if self.rank in local_master_ranks:
-                idx = local_master_ranks.index(self.rank)
+            if is_local_master:
+                idx = subcomm_index
                 if idx + batch_start < batch_end:
-                    recvbuf_counts = vec_counts
+                    recvbuf_counts = list(vec_counts)
                 else:
                     recvbuf_counts = [0 for x in vec_counts]
             else:
@@ -975,36 +979,74 @@ class LinearSolver:
 
             prep_t0 = tm.time()
 
-            local_e2_ger_data = None
-            local_e2_ung_data = None
+            # Here we need to distribute the sigma vectors (on local master
+            # ranks), using Alltoallv "transpose"
 
-            for idx, local_master_rank in enumerate(local_master_ranks):
+            # e2_flags is a list containing ger/ung info for each subcomm
+            if is_local_master:
+                e2_flag = None
+                if subcomm_index + batch_start < batch_end:
+                    if e2_ger.data.shape[1] == 1 and e2_ung.data.shape[1] == 0:
+                        e2_flag = 'ger'
+                    elif e2_ger.data.shape[1] == 0 and e2_ung.data.shape[1] == 1:
+                        e2_flag = 'ung'
+                    else:
+                        assert_msg_critical(
+                            False, 'LinearSolver._e2n_half_size: Incorrect ' +
+                            'shape of e2 vectors')
+                e2_flags = cross_comm.gather(e2_flag, root=mpi_master())
+            else:
+                e2_flags = None
+            e2_flags = self.comm.bcast(e2_flags, root=mpi_master())
 
-                if idx + batch_start >= batch_end:
-                    break
-
-                dist_e2_ger = DistributedArray(e2_ger, self.comm, root=local_master_rank)
-                dist_e2_ung = DistributedArray(e2_ung, self.comm, root=local_master_rank)
-
-                # Note: accumulate per-rank data to avoid incremental appending
-
-                if local_e2_ger_data is None:
-                    local_e2_ger_data = dist_e2_ger.data.copy()
+            # sendbuf data
+            if is_local_master:
+                idx = subcomm_index
+                if idx + batch_start < batch_end:
+                    sendbuf_2 = np.hstack((e2_ger.data, e2_ung.data))
                 else:
-                    local_e2_ger_data = np.hstack((local_e2_ger_data,
-                                                   dist_e2_ger.data))
+                    sendbuf_2 = np.zeros(0)
+            else:
+                sendbuf_2 = np.zeros(0)
 
-                if local_e2_ung_data is None:
-                    local_e2_ung_data = dist_e2_ung.data.copy()
+            # sendbuf counts and displacements
+            sendbuf_counts_2 = list(recvbuf_counts)
+            sendbuf_displs_2 = list(recvbuf_displs)
+
+            # revvdbuf, counts and displacements
+            recvbuf_2 = np.zeros(sendbuf.shape)
+            recvbuf_counts_2 = list(sendbuf_counts)
+            recvbuf_displs_2 = list(sendbuf_displs)
+
+            # Alltoallv
+            self.comm.Alltoallv(
+                [sendbuf_2, sendbuf_counts_2, sendbuf_displs_2, MPI.DOUBLE],
+                [recvbuf_2, recvbuf_counts_2, recvbuf_displs_2, MPI.DOUBLE])
+            recvbuf_2 = recvbuf_2.T.copy()
+
+            ger_mask = []
+            ung_mask = []
+            for idx in range(recvbuf_2.shape[1]):
+                if e2_flags[idx] == 'ger':
+                    ger_mask.append(True)
+                    ung_mask.append(False)
+                elif e2_flags[idx] == 'ung':
+                    ger_mask.append(False)
+                    ung_mask.append(True)
                 else:
-                    local_e2_ung_data = np.hstack((local_e2_ung_data,
-                                                   dist_e2_ung.data))
+                    assert_msg_critical(
+                        False, 'LinearSolver._e2n_half_size: Invalid e2_flag')
 
-                if self.nonlinear:
-                    dist_fock_ger = DistributedArray(fock_ger, self.comm, root=local_master_rank)
-                    dist_fock_ung = DistributedArray(fock_ung, self.comm, root=local_master_rank)
-                    # TODO: avoid incremental append
-                    self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+            if all(ger_mask):
+                local_e2_ger_data = recvbuf_2
+                local_e2_ung_data = np.zeros((recvbuf_2.shape[0], 0))
+            elif all(ung_mask):
+                local_e2_ger_data = np.zeros((recvbuf_2.shape[0], 0))
+                local_e2_ung_data = recvbuf_2
+            else:
+                ger_count = ger_mask.count(True)
+                local_e2_ger_data = recvbuf_2[:, :ger_count]
+                local_e2_ung_data = recvbuf_2[:, ger_count:]
 
             # Note: accumulate per-batch data to avoid incremental appending
 
