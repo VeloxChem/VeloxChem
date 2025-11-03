@@ -66,7 +66,8 @@ class ReactionMatcher:
         self._iso_count = 0
         self._mono_count = 0
         self._start_time = 0
-        self._verbose = False
+        self.verbose = True
+        self.print_starting_index = 0
         self.max_time = 600
 
         self.max_break_attempts_guess = 1e5
@@ -113,27 +114,155 @@ class ReactionMatcher:
         self.ostream.print_info(
             f"Total subgraph isomorphism checks: {self._iso_count}, total subgraph monomorphism checks: {self._mono_count}"
         )
+        
+        for rea_node, rea_info in self.rea_graph.nodes.items():
+            if rea_info.get('H_bond_count', 0) > 0:
+                rea_H = rea_info['H_indices']
+                pro_node = map[rea_node]
+                pro_info = self.pro_graph.nodes[pro_node]
+                pro_H = pro_info['H_indices']
+                self.ostream.print_info(f"rea_node: {rea_node}, pro_node: {pro_node}, rea_H: {rea_H}, pro_H: {pro_H}")
+                for h1, h2 in zip(rea_H, pro_H):
+                    map.update({h1: h2})
+                self.ostream.flush()
+            
+        
         return map, breaking_edges, forming_edges
 
     def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
                                 pro_elems):
-        rea_graph = nx.Graph()
-        reactant_bonds = list(reactant_ff.bonds.keys())
-        # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
+        rea_graph, rea_info, rea_unique_connected_atoms = self._prepare_graph(reactant_ff, rea_elems)
 
-        rea_graph.add_nodes_from(reactant_ff.atoms.keys())
-        rea_graph.add_edges_from(reactant_bonds)
+        pro_graph,pro_info, pro_unique_connected_atoms = self._prepare_graph(product_ff, pro_elems)
+                            
+        to_pop = []
+        for i, connected_atoms in rea_unique_connected_atoms.items():
+            if connected_atoms not in pro_unique_connected_atoms.values():
+                to_pop.append(i)
+        for i in to_pop:
+            rea_unique_connected_atoms.pop(i)
+                
+        to_pop = []
+        for i, connected_atoms in pro_unique_connected_atoms.items():
+            if connected_atoms not in rea_unique_connected_atoms.values():
+                to_pop.append(i)
+            
+        for i in to_pop:
+            pro_unique_connected_atoms.pop(i)
+                    
+                    
+        # Loop through all uniquely connected atoms
+        # Find the matching product atom, assign the same assist_id to both
+        assigned_assist_ids = {}
+        assigned_assist_ids_2 = {}
+        for rea_id, connected_atoms in rea_unique_connected_atoms.items():
+            rea_graph.nodes[rea_id]['assist_id'] = rea_id
+            
+            pro_id = 0
+            for pro_id, connected_atoms_pro in pro_unique_connected_atoms.items():
+                if connected_atoms == connected_atoms_pro:
+                    pro_graph.nodes[pro_id]['assist_id'] = rea_id
+                    assigned_assist_ids[rea_id] = pro_id
+                    break
+            
+        #     # Given a matching uniquely connected atom in the reactant and product
+        #     # Collect all the connected atoms of the bordering atoms
+        # # for rea_id,pro_id in assigned_assist_ids.items():
+        #     rea_connected_atoms_2 = []
+        #     for i in rea_info[rea_id]['ConnectedAtomsNumbers']:
+        #         rea_connected_atoms_2.append(rea_info[i]['ConnectedAtoms'])
+            
 
-        for i, elem in enumerate(rea_elems):
-            rea_graph.nodes[i]['elem'] = elem
+        #     pro_connected_atoms_2 = []
+        #     for i in pro_info[pro_id]['ConnectedAtomsNumbers']:
+        #         pro_connected_atoms_2.append(pro_info[i]['ConnectedAtoms'])
 
-        pro_graph = nx.Graph()
-        pro_graph.add_nodes_from(product_ff.atoms.keys())
-        pro_graph.add_edges_from(list(product_ff.bonds.keys()))
-        for i, elem in enumerate(pro_elems):
-            pro_graph.nodes[i]['elem'] = elem
+
+        #     # if both have the same set of secondary connected atoms
+        #     # assign assist ids to the first order connected atoms
+        #     if sorted(rea_connected_atoms_2) == sorted(pro_connected_atoms_2):
+        #         for rea_id_2, connected_atoms_rea_2 in zip(rea_info[rea_id]['ConnectedAtomsNumbers'],rea_connected_atoms_2):
+        #             for pro_id_2, connected_atoms_pro_2 in zip(pro_info[pro_id]['ConnectedAtomsNumbers'],pro_connected_atoms_2):
+        #                 if connected_atoms_rea_2 == connected_atoms_pro_2:
+        #                     if rea_id_2 not in rea_graph.nodes or pro_id_2 not in pro_graph.nodes:
+        #                         continue
+        #                     rea_assist_id = rea_graph.nodes[rea_id_2].get('assist_id', -2)
+        #                     pro_assist_id = pro_graph.nodes[pro_id_2].get('assist_id', -2)
+        #                     if rea_assist_id == -2 and pro_assist_id == -2:
+        #                         rea_graph.nodes[rea_id_2]['assist_id'] = rea_id_2
+        #                         pro_graph.nodes[pro_id_2]['assist_id'] = rea_id_2
+        #                         assigned_assist_ids_2[rea_id_2] = pro_id_2
+        #                     else:
+        #                         if rea_assist_id != pro_assist_id:
+        #                             rea_graph.nodes[rea_id_2]['assist_id'] = -1
+        #                             pro_graph.nodes[pro_id_2]['assist_id'] = -1
+        #                             if rea_id_2 in assigned_assist_ids:
+        #                                 assigned_assist_ids.pop(rea_id_2, None)
+        #                             if rea_id_2 in assigned_assist_ids_2:
+        #                                 assigned_assist_ids_2.pop(rea_id_2, None)
+                                    
+        #                             self.ostream.print_info(f"Conflicting assist ids for rea_id {rea_id_2} and pro_id {pro_id_2}, setting to -1")
+        #                             self.ostream.flush()
+                                
+        #                     self.ostream.flush()
+        #                     break
+
+        self.ostream.print_info(f"Assigned assist ids for uniquely connected atoms: {assigned_assist_ids}")
+        self.ostream.print_info(f"Assigned assist ids for 2nd order uniquely connected atoms: {assigned_assist_ids_2}")
+        self.ostream.flush()
 
         return rea_graph, pro_graph
+
+    def _prepare_graph(self, forcefield, elements):
+        graph = nx.Graph()
+        bonds = list(forcefield.bonds.keys())
+        # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
+
+        graph.add_nodes_from(forcefield.atoms.keys())
+        graph.add_edges_from(bonds)
+
+        for i, elem in enumerate(elements):
+            if elem > 1.0:
+                graph.nodes[i]['elem'] = elem
+            else:
+                graph.remove_node(i)
+    
+        info = {i-1: info for i, info in forcefield.atom_info_dict.items()}
+        for i, info_entry in info.items():
+            info[i]['ConnectedAtomsNumbers'] = [n-1 for n in info_entry['ConnectedAtomsNumbers']]
+        
+        unique_connected_atoms = {}
+        non_unique_connected_atoms = []
+        for i, atom_info in info.items():
+            connected_atoms = atom_info['ConnectedAtoms']
+            if connected_atoms not in non_unique_connected_atoms:
+                if connected_atoms not in unique_connected_atoms.values():
+                    unique_connected_atoms[i] = connected_atoms
+                else:
+                    non_unique_connected_atoms.append(connected_atoms)
+                    # remove from rea_unique_connected_atoms
+                    for key, val in list(unique_connected_atoms.items()):
+                        if val == connected_atoms:
+                            unique_connected_atoms.pop(key)
+                            
+            H_count = sum(1 for atom in connected_atoms if atom =='H')
+            if i in graph.nodes:
+                graph.nodes[i]['H_bond_count'] = H_count
+                if H_count > 0:
+                    H_indices = []
+                    for elem, number in zip(connected_atoms,atom_info['ConnectedAtomsNumbers']):
+                        if elem == 'H':
+                            H_indices.append(number)
+                    graph.nodes[i]['H_indices'] = H_indices
+        return graph,info,unique_connected_atoms
+    
+    def _assign_assist_ids(self,rea_ids,pro_ids,rea_graph,pro_graph,rea_info,pro_info):
+        assigned_assist_ids = {}
+        
+        rea_unique_connected_atoms = {rea_id: rea_info[rea_id]['ConnectedAtoms'] for rea_id in rea_ids}
+        pro_unique_connected_atoms = {pro_id: pro_info[pro_id]['ConnectedAtoms'] for pro_id in pro_ids}
+        
+        
 
     def _find_mapping(self,
                       A,
@@ -194,7 +323,7 @@ class ReactionMatcher:
         )
         self.ostream.flush()
         # print(forming_edges)
-        GM = GraphMatcher(A, B, categorical_node_match('elem', ''))
+        GM = self.get_graph_matcher(A,B)
         map = next(GM.isomorphisms_iter())
 
         self._check_time(f"finding mapping.")
@@ -278,11 +407,11 @@ class ReactionMatcher:
                     continue
 
                 A.remove_edge(*edge)
-                if self._verbose:
+                if self.verbose:
                     self.ostream.print_info(
                         f"Trying to find breaking edge {self._print_bond(edge)} at depth {depth}"
                     )
-                self.ostream.flush()
+                    self.ostream.flush()
                 edges = self._recurse_breaking_edges(
                     A,
                     B,
@@ -345,11 +474,12 @@ class ReactionMatcher:
                         continue
 
                     A.add_edge(node_i, node_j)
-                    if self._verbose:
+                    if self.verbose:
                         self.ostream.print_info(
-                            f"Trying to find bond {bond_count}: {self._print_bond((node_i, node_j))}"
+                            f"Trying to find forming bond {bond_count}: {self._print_bond((node_i, node_j))}"
                         )
                         self.ostream.flush()
+                    # self.ostream.print_info(f"Checking bond {self._print_bond((node_i, node_j))}")
                     if not self._connected_components_are_subgraphs(A, B):
                         A.remove_edge(node_i, node_j)
                         continue
@@ -374,6 +504,7 @@ class ReactionMatcher:
     def _get_bond_element_composition(A):
         composition = {}
         for edge in A.edges():
+            
             comb = ReactionMatcher._get_elem_comb(edge[0], edge[1], A)
             if comb not in composition.keys():
                 composition[comb] = 1
@@ -420,7 +551,7 @@ class ReactionMatcher:
             if len(g) > max_nodes:
                 return False
             A_sub = A.subgraph(g)
-            GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
+            GM = ReactionMatcher.get_graph_matcher(B, A_sub)
             if self._check_monomorphic:
                 self._mono_count += 1
                 is_mono = GM.subgraph_is_monomorphic()
@@ -441,7 +572,7 @@ class ReactionMatcher:
         # Look for all maps from A_sub to B and find the mapping that leaves the least amount of connected components in B when removing the mapped nodes
         for g in cc_A:
             A_sub = A.subgraph(g)
-            GM = GraphMatcher(B, A_sub, categorical_node_match('elem', ''))
+            GM = self.get_graph_matcher(B,A_sub)
             if self._check_monomorphic:
                 self._mono_count += 1
                 if not GM.subgraph_is_monomorphic():
@@ -485,6 +616,21 @@ class ReactionMatcher:
 
             B.remove_nodes_from(best_map.keys())
         return True
+    
+    @staticmethod
+    def get_graph_matcher(A,B):
+        def node_match(a, b):
+            # the elem key is always expected, the assist_id key is optional
+            elem_a = a['elem']
+            elem_b = b['elem']
+            assist_a = a.get('assist_id', -1)
+            assist_b = b.get('assist_id', -1)
+            h_count_a = a.get('H_bond_count', 0)
+            h_count_b = b.get('H_bond_count', 0)
+            return elem_a == elem_b and assist_a == assist_b and h_count_a == h_count_b
+        GM = GraphMatcher(A,B, node_match=node_match)
+        return GM
+        
 
     def _check_time(self, msg=None):
         if msg is not None:
@@ -501,11 +647,11 @@ class ReactionMatcher:
             return False
         return True
 
-    @staticmethod
-    def _print_bond_list(bonds):
+    
+    def _print_bond_list(self,bonds):
         bonds = list(bonds)
-        return f"[{', '.join([ReactionMatcher._print_bond(bond) for bond in bonds])}]"
+        return f"[{', '.join([self._print_bond(bond) for bond in bonds])}]"
 
-    @staticmethod
-    def _print_bond(bond):
-        return f"({bond[0]+1}, {bond[1]+1})"
+    
+    def _print_bond(self,bond):
+        return f"({bond[0]+self.print_starting_index}, {bond[1]+self.print_starting_index})"
