@@ -721,7 +721,7 @@ class MMForceFieldGenerator:
                 'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
             }
 
-            self.print_validation_summary(fitted_dihedral_results)
+            self.print_validation_summary(fitted_dihedral_results, verbose=verbose)
 
             if visualize:
                 self.visualize(fitted_dihedral_results, show_diff=show_diff)
@@ -841,7 +841,7 @@ class MMForceFieldGenerator:
             'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
         }
 
-        self.print_validation_summary(fitted_dihedral_results)
+        self.print_validation_summary(fitted_dihedral_results, verbose=verbose)
 
         if visualize:
             self.visualize(fitted_dihedral_results, show_diff=show_diff)
@@ -1363,14 +1363,16 @@ class MMForceFieldGenerator:
     def apply_water_model(self, water_model):
         """
         Creates the topology for water based on predefined parameters.
-        
+
         :param water_model:
             The water model to use.
         """
 
-        assert_msg_critical(water_model.lower() in self.water_parameters,
-        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}")
-        
+        assert_msg_critical(
+            water_model.lower() in self.water_parameters,
+            f"Error: '{water_model}' is not available. Available models " +
+            f"are: {list(self.water_parameters.keys())}")
+
         self.ostream.print_info(f'Using water model parameters for {water_model}.')
         self.ostream.print_reference('Reference: ' + self.water_parameters[water_model.lower()]['ref'])
         self.ostream.flush()
@@ -3348,7 +3350,7 @@ class MMForceFieldGenerator:
 
         return mm_drv.get_energy()
 
-    def print_validation_summary(self, fitted_dihedral_results):
+    def print_validation_summary(self, fitted_dihedral_results, verbose=True):
         """
         Prints validation summary.
 
@@ -3356,18 +3358,19 @@ class MMForceFieldGenerator:
             The dictionary containing the result of validation.
         """
 
-        self.ostream.print_info(
-            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
-        self.ostream.print_info(
-            '  ---------------------------------------------------------------')
-        for angle, e_mm, e_qm in zip(
-                fitted_dihedral_results['dihedral_angles'],
-                fitted_dihedral_results['mm_scan_kJpermol'],
-                fitted_dihedral_results['qm_scan_kJpermol']):
+        if verbose:
             self.ostream.print_info(
-                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
-                f'{(e_mm - e_qm):10.3f}')
-        self.ostream.print_blank()
+                '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+            self.ostream.print_info(
+                '  ---------------------------------------------------------------')
+            for angle, e_mm, e_qm in zip(
+                    fitted_dihedral_results['dihedral_angles'],
+                    fitted_dihedral_results['mm_scan_kJpermol'],
+                    fitted_dihedral_results['qm_scan_kJpermol']):
+                self.ostream.print_info(
+                    f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                    f'{(e_mm - e_qm):10.3f}')
+            self.ostream.print_blank()
 
         self.ostream.print_info('Summary of validation')
         self.ostream.print_info('---------------------')
@@ -3512,7 +3515,7 @@ class MMForceFieldGenerator:
 
         Args:
             json_string (str): The JSON string containing the forcefield data.
-        
+
         Returns:
             MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
