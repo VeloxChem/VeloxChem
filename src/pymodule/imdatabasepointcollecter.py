@@ -2480,10 +2480,6 @@ class IMDatabasePointCollecter:
 
         all_combinations = list(itertools.combinations(self.roots_to_follow, 2))
 
-        masses = molecule.get_masses().copy()
-        masses_cart = np.repeat(masses, 3)
-        inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-
         for comb in all_combinations:
             current_state_to_state_difference[comb] = [None, None]
         for root in self.roots_to_follow:
@@ -2561,7 +2557,7 @@ class IMDatabasePointCollecter:
             # gradients = [np.zeros((natms, 3)), np.zeros((natms, 3))]
             for e_idx in range(len(qm_energy)):
                 grad_vec = gradients[e_idx].reshape(-1)         # (3N,)
-                mw_grad_vec = grad_vec * inv_sqrt_masses
+                mw_grad_vec = grad_vec
                 print('weights', self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].weights)
                 energy_difference = (abs(qm_energy[e_idx] - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.energy))
                 grad_mw = mw_grad_vec.reshape(gradients[e_idx].shape)
