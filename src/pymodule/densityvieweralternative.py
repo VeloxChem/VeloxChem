@@ -517,6 +517,7 @@ class DensityViewerAlternative:
 
         try:
             import ipywidgets as widgets
+            from IPython.display import display, HTML
         except ImportError:
             raise ImportError(self.help_string_widgets_and_display())
 
@@ -532,13 +533,38 @@ class DensityViewerAlternative:
 
         self.initialize(molecule, basis)
 
-        den_key_list = []
-        for key in self._density_dict:
-            den_key_list.append(key)
+        den_key_list = list(self._density_dict.keys())
 
-        widgets.interact(self.draw_density, density_label=den_key_list)
+        # use a persistent output widget
+        out = widgets.Output()
 
-    def draw_density(self, density_label):
+        # draw the first density by default
+        with out:
+            display(HTML(self.draw_density_html(den_key_list[0])))
+
+        def update_view(change):
+            out.clear_output()
+            with out:
+                display(HTML(self.draw_density_html(change['new'])))
+
+        dropdown = widgets.Dropdown(
+            options=den_key_list,
+            description='Density')
+
+        dropdown.observe(update_view, names='value')
+
+        display(dropdown, out)
+
+    def draw_density_html(self, density_label):
+        """
+        Generates HTML for density volumetric data using py3dmol.
+
+        :param density_label:
+            The label of the density.
+
+        :return:
+            The HTML for density volumetric data.
+        """
 
         try:
             import py3Dmol
@@ -554,30 +580,28 @@ class DensityViewerAlternative:
         viewer.addModel(density_cube_str, "cube")
         viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})
 
+        viewer.zoomTo()
+
         isovalue = self.density_isovalue
         opacity = self.density_opacity
         if self.density_color_scheme == 'default':
-            color = 0x0000ff
+            positive_color = 0x0000ff
+            negative_color = 0xff0000
         elif self.density_color_scheme == 'alternative':
-            color = 0x62a0ea
+            positive_color = 0x62a0ea
+            negative_color = 0xe5a50a
 
         viewer.addVolumetricData(density_cube_str, "cube", {
             "isoval": isovalue,
-            "color": color,
+            "color": positive_color,
             "opacity": opacity,
         })
-
-        isovalue = -isovalue
-        if self.density_color_scheme == 'default':
-            color = 0xff0000
-        elif self.density_color_scheme == 'alternative':
-            color = 0xe5a50a
 
         viewer.addVolumetricData(density_cube_str, "cube", {
-            "isoval": isovalue,
-            "color": color,
+            "isoval": -isovalue,
+            "color": negative_color,
             "opacity": opacity,
         })
 
-        viewer.zoomTo()
-        viewer.show()
+        # self-contained HTML that is stable in ipywidgets
+        return viewer._make_html()
