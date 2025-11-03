@@ -534,6 +534,10 @@ class InterpolationDriver():
         self.dw_dalpha_list = []
         self.dw_dX_dalpha_list = []
 
+        masses = self.molecule.get_masses().copy()
+        masses_cart = np.repeat(masses, 3)
+        sqrt_masses = np.sqrt(masses_cart)
+
         sum_weight_gradients_cart = np.zeros((natms, 3))
 
         distances_and_gradients = []
@@ -562,7 +566,7 @@ class InterpolationDriver():
 
         else:
             for i, data_point in enumerate(self.qm_data_points[:]):
-
+                
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_distance(data_point)
               
 
@@ -584,8 +588,9 @@ class InterpolationDriver():
             sum_weights_cart += weight_cart
             sum_weight_gradients_cart += weight_grad_cart
 
-            potential, gradient, r_i = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
-            
+            potential, gradient_mw, r_i = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
+            gradient = sqrt_masses * gradient_mw.reshape(-1)
+            gradient = gradient.reshape(gradient_mw.shape)
             gradients.append(gradient)
             averaged_int_dists.append(qm_data_point.internal_coordinates_values)
 

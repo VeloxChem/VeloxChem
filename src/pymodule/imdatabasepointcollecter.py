@@ -1047,7 +1047,7 @@ class IMDatabasePointCollecter:
             # Append the object to the list
             self.impes_drivers[root] = driver_object
 
-        self.current_state = self.starting_state
+        self.current_state = self.roots_to_follow[0]
         self.swap_back = True
         self.prev_state = self.current_state
         start_time = time()
@@ -2059,7 +2059,7 @@ class IMDatabasePointCollecter:
         for root in self.roots_to_follow:
             self.impes_drivers[root].qm_data_points = self.qm_data_point_dict[root]
             self.impes_drivers[root].compute(new_molecule)
-            # print('impesdriver weights', self.impes_drivers[root].weights)
+            print('impesdriver weights', self.impes_drivers[root].weights)
 
 
         if self.nstates > 1:
@@ -2138,7 +2138,7 @@ class IMDatabasePointCollecter:
         qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
 
         self.velocities_np.append(context.getState(getVelocities=True).getVelocities(True))
-        gradient_mw = self.update_gradient(qm_positions)
+        gradient = self.update_gradient(qm_positions)
 
         positions_ang = (qm_positions) * 10
 
@@ -2148,12 +2148,7 @@ class IMDatabasePointCollecter:
         new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
         new_molecule.set_charge(self.molecule.get_charge())
         new_molecule.set_multiplicity(self.molecule.get_multiplicity())
-        masses = new_molecule.get_masses().copy()
-        masses_cart = np.repeat(masses, 3)
-        sqrt_masses = np.sqrt(masses_cart)
-       
-        gradient = sqrt_masses * gradient_mw.reshape(-1)
-        gradient = gradient.reshape(gradient_mw.shape)
+        
         force = -np.array(gradient) * conversion_factor
 
         self.all_gradients.append(gradient)
@@ -2365,9 +2360,8 @@ class IMDatabasePointCollecter:
                 new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
                 new_molecule.set_charge(self.molecule.get_charge())
                 new_molecule.set_multiplicity(self.molecule.get_multiplicity())
-                gradient_2_mw = self.update_gradient(qm_positions)
-                gradient_2 = sqrt_masses * gradient_2_mw.reshape(-1)
-                gradient_2 = gradient_2.reshape(gradient_2_mw.shape)
+                gradient_2 = self.update_gradient(qm_positions)
+                
                 force = -np.array(gradient_2) * conversion_factor
             
             if (self.point_checker + self.last_point_added) % self.duration == 0 and self.point_checker != 0:
@@ -2410,9 +2404,7 @@ class IMDatabasePointCollecter:
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
             new_molecule.set_charge(self.molecule.get_charge())
             new_molecule.set_multiplicity(self.molecule.get_multiplicity())
-            gradient_2_mw = self.update_gradient(qm_positions)
-            gradient_2 = sqrt_masses * gradient_2_mw.reshape(-1)
-            gradient_2 = gradient_2.reshape(gradient_2_mw.shape)
+            gradient_2 = self.update_gradient(qm_positions)
             force = -np.array(gradient_2) * conversion_factor
             
             self.state_specific_molecules[self.current_state].append(new_molecule)
@@ -2569,7 +2561,7 @@ class IMDatabasePointCollecter:
             # gradients = [np.zeros((natms, 3)), np.zeros((natms, 3))]
             for e_idx in range(len(qm_energy)):
                 grad_vec = gradients[e_idx].reshape(-1)         # (3N,)
-                mw_grad_vec = inv_sqrt_masses * grad_vec
+                mw_grad_vec = grad_vec * inv_sqrt_masses
                 print('weights', self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].weights)
                 energy_difference = (abs(qm_energy[e_idx] - self.impes_drivers[self.roots_to_follow[identification_state + e_idx]].impes_coordinate.energy))
                 grad_mw = mw_grad_vec.reshape(gradients[e_idx].shape)
