@@ -124,7 +124,7 @@ class EvbSystemBuilder():
         self.soft_core_coulomb_int = False
         self.soft_core_lj_int = False
 
-        self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
+        # self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.2  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
         self.torsion_lambda_switch: float = 0.4  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
@@ -132,7 +132,7 @@ class EvbSystemBuilder():
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
 
         self.dynamic_bond_tightening = 3.25  # Power for tigthening breaking and forming bonds during the integration
-        self.dynamic_bond_fc_factor = 0.75  # Force constant factor for the dynamic bond tightening
+        self.dynamic_bond_fc_factor = 0.8  # Force constant factor for the dynamic bond tightening
 
         self.verbose = False
 
@@ -162,8 +162,8 @@ class EvbSystemBuilder():
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
         self.keywords = {
-            "temperature": float,
-            "nb_cutoff": float,
+            "temperature": float,  #-> system dependent
+            "nb_cutoff": float,  #-> 
             "bonded_integration": bool,
             "bonded_integration_bond_fac": float,
             "bonded_integration_angle_fac": float,
@@ -207,7 +207,7 @@ class EvbSystemBuilder():
         product: MMForceFieldGenerator,
         Lambda: list,
         configuration: dict,
-        constraints: list = [],
+        constraints: list | None = None,
     ):
 
         assert_msg_critical('openmm' in sys.modules,
@@ -232,7 +232,9 @@ class EvbSystemBuilder():
         self.ostream.flush()
         self.reactant = reactant
         self.product = product
-        self.constraints = constraints
+        
+        if constraints is not None:
+            self.constraints = constraints
 
         if self.pdb is None:
             system = mm.System()

@@ -176,7 +176,7 @@ class TransitionStateGuesser():
     def build_forcefields(self,
                           reactant_mol,
                           product_mol,
-                          constraints=[],
+                          constraints=None,
                           **build_forcefields_kwargs):
         if self.mute_ff_build:
             self.ostream.print_info(
@@ -387,7 +387,7 @@ class TransitionStateGuesser():
                         for l in scan_dict_discont_conf.keys():
                             scan_dict[l] += scan_dict_discont_conf[l]
                         V, E1, E2, conf_indices = self._get_best_mm_E_from_scan_dict(
-                            mm_results)
+                            scan_dict)
                         discont_indices = self._check_discontinuities(E1, E2)
 
         except Exception as e:
@@ -626,6 +626,8 @@ class TransitionStateGuesser():
                 min_conf_index = 0
                 for i, conformer in enumerate(scan):
                     scf_E = self._get_scf_energy(conformer['xyz'])
+                    
+                    results['scan'][l][i]['scf_energy'] = scf_E
                     if math.isnan(scf_E):
                         continue
                     if min_scf_conf_E is None or scf_E < min_scf_conf_E:
@@ -635,7 +637,6 @@ class TransitionStateGuesser():
                     if ref is None:
                         ref = scf_E
                     dif = scf_E - ref
-                    results['scan'][l][i]['scf_energy'] = scf_E
                     mm_E = results['scan'][l][i]['v']
 
                     self._print_scf_iter(l, scf_E, mm_E, dif, i)
@@ -800,7 +801,7 @@ class TransitionStateGuesser():
         except ImportError:
             raise ImportError('matplotlib is required for this functionality.')
 
-        rel_mm_energies = mm_energies - np.min(mm_energies)
+        rel_mm_energies = np.asarray(mm_energies) - np.min(mm_energies)
 
         lam_index = np.where(lambda_vec == np.array(step))[0][0]
         xyz_i = xyzs[lam_index]
@@ -933,7 +934,7 @@ class TransitionStateGuesser():
             index = 0
             for i, conf in enumerate(conf_scan):
                 scf_e = conf.get('scf_energy', None)
-                if scf_e is not None:
+                if scf_e is not None and not math.isnan(scf_e):
                     if lowest_scf_e is None or scf_e < lowest_scf_e:
                         lowest_scf_e = scf_e
                         index = i
@@ -1248,7 +1249,7 @@ class TransitionStateGuesser():
             else:
                 continue
             ts_params.update({id: copy.copy(param)})
-        if ts_params is {}:
+        if not ts_params:
             return None
         return ts_params
 

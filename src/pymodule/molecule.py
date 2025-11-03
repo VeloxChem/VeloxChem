@@ -956,10 +956,10 @@ def _Molecule_show(self,
     :starting_index:
         The starting index for atom indices.
     :bonds:
-        A list of tuples with bonds to draw. If None, connectivity is based on
+        A list of zero-indexed tuples with bonds to draw. If None, connectivity is based on
         proximity.
     :dashed_bonds:
-        A list of tuples with bonds to draw as dashed lines.
+        A list of zero-indexed tuples with bonds to draw as dashed lines.
     """
 
     try:
