@@ -616,12 +616,100 @@ def _Molecule_get_angle(self, angle_indices_one_based, angle_unit):
     theta_in_radian = safe_arccos(cos_theta)
 
     assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
-                        'Molecule.get_dihedral: Invalid angle unit')
+                        'Molecule.get_angle: Invalid angle unit')
 
     if angle_unit.lower() == 'degree':
         return 180.0 * theta_in_radian / math.pi
     else:
         return theta_in_radian
+
+
+def _Molecule_set_angle_in_degrees(self, angle_indices_one_based, target_angle):
+    """
+    Sets angle.
+
+    :param angle_indices_one_based:
+        The angle indices (1-based).
+    :param target_angle:
+        The target value of angle.
+    """
+
+    self.set_angle(angle_indices_one_based, target_angle, 'degree')
+
+
+def _Molecule_set_angle(self, angle_indices_one_based, target_angle,
+                        angle_unit):
+    """
+    Sets angle.
+
+    :param angle_indices_one_based:
+        The angle indices (1-based).
+    :param target_angle:
+        The target value of angle.
+    :param angle_unit:
+        The unit of angle (degree or radian).
+    """
+
+    assert_msg_critical(
+        len(angle_indices_one_based) == 3,
+        'Molecule.set_angle: Expecting three atom indices (1-based)')
+
+    # get the 0-based atom indices for the i-j bond of the i-j-k angle
+    i = angle_indices_one_based[0] - 1
+    j = angle_indices_one_based[1] - 1
+    k = angle_indices_one_based[2] - 1
+
+    # disconnect i-j and find all atoms that at connected to j
+    connectivity_matrix = self.get_connectivity_matrix()
+    connectivity_matrix[i, j] = 0
+    connectivity_matrix[j, i] = 0
+
+    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+
+    assert_msg_critical(
+        i not in atoms_connected_to_j,
+        'Molecule.set_angle: Cannot rotate angle ' +
+        '(Maybe it is part of a ring?)')
+
+    # rotate whole molecule around normal vector of i-j-k
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[i] - coords_in_au[j]
+    v32 = coords_in_au[j] - coords_in_au[k]
+
+    u21 = v21 / np.linalg.norm(v21)
+    u32 = v32 / np.linalg.norm(v32)
+
+    nijk = np.cross(u32, u21)
+    nijk = nijk / np.linalg.norm(nijk)
+
+    current_angle = self.get_angle(angle_indices_one_based, angle_unit)
+
+    # make several attempts to rotate the angle, with the constraint
+    # that the connectivity matrix should not change
+    for attempt in range(10, -1, -1):
+
+        rotation_angle = (target_angle - current_angle) * (0.1 * attempt)
+
+        new_coords_in_au = self._rotate_around_vector(coords_in_au,
+                                                      coords_in_au[j], nijk,
+                                                      rotation_angle,
+                                                      angle_unit)
+
+        new_mol = Molecule(self)
+        for idx in atoms_connected_to_j:
+            new_mol.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+        new_conn_mat = new_mol.get_connectivity_matrix()
+        conn_mat = self.get_connectivity_matrix()
+        if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
+            for idx in atoms_connected_to_j:
+                self.set_atom_coordinates(idx, new_coords_in_au[idx])
+            return
+
+    assert_msg_critical(
+        False,
+        'Molecule.set_angle: Cannot set angle due to ' + 'overlapping atoms')
 
 
 def _Molecule_get_dihedral_in_degrees(self, dihedral_indices_one_based):
@@ -1499,7 +1587,9 @@ Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
 Molecule.get_angle = _Molecule_get_angle
+Molecule.set_angle = _Molecule_set_angle
 Molecule.get_angle_in_degrees = _Molecule_get_angle_in_degrees
+Molecule.set_angle_in_degrees = _Molecule_set_angle_in_degrees
 Molecule.get_dihedral = _Molecule_get_dihedral
 Molecule.set_dihedral = _Molecule_set_dihedral
 Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
