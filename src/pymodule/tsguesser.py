@@ -106,7 +106,7 @@ class TransitionStateGuesser():
         self.conformer_snapshots = 10
         self.results_file = 'ts_results.h5'
 
-        self.ffbuilder = ReactionForceFieldBuilder()
+        self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
 
     def find_TS(
         self,
