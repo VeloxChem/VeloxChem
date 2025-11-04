@@ -772,7 +772,7 @@ class DensityViewer:
 
     def _plot_using_py3dmol(self, molecule, basis, den_inp):
         """
-        Plots the densities, with a widget to choose which.
+        Plots the densities using py3dmol, with a widget to choose which.
 
         :param molecule:
             The molecule.
@@ -816,7 +816,9 @@ class DensityViewer:
             with out:
                 display(HTML(self._draw_density_html(change['new'])))
 
-        dropdown = widgets.Dropdown(options=den_key_list, description='Density')
+        dropdown = widgets.Dropdown(options=den_key_list,
+                                    value=den_key_list[0],
+                                    description='Density')
 
         dropdown.observe(update_view, names='value')
 
