@@ -1320,8 +1320,8 @@ class VibrationalAnalysis:
 
         if invert_axes:
             ax.invert_xaxis()
-            #ax.invert_yaxis()
-            #ax2.invert_yaxis()
+            ax.invert_yaxis()
+            ax2.invert_yaxis()
 
     def plot_raman(self,
                    vib_results,
