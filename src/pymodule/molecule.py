@@ -599,6 +599,9 @@ def _Molecule_get_angle(self, angle_indices_one_based, angle_unit):
         len(angle_indices_one_based) == 3,
         'Molecule.get_angle: Expecting three atom indices (1-based)')
 
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.get_angle: Invalid angle unit')
+
     a = angle_indices_one_based[0] - 1
     b = angle_indices_one_based[1] - 1
     c = angle_indices_one_based[2] - 1
@@ -614,9 +617,6 @@ def _Molecule_get_angle(self, angle_indices_one_based, angle_unit):
     cos_theta = -np.vdot(u21, u32)
 
     theta_in_radian = safe_arccos(cos_theta)
-
-    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
-                        'Molecule.get_angle: Invalid angle unit')
 
     if angle_unit.lower() == 'degree':
         return 180.0 * theta_in_radian / math.pi
@@ -653,6 +653,9 @@ def _Molecule_set_angle(self, angle_indices_one_based, target_angle,
     assert_msg_critical(
         len(angle_indices_one_based) == 3,
         'Molecule.set_angle: Expecting three atom indices (1-based)')
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.set_angle: Invalid angle unit')
 
     # get the 0-based atom indices for the i-j bond of the i-j-k angle
     i = angle_indices_one_based[0] - 1
@@ -705,6 +708,13 @@ def _Molecule_set_angle(self, angle_indices_one_based, target_angle,
         if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
             for idx in atoms_connected_to_j:
                 self.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+            current_angle = self.get_angle(angle_indices_one_based, angle_unit)
+            if abs(target_angle - current_angle) > 1.0e-6:
+                warn_msg = "* Warning * After rotation, the angle is "
+                warn_msg += f"{current_angle:.3f} {angle_unit.lower()}\n"
+                print(warn_msg)
+
             return
 
     assert_msg_critical(
@@ -743,6 +753,9 @@ def _Molecule_get_dihedral(self, dihedral_indices_one_based, angle_unit):
         len(dihedral_indices_one_based) == 4,
         'Molecule.get_dihedral: Expecting four atom indices (1-based)')
 
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.get_dihedral: Invalid angle unit')
+
     a = dihedral_indices_one_based[0] - 1
     b = dihedral_indices_one_based[1] - 1
     c = dihedral_indices_one_based[2] - 1
@@ -774,9 +787,6 @@ def _Molecule_get_dihedral(self, dihedral_indices_one_based, angle_unit):
     phi_in_radian = safe_arccos(cos_phi)
     if sin_phi < 0.0:
         phi_in_radian *= -1.0
-
-    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
-                        'Molecule.get_dihedral: Invalid angle unit')
 
     if angle_unit.lower() == 'degree':
         return 180.0 * phi_in_radian / math.pi
@@ -814,6 +824,9 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
     assert_msg_critical(
         len(dihedral_indices_one_based) == 4,
         'Molecule.set_dihedral: Expecting four atom indices (1-based)')
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.set_dihedral: Invalid angle unit')
 
     # get the 0-based atom indices for central bond
     i = dihedral_indices_one_based[1] - 1
@@ -866,6 +879,14 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
         if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
             for idx in atoms_connected_to_j:
                 self.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+            current_angle = self.get_dihedral(dihedral_indices_one_based,
+                                              angle_unit)
+            if abs(updated_target_angle - current_angle) > 1.0e-6:
+                warn_msg = "* Warning * After rotation, the dihedral angle is "
+                warn_msg += f"{current_angle:.3f} {angle_unit.lower()}\n"
+                print(warn_msg)
+
             return
 
     assert_msg_critical(
