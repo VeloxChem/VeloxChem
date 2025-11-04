@@ -7,7 +7,8 @@
             "charge": -0.337857,
             "sigma": 0.3315212309943831,
             "epsilon": 0.4133792,
-            "equivalent_atom": "c2_00"
+            "equivalent_atom": "c2_00",
+            "comment": "GAFF"
         },
         "1": {
             "type": "c2",
@@ -16,7 +17,8 @@
             "charge": -0.3485849999999999,
             "sigma": 0.3315212309943831,
             "epsilon": 0.4133792,
-            "equivalent_atom": "c2_00"
+            "equivalent_atom": "c2_00",
+            "comment": "GAFF"
         },
         "2": {
             "type": "ha",
@@ -25,7 +27,8 @@
             "charge": 0.170322,
             "sigma": 0.262547852235958,
             "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00"
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
         },
         "3": {
             "type": "ha",
@@ -34,7 +37,8 @@
             "charge": 0.170175,
             "sigma": 0.262547852235958,
             "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00"
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
         },
         "4": {
             "type": "ha",
@@ -43,7 +47,8 @@
             "charge": 0.173394,
             "sigma": 0.262547852235958,
             "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00"
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
         },
         "5": {
             "type": "ha",
@@ -52,34 +57,38 @@
             "charge": 0.172551,
             "sigma": 0.262547852235958,
             "epsilon": 0.0673624,
-            "equivalent_atom": "ha_00"
+            "equivalent_atom": "ha_00",
+            "comment": "GAFF"
         },
         "6": {
             "type": "ow",
-            "name": "O22",
+            "name": "O2",
             "mass": 15.994915,
             "charge": -0.8476,
             "sigma": 0.31658,
             "epsilon": 0.649775,
-            "equivalent_atom": "SPC/E water"
+            "equivalent_atom": "ow_00",
+            "comment": "GAFF"
         },
         "7": {
-            "type": "hw",
-            "name": "H02",
-            "mass": 1.007825,
-            "charge": 0.4238,
-            "sigma": 0.11658,
-            "epsilon": 0.064978,
-            "equivalent_atom": "SPC/E water"
-        },
-        "8": {
             "type": "hw",
             "name": "H12",
             "mass": 1.007825,
             "charge": 0.4238,
             "sigma": 0.11658,
             "epsilon": 0.064978,
-            "equivalent_atom": "SPC/E water"
+            "equivalent_atom": "hw_00",
+            "comment": "GAFF"
+        },
+        "8": {
+            "type": "hw",
+            "name": "H22",
+            "mass": 1.007825,
+            "charge": 0.4238,
+            "sigma": 0.11658,
+            "epsilon": 0.064978,
+            "equivalent_atom": "hw_00",
+            "comment": "GAFF"
         }
     },
     "bonds": {
@@ -117,13 +126,13 @@
             "type": "harmonic",
             "force_constant": 345000,
             "equilibrium": 0.1,
-            "comment": "SPC/E water"
+            "comment": "cSPC/E water, formed in reaction"
         },
         "(6, 8)": {
             "type": "harmonic",
             "force_constant": 345000,
             "equilibrium": 0.1,
-            "comment": "SPC/E water"
+            "comment": "cSPC/E water"
         }
     },
     "angles": {
@@ -167,7 +176,7 @@
             "type": "harmonic",
             "force_constant": 383,
             "equilibrium": 109.47,
-            "comment": "SPC/E water"
+            "comment": "cSPC/E water"
         }
     },
     "dihedrals": {

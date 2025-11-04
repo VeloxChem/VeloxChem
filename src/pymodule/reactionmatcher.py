@@ -41,6 +41,7 @@ import math
 
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
+from collections import Counter
 
 
 class ReactionMatcher:
@@ -66,15 +67,16 @@ class ReactionMatcher:
         self._iso_count = 0
         self._mono_count = 0
         self._start_time = 0
-        self.verbose = True
+        self.verbose = False
         self.print_starting_index = 0
         self.max_time = 600
-        self.force_hydrogen_inclusion = False
+        self.force_hydrogen_inclusion = True
         self._reduce_hydrogen = False
 
         self.max_break_attempts_guess = 1e5
         self._breaking_depth = 1  # how many breaking edges to try
         self._check_monomorphic = False
+        self._assisting_map = {}
 
     def get_mapping(
         self,
@@ -90,7 +92,9 @@ class ReactionMatcher:
             reactant_ff,
             rea_elems,
             product_ff,
-            pro_elems,
+            pro_elems, 
+            breaking_bonds, 
+            forming_bonds,
             self.force_hydrogen_inclusion
         )
 
@@ -105,11 +109,14 @@ class ReactionMatcher:
         if map is None and self._reduce_hydrogen:
             self.ostream.print_info("No mapping found, retrying with hydrogens included.")
             self.ostream.flush()
+            self._reduce_hydrogen = False
             self.rea_graph, self.pro_graph = self._create_reaction_graphs(
                 reactant_ff,
                 rea_elems,
                 product_ff,
                 pro_elems,
+                breaking_bonds,
+                forming_bonds,
                 True
             )
             map, breaking_edges, forming_edges = self._find_mapping(
@@ -124,8 +131,8 @@ class ReactionMatcher:
         self.ostream.print_info(
             f"Total subgraph isomorphism checks: {self._iso_count}, total subgraph monomorphism checks: {self._mono_count}"
         )
-        
-        self._restore_hydrogen(map,self.rea_graph,self.pro_graph)
+        if self._reduce_hydrogen:
+            self._restore_hydrogen(map,self.rea_graph,self.pro_graph)
             
         return map, breaking_edges, forming_edges
 
@@ -133,8 +140,12 @@ class ReactionMatcher:
     def _decide_breaking_depth(self):
         N = len(self.rea_graph.edges)
         _breaking_depth = 1
-        while math.factorial(N) / math.factorial(
-                N - _breaking_depth) < self.max_break_attempts_guess:
+        # Equivalent to N! / (N - depth)!
+        def estimate_attempts(N,depth):
+            lg = math.lgamma(N + 1) - math.lgamma(N - depth + 1)
+            return math.exp(lg)
+        
+        while estimate_attempts(N, _breaking_depth) < self.max_break_attempts_guess:
             _breaking_depth += 1
             if _breaking_depth == N:
                 break
@@ -147,12 +158,12 @@ class ReactionMatcher:
     
 
     def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
-                                pro_elems, force_hydrogen_inclusion):
+                                pro_elems, breaking_bonds, forming_bonds, force_hydrogen_inclusion):
         
         
-        rea_graph, rea_info, rea_unique_connected_atoms = self._prepare_graph(reactant_ff, rea_elems)
+        rea_graph  = self._prepare_graph(reactant_ff, rea_elems, breaking_bonds,forming_bonds)
 
-        pro_graph,pro_info, pro_unique_connected_atoms = self._prepare_graph(product_ff, pro_elems)
+        pro_graph = self._prepare_graph(product_ff, pro_elems)
 
 
         if not force_hydrogen_inclusion:
@@ -165,87 +176,11 @@ class ReactionMatcher:
                 rea_graph.remove_nodes_from(rea_hydrogens)
                 pro_graph.remove_nodes_from(pro_hydrogens)
         
+        rea_graph, pro_graph, assisting_map = self._assign_assist_ids(rea_graph, pro_graph)
         
-        
-        to_pop = []
-        for i, connected_atoms in rea_unique_connected_atoms.items():
-            if connected_atoms not in pro_unique_connected_atoms.values():
-                to_pop.append(i)
-        for i in to_pop:
-            rea_unique_connected_atoms.pop(i)
-                
-        to_pop = []
-        for i, connected_atoms in pro_unique_connected_atoms.items():
-            if connected_atoms not in rea_unique_connected_atoms.values():
-                to_pop.append(i)
-            
-        for i in to_pop:
-            pro_unique_connected_atoms.pop(i)
-                    
-                    
-        # Loop through all uniquely connected atoms
-        # Find the matching product atom, assign the same assist_id to both
-        assigned_assist_ids = {}
-        assigned_assist_ids_2 = {}
-        for rea_id, connected_atoms in rea_unique_connected_atoms.items():
-            rea_graph.nodes[rea_id]['assist_id'] = rea_id
-            
-            pro_id = 0
-            for pro_id, connected_atoms_pro in pro_unique_connected_atoms.items():
-                if connected_atoms == connected_atoms_pro:
-                    pro_graph.nodes[pro_id]['assist_id'] = rea_id
-                    assigned_assist_ids[rea_id] = pro_id
-                    break
-            
-        #     # Given a matching uniquely connected atom in the reactant and product
-        #     # Collect all the connected atoms of the bordering atoms
-        # # for rea_id,pro_id in assigned_assist_ids.items():
-        #     rea_connected_atoms_2 = []
-        #     for i in rea_info[rea_id]['ConnectedAtomsNumbers']:
-        #         rea_connected_atoms_2.append(rea_info[i]['ConnectedAtoms'])
-            
-
-        #     pro_connected_atoms_2 = []
-        #     for i in pro_info[pro_id]['ConnectedAtomsNumbers']:
-        #         pro_connected_atoms_2.append(pro_info[i]['ConnectedAtoms'])
-
-
-        #     # if both have the same set of secondary connected atoms
-        #     # assign assist ids to the first order connected atoms
-        #     if sorted(rea_connected_atoms_2) == sorted(pro_connected_atoms_2):
-        #         for rea_id_2, connected_atoms_rea_2 in zip(rea_info[rea_id]['ConnectedAtomsNumbers'],rea_connected_atoms_2):
-        #             for pro_id_2, connected_atoms_pro_2 in zip(pro_info[pro_id]['ConnectedAtomsNumbers'],pro_connected_atoms_2):
-        #                 if connected_atoms_rea_2 == connected_atoms_pro_2:
-        #                     if rea_id_2 not in rea_graph.nodes or pro_id_2 not in pro_graph.nodes:
-        #                         continue
-        #                     rea_assist_id = rea_graph.nodes[rea_id_2].get('assist_id', -2)
-        #                     pro_assist_id = pro_graph.nodes[pro_id_2].get('assist_id', -2)
-        #                     if rea_assist_id == -2 and pro_assist_id == -2:
-        #                         rea_graph.nodes[rea_id_2]['assist_id'] = rea_id_2
-        #                         pro_graph.nodes[pro_id_2]['assist_id'] = rea_id_2
-        #                         assigned_assist_ids_2[rea_id_2] = pro_id_2
-        #                     else:
-        #                         if rea_assist_id != pro_assist_id:
-        #                             rea_graph.nodes[rea_id_2]['assist_id'] = -1
-        #                             pro_graph.nodes[pro_id_2]['assist_id'] = -1
-        #                             if rea_id_2 in assigned_assist_ids:
-        #                                 assigned_assist_ids.pop(rea_id_2, None)
-        #                             if rea_id_2 in assigned_assist_ids_2:
-        #                                 assigned_assist_ids_2.pop(rea_id_2, None)
-                                    
-        #                             self.ostream.print_info(f"Conflicting assist ids for rea_id {rea_id_2} and pro_id {pro_id_2}, setting to -1")
-        #                             self.ostream.flush()
-                                
-        #                     self.ostream.flush()
-        #                     break
-
-        self.ostream.print_info(f"Assigned assist ids for uniquely connected atoms: {assigned_assist_ids}")
-        self.ostream.print_info(f"Assigned assist ids for 2nd order uniquely connected atoms: {assigned_assist_ids_2}")
-        self.ostream.flush()
-
         return rea_graph, pro_graph
 
-    def _prepare_graph(self, forcefield, elements):
+    def _prepare_graph(self, forcefield, elements, breaking_bonds = None, forming_bonds = None):
         graph = nx.Graph()
         bonds = list(forcefield.bonds.keys())
         # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
@@ -253,63 +188,155 @@ class ReactionMatcher:
         graph.add_nodes_from(forcefield.atoms.keys())
         graph.add_edges_from(bonds)
 
+
+        if breaking_bonds is not None:
+            for edge in breaking_bonds:
+                graph.remove_edge(*edge)
+
+        if forming_bonds is not None:
+            for edge in forming_bonds:
+                graph.add_edge(*edge)
+
         for i, elem in enumerate(elements):
             graph.nodes[i]['elem'] = elem
     
-        info = {i-1: info for i, info in forcefield.atom_info_dict.items()}
-        for i, info_entry in info.items():
-            info[i]['ConnectedAtomsNumbers'] = [n-1 for n in info_entry['ConnectedAtomsNumbers']]
+        for i in graph.nodes:
+            connected_indices, connected_elements = self._get_connected_atoms(graph, i)
+            H_count = sum(1 for elem in connected_elements if elem == 1.0)
+            graph.nodes[i]['H_bond_count'] = H_count
+            if H_count > 0:
+                graph.nodes[i]['H_indices'] = [idx for idx, elem in zip(connected_indices, connected_elements) if elem == 1.0]
         
-        unique_connected_atoms = {}
-        non_unique_connected_atoms = []
-        for i, atom_info in info.items():
-            connected_atoms = atom_info['ConnectedAtoms']
-            if connected_atoms not in non_unique_connected_atoms:
-                if connected_atoms not in unique_connected_atoms.values():
-                    unique_connected_atoms[i] = connected_atoms
-                else:
-                    non_unique_connected_atoms.append(connected_atoms)
-                    # remove from rea_unique_connected_atoms
-                    for key, val in list(unique_connected_atoms.items()):
-                        if val == connected_atoms:
-                            unique_connected_atoms.pop(key)
-                            
-            H_count = sum(1 for atom in connected_atoms if atom =='H')
-            if i in graph.nodes:
-                graph.nodes[i]['H_bond_count'] = H_count
-                if H_count > 0:
-                    H_indices = []
-                    for elem, number in zip(connected_atoms,atom_info['ConnectedAtomsNumbers']):
-                        if elem == 'H':
-                            H_indices.append(number)
-                    graph.nodes[i]['H_indices'] = H_indices
-        return graph,info,unique_connected_atoms
-    
-    def _decide_hydrogen_reduction(self, rea_graph, pro_graph):
-        rea_bond_composition = self._get_bond_element_composition(rea_graph)
-        pro_bond_composition = self._get_bond_element_composition(pro_graph)
-        for rea_bond in rea_bond_composition.keys():
-            if 1.0 in rea_bond:
-                if rea_bond not in pro_bond_composition.keys():
-                    return False
-                if pro_bond_composition[rea_bond] != rea_bond_composition[rea_bond]:
-                    return False
-                
-        for pro_bond in pro_bond_composition.keys():
-            if 1.0 in pro_bond:
-                if pro_bond not in rea_bond_composition.keys():
-                    return False
-                if rea_bond_composition[pro_bond] != pro_bond_composition[pro_bond]:
-                    return False
+        return graph
+
+    def _get_connected_atoms(self, graph, node):
+        indices =  list(graph.neighbors(node))
+        elements = [graph.nodes[n]['elem'] for n in indices]
+        return indices, elements
+
+    def _get_range_subgraph(self,graph,node,cutoff):
+        nodes = [node for node, dist in nx.single_source_shortest_path_length(graph, node, cutoff=cutoff).items()]
+        return graph.subgraph(nodes)
+        
+        
+    def _decide_hydrogen_reduction(self, A, B):
+        # Small enough graphs don't need hydrogen reduction
+        if len(A.nodes) < 30:
+            return False
+        
+        # # Always return false if the reaction is intramolecular
+        # if len(cc_A) == 1 and len(cc_B) == 1:
+        #     return False
+        
+        # todo
+        # check different connected components seperately
+        # if len(cc_A) == len(cc_B):
+        
+        # else
+        
+        # Returns true if the types of bonds that are involving hydrogens are balanced between A and B
+        A_bond_composition = self._get_bond_element_composition(A)
+        B_bond_composition = self._get_bond_element_composition(B)
+        hydrogen_combs = {
+            comb for comb in set(A_bond_composition) | set(B_bond_composition)
+            if 1.0 in comb
+        }
+        for comb in hydrogen_combs:
+            if A_bond_composition.get(comb, 0) != B_bond_composition.get(comb, 0):
+                return False
         return True
                 
     
-    def _assign_assist_ids(self,rea_ids,pro_ids,rea_graph,pro_graph,rea_info,pro_info):
-        assigned_assist_ids = {}
+    def _assign_assist_ids(self,rea_graph,pro_graph):
+        # Tries to figure out the 'obvious' atom mappings before starting the full graph matching
+        # This speeds up the matching significantly for larger molecules
+        # Subgraphs of decreasing size in the reactant and product and product are itterated over
+        # If they are isomorphic, it is assumed that these structures are the same in both the reactant and the product
         
-        rea_unique_connected_atoms = {rea_id: rea_info[rea_id]['ConnectedAtoms'] for rea_id in rea_ids}
-        pro_unique_connected_atoms = {pro_id: pro_info[pro_id]['ConnectedAtoms'] for pro_id in pro_ids}
         
+        self.ostream.print_info("Searching for matching subgraphs to assign assist ids")
+        self.ostream.flush()
+        H_count = sum([1 for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0])
+        
+        # Rough upper bound for a starting guess
+        depth = int((len(rea_graph.nodes) - H_count)/4)
+        
+        min_depth = 2
+        assisting_map = {}
+        while depth>= min_depth:
+            for rea_id in sorted(rea_graph.nodes):
+                
+                # Break early
+                if rea_graph.nodes[rea_id]['elem'] == 1.0:
+                    continue
+                if rea_graph.nodes[rea_id].get('assist_id', None) is not None:
+                    continue
+                
+                rea_subgraph = self._get_range_subgraph(rea_graph, rea_id, depth)
+                # Break if the subgraph spans the entire molecule because there won't be an isomorphism
+                if len(rea_subgraph.nodes) == len(rea_graph.nodes):
+                    break
+                
+                if self.verbose:
+                    self.ostream.print_info(f"Trying range {depth} around reactant atom {rea_id}. Total nodes in subgraphs: {len(rea_subgraph.nodes)}")
+                    self.ostream.flush()
+                    
+                
+                # get subgraph around atom for range
+                for pro_id in sorted(pro_graph.nodes):
+                    if pro_graph.nodes[pro_id]['elem'] == 1.0:
+                        continue
+                    if rea_graph.nodes[rea_id]['elem'] != pro_graph.nodes[pro_id]['elem']:
+                        continue
+                    if pro_graph.nodes[pro_id].get('assist_id', None) is not None:
+                        continue
+                    
+                    pro_subgraph = self._get_range_subgraph(pro_graph, pro_id, depth)
+                    
+                    # isomorphism checks are pointless if the number of nodes differs
+                    if len(rea_subgraph.nodes) != len(pro_subgraph.nodes):
+                        continue
+                    
+                    GM = self.get_graph_matcher(rea_subgraph, pro_subgraph)
+                    if not GM.is_isomorphic():
+                        continue
+                    
+                    # rea_dim_subgraph = self._get_range_subgraph(rea_graph, rea_id, depth-1)
+                    # pro_dim_subgraph = self._get_range_subgraph(pro_graph, pro_id, depth-1)
+                    # GM = self.get_graph_matcher(rea_dim_subgraph, pro_dim_subgraph)
+                    # if not GM.is_isomorphic():
+                    #     self.ostream.print_warning("Found isomorphism on outer range, but not on inner range. This should not happen.")
+                    #     self.ostream.flush()
+                    #     continue
+                    
+                    map = GM.mapping
+                    assisting_map.update(map)
+                    self.ostream.print_info(f"Found matching subgraph between reactant atom {rea_id} and product atom {pro_id} with mapping: {map}. Assigning assist ids.")
+                    self.ostream.flush()
+                    for rea_node, pro_node in map.items():
+                        
+                        # ids might be assigned multiple times. This shouldn't be a problem unless they differ
+                        rea_assist_id = rea_graph.nodes[rea_node].get('assist_id', None)
+                        pro_assist_id = pro_graph.nodes[pro_node].get('assist_id', None)
+                        
+                        if rea_assist_id != pro_assist_id:
+                            self.ostream.print_warning("Conflict in assist ids, this should not happen!")
+                            
+                        rea_graph.nodes[rea_node]['assist_id'] = rea_node
+                        pro_graph.nodes[pro_node]['assist_id'] = rea_node
+                    
+                    if min_depth == 2:
+                        min_depth = max(2, depth//2)
+                        self.ostream.print_info(f"Setting min depth to {min_depth}.")
+                        self.ostream.flush()
+                    break
+            depth -= 1
+
+        sorted_assisting_map = {k: assisting_map[k] for k in sorted(assisting_map)}
+        self.ostream.print_info(f"Assigned {len(assisting_map)} assist ids: {sorted_assisting_map}")
+        self._assisting_map = sorted_assisting_map
+        self.ostream.flush()
+        return rea_graph,pro_graph,sorted_assisting_map
         
 
     def _find_mapping(self,
@@ -320,11 +347,7 @@ class ReactionMatcher:
         """
         Find a mapping between the connected components of A and B, while avoiding reconnecting broken edges.
         """
-        for edge in forced_breaking_edges:
-            A.remove_edge(*edge)
-
-        for edge in forced_forming_edges:
-            A.add_edge(*edge)
+        
 
         # loop progressively over more and more broken bonds till all connected components of A are subgraphs of B
         # can be done based on elements
@@ -504,9 +527,7 @@ class ReactionMatcher:
                     if j <= i:
                         continue
                     # If an edge is in A, it cannot be formed
-                    edge_in_A = (node_i,
-                                 node_j) in A.edges() or (node_j,
-                                                          node_i) in A.edges()
+                    edge_in_A = A.has_edge(node_i, node_j)
                     # If an edge was broken, it should not be re-formed
                     edge_in_broken = (node_i, node_j) in breaking_edges or (
                         node_j, node_i) in breaking_edges
@@ -550,15 +571,9 @@ class ReactionMatcher:
 
     @staticmethod
     def _get_bond_element_composition(A):
-        composition = {}
-        for edge in A.edges():
-            
-            comb = ReactionMatcher._get_elem_comb(edge[0], edge[1], A)
-            if comb not in composition.keys():
-                composition[comb] = 1
-            else:
-                composition[comb] += 1
-        return composition
+        gen = (ReactionMatcher._get_elem_comb(u, v, A) for u, v in A.edges())
+        composition = Counter(gen)
+        return dict(composition)
 
     @staticmethod
     def _sort_edges(A):
@@ -599,7 +614,7 @@ class ReactionMatcher:
             if len(g) > max_nodes:
                 return False
             A_sub = A.subgraph(g)
-            GM = ReactionMatcher.get_graph_matcher(B, A_sub)
+            GM = self.get_graph_matcher(B, A_sub)
             if self._check_monomorphic:
                 self._mono_count += 1
                 is_mono = GM.subgraph_is_monomorphic()
@@ -665,17 +680,19 @@ class ReactionMatcher:
             B.remove_nodes_from(best_map.keys())
         return True
     
-    @staticmethod
-    def get_graph_matcher(A,B):
+    
+    def get_graph_matcher(self,A,B):
         def node_match(a, b):
-            # the elem key is always expected, the assist_id key is optional
-            elem_a = a['elem']
-            elem_b = b['elem']
-            assist_a = a.get('assist_id', -1)
-            assist_b = b.get('assist_id', -1)
-            h_count_a = a.get('H_bond_count', 0)
-            h_count_b = b.get('H_bond_count', 0)
-            return elem_a == elem_b and assist_a == assist_b and h_count_a == h_count_b
+            # the elem key is always expected, the assist_id key and H_bond_count key are optional
+            elem_match = a['elem'] == b['elem']
+            h_count_match = a.get('H_bond_count', 0) == b.get('H_bond_count', 0)
+            assist_match = a.get('assist_id', -1) == b.get('assist_id', -1)
+            if self._reduce_hydrogen:
+                return elem_match and assist_match and h_count_match
+            else:
+                return elem_match and assist_match
+
+            
         GM = GraphMatcher(A,B, node_match=node_match)
         return GM
         
@@ -686,7 +703,7 @@ class ReactionMatcher:
                 pro_node = map[rea_node]
                 pro_info = pro_graph.nodes[pro_node]
                 pro_H = pro_info['H_indices']
-                self.ostream.print_info(f"rea_node: {rea_node}, pro_node: {pro_node}, rea_H: {rea_H}, pro_H: {pro_H}")
+                
                 for h1, h2 in zip(rea_H, pro_H):
                     map.update({h1: h2})
                 self.ostream.flush()
@@ -714,3 +731,4 @@ class ReactionMatcher:
     
     def _print_bond(self,bond):
         return f"({bond[0]+self.print_starting_index}, {bond[1]+self.print_starting_index})"
+

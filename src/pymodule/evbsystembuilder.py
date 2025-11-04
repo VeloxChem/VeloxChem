@@ -164,7 +164,7 @@ class EvbSystemBuilder():
         self.keywords = {
             "temperature": float,  #-> system dependent
             "nb_cutoff": float,  #-> 
-            "bonded_integration": bool,
+            # "bonded_integration": bool,
             "bonded_integration_bond_fac": float,
             "bonded_integration_angle_fac": float,
             "torsion_lambda_switch": float,

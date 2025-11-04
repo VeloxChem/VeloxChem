@@ -58,8 +58,8 @@ class TestReactionMatcher:
             pro,
             reactant_partial_charges=rea_charges,
             product_partial_charges=pro_charges,
-            breaking_bonds=breaking_bonds,
-            forming_bonds=forming_bonds,
+            forced_breaking_bonds=breaking_bonds,
+            forced_forming_bonds=forming_bonds,
         )
         return evb.breaking_bonds, evb.forming_bonds
 
@@ -119,7 +119,7 @@ class TestReactionMatcher:
         # load forcefields
 
     @pytest.mark.timeconsuming
-    def test_copper_complex(self):
+    def test_copper_complex_1(self):
         data_path = Path(__file__).parent / 'data'
         rea1 = Molecule.read_xyz_file(str(data_path / 'reamatcher_cu-tfe.xyz'))
         rea2 = Molecule.read_xyz_file(str(data_path / 'reamatcher_c-s.xyz'))
@@ -162,3 +162,21 @@ class TestReactionMatcher:
         )
         assert breaking_bonds == {(71, 76)}
         assert forming_bonds == {(51, 78)}
+
+    @pytest.mark.timeconsuming
+    def test_copper_complex_2(self):
+        data_path = Path(__file__).parent / 'data'
+        rea = Molecule.read_xyz_file(str(data_path / 'reamatcher_3plus.xyz'))
+
+        pro = Molecule.read_xyz_file(str(data_path / 'reamatcher_5plus.xyz'))
+
+        rea.set_charge(1)
+        pro.set_charge(1)
+
+        breaking_bonds, forming_bonds = self.run_graph_matcher(
+            rea=[rea],
+            pro=[pro],
+        )
+        # Input is one-indexed, but inner representation is zero-indexed
+        assert breaking_bonds == {(1, 99)}
+        assert forming_bonds == {(42, 99), (36, 101)}
