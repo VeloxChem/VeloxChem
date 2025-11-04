@@ -443,7 +443,7 @@ def _Molecule_from_dict(mol_dict):
     return mol
 
 
-def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
+def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.8):
     """
     Gets connectivity matrix.
 
@@ -505,8 +505,8 @@ def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
         more_connected_atoms = set()
         for a in connected_atoms:
             for b in range(connectivity_matrix.shape[0]):
-                if (b not in connected_atoms and
-                        connectivity_matrix[a, b] == 1):
+                if (b not in connected_atoms
+                        and connectivity_matrix[a, b] == 1):
                     more_connected_atoms.add(b)
         if more_connected_atoms:
             connected_atoms.update(more_connected_atoms)
@@ -958,10 +958,10 @@ def _Molecule_show(self,
     :starting_index:
         The starting index for atom indices.
     :bonds:
-        A list of tuples with bonds to draw. If None, connectivity is based on
+        A list of zero-indexed tuples with bonds to draw. If None, connectivity is based on
         proximity.
     :dashed_bonds:
-        A list of tuples with bonds to draw as dashed lines.
+        A list of zero-indexed tuples with bonds to draw as dashed lines.
     """
 
     try:
@@ -1314,16 +1314,48 @@ def _Molecule_is_water_molecule(self):
     conn = self.get_connectivity_matrix()
 
     bond_labels = [
-        sorted([labels[i], labels[j]])
-        for i in range(natoms)
-        for j in range(i, natoms)
-        if conn[i, j] == 1
+        sorted([labels[i], labels[j]]) for i in range(natoms)
+        for j in range(i, natoms) if conn[i, j] == 1
     ]
 
     if bond_labels != [['H', 'O'], ['H', 'O']]:
         return False
 
     return True
+
+
+def _Molecule_contains_water_molecule(self):
+    """
+    Checks if a molecule contains a water molecule.
+
+    :return:
+        True if the molecule contains a water molecule, False otherwise.
+    """
+
+    conn = self.get_connectivity_matrix()
+    natoms = self.number_of_atoms()
+    visited = set()
+    labels = self.get_labels()
+
+    for i in range(natoms):
+        if i in visited:
+            continue
+        if labels[i] != 'O':
+            continue
+
+        connected_atoms = self._find_connected_atoms(i, conn)
+        if len(connected_atoms) != 3:
+            continue
+        
+        connected_atoms.remove(i)
+        connected_atoms = list(connected_atoms)
+        if labels[connected_atoms[0]] == 'H' and labels[
+                connected_atoms[1]] == 'H':
+            return True
+
+        visited.update(connected_atoms)
+
+    return False
 
 
 @staticmethod
@@ -1466,6 +1498,7 @@ Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
 Molecule.partition_atoms = _Molecule_partition_atoms
 Molecule.is_water_molecule = _Molecule_is_water_molecule
+Molecule.contains_water_molecule = _Molecule_contains_water_molecule
 
 Molecule.read_name = _Molecule_read_name
 Molecule.name_to_smiles = _Molecule_name_to_smiles

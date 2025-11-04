@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <System openmmVersion="8.2" type="System" version="1">
 	<PeriodicBoxVectors>
-		<A x="3.374577" y="0" z="0"/>
-		<B x="0" y="3.272386" z="0"/>
-		<C x="0" y="0" z="3.1984339999999998"/>
+		<A x="3.303834440930453" y="0" z="0"/>
+		<B x="0" y="3.278347349676755" z="0"/>
+		<C x="0" y="0" z="3.380888284630817"/>
 	</PeriodicBoxVectors>
 	<Particles>
 		<Particle mass="12.01078"/>
@@ -73,6 +73,13 @@
 			</Exceptions>
 		</Force>
 		<Force forceGroup="7" frequency="1" name="CMMotionRemover" type="CMMotionRemover" version="1"/>
+		<Force forceGroup="12" name="Dynamic reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
+			<Bonds>
+				<Bond d=".22405061549719155" k="62910.62399999999" p1="0" p2="7"/>
+				<Bond d=".1" k="345000" p1="6" p2="7"/>
+				<Bond d=".3240506154971915" k="49103.42399999999" p1="1" p2="6"/>
+			</Bonds>
+		</Force>
 		<Force energy=" (1-l) * LjtotA   + l  * LjtotB; LjtotA     = A12 / r^12 - A6 / r^6;LjtotB     = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; " forceGroup="2" name="Reaction internal lennard-jones" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="sigmaA"/>
@@ -139,13 +146,6 @@
 				<Bond p1="5" p2="7" param1="-.0011389836292380001" param2=".0731271138"/>
 				<Bond p1="5" p2="8" param1="-.020273035895658" param2=".0731271138"/>
 				<Bond p1="7" p2="8" param1=".008556972316" param2="0"/>
-			</Bonds>
-		</Force>
-		<Force forceGroup="12" name="Dynamic reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
-			<Bonds>
-				<Bond d=".22405061549719155" k="62910.62399999999" p1="0" p2="7"/>
-				<Bond d=".1" k="345000" p1="6" p2="7"/>
-				<Bond d=".3240506154971915" k="49103.42399999999" p1="1" p2="6"/>
 			</Bonds>
 		</Force>
 		<Force forceGroup="11" name="Static reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">

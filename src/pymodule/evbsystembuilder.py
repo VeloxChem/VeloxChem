@@ -124,12 +124,15 @@ class EvbSystemBuilder():
         self.soft_core_coulomb_int = False
         self.soft_core_lj_int = False
 
-        self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
+        # self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
         self.bonded_integration_bond_fac: float = 0.2  # Scaling factor for the bonded integration forces.
         self.bonded_integration_angle_fac: float = 0.1  # Scaling factor for the bonded integration forces.
         self.torsion_lambda_switch: float = 0.4  # The minimum (1-maximum) lambda value at which to start turning on (have turned of) the proper torsion for the product (reactant)
 
         self.int_nb_const_exceptions = True  # If the exceptions for the integration nonbonded force should be kept constant over the entire simulation
+
+        self.dynamic_bond_tightening = 3.25  # Power for tigthening breaking and forming bonds during the integration
+        self.dynamic_bond_fc_factor = 0.8  # Force constant factor for the dynamic bond tightening
 
         self.verbose = False
 
@@ -159,9 +162,9 @@ class EvbSystemBuilder():
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
         self.keywords = {
-            "temperature": float,
-            "nb_cutoff": float,
-            "bonded_integration": bool,
+            "temperature": float,  #-> system dependent
+            "nb_cutoff": float,  #-> 
+            # "bonded_integration": bool,
             "bonded_integration_bond_fac": float,
             "bonded_integration_angle_fac": float,
             "torsion_lambda_switch": float,
@@ -172,6 +175,8 @@ class EvbSystemBuilder():
             "soft_core_coulomb_int": bool,
             "soft_core_lj_int": bool,
             "int_nb_const_exceptions": bool,
+            "dynamic_bond_tightening": float,
+            "dynamic_bond_fc_factor": float,
             "pressure": float,
             "solvent": str,
             "padding": float,
@@ -202,7 +207,7 @@ class EvbSystemBuilder():
         product: MMForceFieldGenerator,
         Lambda: list,
         configuration: dict,
-        constraints: list = [],
+        constraints: list | None = None,
     ):
 
         assert_msg_critical('openmm' in sys.modules,
@@ -227,7 +232,9 @@ class EvbSystemBuilder():
         self.ostream.flush()
         self.reactant = reactant
         self.product = product
-        self.constraints = constraints
+        
+        if constraints is not None:
+            self.constraints = constraints
 
         if self.pdb is None:
             system = mm.System()
@@ -1040,7 +1047,8 @@ class EvbSystemBuilder():
             solvent_chain = topology.addChain()
             solvent_ff = MMForceFieldGenerator()
 
-            solvent_ff.create_topology(vlx_solvent_molecule,water_model=self.water_model)
+            solvent_ff.create_topology(vlx_solvent_molecule,
+                                       water_model=self.water_model)
 
             atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
             if 'ow' in atom_types and 'hw' in atom_types and len(
@@ -1275,6 +1283,7 @@ class EvbSystemBuilder():
         improper = self._create_improper_torsion_forces(lam)
 
         if not pes:
+            system.addForce(dynamic_bonded_harmonic)
             syslj, syscoul = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_int,
@@ -1286,6 +1295,7 @@ class EvbSystemBuilder():
             system.addForce(syslj)
             system.addForce(syscoul)
         else:
+            system.addForce(morse)
             syslj_static, syscoul_static = self._create_nonbonded_forces(
                 lam,
                 lj_soft_core=self.soft_core_lj_pes_static,
@@ -1313,10 +1323,7 @@ class EvbSystemBuilder():
 
         bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(
             lam)
-        if not pes:
-            system.addForce(dynamic_bonded_harmonic)
-        else:
-            system.addForce(morse)
+
         system.addForce(static_bonded_harmonic)
         system.addForce(angle)
         system.addForce(torsion)
@@ -1575,8 +1582,21 @@ class EvbSystemBuilder():
                 eqA = 0.5 * (s1 + s2)
 
                 fcA = fcB * self.bonded_integration_bond_fac
+
+            p = self.dynamic_bond_tightening
             eq = eqA * (1 - lam) + eqB * lam
+
+            # Apply bond tightening. This causes breaking and forming bonds to be more tightly bonded for intermediate lambda values
+            min_eq = min(eqA, eqB)
+            dif_eq = abs(eqA - eqB)
+            if dif_eq > 0:
+                eq = (((eq - min_eq) / dif_eq)**p * dif_eq) + min_eq
+
+            gamma = self.dynamic_bond_fc_factor
+            fc_scaling = 4 * (lam - 0.5)**2 * (1 - gamma) + gamma
+
             fc = fcA * (1 - lam) + fcB * lam
+            fc = fc * fc_scaling
             self._add_bond(harmonic_force, atom_ids, eq, fc)
 
         return harmonic_force
@@ -1967,8 +1987,11 @@ class EvbSystemBuilder():
     # This causes all exceptdions to be constant. This will include constant 1-4 interactions between atoms that bonded in either the reactant or the product, but not in the other.
 
     # Broken exceptions will add exceptions for bonds that are changing between the reactant and product.
-    # This is weaker then merge_exceptions, as it will not include 1-4 interactions between atoms that are not bonded, even if they are bonded on the other side of the reaction.
+    # This is weaker then merge_exceptions, as it will not add 1-4 interactions between atoms that are not bonded, even if they are bonded on the other side of the reaction.
     # This is used to remove the nonbonded interactions that are modelled by other forces
+
+    # Only changing bonds will only add nonbonded interactions for atom pairs that are part of changing bonds.
+    # Exclude changing bonds will do the opposite
 
     # Turning both off gives the proper reactant or product for lam=0 or 1
     def _create_nonbonded_forces(
@@ -2299,7 +2322,7 @@ class EvbSystemBuilder():
             return 180.0 * phi_in_radian / math.pi
         else:
             return phi_in_radian
-        
+
     def save_systems_as_xml(self, systems: dict, folder: str):
         """Save the systems as xml files to the given folder.
 

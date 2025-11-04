@@ -1905,6 +1905,7 @@ class OpenMMDynamics:
             return None
         else:
             platform = mm.Platform.getPlatformByName(self.openmm_platform)
+            # Set single thread because for single molecules multithreading doesn't have any benefits
             if self.openmm_platform == "CPU":
                 platform.setPropertyDefaultValue("Threads", "1")
             return platform

@@ -55,6 +55,7 @@ from .outputstream import OutputStream
 from .veloxchemlib import Point
 from .waterparameters import get_water_parameters
 from .errorhandler import assert_msg_critical
+from .openmmdynamics import OpenMMDynamics
 
 try:
     import openmm as mm
@@ -83,14 +84,18 @@ class ReactionForceFieldBuilder():
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-
-        self.reactant: MMForceFieldGenerator = None
-        self.product: MMForceFieldGenerator = None
-
+        
+        
+        self.calculate_resp: bool = True
         self.optimize_mol: bool = False
         self.reparameterize_bonds: bool = False
         self.reparameterize_angles: bool = False
         self.optimize_ff: bool = True
+        self.optimize_steps: int = 1000
+        self.optimize_conformer_snapshots: int = 10
+        self.optimize_temp: int = 600
+        self.optimize_dist_restraint_offset = 0.5  # Angstrom
+        self.optimize_dist_restraint_k = 250000.0  # kJ mol^-1 nm^-2
         self.mm_opt_constrain_bonds: bool = True
         self.water_model: str = 'cspce'
         self.product_mapping: dict[int, int] | None = None  # one-indexed
@@ -101,140 +106,115 @@ class ReactionForceFieldBuilder():
         #Todo get better basis set once we have f-functionals
         # Can (should?) be scaled up to def2-TZVPPD, and if only we had our ECP's by now
         self.hessian_basis = 'def2-SV_P_'
-        
-        # argument inputs
-        self.reactant_partial_charges: list[float] | list[
-            list[float]] | None = None
-        self.product_partial_charges: list[float] | list[
-            list[float]] | None = None
-        self.reactant_hessians: np.ndarray | list[np.ndarray
-                                                  | None] | None = None
-        self.product_hessians: np.ndarray | list[np.ndarray
-                                                 | None] | None = None
-        self.breaking_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
-        self.forming_bonds: set[tuple[int, int]] | tuple = set()  # one-indexed
-        self.reactant_total_multiplicity: int = -1
-        self.product_total_multiplicity: int = -1
-
-        self.keywords = {
-            "reactant_partial_charges": list | None,
-            "product_partial_charges": list | None,
-            "reactant_hessians": np.ndarray | list | None,
-            "product_hessians": np.ndarray | list | None,
-            "reactant_total_multiplicity": int,
-            "product_total_multiplicity": int,
-            "breaking_bonds": set | tuple,
-            "forming_bonds": set | tuple,
-        }
-
-    def read_keywords(self, **kwargs):
-        for key, value in kwargs.items():
-            if key in self.keywords.keys():
-                if isinstance(value, self.keywords[key]):
-                    setattr(self, key, value)
-                else:
-                    raise ValueError(
-                        f"Type for given keyword {key} is {type(value)} but should be {self.keywords[key]}"
-                    )
-            else:
-                raise ValueError(
-                    f"Unknown keyword {key} in EvbForceFieldBuilder")
 
     def build_forcefields(
         self,
         reactant: Molecule | list[Molecule],
         product: Molecule | list[Molecule],
+        reactant_partial_charges: list[float] | list[list[float]] | None = None,
+        product_partial_charges: list[float] | list[list[float]] | None = None,
+        reactant_hessians: np.ndarray | list[np.ndarray | None] | None = None,
+        product_hessians: np.ndarray | list[np.ndarray | None] | None = None,
+        reactant_total_multiplicity: int = -1,
+        product_total_multiplicity: int = -1,
+        forced_breaking_bonds: set[tuple[int, int]] | tuple = (),
+        forced_forming_bonds: set[tuple[int, int]] | tuple = (),
+        product_mapping: dict[int, int] | None = None,
     ):
 
-        self.reactant, reactants, reactant_total_charge = self._create_combined_forcefield(
+        reactant_ff, reactant_ffs, reactant_total_charge = self._create_combined_forcefield(
             reactant,
-            self.reactant_partial_charges,
-            self.reactant_hessians,
+            reactant_partial_charges,
+            reactant_hessians,
             "REA",
+            reactant_total_multiplicity,
         )
 
-        self.product, products, product_total_charge = self._create_combined_forcefield(
+        product_ff, product_ffs, product_total_charge = self._create_combined_forcefield(
             product,
-            self.product_partial_charges,
-            self.product_hessians,
+            product_partial_charges,
+            product_hessians,
             "PRO",
+            product_total_multiplicity,
         )
 
         assert reactant_total_charge == product_total_charge, f"Total charge of reactants {reactant_total_charge} and products {product_total_charge} must match"
 
-        if not self.skip_reaction_matching and self.product_mapping is None:
+        if not self.skip_reaction_matching and product_mapping is None:
             breaking_bonds_insert = "no forced breaking bonds"
-            if len(self.breaking_bonds) > 0:
-                breaking_bonds_insert = f"forced breaking bonds: {self.breaking_bonds}"
-                
+            if len(forced_breaking_bonds) > 0:
+                breaking_bonds_insert = f"forced breaking bonds: {forced_breaking_bonds}"
+
             forming_bonds_insert = "no forced forming bonds"
-            if len(self.forming_bonds) > 0:
-                forming_bonds_insert = f"forced forming bonds: {self.forming_bonds}"
-            self.ostream.print_info(
-                "Matching reactant and product force fields with " +
-                breaking_bonds_insert + " and " + forming_bonds_insert + ".")
+            if len(forced_forming_bonds) > 0:
+                forming_bonds_insert = f"forced forming bonds: {forced_forming_bonds}"
+
+            msg = "Matching reactant and product force fields with "
+            msg += breaking_bonds_insert + " and " + forming_bonds_insert + "."
+            self.ostream.print_info(msg)
             self.ostream.flush()
+
             # adjust for 1-indexed input of breaking bonds
-            self.breaking_bonds = {(bond[0] - 1, bond[1] - 1)
-                                   for bond in self.breaking_bonds}
-            self.forming_bonds = {(bond[0] - 1, bond[1] - 1) for bond in self.forming_bonds}
-            self.product, self.product_mapping = self._match_reactant_and_product(
-                self.reactant,
-                self.reactant.molecule.get_element_ids(),
-                self.product,
-                self.product.molecule.get_element_ids(),
-                self.breaking_bonds,
-                self.forming_bonds,
+            forced_breaking_bonds = {(bond[0] - 1, bond[1] - 1)
+                                     for bond in forced_breaking_bonds}
+            forced_forming_bonds = {(bond[0] - 1, bond[1] - 1)
+                                    for bond in forced_forming_bonds}
+
+            product_ff, product_mapping = self._match_reactant_and_product(
+                reactant_ff,
+                reactant_ff.molecule.get_element_ids(),
+                product_ff,
+                product_ff.molecule.get_element_ids(),
+                forced_breaking_bonds,
+                forced_forming_bonds,
             )
-        elif self.product_mapping is not None:
+        elif product_mapping is not None:
             self.ostream.print_info(
-                f"Skipping reaction matching because the mapping {self.product_mapping} is already provided"
+                f"Skipping reaction matching because the mapping {product_mapping} is already provided"
             )
-            self.product_mapping = {
-                k - 1: v - 1
-                for k, v in self.product_mapping.items()
-            }
+            product_mapping = {k - 1: v - 1 for k, v in product_mapping.items()}
         else:
             self.ostream.print_info("Skipping reaction matching")
         self.ostream.flush()
 
-        if self.product_mapping is not None:
-            self.product = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
-                self.product,
-                self.product_mapping,
+        if product_mapping is not None:
+            product_ff = ReactionForceFieldBuilder._apply_mapping_to_forcefield(
+                product_ff,
+                product_mapping,
             )
 
-            self.product.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
-                self.product.molecule,
-                self.product_mapping,
+            product_ff.molecule = ReactionForceFieldBuilder._apply_mapping_to_molecule(
+                product_ff.molecule,
+                product_mapping,
             )
 
-        self.forming_bonds, self.breaking_bonds = self._summarise_reaction(
-            self.reactant, self.product)
+        forming_bonds, breaking_bonds = self._summarise_reaction(
+            reactant_ff, product_ff, self.ostream)
 
-        for bond in self.breaking_bonds:
-            self.reactant.bonds[bond]['comment'] += ', broken in reaction'
-        for bond in self.forming_bonds:
-            self.product.bonds[bond]['comment'] += ', formed in reaction'
+        for bond in breaking_bonds:
+            reactant_ff.bonds[bond]['comment'] += ', broken in reaction'
+        for bond in forming_bonds:
+            product_ff.bonds[bond]['comment'] += ', formed in reaction'
 
         self.ostream.flush()
         if self.optimize_ff:
-            if len(reactants) > 1:
-                self.reactant.molecule = self._optimize_molecule(
-                    self.reactant.molecule.get_element_ids(),
-                    self.reactant,
-                    self.forming_bonds,
-                    note='reactant',
-                )
-            if len(products) > 1:
-                self.product.molecule = self._optimize_molecule(
-                    self.product.molecule.get_element_ids(),
-                    self.product,
-                    self.breaking_bonds,
-                    note='product',
-                )
+            # TODO this optimisation can likely be taken care of by the openmmdynamics class
+            reactant_ff.molecule = self._optimize_molecule(
+                reactant_ff.molecule.get_element_ids(),
+                reactant_ff,
+                forming_bonds,
+                note='reactant',
+            )
+            product_ff.molecule = self._optimize_molecule(
+                product_ff.molecule.get_element_ids(),
+                product_ff,
+                breaking_bonds,
+                note='product',
+            )
+            # if len(reactant_ffs) > 1:
+            # if len(product_ffs) > 1:
 
-        return self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, self.product_mapping
+        return reactant_ff, product_ff, forming_bonds, breaking_bonds, reactant_ffs, product_ffs, product_mapping
 
     def _create_combined_forcefield(
         self,
@@ -243,6 +223,7 @@ class ReactionForceFieldBuilder():
         | list[float] | None,
         hessians: np.ndarray | list[np.ndarray | None] | None,
         name: str,
+        total_multiplicity: int,
     ):
         if isinstance(molecules, Molecule):
             molecules = [molecules]
@@ -294,8 +275,8 @@ class ReactionForceFieldBuilder():
         self.ostream.flush()
         combined_mol = self._combine_molecule(
             molecules,
-            self.reactant_total_multiplicity,
-            name=name,
+            total_multiplicity,
+            name,
         )
         self.ostream.print_info(
             f"Combined reactant with total charge {combined_mol.get_charge()} and multiplicity {combined_mol.get_multiplicity()}"
@@ -328,9 +309,11 @@ class ReactionForceFieldBuilder():
                 scf_drv.ostream.mute()
             opt_results = opt_drv.compute(molecule)
 
+            charge = molecule.get_charge()
+            multiplicity = molecule.get_multiplicity()
             molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
-            molecule.set_charge(molecule.get_charge())
-            molecule.set_multiplicity(molecule.get_multiplicity())
+            molecule.set_charge(charge)
+            molecule.set_multiplicity(multiplicity)
 
         forcefield = MMForceFieldGenerator(ostream=self.ostream)
 
@@ -350,66 +333,61 @@ class ReactionForceFieldBuilder():
             self.ostream.flush()
             forcefield.create_topology(molecule, water_model=self.water_model)
         else:
-            if max(molecule.get_masses()) > 84:
-                basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
-                self.ostream.print_info(
-                    f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
-                )
-            else:
-                basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
-            if molecule.get_multiplicity() == 1:
-                scf_drv = ScfRestrictedDriver()
-            else:
-                scf_drv = ScfUnrestrictedDriver()
+            if self.calculate_resp:
+                if max(molecule.get_masses()) > 84:
+                    basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
+                    self.ostream.print_info(
+                        f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
+                    )
+                else:
+                    basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
+                if molecule.get_multiplicity() == 1:
+                    scf_drv = ScfRestrictedDriver()
+                else:
+                    scf_drv = ScfUnrestrictedDriver()
 
-            self.ostream.print_info("Calculating SCF for RESP charges")
-            self.ostream.flush()
-            if self.mute_scf:
-                scf_drv.ostream.mute()
-            scf_results = scf_drv.compute(molecule, basis)
-            if not scf_drv.is_converged:
-                self.ostream.print_warning(
-                    "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
-                )
+                self.ostream.print_info("Calculating SCF for RESP charges")
                 self.ostream.flush()
-                scf_drv.conv_thresh = 1.0e-4
-                scf_drv.max_iter = 200
+                if self.mute_scf:
+                    scf_drv.ostream.mute()
                 scf_results = scf_drv.compute(molecule, basis)
-            # self.ostream.unmute()
-            assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
-            resp_drv = RespChargesDriver()
-            self.ostream.flush()
-            if self.mute_scf:
-                resp_drv.ostream.mute()
-                self.ostream.print_info("Calculating RESP charges")
+                if not scf_drv.is_converged:
+                    self.ostream.print_warning(
+                        "SCF did not converge, increasing convergence threshold to 1.0e-4 and maximum itterations to 200."
+                    )
+                    self.ostream.flush()
+                    scf_drv.conv_thresh = 1.0e-4
+                    scf_drv.max_iter = 200
+                    scf_results = scf_drv.compute(molecule, basis)
+                # self.ostream.unmute()
+                assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
+                resp_drv = RespChargesDriver()
                 self.ostream.flush()
-            forcefield.partial_charges = resp_drv.compute(
-                molecule, basis, scf_results, 'resp')
-            self.ostream.print_info(
-                f"RESP charges: {forcefield.partial_charges}")
-            self.ostream.flush()
-            self.ostream.print_info("Creating topology")
-            forcefield.create_topology(
-                molecule,
-                basis,
-                scf_results=scf_results,
-                water_model=self.water_model,
-            )
+                if self.mute_scf:
+                    resp_drv.ostream.mute()
+                    self.ostream.print_info("Calculating RESP charges")
+                    self.ostream.flush()
+                forcefield.partial_charges = resp_drv.compute(
+                    molecule, basis, scf_results, 'resp')
+                self.ostream.print_info(
+                    f"RESP charges: {forcefield.partial_charges}")
+                self.ostream.flush()
+                self.ostream.print_info("Creating topology")
+                forcefield.create_topology(
+                    molecule,
+                    basis,
+                    scf_results=scf_results,
+                    water_model=self.water_model,
+                )
+            else:
+                self.ostream.print_info("Assigning partial charges based on electronegativity")
+                partial_charges = molecule.get_partial_charges(molecule.get_charge())
+                forcefield.partial_charges = partial_charges
+                self.ostream.print_info("Creating topology")
+                self.ostream.flush()
+                forcefield.create_topology(molecule, water_model=self.water_model)
 
-        # The atomtypeidentifier returns water with no Lennard-Jones on the hydrogens, which leads to unstable simulations
-        atom_types = [atom['type'] for atom in forcefield.atoms.values()]
-        if 'ow' in atom_types and 'hw' in atom_types and len(atom_types) == 3:
-            water_model = get_water_parameters()[self.water_model]
-            for atom_id, atom in forcefield.atoms.items():
-                forcefield.atoms[atom_id] = copy.copy(water_model[atom['type']])
-                forcefield.atoms[atom_id]['name'] = forcefield.atoms[atom_id][
-                    'name'][0] + str(atom_id)
-            for bond_id in forcefield.bonds.keys():
-                forcefield.bonds[bond_id] = copy.copy(water_model['bonds'])
-            for ang_id in forcefield.angles.keys():
-                forcefield.angles[ang_id] = copy.copy(water_model['angles'])
-
-        #Reparameterize the forcefield if necessary and requested
+        # Reparameterize the forcefield if necessary and requested
         unknown_pairs = set()
         unknown_params = set()
         if self.reparameterize_bonds:
@@ -513,72 +491,6 @@ class ReactionForceFieldBuilder():
         molecule_sanity_check(combined_molecule)
         return combined_molecule
 
-    def _add_reaction_bonds(self, forcefield, mmsys, changing_bonds, note):
-        self.ostream.print_info(
-            "Guessing intra-molecular constraints based on breaking bonds. This option can be turned off with mm_opt_constrain_bonds."
-        )
-        morse_expr = "D*(1-exp(-a*(r-re)))^2 + b*(r-re);"
-        morse_force = mm.CustomBondForce(morse_expr)
-        morse_force.setName("Reaction morse bond")
-        morse_force.addPerBondParameter("re")
-        D = 500
-        morse_force.addPerBondParameter("a")
-        morse_force.addGlobalParameter("D", D)
-        morse_force.addGlobalParameter("b", 50000)
-
-        harm_force = mm.HarmonicBondForce()
-
-        changing_atoms = []
-        for bond in changing_bonds:
-            s1 = forcefield.atoms[bond[0]]['sigma']
-            s2 = forcefield.atoms[bond[1]]['sigma']
-            e1 = forcefield.atoms[bond[0]]['epsilon']
-            e2 = forcefield.atoms[bond[1]]['epsilon']
-            if bond[0] not in changing_atoms:
-                changing_atoms.append(bond[0])
-            if bond[1] not in changing_atoms:
-                changing_atoms.append(bond[1])
-            s = (s1 + s2) / 2
-            e = math.sqrt(e1 * e2)
-
-            rmin = s * (2**(1 / 6))  # rmin = sigma * 2^(1/6)
-            fc = 250000 * e  # force constant in kJ/mol/angstrom^2
-            a = math.sqrt(fc / (2 * D))
-            # morse_force.addBond(bond[0], bond[1], [a, rmin])
-
-            harm_force.addBond(bond[0], bond[1], rmin, fc)
-            self.ostream.print_info(
-                f"Replacing nonbonded interaction for atoms {tuple(b+1 for b in bond)} with Harmonic bond  with r {rmin:.3f} and fc {fc:.3f} for MM equilibration of the {note}"
-            )
-            self.ostream.flush()
-        # mmsys.addForce(morse_force)
-        mmsys.addForce(harm_force)
-
-        nbforce = [
-            force for force in mmsys.getForces()
-            if isinstance(force, mm.NonbondedForce)
-        ][0]
-        existing_exceptions = {}
-        for i in range(nbforce.getNumExceptions()):
-            params = nbforce.getExceptionParameters(i)
-            if params[0] in changing_atoms or params[1] in changing_atoms:
-                sorted_tuple = (params[0], params[1])
-                existing_exceptions.update({sorted_tuple: i})
-        added_exceptions = {}
-        for bond in changing_bonds:
-            self.ostream.flush()
-            if bond in existing_exceptions.keys():
-                nbforce.setExceptionParameters(existing_exceptions[bond],
-                                               bond[0], bond[1], 0, 1, 0)
-            elif (bond[1], bond[0]) in existing_exceptions.keys():
-                nbforce.setExceptionParameters(
-                    existing_exceptions[(bond[1], bond[0])], bond[0], bond[1],
-                    0, 1, 0)
-            else:
-                index = nbforce.addException(bond[0], bond[1], 0, 1, 0)
-                added_exceptions.update({bond: index})
-        return mmsys
-
     #Match the indices of the reactant and product forcefield generators
     def _match_reactant_and_product(
         self,
@@ -662,14 +574,14 @@ class ReactionForceFieldBuilder():
 
         new_atom_info = {}
         for atom_info_key in forcefield.atom_info_dict.keys():
-            key = mapping[atom_info_key-1]+1
+            key = mapping[atom_info_key - 1] + 1
             val = forcefield.atom_info_dict[atom_info_key]
             val['ConnectedAtomsNumbers'] = [
-                mapping[key-1]+1 for key in val['ConnectedAtomsNumbers']
+                mapping[key - 1] + 1 for key in val['ConnectedAtomsNumbers']
             ]
-            val['AtomNumber'] = mapping[val['AtomNumber']-1]+1
+            val['AtomNumber'] = mapping[val['AtomNumber'] - 1] + 1
             new_atom_info.update({key: val})
-        
+
         # Sort the atoms by index
         forcefield.atoms = dict(sorted(new_ff_atoms.items()))
         forcefield.atom_info_dict = dict(sorted(new_atom_info.items()))
@@ -713,7 +625,7 @@ class ReactionForceFieldBuilder():
             new_parameters.update({new_key: val})
         return new_parameters
 
-    def _summarise_reaction(self, reactant, product):
+    def _summarise_reaction(self, reactant, product, ostream):
         """
         Summarises the reaction by printing the bonds that are being broken and formed.
 
@@ -724,12 +636,11 @@ class ReactionForceFieldBuilder():
         product_bonds = set(product.bonds)
         formed_bonds = product_bonds - reactant_bonds
         broken_bonds = reactant_bonds - product_bonds
-        self.ostream.print_header("Reaction summary")
-        self.ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
-        
+        ostream.print_header("Reaction summary")
+        ostream.print_header(f"{len(broken_bonds)} breaking bonds:")
+
         if len(broken_bonds) > 0:
-            self.ostream.print_header(
-                f"ReaType  ProType  ID - ReaType  ProType  ID")
+            ostream.print_header(f"ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -737,14 +648,13 @@ class ReactionForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1] + 1
-            self.ostream.print_header(
+            ostream.print_header(
                 f"{reactant_type0:^9}{product_type0:^9}{id0:^2} - {reactant_type1:^9}{product_type1:^9}{id1:^2}"
             )
-        self.ostream.print_blank()
-        self.ostream.print_header(f"{len(formed_bonds)} forming bonds:")
+        ostream.print_blank()
+        ostream.print_header(f"{len(formed_bonds)} forming bonds:")
         if len(formed_bonds) > 0:
-            self.ostream.print_header(
-                "ReaType  ProType  ID - ReaType  ProType  ID")
+            ostream.print_header("ReaType  ProType  ID - ReaType  ProType  ID")
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -752,26 +662,12 @@ class ReactionForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1] + 1
-            self.ostream.print_header(
+            ostream.print_header(
                 f"{reactant_type0:^9}{product_type0:^9}{id0:^2} - {reactant_type1:^9}{product_type1:^9}{id1:^2}"
             )
-        self.ostream.print_blank()
-        self.ostream.flush()
+        ostream.print_blank()
+        ostream.flush()
         return formed_bonds, broken_bonds
-
-    def show_molecule(self, reactant=False, product=False, **kwargs):
-        if reactant:
-            bonds = self.reactant.bonds
-            dashed_bonds = self.forming_bonds
-            self.reactant.molecule.show(bonds=bonds,
-                                        dashed_bonds=dashed_bonds,
-                                        **kwargs)
-        if product:
-            bonds = self.product.bonds
-            dashed_bonds = self.breaking_bonds
-            self.product.molecule.show(bonds=bonds,
-                                       dashed_bonds=dashed_bonds,
-                                       **kwargs)
 
     # Does an FF optimization of the molecule.
     def _optimize_molecule(
@@ -810,32 +706,70 @@ class ReactionForceFieldBuilder():
 
         with open(f'{name}_sys.xml', 'w') as f:
             f.write(mm.XmlSerializer.serialize(mmsys))
+
+        opm_dyn = OpenMMDynamics()
+        opm_dyn.ostream.mute()
+        opm_dyn.openmm_platform = "CPU"
+
+        opm_dyn.pdb = pdb
+        opm_dyn.system = mmsys
+
+        self.ostream.print_info(
+            f"Running conformational sampling with {self.optimize_steps*self.optimize_conformer_snapshots} steps and {self.optimize_conformer_snapshots} snapshots at {self.optimize_temp} K for {note} molecule."
+        )
+        self.ostream.flush()
+        try:
+            conformers_dict = opm_dyn.conformational_sampling(
+                ensemble='NVT',
+                nsteps=self.optimize_steps * self.optimize_conformer_snapshots,
+                snapshots=self.optimize_conformer_snapshots,
+                temperature=self.optimize_temp,
+            )
+
+            min_arg = np.argmin(conformers_dict['energies'])
+            new_molecule = conformers_dict['molecules'][min_arg]
+            self.ostream.print_info(
+                f"Found {len(conformers_dict['molecules'])} conformers with energies {conformers_dict['energies']} during optimization of the {note} molecule."
+            )
+            self.ostream.flush()
+        except Exception as e:
+            self.ostream.print_warning(
+                f"OpenMM optimization of the {note} molecule failed with error: {e}. Reverting to original geometry."
+            )
+            self.ostream.flush()
+            new_molecule = forcefield.molecule
+            
+        new_molecule.set_charge(forcefield.molecule.get_charge())
+        new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         os.unlink(f'{name}.xml')
         os.unlink(f'{name}.pdb')
         os.unlink(f'{name}_sys.xml')
-        integrator = mm.VerletIntegrator(0.001)
-        sim = mmapp.Simulation(top, mmsys, integrator)
-        sim.context.setPositions(pos)
-        self.ostream.print_info(f"Minimizing {note} molecule.")
-        sim.minimizeEnergy()
-        # with open(f'{name}_optimized.pdb', 'w') as pdbfile:
-        sim.context.setVelocitiesToTemperature(600 * mmunit.kelvin)
-        self.ostream.print_info(
-            f"Running 1000 NVE steps with initial T at 600 K for {note} molecule."
-        )
-        self.ostream.flush()
-        sim.step(1000)
-        self.ostream.print_info(f"Minimizing {note} molecule again.")
-        self.ostream.flush()
-        sim.minimizeEnergy()
-        state = sim.context.getState(getPositions=True)
-
-        pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
-
-        new_molecule = Molecule()
-        for i, elem in enumerate(elemental_ids):
-            point = Point(pos[i])
-            new_molecule.add_atom(int(elem), point, 'angstrom')
-        new_molecule.set_charge(forcefield.molecule.get_charge())
-        new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         return new_molecule
+
+    def _add_reaction_bonds(self, forcefield, mmsys, changing_bonds, note):
+        self.ostream.print_info(
+            "Guessing intra-molecular constraints based on breaking bonds. This option can be turned off with mm_opt_constrain_bonds."
+        )
+
+        dist_restraint_expr = "0.5 * k * (r - r0)^2*step(r-r0)"
+        dist_restraint_force = mm.CustomBondForce(dist_restraint_expr)
+        dist_restraint_force.addPerBondParameter("r0")
+        dist_restraint_force.addGlobalParameter("k",
+                                                self.optimize_dist_restraint_k)
+
+        for bond in changing_bonds:
+            s1 = forcefield.atoms[bond[0]]['sigma']
+            s2 = forcefield.atoms[bond[1]]['sigma']
+            s = (s1 + s2) / 2
+
+            r0 = s * (
+                2**(1 / 6)
+            ) + self.optimize_dist_restraint_offset * 0.1  # rmin = sigma * 2^(1/6)
+            dist_restraint_force.addBond(bond[0], bond[1], [r0])
+            self.ostream.print_info(
+                f"Adding distance restraint for atoms {tuple(b+1 for b in bond)} with r0 {r0:.3f} and k {self.optimize_dist_restraint_k} for MM equilibration of the {note}"
+            )
+            self.ostream.flush()
+
+        mmsys.addForce(dist_restraint_force)
+        return mmsys
