@@ -568,6 +568,160 @@ def _Molecule_rotate_around_vector(self, coords, origin, vector, rotation_angle,
     return np.matmul(coords - origin, rotation_mat.T) + origin
 
 
+def _Molecule_get_distance_in_angstroms(self, distance_indices_one_based):
+    """
+    Gets distance.
+
+    :param distance_indices_one_based:
+        The indices (1-based).
+
+    :return:
+        The distance.
+    """
+
+    return self.get_distance(distance_indices_one_based, 'angstrom')
+
+
+def _Molecule_get_distance(self, distance_indices_one_based, distance_unit):
+    """
+    Gets distance.
+
+    :param distance_indices_one_based:
+        The distance indices (1-based).
+    :param distance_unit:
+        The unit of distance (angstrom or bohr).
+
+    :return:
+        The distance.
+    """
+
+    assert_msg_critical(
+        len(distance_indices_one_based) == 2,
+        'Molecule.get_distance: Expecting two atom indices (1-based)')
+
+    assert_msg_critical(distance_unit.lower() in ['angstrom', 'bohr'],
+                        'Molecule.get_distance: Invalid distance unit')
+
+    a = distance_indices_one_based[0] - 1
+    b = distance_indices_one_based[1] - 1
+
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[a] - coords_in_au[b]
+
+    r21 = float(np.linalg.norm(v21))
+
+    if distance_unit.lower() == 'angstrom':
+        return r21 * bohr_in_angstrom()
+    else:
+        return r21
+
+
+def _Molecule_set_distance_in_angstroms(self, distance_indices_one_based,
+                                        target_distance):
+    """
+    Sets distance.
+
+    :param distance_indices_one_based:
+        The distance indices (1-based).
+    :param target_distance:
+        The target value of distance.
+    """
+
+    self.set_distance(distance_indices_one_based, target_distance, 'angstrom')
+
+
+def _Molecule_set_distance(self, distance_indices_one_based, target_distance,
+                           distance_unit):
+    """
+    Sets distance.
+
+    :param distance_indices_one_based:
+        The distance indices (1-based).
+    :param target_distance:
+        The target value of distance.
+    :param distance_unit:
+        The unit of distance (angstrom or bohr).
+    """
+
+    assert_msg_critical(
+        len(distance_indices_one_based) == 2,
+        'Molecule.set_distance: Expecting two atom indices (1-based)')
+
+    assert_msg_critical(distance_unit.lower() in ['angstrom', 'bohr'],
+                        'Molecule.set_distance: Invalid distance unit')
+
+    # get the 0-based atom indices for the i-j pair
+    i = distance_indices_one_based[0] - 1
+    j = distance_indices_one_based[1] - 1
+
+    # disconnect i-j and find all atoms that at connected to j
+    connectivity_matrix = self.get_connectivity_matrix()
+    connectivity_matrix[i, j] = 0
+    connectivity_matrix[j, i] = 0
+
+    atoms_connected_to_j = self._find_connected_atoms(j, connectivity_matrix)
+
+    assert_msg_critical(
+        i not in atoms_connected_to_j,
+        'Molecule.set_distance: Cannot rotate distance ' +
+        '(Maybe it is part of a ring?)')
+
+    # rotate whole molecule around normal vector of i-j-k
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[i] - coords_in_au[j]
+
+    u21 = v21 / np.linalg.norm(v21)
+
+    current_distance = self.get_distance(distance_indices_one_based,
+                                         distance_unit)
+
+    # make several attempts to rotate the distance, with the constraint
+    # that the connectivity matrix should not change
+    for attempt in range(10, -1, -1):
+
+        shift_distance = (target_distance - current_distance) * (0.1 * attempt)
+
+        if distance_unit.lower() == 'angstrom':
+            shift_distance_in_bohr = shift_distance / bohr_in_angstrom()
+        else:
+            shift_distance_in_bohr = shift_distance
+
+        new_mol = Molecule(self)
+        for idx in atoms_connected_to_j:
+            new_mol.set_atom_coordinates(
+                idx, coords_in_au[idx] - u21 * shift_distance_in_bohr)
+
+        new_conn_mat = new_mol.get_connectivity_matrix()
+        conn_mat = self.get_connectivity_matrix()
+
+        # allowing i-j bond to be broken by set_distance
+        new_conn_mat[i, j] = 0
+        new_conn_mat[j, i] = 0
+        conn_mat[i, j] = 0
+        conn_mat[j, i] = 0
+
+        if np.max(np.abs(new_conn_mat - conn_mat)) < 1.0e-10:
+            new_coords_in_au = new_mol.get_coordinates_in_bohr()
+
+            for idx in atoms_connected_to_j:
+                self.set_atom_coordinates(idx, new_coords_in_au[idx])
+
+            current_distance = self.get_distance(distance_indices_one_based,
+                                                 distance_unit)
+            if abs(target_distance - current_distance) > 1.0e-6:
+                warn_msg = "* Warning * New distance is "
+                warn_msg += f"{current_distance:.3f} {distance_unit.lower()}\n"
+                print(warn_msg)
+
+            return
+
+    assert_msg_critical(
+        False, 'Molecule.set_distance: Cannot set distance due to ' +
+        'overlapping atoms')
+
+
 def _Molecule_get_angle_in_degrees(self, angle_indices_one_based):
     """
     Gets angle.
@@ -882,6 +1036,10 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
 
             current_angle = self.get_dihedral(dihedral_indices_one_based,
                                               angle_unit)
+            while updated_target_angle - current_angle > half_period:
+                updated_target_angle -= 2.0 * half_period
+            while updated_target_angle - current_angle < -half_period:
+                updated_target_angle += 2.0 * half_period
             if abs(updated_target_angle - current_angle) > 1.0e-6:
                 warn_msg = "* Warning * After rotation, the dihedral angle is "
                 warn_msg += f"{current_angle:.3f} {angle_unit.lower()}\n"
@@ -1607,6 +1765,10 @@ Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
+Molecule.get_distance = _Molecule_get_distance
+Molecule.set_distance = _Molecule_set_distance
+Molecule.get_distance_in_angstroms = _Molecule_get_distance_in_angstroms
+Molecule.set_distance_in_angstroms = _Molecule_set_distance_in_angstroms
 Molecule.get_angle = _Molecule_get_angle
 Molecule.set_angle = _Molecule_set_angle
 Molecule.get_angle_in_degrees = _Molecule_get_angle_in_degrees
