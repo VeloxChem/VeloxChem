@@ -617,8 +617,10 @@ def _Molecule_get_distance(self, distance_indices_one_based, distance_unit):
         return r21
 
 
-def _Molecule_set_distance_in_angstroms(self, distance_indices_one_based,
-                                        target_distance):
+def _Molecule_set_distance_in_angstroms(self,
+                                        distance_indices_one_based,
+                                        target_distance,
+                                        verbose=True):
     """
     Sets distance.
 
@@ -628,11 +630,15 @@ def _Molecule_set_distance_in_angstroms(self, distance_indices_one_based,
         The target value of distance.
     """
 
-    self.set_distance(distance_indices_one_based, target_distance, 'angstrom')
+    self.set_distance(distance_indices_one_based, target_distance, 'angstrom',
+                      verbose)
 
 
-def _Molecule_set_distance(self, distance_indices_one_based, target_distance,
-                           distance_unit):
+def _Molecule_set_distance(self,
+                           distance_indices_one_based,
+                           target_distance,
+                           distance_unit,
+                           verbose=True):
     """
     Sets distance.
 
@@ -710,7 +716,7 @@ def _Molecule_set_distance(self, distance_indices_one_based, target_distance,
 
             current_distance = self.get_distance(distance_indices_one_based,
                                                  distance_unit)
-            if abs(target_distance - current_distance) > 1.0e-6:
+            if abs(target_distance - current_distance) > 1.0e-6 and verbose:
                 warn_msg = "* Warning * New distance is "
                 warn_msg += f"{current_distance:.3f} {distance_unit.lower()}\n"
                 print(warn_msg)
@@ -778,7 +784,10 @@ def _Molecule_get_angle(self, angle_indices_one_based, angle_unit):
         return theta_in_radian
 
 
-def _Molecule_set_angle_in_degrees(self, angle_indices_one_based, target_angle):
+def _Molecule_set_angle_in_degrees(self,
+                                   angle_indices_one_based,
+                                   target_angle,
+                                   verbose=True):
     """
     Sets angle.
 
@@ -788,11 +797,14 @@ def _Molecule_set_angle_in_degrees(self, angle_indices_one_based, target_angle):
         The target value of angle.
     """
 
-    self.set_angle(angle_indices_one_based, target_angle, 'degree')
+    self.set_angle(angle_indices_one_based, target_angle, 'degree', verbose)
 
 
-def _Molecule_set_angle(self, angle_indices_one_based, target_angle,
-                        angle_unit):
+def _Molecule_set_angle(self,
+                        angle_indices_one_based,
+                        target_angle,
+                        angle_unit,
+                        verbose=True):
     """
     Sets angle.
 
@@ -864,7 +876,7 @@ def _Molecule_set_angle(self, angle_indices_one_based, target_angle,
                 self.set_atom_coordinates(idx, new_coords_in_au[idx])
 
             current_angle = self.get_angle(angle_indices_one_based, angle_unit)
-            if abs(target_angle - current_angle) > 1.0e-6:
+            if abs(target_angle - current_angle) > 1.0e-6 and verbose:
                 warn_msg = "* Warning * After rotation, the angle is "
                 warn_msg += f"{current_angle:.3f} {angle_unit.lower()}\n"
                 print(warn_msg)
@@ -948,8 +960,10 @@ def _Molecule_get_dihedral(self, dihedral_indices_one_based, angle_unit):
         return phi_in_radian
 
 
-def _Molecule_set_dihedral_in_degrees(self, dihedral_indices_one_based,
-                                      target_angle):
+def _Molecule_set_dihedral_in_degrees(self,
+                                      dihedral_indices_one_based,
+                                      target_angle,
+                                      verbose=True):
     """
     Sets dihedral angle.
 
@@ -959,11 +973,15 @@ def _Molecule_set_dihedral_in_degrees(self, dihedral_indices_one_based,
         The target value of dihedral angle.
     """
 
-    self.set_dihedral(dihedral_indices_one_based, target_angle, 'degree')
+    self.set_dihedral(dihedral_indices_one_based, target_angle, 'degree',
+                      verbose)
 
 
-def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
-                           angle_unit):
+def _Molecule_set_dihedral(self,
+                           dihedral_indices_one_based,
+                           target_angle,
+                           angle_unit,
+                           verbose=True):
     """
     Sets dihedral angle.
 
@@ -1040,7 +1058,7 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
                 updated_target_angle -= 2.0 * half_period
             while updated_target_angle - current_angle < -half_period:
                 updated_target_angle += 2.0 * half_period
-            if abs(updated_target_angle - current_angle) > 1.0e-6:
+            if abs(updated_target_angle - current_angle) > 1.0e-6 and verbose:
                 warn_msg = "* Warning * After rotation, the dihedral angle is "
                 warn_msg += f"{current_angle:.3f} {angle_unit.lower()}\n"
                 print(warn_msg)
