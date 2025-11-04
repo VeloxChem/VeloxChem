@@ -568,6 +568,62 @@ def _Molecule_rotate_around_vector(self, coords, origin, vector, rotation_angle,
     return np.matmul(coords - origin, rotation_mat.T) + origin
 
 
+def _Molecule_get_angle_in_degrees(self, angle_indices_one_based):
+    """
+    Gets angle.
+
+    :param angle_indices_one_based:
+        The indices (1-based).
+
+    :return:
+        The angle.
+    """
+
+    return self.get_angle(angle_indices_one_based, 'degree')
+
+
+def _Molecule_get_angle(self, angle_indices_one_based, angle_unit):
+    """
+    Gets angle.
+
+    :param angle_indices_one_based:
+        The angle indices (1-based).
+    :param angle_unit:
+        The unit of angle (degree or radian).
+
+    :return:
+        The angle.
+    """
+
+    assert_msg_critical(
+        len(angle_indices_one_based) == 3,
+        'Molecule.get_angle: Expecting three atom indices (1-based)')
+
+    a = angle_indices_one_based[0] - 1
+    b = angle_indices_one_based[1] - 1
+    c = angle_indices_one_based[2] - 1
+
+    coords_in_au = self.get_coordinates_in_bohr()
+
+    v21 = coords_in_au[a] - coords_in_au[b]
+    v32 = coords_in_au[b] - coords_in_au[c]
+
+    u21 = v21 / np.linalg.norm(v21)
+    u32 = v32 / np.linalg.norm(v32)
+
+    cos_theta = -np.vdot(u21, u32)
+
+    theta_in_radian = safe_arccos(cos_theta)
+
+    assert_msg_critical(angle_unit.lower() in ['degree', 'radian'],
+                        'Molecule.get_dihedral: Invalid angle unit')
+
+    if angle_unit.lower() == 'degree':
+        return 180.0 * theta_in_radian / math.pi
+    else:
+        return theta_in_radian
+
+
 def _Molecule_get_dihedral_in_degrees(self, dihedral_indices_one_based):
     """
     Gets dihedral angle.
@@ -1442,6 +1498,8 @@ Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
+Molecule.get_angle = _Molecule_get_angle
+Molecule.get_angle_in_degrees = _Molecule_get_angle_in_degrees
 Molecule.get_dihedral = _Molecule_get_dihedral
 Molecule.set_dihedral = _Molecule_set_dihedral
 Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
