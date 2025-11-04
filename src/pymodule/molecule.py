@@ -1263,6 +1263,7 @@ def _Molecule_show(self,
                    height=300,
                    atom_indices=False,
                    atom_labels=False,
+                   gradient=None,
                    starting_index=1,
                    bonds=None,
                    dashed_bonds=None):
@@ -1278,6 +1279,8 @@ def _Molecule_show(self,
     :param atom_labels:
         The flag for showing atom labels. If provided with a list, will use
         that list as labels.
+    :param gradient:
+        The molecular gradient.
     :starting_index:
         The starting index for atom indices.
     :bonds:
@@ -1293,6 +1296,44 @@ def _Molecule_show(self,
 
         if bonds is None:
             viewer.addModel(self.get_xyz_string())
+
+            if gradient is not None:
+                coords = self.get_coordinates_in_bohr()
+                assert_msg_critical(coords.shape == gradient.shape,
+                                    'Molecule.show: Invalid shape of gradient')
+
+                # use some scaling factor so that the length of gradient arrow
+                # looks reasonable
+                scaling_f = 50
+
+                for coord, grad in zip(coords, gradient):
+                    center = coord * bohr_in_angstrom()
+                    start = center
+                    end = center + scaling_f * grad
+                    viewer.addArrow({
+                        'start': {
+                            'x': start[0],
+                            'y': start[1],
+                            'z': start[2],
+                        },
+                        'end': {
+                            'x': end[0],
+                            'y': end[1],
+                            'z': end[2],
+                        },
+                        'radius': 0.1,
+                        'color': 'green',
+                    })
+                    viewer.addSphere({
+                        'center': {
+                            'x': center[0],
+                            'y': center[1],
+                            'z': center[2],
+                        },
+                        'radius': 0.1,
+                        'color': 'green',
+                    })
+
         else:
             from rdkit import Chem
             import re
