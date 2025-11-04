@@ -320,8 +320,7 @@ class VibrationalAnalysis:
             vib_results['gibbs_free_energy'] = self.gibbs_free_energy
             vib_results['free_energy_summary'] = self.free_energy_summary
             vib_results['vib_frequencies'] = self.vib_frequencies
-            # FIXME: normalized or not? What should the user get?
-            # NOTE: JHA changes -- now they get for normalized ones
+            # normalized
             vib_results['normal_modes'] = self.normal_modes
 
             # calculate force constants
@@ -1170,8 +1169,6 @@ class VibrationalAnalysis:
         hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array(self.reduced_masses))
         if self.do_ir:
-            hf.create_dataset(vib_group + 'dipole_gradient',
-                              data=np.array(self.dipole_gradient.reshape(3, natm, 3)))
             hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array(self.ir_intensities))
 
@@ -1393,8 +1390,7 @@ class VibrationalAnalysis:
             ax.set_xlabel('Wavenumber [cm$^{-1}$]')
             ax.set_ylabel('Scattering cross section')
             ax2.set_ylabel('Raman activity [' + r'${\AA}^4$' + '/amu]')
-            #ax.set_title(f"Raman Spectrum ({w:2.4} a.u.)")
-            ax.set_title(f"{raman_type} Spectrum ({w:2.4} a.u.)")
+            ax.set_title(f"{raman_type} Spectrum ({w:2.4f} a.u.)")
 
             if broadening_type.lower() == 'lorentzian':
                 x, y = self.lorentzian_broadening(vib_freqs, raman_act, xmin, xmax, 1,
