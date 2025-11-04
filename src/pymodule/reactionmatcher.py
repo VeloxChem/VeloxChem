@@ -69,6 +69,8 @@ class ReactionMatcher:
         self.verbose = True
         self.print_starting_index = 0
         self.max_time = 600
+        self.force_hydrogen_inclusion = False
+        self._reduce_hydrogen = False
 
         self.max_break_attempts_guess = 1e5
         self._breaking_depth = 1  # how many breaking edges to try
@@ -89,19 +91,10 @@ class ReactionMatcher:
             rea_elems,
             product_ff,
             pro_elems,
+            self.force_hydrogen_inclusion
         )
 
-        N = len(self.rea_graph.edges)
-        while math.factorial(N) / math.factorial(
-                N - self._breaking_depth) < self.max_break_attempts_guess:
-            self._breaking_depth += 1
-            if self._breaking_depth == N:
-                break
-
-        self.ostream.print_info(
-            f"Set max breaking depth to {self._breaking_depth} from max breaking attempts {self.max_break_attempts_guess}"
-        )
-        self.ostream.flush()
+        self._breaking_depth = self._decide_breaking_depth()
 
         map, breaking_edges, forming_edges = self._find_mapping(
             self.rea_graph.copy(),
@@ -109,32 +102,71 @@ class ReactionMatcher:
             breaking_bonds,
             forming_bonds,
         )
+        if map is None and self._reduce_hydrogen:
+            self.ostream.print_info("No mapping found, retrying with hydrogens included.")
+            self.ostream.flush()
+            self.rea_graph, self.pro_graph = self._create_reaction_graphs(
+                reactant_ff,
+                rea_elems,
+                product_ff,
+                pro_elems,
+                True
+            )
+            map, breaking_edges, forming_edges = self._find_mapping(
+                self.rea_graph.copy(),
+                self.pro_graph.copy(),
+                breaking_bonds,
+                forming_bonds,
+            )
+            
 
         self.ostream.flush()
         self.ostream.print_info(
             f"Total subgraph isomorphism checks: {self._iso_count}, total subgraph monomorphism checks: {self._mono_count}"
         )
         
-        for rea_node, rea_info in self.rea_graph.nodes.items():
-            if rea_info.get('H_bond_count', 0) > 0:
-                rea_H = rea_info['H_indices']
-                pro_node = map[rea_node]
-                pro_info = self.pro_graph.nodes[pro_node]
-                pro_H = pro_info['H_indices']
-                self.ostream.print_info(f"rea_node: {rea_node}, pro_node: {pro_node}, rea_H: {rea_H}, pro_H: {pro_H}")
-                for h1, h2 in zip(rea_H, pro_H):
-                    map.update({h1: h2})
-                self.ostream.flush()
+        self._restore_hydrogen(map,self.rea_graph,self.pro_graph)
             
-        
         return map, breaking_edges, forming_edges
 
+
+    def _decide_breaking_depth(self):
+        N = len(self.rea_graph.edges)
+        _breaking_depth = 1
+        while math.factorial(N) / math.factorial(
+                N - _breaking_depth) < self.max_break_attempts_guess:
+            _breaking_depth += 1
+            if _breaking_depth == N:
+                break
+
+        self.ostream.print_info(
+            f"Set max breaking depth to {_breaking_depth} from max breaking attempts {self.max_break_attempts_guess}"
+        )
+        self.ostream.flush()
+        return _breaking_depth
+    
+
     def _create_reaction_graphs(self, reactant_ff, rea_elems, product_ff,
-                                pro_elems):
+                                pro_elems, force_hydrogen_inclusion):
+        
+        
         rea_graph, rea_info, rea_unique_connected_atoms = self._prepare_graph(reactant_ff, rea_elems)
 
         pro_graph,pro_info, pro_unique_connected_atoms = self._prepare_graph(product_ff, pro_elems)
-                            
+
+
+        if not force_hydrogen_inclusion:
+            self._reduce_hydrogen = self._decide_hydrogen_reduction(rea_graph, pro_graph)
+            if self._reduce_hydrogen:
+                self.ostream.print_info("Reducing hydrogens into parent atoms")
+                self.ostream.flush()
+                rea_hydrogens = [n for n in rea_graph.nodes if rea_graph.nodes[n]['elem'] == 1.0]
+                pro_hydrogens = [n for n in pro_graph.nodes if pro_graph.nodes[n]['elem'] == 1.0]
+                rea_graph.remove_nodes_from(rea_hydrogens)
+                pro_graph.remove_nodes_from(pro_hydrogens)
+        
+        
+        
         to_pop = []
         for i, connected_atoms in rea_unique_connected_atoms.items():
             if connected_atoms not in pro_unique_connected_atoms.values():
@@ -222,10 +254,7 @@ class ReactionMatcher:
         graph.add_edges_from(bonds)
 
         for i, elem in enumerate(elements):
-            if elem > 1.0:
-                graph.nodes[i]['elem'] = elem
-            else:
-                graph.remove_node(i)
+            graph.nodes[i]['elem'] = elem
     
         info = {i-1: info for i, info in forcefield.atom_info_dict.items()}
         for i, info_entry in info.items():
@@ -255,6 +284,25 @@ class ReactionMatcher:
                             H_indices.append(number)
                     graph.nodes[i]['H_indices'] = H_indices
         return graph,info,unique_connected_atoms
+    
+    def _decide_hydrogen_reduction(self, rea_graph, pro_graph):
+        rea_bond_composition = self._get_bond_element_composition(rea_graph)
+        pro_bond_composition = self._get_bond_element_composition(pro_graph)
+        for rea_bond in rea_bond_composition.keys():
+            if 1.0 in rea_bond:
+                if rea_bond not in pro_bond_composition.keys():
+                    return False
+                if pro_bond_composition[rea_bond] != rea_bond_composition[rea_bond]:
+                    return False
+                
+        for pro_bond in pro_bond_composition.keys():
+            if 1.0 in pro_bond:
+                if pro_bond not in rea_bond_composition.keys():
+                    return False
+                if rea_bond_composition[pro_bond] != pro_bond_composition[pro_bond]:
+                    return False
+        return True
+                
     
     def _assign_assist_ids(self,rea_ids,pro_ids,rea_graph,pro_graph,rea_info,pro_info):
         assigned_assist_ids = {}
@@ -631,6 +679,17 @@ class ReactionMatcher:
         GM = GraphMatcher(A,B, node_match=node_match)
         return GM
         
+    def _restore_hydrogen(self, map, rea_graph,pro_graph):
+        for rea_node, rea_info in rea_graph.nodes.items():
+            if rea_info.get('H_bond_count', 0) > 0:
+                rea_H = rea_info['H_indices']
+                pro_node = map[rea_node]
+                pro_info = pro_graph.nodes[pro_node]
+                pro_H = pro_info['H_indices']
+                self.ostream.print_info(f"rea_node: {rea_node}, pro_node: {pro_node}, rea_H: {rea_H}, pro_H: {pro_H}")
+                for h1, h2 in zip(rea_H, pro_H):
+                    map.update({h1: h2})
+                self.ostream.flush()
 
     def _check_time(self, msg=None):
         if msg is not None:
