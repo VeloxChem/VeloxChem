@@ -1935,6 +1935,8 @@ class LinearSolver:
         n_extra_ger = n_ger - n_general
         n_extra_ung = n_ung - n_general
 
+        prep_t0 = tm.time()
+
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
@@ -1989,6 +1991,12 @@ class LinearSolver:
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
+        if profiler is not None:
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
+        vecs_e2_ger_data = None
+        vecs_e2_ung_data = None
+
         # go through batches
 
         if self.rank == mpi_master() and self.print_level > 1:
@@ -2028,6 +2036,8 @@ class LinearSolver:
                 kns_a = None
                 dks_b = None
                 kns_b = None
+
+            prep_t0 = tm.time()
 
             for col in range(batch_start, batch_end):
 
@@ -2117,11 +2127,22 @@ class LinearSolver:
                     kns_a.append(kn_a)
                     kns_b.append(kn_b)
 
+            if profiler is not None:
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
             # form Fock matrices
 
             fock = self._comp_lr_fock_unrestricted(
                 (dks_a, dks_b), molecule, basis, eri_dict, dft_dict, pe_dict,
                 profiler)
+
+            if profiler is not None:
+                # only increment FockCount on master rank
+                if self.rank == mpi_master():
+                    # Note: Jab/Ka/Kb -> 3 Fock builds for openshell
+                    profiler.add_timing_info('_FockCount_', len(dks_a) * 3)
+
+            prep_t0 = tm.time()
 
             if self.rank == mpi_master():
                 raw_fock_ger_a = []
@@ -2270,18 +2291,50 @@ class LinearSolver:
                 e2_ger = None
                 e2_ung = None
 
-            vecs_e2_ger = DistributedArray(e2_ger, self.comm)
-            vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+            dist_e2_ger = DistributedArray(e2_ger, self.comm)
+            dist_e2_ung = DistributedArray(e2_ung, self.comm)
+
+            if vecs_e2_ger_data is None:
+                vecs_e2_ger_data = dist_e2_ger.data.copy()
+            else:
+                vecs_e2_ger_data = np.hstack(
+                    (vecs_e2_ger_data, dist_e2_ger.data))
+
+            if vecs_e2_ung_data is None:
+                vecs_e2_ung_data = dist_e2_ung.data.copy()
+            else:
+                vecs_e2_ung_data = np.hstack(
+                    (vecs_e2_ung_data, dist_e2_ung.data))
 
             if self.nonlinear:
                 # TODO: unrestricted for nonlinear
                 # dist_fock_ger = DistributedArray(fock_ger, self.comm)
                 # dist_fock_ung = DistributedArray(fock_ung, self.comm)
+                # TODO: avoid incremental append
                 # self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
                 pass
 
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
+        prep_t0 = tm.time()
+
+        # Note: append sigma and trial vectors only once
+
+        vecs_e2_ger = DistributedArray(vecs_e2_ger_data,
+                                       self.comm,
+                                       distribute=False)
+
+        vecs_e2_ung = DistributedArray(vecs_e2_ung_data,
+                                       self.comm,
+                                       distribute=False)
+
+        self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
         self._append_trial_vectors(vecs_ger, vecs_ung)
+
+        if profiler is not None:
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
