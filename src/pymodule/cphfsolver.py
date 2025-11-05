@@ -908,6 +908,8 @@ class CphfSolver(LinearSolver):
         batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
+        vecs_sigma_data = None
+
         if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {num_vecs} Fock build'
             if num_vecs > 1:
@@ -958,16 +960,23 @@ class CphfSolver(LinearSolver):
                         vec.reshape(nocc, nvir) * eov)
                     sigmas[:, ifock] = cphf_mo.reshape(nocc * nvir)
 
-            dist_sigmas = DistributedArray(sigmas, self.comm)
+            dist_sigma = DistributedArray(sigmas, self.comm)
 
-            # append new sigma and trial vectors
-            # TODO: create new function for this?
-            if self.dist_sigmas is None:
-                self.dist_sigmas = DistributedArray(dist_sigmas.data,
-                                                    self.comm,
-                                                    distribute=False)
+            if vecs_sigma_data is None:
+                vecs_sigma_data = dist_sigma.data.copy()
             else:
-                self.dist_sigmas.append(dist_sigmas, axis=1)
+                vecs_sigma_data = np.hstack((vecs_sigma_data, dist_sigma.data))
+
+        vecs_sigma = DistributedArray(vecs_sigma_data,
+                                      self.comm,
+                                      distribute=False)
+
+        if self.dist_sigmas is None:
+            self.dist_sigmas = DistributedArray(vecs_sigma.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_sigmas.append(vecs_sigma, axis=1)
 
         if self.dist_trials is None:
             self.dist_trials = DistributedArray(dist_trials.data,
@@ -1028,6 +1037,8 @@ class CphfSolver(LinearSolver):
 
         batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
+
+        vecs_sigma_data = None
 
         if self.rank == mpi_master() and self.print_level > 1:
             batch_str = f'Processing {num_vecs} Fock build'
@@ -1099,16 +1110,23 @@ class CphfSolver(LinearSolver):
                     sigmas_b[:, ifock] = cphf_mo_b.reshape(nocc_b * nvir_b)
                     sigmas = np.vstack((sigmas_a, sigmas_b))
 
-            dist_sigmas = DistributedArray(sigmas, self.comm)
+            dist_sigma = DistributedArray(sigmas, self.comm)
 
-            # append new sigma and trial vectors
-            # TODO: create new function for this?
-            if self.dist_sigmas is None:
-                self.dist_sigmas = DistributedArray(dist_sigmas.data,
-                                                    self.comm,
-                                                    distribute=False)
+            if vecs_sigma_data is None:
+                vecs_sigma_data = dist_sigma.data.copy()
             else:
-                self.dist_sigmas.append(dist_sigmas, axis=1)
+                vecs_sigma_data = np.hstack((vecs_sigma_data, dist_sigma.data))
+
+        vecs_sigma = DistributedArray(vecs_sigma_data,
+                                      self.comm,
+                                      distribute=False)
+
+        if self.dist_sigmas is None:
+            self.dist_sigmas = DistributedArray(vecs_sigma.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_sigmas.append(vecs_sigma, axis=1)
 
         if self.dist_trials is None:
             self.dist_trials = DistributedArray(dist_trials.data,
