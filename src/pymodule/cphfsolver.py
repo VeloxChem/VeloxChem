@@ -404,7 +404,7 @@ class CphfSolver(LinearSolver):
         self.dist_sigmas = None
 
         dist_precond = self._get_precond(molecule, basis, scf_tensors,
-                                        self._method_type)
+                                         self._method_type)
 
         orbrsp_vector_labels = [
             self.orbrsp_type.upper() + '_orbrsp_trials',
@@ -620,12 +620,12 @@ class CphfSolver(LinearSolver):
         if self.use_subcomms:
             if method_type == 'restricted':
                 self.build_sigmas_subcomms(molecule, basis, scf_tensors,
-                                           dist_trials, eri_dict, dft_dict, pe_dict,
-                                           profiler)
+                                           dist_trials, eri_dict, dft_dict,
+                                           pe_dict, profiler)
             else:
                 # TODO: enable subcomms for unrestricted
-                assert_msg_critical(False,
-                    'CphfSolver.build_sigmas: '
+                assert_msg_critical(
+                    False, 'CphfSolver.build_sigmas: ' +
                     'Cannot use subcomms for unrestricted case.')
         else:
             if method_type == 'restricted':
@@ -633,9 +633,9 @@ class CphfSolver(LinearSolver):
                                               dist_trials, eri_dict, dft_dict,
                                               pe_dict, profiler)
             else:
-                self.build_sigmas_single_comm_unrestricted(molecule, basis, scf_tensors,
-                                              dist_trials, eri_dict, dft_dict,
-                                              pe_dict, profiler)
+                self.build_sigmas_single_comm_unrestricted(
+                    molecule, basis, scf_tensors, dist_trials, eri_dict,
+                    dft_dict, pe_dict, profiler)
 
     def build_sigmas_subcomms(self,
                               molecule,
@@ -696,6 +696,11 @@ class CphfSolver(LinearSolver):
 
                 n_subcomms = self.nodes // subcomm_size
 
+                # make sure that number of subcomms does not exceed number
+                # of trial vectors
+                if n_subcomms > n_total:
+                    continue
+
                 ave, res = divmod(n_total, n_subcomms)
                 counts = [
                     ave + 1 if p < res else ave for p in range(n_subcomms)
@@ -749,6 +754,8 @@ class CphfSolver(LinearSolver):
         if n_total % batch_size != 0:
             num_batches += 1
 
+        vecs_sigma_data = None
+
         # go through batches
 
         if self.rank == mpi_master() and self.print_level > 1:
@@ -757,6 +764,7 @@ class CphfSolver(LinearSolver):
                 batch_str += f' on {batch_size} subcommunicators'
             batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         for batch_ind in range(num_batches):
@@ -808,21 +816,44 @@ class CphfSolver(LinearSolver):
 
             self.comm.barrier()
 
+            local_sigma_data = None
+
             for idx, local_master_rank in enumerate(local_master_ranks):
 
                 if idx + batch_start >= batch_end:
                     break
 
-                dist_sigmas = DistributedArray(sigmas,
-                                               self.comm,
-                                               root=local_master_rank)
+                dist_sigma = DistributedArray(sigmas,
+                                              self.comm,
+                                              root=local_master_rank)
 
-                if self.dist_sigmas is None:
-                    self.dist_sigmas = DistributedArray(dist_sigmas.data,
-                                                        self.comm,
-                                                        distribute=False)
+                # Note: accumulate per-rank data to avoid incremental appending
+
+                if local_sigma_data is None:
+                    local_sigma_data = dist_sigma.data.copy()
                 else:
-                    self.dist_sigmas.append(dist_sigmas, axis=1)
+                    local_sigma_data = np.hstack(
+                        (local_sigma_data, dist_sigma.data))
+
+            # Note: accumulate per-batch data to avoid incremental appending
+
+            if vecs_sigma_data is None:
+                vecs_sigma_data = local_sigma_data.copy()
+            else:
+                vecs_sigma_data = np.hstack((vecs_sigma_data, local_sigma_data))
+
+        # Note: append sigma and trial vectors only once
+
+        vecs_sigma = DistributedArray(vecs_sigma_data,
+                                      self.comm,
+                                      distribute=False)
+
+        if self.dist_sigmas is None:
+            self.dist_sigmas = DistributedArray(vecs_sigma.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_sigmas.append(vecs_sigma, axis=1)
 
         if self.dist_trials is None:
             self.dist_trials = DistributedArray(dist_trials.data,
@@ -946,14 +977,14 @@ class CphfSolver(LinearSolver):
             self.dist_trials.append(dist_trials, axis=1)
 
     def build_sigmas_single_comm_unrestricted(self,
-                                             molecule,
-                                             basis,
-                                             scf_tensors,
-                                             dist_trials,
-                                             eri_dict,
-                                             dft_dict,
-                                             pe_dict,
-                                             profiler=None):
+                                              molecule,
+                                              basis,
+                                              scf_tensors,
+                                              dist_trials,
+                                              eri_dict,
+                                              dft_dict,
+                                              pe_dict,
+                                              profiler=None):
         """
         Compute the matrix-vector product corresponding to the
         left-hand-side of the CPHF/CPKS equations.
@@ -988,7 +1019,6 @@ class CphfSolver(LinearSolver):
             nvir_a = evir_a.shape[0]
             nvir_b = evir_b.shape[0]
             nov_a = nocc_a * nvir_a
-            nov_b = nocc_b * nvir_b
             eov_a = eocc_a.reshape(-1, 1) - evir_a
             eov_b = eocc_b.reshape(-1, 1) - evir_b
         else:
@@ -1027,15 +1057,17 @@ class CphfSolver(LinearSolver):
                 if self.rank == mpi_master():
                     vec_a = vec[:nov_a].reshape(nocc_a, nvir_a)
                     vec_b = vec[nov_a:].reshape(nocc_b, nvir_b)
-                    vec_ao_a = np.linalg.multi_dot([mo_occ_a, vec_a, mo_vir_a.T])
-                    vec_ao_b = np.linalg.multi_dot([mo_occ_b, vec_b, mo_vir_b.T])
+                    vec_ao_a = np.linalg.multi_dot(
+                        [mo_occ_a, vec_a, mo_vir_a.T])
+                    vec_ao_b = np.linalg.multi_dot(
+                        [mo_occ_b, vec_b, mo_vir_b.T])
                     vec_list_a.append(vec_ao_a)
                     vec_list_b.append(vec_ao_b)
 
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock_unrestricted([vec_list_a, vec_list_b],
-                                      molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, profiler)
+                                                   molecule, basis, eri_dict,
+                                                   dft_dict, pe_dict, profiler)
 
             # create sigma vectors
             if self.rank == mpi_master():
@@ -1054,12 +1086,14 @@ class CphfSolver(LinearSolver):
                     fock_vec_a = fock[ifock * 2 + 0]
                     fock_vec_b = fock[ifock * 2 + 1]
                     cphf_mo_a = (
-                       -np.linalg.multi_dot([mo_occ_a.T, fock_vec_a, mo_vir_a]) -
-                        np.linalg.multi_dot([mo_vir_a.T, fock_vec_a, mo_occ_a]).T +
+                        -np.linalg.multi_dot([mo_occ_a.T, fock_vec_a, mo_vir_a])
+                        - np.linalg.multi_dot(
+                            [mo_vir_a.T, fock_vec_a, mo_occ_a]).T +
                         vec_a.reshape(nocc_a, nvir_a) * eov_a)
                     cphf_mo_b = (
-                       -np.linalg.multi_dot([mo_occ_b.T, fock_vec_b, mo_vir_b]) -
-                        np.linalg.multi_dot([mo_vir_b.T, fock_vec_b, mo_occ_b]).T +
+                        -np.linalg.multi_dot([mo_occ_b.T, fock_vec_b, mo_vir_b])
+                        - np.linalg.multi_dot(
+                            [mo_vir_b.T, fock_vec_b, mo_occ_b]).T +
                         vec_b.reshape(nocc_b, nvir_b) * eov_b)
                     sigmas_a[:, ifock] = cphf_mo_a.reshape(nocc_a * nvir_a)
                     sigmas_b[:, ifock] = cphf_mo_b.reshape(nocc_b * nvir_b)
@@ -1117,7 +1151,6 @@ class CphfSolver(LinearSolver):
         else:
             eov_a = None
             eov_b = None
-            nao = None
 
         eov_a = self.comm.bcast(eov_a, root=mpi_master())
         eov_b = self.comm.bcast(eov_b, root=mpi_master())
