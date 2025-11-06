@@ -937,8 +937,8 @@ class NonlinearSolver:
 
             if self._dft and mode_is_cubic:
                 if self.rank == mpi_master():
-                    fock_mo_2 = fock_mo[:, :len(dts2)]
-                    fock_mo_3 = fock_mo[:, len(dts2):]
+                    fock_mo_2 = fock_mo[:, :len(dts2)].copy()
+                    fock_mo_3 = fock_mo[:, len(dts2):].copy()
                 else:
                     fock_mo_2 = None
                     fock_mo_3 = None

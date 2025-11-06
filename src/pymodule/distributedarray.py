@@ -73,6 +73,7 @@ class DistributedArray:
 
         if self.rank == root:
             sendbuf = array
+            dtype = sendbuf.dtype
             # determine row_counts and displacements
             ave, res = divmod(array.shape[0], self.nodes)
             if array.ndim == 1:
@@ -86,15 +87,16 @@ class DistributedArray:
             row_counts = np.array(row_counts)
         else:
             sendbuf = None
+            dtype = None
             ndim, ncols = None, None
-            row_counts = np.zeros(self.nodes, dtype=int)
+            row_counts = None
 
+        dtype = self.comm.bcast(dtype, root=root)
         ndim, ncols = self.comm.bcast((ndim, ncols), root=root)
-
-        self.comm.Bcast(row_counts, root=root)
+        row_counts = self.comm.bcast(row_counts, root=root)
 
         if ncols == 0:
-            self.data = np.zeros((row_counts[self.rank], 0))
+            self.data = np.zeros((row_counts[self.rank], 0), dtype=dtype)
             return
 
         elem_counts = ncols * row_counts
@@ -103,11 +105,16 @@ class DistributedArray:
         displacements = np.array(displacements)
 
         if ndim == 1:
-            recvbuf = np.zeros(row_counts[self.rank])
+            recvbuf = np.zeros(row_counts[self.rank], dtype=dtype)
         elif ndim == 2:
-            recvbuf = np.zeros((row_counts[self.rank], ncols))
+            recvbuf = np.zeros((row_counts[self.rank], ncols), dtype=dtype)
 
-        self.comm.Scatterv([sendbuf, elem_counts, displacements, MPI.DOUBLE],
+        if dtype == np.dtype('float64'):
+            mpi_data_type = MPI.DOUBLE
+        elif dtype == np.dtype('complex128'):
+            mpi_data_type = MPI.C_DOUBLE_COMPLEX
+
+        self.comm.Scatterv([sendbuf, elem_counts, displacements, mpi_data_type],
                            recvbuf,
                            root=root)
 
