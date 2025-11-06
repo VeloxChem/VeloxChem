@@ -710,7 +710,7 @@ class SolvationFepDriver:
     
     def _recalculate_energies(self, forcefields, topology):
         snapshots = self.snapshots
-        u_kn = np.zeros((len(forcefields), sum(self.N_k)), np.float64)
+        u_kn = np.zeros((len(forcefields), sum(self.N_k)), dtype=np.float64)
 
         for k, forcefield in enumerate(forcefields):
             self.ostream.print_info(f"Recalculating energies for Forcefield {k}...")

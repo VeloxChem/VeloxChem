@@ -40,6 +40,7 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
 
+
 def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
     """
     Creates HDF5 file for a calculation.
@@ -592,6 +593,7 @@ def read_cpcm_charges(fname):
 
     return cpcm_q
 
+
 def read_results(fname, label):
     """ Read the results dictionary from a checkpoint file.
 
@@ -607,7 +609,7 @@ def read_results(fname, label):
     valid_checkpoint = (fname and isinstance(fname, str) and
                         Path(fname).is_file())
 
-    assert_msg_critical(valid_checkpoint, fname + " is not a valid checkpoint file.") 
+    assert_msg_critical(valid_checkpoint, fname + " is not a valid checkpoint file.")
 
     res_dict = {}
     h5f = h5py.File(fname, "r")
@@ -652,15 +654,15 @@ def read_results(fname, label):
 
     if "opt" in label:
         # Create the list of xyz geometries
-        nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+        nuclear_charges = np.array(res_dict["nuclear_charges"]).astype(int)
         xyz_geometries = []
         for coords in res_dict["opt_coordinates_au"]:
             molecule = Molecule(nuclear_charges, coords, units="au")
             xyz_geometries.append(molecule.get_xyz_string())
         res_dict["opt_geometries"] = xyz_geometries
-    
+
     # Create molecule xyz
-    nuclear_charges = np.array(res_dict["nuclear_charges"], dtype=int)
+    nuclear_charges = np.array(res_dict["nuclear_charges"]).astype(int)
     coords = res_dict["atom_coordinates"]
     molecule = Molecule(nuclear_charges, coords, units="au")
 
@@ -677,5 +679,5 @@ def read_results(fname, label):
         res_dict["molecule_xyz_string"] = molecule.get_xyz_string()
 
     h5f.close()
-    
+
     return res_dict
