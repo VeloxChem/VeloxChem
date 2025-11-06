@@ -685,6 +685,8 @@ class CphfSolver(LinearSolver):
 
         n_total = num_vecs
 
+        prep_t0 = tm.time()
+
         # determine subcomm size
 
         if self.rank == mpi_master():
@@ -754,6 +756,9 @@ class CphfSolver(LinearSolver):
         if n_total % batch_size != 0:
             num_batches += 1
 
+        if profiler is not None:
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
         vecs_sigma_data = None
 
         # go through batches
@@ -774,6 +779,10 @@ class CphfSolver(LinearSolver):
 
             vec_list = [None for idx in range(len(local_master_ranks))]
 
+            # TODO: use Alltoallv
+
+            prep_t0 = tm.time()
+
             for idx, local_master_rank in enumerate(local_master_ranks):
 
                 if idx + batch_start >= batch_end:
@@ -786,7 +795,12 @@ class CphfSolver(LinearSolver):
 
             self.comm.barrier()
 
+            if profiler is not None:
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
             if subcomm_index + batch_start < batch_end:
+
+                prep_t0 = tm.time()
 
                 local_master_rank = local_master_ranks[subcomm_index]
 
@@ -798,10 +812,20 @@ class CphfSolver(LinearSolver):
                 else:
                     dens = None
 
+                if profiler is not None:
+                    profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
                 # create Fock matrices and contract with two-electron integrals
                 fock = self._comp_lr_fock(dens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler,
                                           local_comm)
+
+                if profiler is not None:
+                    # only increment FockCount on local master
+                    if is_local_master:
+                        profiler.add_timing_info('_FockCount_', 1)
+
+                prep_t0 = tm.time()
 
                 if is_local_master:
                     sigmas = np.zeros((nocc * nvir, 1))
@@ -814,7 +838,14 @@ class CphfSolver(LinearSolver):
                 else:
                     sigmas = None
 
+                if profiler is not None:
+                    profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
             self.comm.barrier()
+
+            prep_t0 = tm.time()
+
+            # TODO: use Alltoallv
 
             local_sigma_data = None
 
@@ -842,6 +873,11 @@ class CphfSolver(LinearSolver):
             else:
                 vecs_sigma_data = np.hstack((vecs_sigma_data, local_sigma_data))
 
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
+        prep_t0 = tm.time()
+
         # Note: append sigma and trial vectors only once
 
         vecs_sigma = DistributedArray(vecs_sigma_data,
@@ -861,6 +897,9 @@ class CphfSolver(LinearSolver):
                                                 distribute=False)
         else:
             self.dist_trials.append(dist_trials, axis=1)
+
+        if profiler is not None:
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
     def build_sigmas_single_comm(self,
                                  molecule,
@@ -886,6 +925,8 @@ class CphfSolver(LinearSolver):
             Distributed array of trial vectors
         """
 
+        prep_t0 = tm.time()
+
         if self.rank == mpi_master():
             mo = scf_tensors['C_alpha']
             nao = basis.get_dimension_of_basis()
@@ -908,6 +949,9 @@ class CphfSolver(LinearSolver):
         batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
+        if profiler is not None:
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
         vecs_sigma_data = None
 
         if self.rank == mpi_master() and self.print_level > 1:
@@ -929,6 +973,8 @@ class CphfSolver(LinearSolver):
             else:
                 vec_list = None
 
+            prep_t0 = tm.time()
+
             # loop over columns / trial vectors
             for col in range(batch_start, batch_end):
                 vec = dist_trials.get_full_vector(col)
@@ -938,9 +984,19 @@ class CphfSolver(LinearSolver):
                     vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     vec_list.append(vec_ao)
 
+            if profiler is not None:
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
                                       dft_dict, pe_dict, profiler)
+
+            if profiler is not None:
+                # only increment FockCount on master rank
+                if self.rank == mpi_master():
+                    profiler.add_timing_info('_FockCount_', len(vec_list))
+
+            prep_t0 = tm.time()
 
             # create sigma vectors
             if self.rank == mpi_master():
@@ -967,6 +1023,13 @@ class CphfSolver(LinearSolver):
             else:
                 vecs_sigma_data = np.hstack((vecs_sigma_data, dist_sigma.data))
 
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
+        prep_t0 = tm.time()
+
+        # Note: append sigma and trial vectors only once
+
         vecs_sigma = DistributedArray(vecs_sigma_data,
                                       self.comm,
                                       distribute=False)
@@ -984,6 +1047,9 @@ class CphfSolver(LinearSolver):
                                                 distribute=False)
         else:
             self.dist_trials.append(dist_trials, axis=1)
+
+        if profiler is not None:
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
     def build_sigmas_single_comm_unrestricted(self,
                                               molecule,
@@ -1008,6 +1074,8 @@ class CphfSolver(LinearSolver):
         :param dist_trials:
             Distributed array of trial vectors
         """
+
+        prep_t0 = tm.time()
 
         if self.rank == mpi_master():
             mo_a = scf_tensors['C_alpha']
@@ -1038,6 +1106,9 @@ class CphfSolver(LinearSolver):
         batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
+        if profiler is not None:
+            profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
         vecs_sigma_data = None
 
         if self.rank == mpi_master() and self.print_level > 1:
@@ -1061,6 +1132,8 @@ class CphfSolver(LinearSolver):
                 vec_list_a = None
                 vec_list_b = None
 
+            prep_t0 = tm.time()
+
             # loop over columns / trial vectors
             for col in range(batch_start, batch_end):
                 vec = dist_trials.get_full_vector(col)
@@ -1075,10 +1148,21 @@ class CphfSolver(LinearSolver):
                     vec_list_a.append(vec_ao_a)
                     vec_list_b.append(vec_ao_b)
 
+            if profiler is not None:
+                profiler.add_timing_info('PreProc', tm.time() - prep_t0)
+
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock_unrestricted([vec_list_a, vec_list_b],
                                                    molecule, basis, eri_dict,
                                                    dft_dict, pe_dict, profiler)
+
+            if profiler is not None:
+                # only increment FockCount on master rank
+                if self.rank == mpi_master():
+                    # Note: Jab/Ka/Kb -> 3 Fock builds for openshell
+                    profiler.add_timing_info('_FockCount_', len(vec_list_a) * 3)
+
+            prep_t0 = tm.time()
 
             # create sigma vectors
             if self.rank == mpi_master():
@@ -1117,6 +1201,13 @@ class CphfSolver(LinearSolver):
             else:
                 vecs_sigma_data = np.hstack((vecs_sigma_data, dist_sigma.data))
 
+            if profiler is not None:
+                profiler.add_timing_info('PostProc', tm.time() - prep_t0)
+
+        prep_t0 = tm.time()
+
+        # Note: append sigma and trial vectors only once
+
         vecs_sigma = DistributedArray(vecs_sigma_data,
                                       self.comm,
                                       distribute=False)
@@ -1134,6 +1225,9 @@ class CphfSolver(LinearSolver):
                                                 distribute=False)
         else:
             self.dist_trials.append(dist_trials, axis=1)
+
+        if profiler is not None:
+            profiler.add_timing_info('AppendVec', tm.time() - prep_t0)
 
     def _get_precond(self,
                      molecule,
