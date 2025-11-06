@@ -426,6 +426,8 @@ class CphfSolver(LinearSolver):
             # setup and precondition trial vectors
             dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
 
+            profiler.set_timing_key('Preparation')
+
             # construct the sigma (E*t) vectors
             self.build_sigmas(molecule, basis, scf_tensors, dist_trials,
                               eri_dict, dft_dict, pe_dict, profiler,
@@ -778,8 +780,6 @@ class CphfSolver(LinearSolver):
             batch_end = min(batch_start + batch_size, num_vecs)
 
             vec_list = [None for idx in range(len(local_master_ranks))]
-
-            # TODO: use Alltoallv
 
             prep_t0 = tm.time()
 
