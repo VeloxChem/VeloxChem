@@ -783,15 +783,52 @@ class CphfSolver(LinearSolver):
 
             prep_t0 = tm.time()
 
-            for idx, local_master_rank in enumerate(local_master_ranks):
+            # Here we need to collect the trial vectors (stored as distributed
+            # arrays) to local master ranks of the subcommunicators, using
+            # Alltoallv "transpose"
 
-                if idx + batch_start >= batch_end:
-                    break
+            # sendbuf data
+            sendbuf = dist_trials.data[:, batch_start:batch_end].copy()
 
-                col = idx + batch_start
+            # sendbuf counts and displacements
+            sendbuf_counts = []
+            for p in range(self.nodes):
+                if p in local_master_ranks:
+                    idx = local_master_ranks.index(p)
+                    if idx + batch_start < batch_end:
+                        sendbuf_counts.append(sendbuf.shape[0])
+                    else:
+                        sendbuf_counts.append(0)
+                else:
+                    sendbuf_counts.append(0)
+            sendbuf_displs = [
+                sum(sendbuf_counts[:p]) for p in range(self.nodes)
+            ]
 
-                vec_list[idx] = dist_trials.get_full_vector(
-                    col, root=local_master_rank)
+            # recvbuf counts and displacements
+            vec_counts = self.comm.allgather(sendbuf.shape[0])
+            if is_local_master:
+                idx = subcomm_index
+                if idx + batch_start < batch_end:
+                    recvbuf_counts = list(vec_counts)
+                else:
+                    recvbuf_counts = [0 for x in vec_counts]
+            else:
+                recvbuf_counts = [0 for x in vec_counts]
+            recvbuf_displs = [
+                sum(recvbuf_counts[:p]) for p in range(self.nodes)
+            ]
+            recvbuf = np.zeros(sum(recvbuf_counts))
+
+            # Alltoallv
+            sendbuf = sendbuf.T.copy()
+            self.comm.Alltoallv(
+                [sendbuf, sendbuf_counts, sendbuf_displs, MPI.DOUBLE],
+                [recvbuf, recvbuf_counts, recvbuf_displs, MPI.DOUBLE])
+
+            if subcomm_index + batch_start < batch_end:
+                if is_local_master:
+                    vec_list[subcomm_index] = recvbuf
 
             self.comm.barrier()
 
@@ -801,8 +838,6 @@ class CphfSolver(LinearSolver):
             if subcomm_index + batch_start < batch_end:
 
                 prep_t0 = tm.time()
-
-                local_master_rank = local_master_ranks[subcomm_index]
 
                 if is_local_master:
                     vec = vec_list[subcomm_index]
@@ -845,26 +880,35 @@ class CphfSolver(LinearSolver):
 
             prep_t0 = tm.time()
 
-            # TODO: use Alltoallv
+            # Here we need to distribute the sigma vectors (on local master
+            # ranks), using Alltoallv "transpose"
 
-            local_sigma_data = None
-
-            for idx, local_master_rank in enumerate(local_master_ranks):
-
-                if idx + batch_start >= batch_end:
-                    break
-
-                dist_sigma = DistributedArray(sigmas,
-                                              self.comm,
-                                              root=local_master_rank)
-
-                # Note: accumulate per-rank data to avoid incremental appending
-
-                if local_sigma_data is None:
-                    local_sigma_data = dist_sigma.data.copy()
+            # sendbuf data
+            if is_local_master:
+                idx = subcomm_index
+                if idx + batch_start < batch_end:
+                    sendbuf_2 = sigmas
                 else:
-                    local_sigma_data = np.hstack(
-                        (local_sigma_data, dist_sigma.data))
+                    sendbuf_2 = np.zeros(0)
+            else:
+                sendbuf_2 = np.zeros(0)
+
+            # sendbuf counts and displacements
+            sendbuf_counts_2 = list(recvbuf_counts)
+            sendbuf_displs_2 = list(recvbuf_displs)
+
+            # revvdbuf, counts and displacements
+            recvbuf_2 = np.zeros(sendbuf.shape)
+            recvbuf_counts_2 = list(sendbuf_counts)
+            recvbuf_displs_2 = list(sendbuf_displs)
+
+            # Alltoallv
+            self.comm.Alltoallv(
+                [sendbuf_2, sendbuf_counts_2, sendbuf_displs_2, MPI.DOUBLE],
+                [recvbuf_2, recvbuf_counts_2, recvbuf_displs_2, MPI.DOUBLE])
+            recvbuf_2 = recvbuf_2.T.copy()
+
+            local_sigma_data = recvbuf_2
 
             # Note: accumulate per-batch data to avoid incremental appending
 
