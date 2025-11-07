@@ -27,6 +27,7 @@ class TestEvb:
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
 
         ffbuilder = ReactionForceFieldBuilder()
+        ffbuilder.ostream.mute()
         ffbuilder.water_model = 'cspce'
         ethanol_xyz = """
         9
@@ -132,6 +133,7 @@ class TestEvb:
 
         # build systems in water and vacuum
         system_builder = EvbSystemBuilder()
+        system_builder.ostream.mute()
 
         reactant_mol = Molecule.read_xyz_file(
             str(data_path / 'evb_ethanol.xyz'), )
@@ -266,6 +268,7 @@ class TestEvb:
         # EVB.load_initialisation(str(water_folder), 'water', skip_systems=True, skip_pdb=True)
         # do data processing
         dp = EvbDataProcessing()
+        dp.ostream.mute()
 
         comp_results = dp.compute(input_results, 5, 10)
 

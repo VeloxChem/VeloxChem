@@ -477,6 +477,28 @@ class DensityViewer:
         try:
             import k3d
         except ImportError:
+            self._plot_using_py3dmol(molecule, basis, den_inp)
+            return
+
+        self._plot_using_k3d(molecule, basis, den_inp)
+
+    def _plot_using_k3d(self, molecule, basis, den_inp):
+        """
+        Plots the densities using k3d, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param den_inp:
+            The density matrix input (filename of h5 file storing the
+            densities, or a dictionary of density matrices (numpy arrays)
+            and their labels).
+        """
+
+        try:
+            import k3d
+        except ImportError:
             raise ImportError(self.help_string_k3d())
 
         try:
@@ -747,3 +769,164 @@ class DensityViewer:
                                          group='Densities')
 
         return plt_iso_one, plt_iso_two
+
+    def _plot_using_py3dmol(self, molecule, basis, den_inp):
+        """
+        Plots the densities using py3dmol, with a widget to choose which.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param den_inp:
+            The density matrix input (filename of h5 file storing the
+            densities, or a dictionary of density matrices (numpy arrays)
+            and their labels).
+        """
+
+        try:
+            import ipywidgets as widgets
+            from IPython.display import display, HTML
+        except ImportError:
+            raise ImportError(self.help_string_widgets_and_display())
+
+        if isinstance(den_inp, str):
+            den_dict = self.read_hdf5(den_inp)
+        elif isinstance(den_inp, dict):
+            den_dict = den_inp
+        else:
+            assert_msg_critical(False,
+                                'DensityViewer.plot: Invalid density input')
+
+        self._density_dict = den_dict
+
+        self.initialize(molecule, basis)
+
+        den_key_list = list(self._density_dict.keys())
+
+        # use a persistent output widget
+        out = widgets.Output()
+
+        # draw the first density by default
+        with out:
+            display(HTML(self._draw_density_html(den_key_list[0])))
+
+        def update_view(change):
+            out.clear_output()
+            with out:
+                display(HTML(self._draw_density_html(change['new'])))
+
+        dropdown = widgets.Dropdown(options=den_key_list,
+                                    value=den_key_list[0],
+                                    description='Density')
+
+        dropdown.observe(update_view, names='value')
+
+        display(dropdown, out)
+
+    def _draw_density_html(self, density_label):
+        """
+        Generates HTML for density volumetric data using py3dmol.
+
+        :param density_label:
+            The label of the density.
+
+        :return:
+            The HTML for density volumetric data.
+        """
+
+        try:
+            import py3Dmol
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol')
+
+        density_np = self._density_dict[density_label]
+        density_cube_data = self.compute_density(density_np)
+        density_cube_str = self._get_density_cube_str(density_cube_data)
+
+        viewer = py3Dmol.view(width=600, height=450)
+
+        viewer.addModel(density_cube_str, "cube")
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})
+
+        viewer.zoomTo()
+
+        isovalue = self.density_isovalue
+        opacity = self.density_opacity
+        if self.density_color_scheme == 'default':
+            positive_color = 0x0000ff
+            negative_color = 0xff0000
+        elif self.density_color_scheme == 'alternative':
+            positive_color = 0x62a0ea
+            negative_color = 0xe5a50a
+
+        viewer.addVolumetricData(density_cube_str, "cube", {
+            "isoval": isovalue,
+            "color": positive_color,
+            "opacity": opacity,
+        })
+
+        viewer.addVolumetricData(density_cube_str, "cube", {
+            "isoval": -isovalue,
+            "color": negative_color,
+            "opacity": opacity,
+        })
+
+        # self-contained HTML that is stable in ipywidgets
+        return viewer._make_html()
+
+    def _get_density_cube_str(self, density_data, comment=''):
+        """
+        Writes density data to a string in cube file format.
+
+        :param cubefile:
+            Name of the cube file.
+        :param grid:
+            The cubic grid.
+        """
+
+        cube_str_list = []
+
+        coords = self._molecule.get_coordinates_in_bohr()
+
+        x = coords[:, 0]
+        y = coords[:, 1]
+        z = coords[:, 2]
+
+        natoms = self._molecule.number_of_atoms()
+        elem_ids = self._molecule.get_identifiers()
+
+        x0, y0, z0 = self.origin
+        dx, dy, dz = self.stepsize
+        nx, ny, nz = self.npoints
+
+        cube_str_list.append('Cube file generated by VeloxChem\n')
+
+        # cube for density
+        cube_str_list.append('Electron {:s} {:s}\n'.format('density', comment))
+        line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:5d}\n'.format(
+            natoms, x0, y0, z0, 1)
+        cube_str_list.append(line)
+
+        cube_str_list.append('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+            nx, dx, 0, 0))
+        cube_str_list.append('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+            ny, 0, dy, 0))
+        cube_str_list.append('{:5d}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+            nz, 0, 0, dz))
+
+        for a in range(natoms):
+            line = '{:5d}{:12.6f}{:12.6f}{:12.6f}{:12.6f}\n'.format(
+                elem_ids[a], float(elem_ids[a]), x[a], y[a], z[a])
+            cube_str_list.append(line)
+
+        for ix in range(nx):
+            for iy in range(ny):
+                for iz in range(nz):
+                    cube_str_list.append(' {:12.5E}'.format(density_data[ix, iy,
+                                                                         iz]))
+                    if iz % 6 == 5:
+                        cube_str_list.append('\n')
+                cube_str_list.append('\n')
+
+        return ''.join(cube_str_list)

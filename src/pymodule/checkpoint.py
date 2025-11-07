@@ -631,22 +631,24 @@ def read_results(fname, label):
 
     h5f_dict = h5f[label]
 
+    known_keys_for_arrays = [
+        'normal_modes',
+        'vib_frequencies',
+        'force_constants',
+        'reduced_masses',
+        'ir_intensities',
+        'external_frequencies',
+        'raman_activities',
+    ]
+
     for key in h5f_dict:
-        # For known lists of arrays (normal modes, raman and resonance raman),
-        # read the sub-group accordingly
-        if "normal_modes" in key or "raman_activities" in key:
-            sub_dict = dict(h5f_dict[key])
-            sub_dict_results = {}
-            for sub_key in sub_dict:
-                sub_dict_results[sub_key] = np.array(sub_dict[sub_key])
-            res_dict[key] = sub_dict_results
+        data = np.array(h5f_dict[key])
+        # Check if data is a number or an array
+        if (len(data.shape) == 1 and data.shape[0] == 1 and
+                key not in known_keys_for_arrays):
+            res_dict[key] = data[0]
         else:
-            data = np.array(h5f_dict[key])
-            # Check if data is a number or an array
-            if len(data.shape) == 1 and data.shape[0] == 1:
-                res_dict[key] = data[0]
-            else:
-                res_dict[key] = data
+            res_dict[key] = data
 
     if "opt" in label:
         # Create the list of xyz geometries
