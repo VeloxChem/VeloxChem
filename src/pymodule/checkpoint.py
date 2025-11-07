@@ -276,7 +276,13 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     return True
 
 
-def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, group_label='rsp'):
+def write_detach_attach_to_hdf5(fname,
+                                state_label,
+                                dens_detach,
+                                dens_attach,
+                                chg_detach=None,
+                                chg_attach=None,
+                                group_label='rsp'):
     """
     Writes the detachment and attachment density matrices for a specific
     excited state to the checkpoint file.
@@ -289,6 +295,10 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, gr
         The detachment density matrix.
     :param dens_attach:
         The attachment density matrix.
+    :param chg_detach:
+        The detachment charges.
+    :param chg_attach:
+        The attachment charges.
     :param group_label:
         The checkpoint file group label.
     """
@@ -308,6 +318,20 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach, gr
         if attach_label in hf:
             del hf[attach_label]
         hf.create_dataset(attach_label, data=dens_attach)
+
+        # add detachment/attachment charges to the rsp group
+
+        if chg_detach is not None:
+            detach_label = group_label + "/detach_charges_" + state_label
+            if detach_label in hf:
+                del hf[detach_label]
+            hf.create_dataset(detach_label, data=chg_detach)
+
+        if chg_attach is not None:
+            attach_label = group_label + "/attach_charges_" + state_label
+            if attach_label in hf:
+                del hf[attach_label]
+            hf.create_dataset(attach_label, data=chg_attach)
 
         hf.close()
 
@@ -609,7 +633,8 @@ def read_results(fname, label):
     valid_checkpoint = (fname and isinstance(fname, str) and
                         Path(fname).is_file())
 
-    assert_msg_critical(valid_checkpoint, fname + " is not a valid checkpoint file.")
+    assert_msg_critical(valid_checkpoint,
+                        fname + " is not a valid checkpoint file.")
 
     res_dict = {}
     h5f = h5py.File(fname, "r")
@@ -619,7 +644,8 @@ def read_results(fname, label):
     if not label_found:
         h5f.close()
 
-    assert_msg_critical(label_found, label + " section not found in the checkpoint file.")
+    assert_msg_critical(label_found,
+                        label + " section not found in the checkpoint file.")
 
     # Always read general information about the molecule, basis, and settings
     for key in h5f:
