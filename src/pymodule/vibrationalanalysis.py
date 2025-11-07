@@ -614,7 +614,8 @@ class VibrationalAnalysis:
         if self.is_scf:
             # only pass numerical option to ScfHessianDriver
             # since XtbHessianDriver will always be numerical
-            hessian_drv.numerical = self.numerical_hessian
+            if self.numerical_hessian and not hessian_drv.numerical:
+                hessian_drv.numerical = self.numerical_hessian
         hessian_drv.do_four_point = self.do_four_point_hessian
         hessian_drv.do_dipole_gradient = self.do_ir
         hessian_drv.do_print_hessian = self.do_print_hessian

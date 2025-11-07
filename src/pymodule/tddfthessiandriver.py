@@ -58,6 +58,9 @@ class TddftHessianDriver(HessianDriver):
             The TDDFT gradient driver.
         """
         super().__init__(scf_drv.comm, scf_drv.ostream)
+        
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+        
         if scf_drv._dft:
             self.flag = "TDDFT Hessian Driver"
         else:
@@ -199,15 +202,7 @@ class TddftHessianDriver(HessianDriver):
                                            self.rsp_driver, rsp_results)
         self.tddft_gradient_driver.ostream.unmute()
 
-        if self.rank == mpi_master():
-            # Multiple excited states can be computed simultaneously by TddftGradientDriver.
-            # For the numerical Hessian, take the first excited state in the list
-            if isinstance(self.tddft_gradient_driver.state_deriv_index, int):
-                return self.tddft_gradient_driver.gradient.copy()
-            else:
-                return self.tddft_gradient_driver.gradient[0].copy()
-        else:
-            return None
+        return self.tddft_gradient_driver.gradient[0].copy()
 
     # The relaxed dipole moment is calculated at the same time as
     # the gradient so, to avoid re-calculating everything, here the value
@@ -224,12 +219,10 @@ class TddftHessianDriver(HessianDriver):
         """
 
         if self.rank == mpi_master():
-            # Multiple excited states can be computed simultaneously by TddftGradientDriver.
+            # Multiple excited states can be computed simultaneously
+            # by TddftGradientDriver.
             # Take the first excited state in the list
-            if isinstance(self.tddft_gradient_driver.state_deriv_index, int):
-                return self.tddft_gradient_driver.relaxed_dipole_moment.copy()
-            else:
-                return self.tddft_gradient_driver.relaxed_dipole_moment[0].copy()
+            return self.tddft_gradient_driver.relaxed_dipole_moment[0].copy()
         else:
             return None
 
@@ -257,7 +250,10 @@ class TddftHessianDriver(HessianDriver):
         if self.tddft_gradient_driver.state_deriv_index is None:
             s = 1
         else:
-            s = self.tddft_gradient_driver.state_deriv_index[0]
+            if isinstance(self.tddft_gradient_driver.state_deriv_index, int):
+                s = self.tddft_gradient_driver.state_deriv_index
+            else:
+                s = self.tddft_gradient_driver.state_deriv_index[0]
 
         cur_str4 = "Exited State                    : %d" % s
 
