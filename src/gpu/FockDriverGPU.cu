@@ -1261,30 +1261,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
-    // setting up the two device streams for Computation and Copying
-    std::vector<StreamWrapper> streamList;
-    streamList.reserve(2);
-    // first stream, high priority, kernels
-    streamList.emplace_back(StreamWrapper{});
-    streamList.back().createHighPriorityStream();
-    // second stream, default priority, data copying
-    streamList.emplace_back(StreamWrapper{});
-    streamList.back().createStream();
-
-    // vector of hipEvent handles (one for each computation block)
-    // once those get marked as completed, the code below can start
-    // moving data back to the host to perform the post processing
-    std::vector<EventWrapper> eventList;
-    EventWrapper copyEvent;
-    eventList.reserve(6);
-
-    for (int32_t i = 0; i < 6; i++)
-    {
-        eventList.emplace_back(EventWrapper{});
-        eventList.back().createEvent();
-    }
-    copyEvent.createEvent();
-
     // Boys function (tabulated for order 0-28)
 
     const auto boys_func_table = boysfunc::getFullBoysFuncTable();
@@ -4480,9 +4456,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[thread_id].stop("J prep.");
 
-    omptimers[thread_id].stop("Coulomb prep.");
-
-    omptimers[thread_id].start("Exchange prep.");
+    omptimers[thread_id].start("K prep.");
 
     // K preparation
 
@@ -4788,12 +4762,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     mat_Fock_omp[gpu_id].zero();
 
-    omptimers[thread_id].start("J computation");
+    omptimers[thread_id].start("J compute");
 
-
-    CTimer coulomb_timer;
-
-    coulomb_timer.start();
 
     // compute J
 
@@ -4801,7 +4771,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
 
     {
-        omptimers[thread_id].start("  J block SS");
+
         const dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
         const dim3 num_blocks(((max_prim_pair_count_local * numCalculationBlocksCoulomb) + threads_per_block.x - 1) / threads_per_block.x);
@@ -4813,8 +4783,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     if (ss_prim_pair_count_local > 0)
     {
-        timer.start("  J block SS");
-
+        //omptimers[thread_id].start("  J block SS");
+    
         const int32_t offsetJ = 0 * max_prim_pair_count_local;
 
         // set up thread blocks for J
@@ -4851,7 +4821,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block SSSS");
+            //omptimers[thread_id].stop("    J block SSSS");
         }
 
         // J: (SS|SP)
@@ -5003,14 +4973,14 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         eventListCoulomb[0].markStreamEvent(streamList[0].stream);
 
-        omptimers[thread_id].stop("  J block SS");
+        //omptimers[thread_id].stop("  J block SS");
     }
 
     // J: S-P block
 
     if (sp_prim_pair_count_local > 0)
     {
-        omptimers[thread_id].start("  J block SP");
+        //omptimers[thread_id].start("  J block SP");
 
         const int32_t offsetJ = 1 * max_prim_pair_count_local;
 
@@ -5196,14 +5166,14 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         eventListCoulomb[1].markStreamEvent(streamList[0].stream);
 
-        omptimers[thread_id].stop("  J block SP");
+        //omptimers[thread_id].stop("  J block SP");
     }
 
     // J: P-P block
 
     if (pp_prim_pair_count_local > 0)
     {
-        omptimers[thread_id].start("  J block PP");
+        //omptimers[thread_id].start("  J block PP");
 
         const int32_t offsetJ = 2 * max_prim_pair_count_local;
 
@@ -5359,7 +5329,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (dd_prim_pair_count > 0)
         {
             const int32_t offsetD = 5 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block PPDD");
+            //omptimers[thread_id].start("    J block PPDD");
 
             gpu::computeCoulombFockPPDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5382,19 +5352,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block PPDD");
+            //omptimers[thread_id].stop("    J block PPDD");
         }
 
         eventListCoulomb[2].markStreamEvent(streamList[0].stream);
 
-        omptimers[thread_id].stop("  J block PP");
+        //omptimers[thread_id].stop("  J block PP");
     }
 
     // J: S-D block
 
     if (sd_prim_pair_count_local > 0)
     {
-        omptimers[thread_id].start("  J block SD");
+        //omptimers[thread_id].start("  J block SD");
 
         const int32_t offsetJ = 3 * max_prim_pair_count_local;
 
@@ -5556,7 +5526,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (dd_prim_pair_count > 0)
         {
             const int32_t offsetD = 5 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block SDDD");
+            //omptimers[thread_id].start("    J block SDDD");
 
             gpu::computeCoulombFockSDDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5579,19 +5549,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block SDDD");
+            //omptimers[thread_id].stop("    J block SDDD");
         }
 
         eventListCoulomb[3].markStreamEvent(streamList[0].stream);
 
-        omptimers[thread_id].stop("  J block SD");
+        //omptimers[thread_id].stop("  J block SD");
     }
 
     // J: P-D block
 
     if (pd_prim_pair_count_local > 0)
     {
-        omptimers[thread_id].start("  J block PD");
+        //omptimers[thread_id].start("  J block PD");
 
         const int32_t offsetJ = 4 * max_prim_pair_count_local;
 
@@ -5667,7 +5637,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (sd_prim_pair_count > 0)
         {
             const int32_t offsetD = 2 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block PDSD");
+            //omptimers[thread_id].start("    J block PDSD");
 
             gpu::computeCoulombFockPDSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5692,7 +5662,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block PDSD");
+            //omptimers[thread_id].stop("    J block PDSD");
         }
 
         // J: (PD|PP)
@@ -5701,7 +5671,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (pp_prim_pair_count > 0)
         {
             const int32_t offsetD = 3 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block PDPP");
+            //omptimers[thread_id].start("    J block PDPP");
 
             gpu::computeCoulombFockPDPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5724,7 +5694,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block PDPP");
+            //omptimers[thread_id].stop("    J block PDPP");
         }
 
         // J: (PD|PD)
@@ -5733,7 +5703,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (pd_prim_pair_count > 0)
         {
             const int32_t offsetD = 4 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block PDPD");
+            //omptimers[thread_id].start("    J block PDPD");
 
             gpu::computeCoulombFockPDPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5756,7 +5726,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block PDPD");
+            //omptimers[thread_id].stop("    J block PDPD");
         }
 
         // J: (PD|DD)
@@ -5765,7 +5735,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (dd_prim_pair_count > 0)
         {
             const int32_t offsetD = 5 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block PDDD");
+            //omptimers[thread_id].start("    J block PDDD");
 
             gpu::computeCoulombFockPDDD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5914,19 +5884,19 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block PDDD");
+            //omptimers[thread_id].stop("    J block PDDD");
         }
 
         eventListCoulomb[4].markStreamEvent(streamList[0].stream);
 
-        omptimers[thread_id].stop("  J block PD");
+        //omptimers[thread_id].stop("  J block PD");
     }
 
     // J: D-D block
 
     if (dd_prim_pair_count_local > 0)
     {
-        omptimers[thread_id].start("  J block DD");
+        //omptimers[thread_id].start("  J block DD");
 
         const int32_t offsetJ = 5 * max_prim_pair_count_local;
 
@@ -5942,7 +5912,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (ss_prim_pair_count > 0)
         {
             const int32_t offsetD = 0 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block DDSS");
+            //omptimers[thread_id].start("    J block DDSS");
 
             gpu::computeCoulombFockDDSS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5965,7 +5935,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block DDSS");
+            //omptimers[thread_id].stop("    J block DDSS");
         }
 
         // J: (DD|SP)
@@ -5974,7 +5944,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (sp_prim_pair_count > 0)
         {
             const int32_t offsetD = 1 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block DDSP");
+            //omptimers[thread_id].start("    J block DDSP");
 
             gpu::computeCoulombFockDDSP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -5999,7 +5969,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block DDSP");
+            //omptimers[thread_id].stop("    J block DDSP");
         }
 
         // J: (DD|SD)
@@ -6008,7 +5978,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (sd_prim_pair_count > 0)
         {
             const int32_t offsetD = 2 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block DDSD");
+            //omptimers[thread_id].start("    J block DDSD");
 
             gpu::computeCoulombFockDDSD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -6031,7 +6001,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block DDSD");
+            //omptimers[thread_id].stop("    J block DDSD");
         }
 
         // J: (DD|PP)
@@ -6040,7 +6010,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (pp_prim_pair_count > 0)
         {
             const int32_t offsetD = 3 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block DDPP");
+            //omptimers[thread_id].start("    J block DDPP");
 
             gpu::computeCoulombFockDDPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J + offsetJ,
@@ -6063,7 +6033,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block DDPP");
+            //omptimers[thread_id].stop("    J block DDPP");
         }
 
         // J: (DD|PD)
@@ -6072,7 +6042,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (pd_prim_pair_count > 0)
         {
             const int32_t offsetD = 4 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block DDPD");
+            //omptimers[thread_id].start("    J block DDPD");
 
             gpu::computeCoulombFockDDPD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                                d_mat_J +offsetJ,
@@ -6284,7 +6254,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block DDPD");
+            //omptimers[thread_id].stop("    J block DDPD");
         }
 
         // J: (DD|DD)
@@ -6293,7 +6263,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         if (dd_prim_pair_count > 0)
         {
             const int32_t offsetD = 5 * max_prim_pair_count;
-            omptimers[thread_id].start("    J block DDDD");
+            //omptimers[thread_id].start("    J block DDDD");
 
             gpuSafe(gpuMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), gpuMemcpyHostToDevice));
 
@@ -6871,25 +6841,17 @@ computeFockOnGPU(const              CMolecule& molecule,
                                d_boys_func_ft,
                                eri_threshold);
 
-            omptimers[thread_id].stop("    J block DDDD");
+            //omptimers[thread_id].stop("    J block DDDD");
         }
         eventListCoulomb[5].markStreamEvent(streamList[0].stream);
-        omptimers[thread_id].stop("  J block DD");
+        //omptimers[thread_id].stop("  J block DD");
     }
 
     }  // end of compute J
 
-    coulomb_timer.stop();
+    omptimers[thread_id].stop("J compute");
 
-    auto coulomb_elapsed_time = coulomb_timer.getElapsedTime();
-
-    screening.setCoulombTime(gpu_id, coulomb_elapsed_time);
-
-    omptimers[thread_id].stop("J computation");
-
-    CTimer exchange_timer;
-
-    exchange_timer.start();
+    omptimers[thread_id].start("K compute"); 
 
     // compute K
 
@@ -7196,13 +7158,13 @@ computeFockOnGPU(const              CMolecule& molecule,
                            eri_threshold);
 
         eventListExchange[0].markStreamEvent(streamList[0].stream);
-        omptimers[thread_id].stop("  K block SS");
+        //omptimers[thread_id].stop("  K block SS");
 
     }
 
     if (pair_inds_count_for_K_sp > 0)
     {
-        omptimers[thread_id].start("  K block SP");
+        //omptimers[thread_id].start("  K block SP");
 
         const int32_t offset = 1 * max_pair_inds_count;
 
@@ -7516,12 +7478,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            eri_threshold);
 
         eventListExchange[1].markStreamEvent(streamList[0].stream);
-        omptimers[thread_id].stop("  K block SP");
+        //omptimers[thread_id].stop("  K block SP");
     }
 
     if (pair_inds_count_for_K_pp > 0)
     {
-        omptimers[thread_id].start("  K block PP");
+        //omptimers[thread_id].start("  K block PP");
         const int32_t offset = 2 * max_pair_inds_count;
 
         // set up thread blocks for K
@@ -7533,7 +7495,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PS|PS)
         //     *  *
 
-        omptimers[thread_id].start("    K block PSPS");
+        //omptimers[thread_id].start("    K block PSPS");
 
         gpu::computeExchangeFockPSPS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7559,12 +7521,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PSPS");
+        //omptimers[thread_id].stop("    K block PSPS");
 
         // K: (PS|PP)
         //     *  *
 
-        omptimers[thread_id].start("    K block PSPP");
+        //omptimers[thread_id].start("    K block PSPP");
 
         gpu::computeExchangeFockPSPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7595,12 +7557,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PSPP");
+        //omptimers[thread_id].stop("    K block PSPP");
 
         // K: (PP|PS)
         //     *  *
 
-        omptimers[thread_id].start("    K block PPPS");
+        //omptimers[thread_id].start("    K block PPPS");
 
         gpu::computeExchangeFockPPPS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7631,12 +7593,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PPPS");
+        //omptimers[thread_id].stop("    K block PPPS");
 
         // K: (PP|PP)
         //     *  *
 
-        omptimers[thread_id].start("    K block PPPP");
+        //omptimers[thread_id].start("    K block PPPP");
 
         gpu::computeExchangeFockPPPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7659,12 +7621,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PPPP");
+        //omptimers[thread_id].stop("    K block PPPP");
 
         // K: (PS|PD)
         //     *  *
 
-        omptimers[thread_id].start("    K block PSPD");
+        //omptimers[thread_id].start("    K block PSPD");
 
         gpu::computeExchangeFockPSPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7698,12 +7660,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PSPD");
+        //omptimers[thread_id].stop("    K block PSPD");
 
         // K: (PD|PS)
         //     *  *
 
-        omptimers[thread_id].start("    K block PDPS");
+        //omptimers[thread_id].start("    K block PDPS");
 
         gpu::computeExchangeFockPDPS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7737,12 +7699,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PDPS");
+        //omptimers[thread_id].stop("    K block PDPS");
 
         // K: (PP|PD)
         //     *  *
 
-        omptimers[thread_id].start("    K block PPPD");
+        //omptimers[thread_id].start("    K block PPPD");
 
         gpu::computeExchangeFockPPPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7773,12 +7735,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PPPD");
+        //omptimers[thread_id].stop("    K block PPPD");
 
         // K: (PD|PP)
         //     *  *
 
-        omptimers[thread_id].start("    K block PDPP");
+        //omptimers[thread_id].start("    K block PDPP");
 
         gpu::computeExchangeFockPDPP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7809,12 +7771,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PDPP");
+        //omptimers[thread_id].stop("    K block PDPP");
 
         // K: (PD|PD)
         //     *  *
 
-        omptimers[thread_id].start("    K block PDPD");
+        //omptimers[thread_id].start("    K block PDPD");
 
         gpu::computeExchangeFockPDPD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7840,14 +7802,14 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PDPD");
+        //omptimers[thread_id].stop("    K block PDPD");
         eventListExchange[2].markStreamEvent(streamList[0].stream);
-        omptimers[thread_id].stop("  K block PP");
+        //omptimers[thread_id].stop("  K block PP");
     }
 
     if (pair_inds_count_for_K_sd > 0)
     {
-        omptimers[thread_id].start("  K block SD");
+        //omptimers[thread_id].start("  K block SD");
 
         // set up thread blocks for K
 
@@ -7962,7 +7924,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|DP)
         //     *  *
 
-        omptimers[thread_id].start("    K block SPDP");
+        //omptimers[thread_id].start("    K block SPDP");
 
         gpu::computeExchangeFockSPDP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -7996,12 +7958,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block SPDP");
+        //omptimers[thread_id].stop("    K block SPDP");
 
         // K: (SS|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block SSDD");
+        //omptimers[thread_id].start("    K block SSDD");
 
         gpu::computeExchangeFockSSDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8032,12 +7994,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block SSDD");
+        //omptimers[thread_id].stop("    K block SSDD");
 
         // K: (SD|DS)
         //     *  *
 
-        omptimers[thread_id].start("    K block SDDS");
+        //omptimers[thread_id].start("    K block SDDS");
 
         gpu::computeExchangeFockSDDS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8068,12 +8030,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block SDDS");
+        //omptimers[thread_id].stop("    K block SDDS");
 
         // K: (SP|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block SPDD");
+        //omptimers[thread_id].start("    K block SPDD");
 
         gpu::computeExchangeFockSPDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8107,12 +8069,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block SPDD");
+        //omptimers[thread_id].stop("    K block SPDD");
 
         // K: (SD|DP)
         //     *  *
 
-        omptimers[thread_id].start("    K block SDDP");
+        //omptimers[thread_id].start("    K block SDDP");
 
         gpu::computeExchangeFockSDDP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8146,12 +8108,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block SDDP");
+        //omptimers[thread_id].stop("    K block SDDP");
 
         // K: (SD|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block SDDD");
+        //omptimers[thread_id].start("    K block SDDD");
 
         gpu::computeExchangeFockSDDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8182,14 +8144,14 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block SDDD");
+        //omptimers[thread_id].stop("    K block SDDD");
         eventListExchange[3].markStreamEvent(streamList[0].stream);
-        omptimers[thread_id].stop("  K block SD");
+        //omptimers[thread_id].stop("  K block SD");
     }
 
     if (pair_inds_count_for_K_pd > 0)
     {
-        omptimers[thread_id].start("  K block PD");
+        //omptimers[thread_id].start("  K block PD");
 
         // set up thread blocks for K
 
@@ -8202,7 +8164,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PS|DS)
         //     *  *
 
-        omptimers[thread_id].start("    K block PSDS");
+        //omptimers[thread_id].start("    K block PSDS");
 
         gpu::computeExchangeFockPSDS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8236,12 +8198,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PSDS");
+        //omptimers[thread_id].stop("    K block PSDS");
 
         // K: (PS|DP)
         //     *  *
 
-        omptimers[thread_id].start("    K block PSDP");
+        //omptimers[thread_id].start("    K block PSDP");
 
         gpu::computeExchangeFockPSDP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8275,12 +8237,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PSDP");
+        //omptimers[thread_id].stop("    K block PSDP");
 
         // K: (PP|DS)
         //     *  *
 
-        omptimers[thread_id].start("    K block PPDS");
+        //omptimers[thread_id].start("    K block PPDS");
 
         gpu::computeExchangeFockPPDS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8314,12 +8276,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PPDS");
+        //omptimers[thread_id].stop("    K block PPDS");
 
         // K: (PS|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block PSDD");
+        //omptimers[thread_id].start("    K block PSDD");
 
         gpu::computeExchangeFockPSDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8353,12 +8315,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PSDD");
+        //omptimers[thread_id].stop("    K block PSDD");
 
         // K: (PD|DS)
         //     *  *
 
-        omptimers[thread_id].start("    K block PDDS");
+        //omptimers[thread_id].start("    K block PDDS");
 
         gpu::computeExchangeFockPDDS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8392,12 +8354,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PDDS");
+        //omptimers[thread_id].stop("    K block PDDS");
 
         // K: (PP|DP)
         //     *  *
 
-        omptimers[thread_id].start("    K block PPDP");
+        //omptimers[thread_id].start("    K block PPDP");
 
         gpu::computeExchangeFockPPDP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8428,12 +8390,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PPDP");
+        //omptimers[thread_id].stop("    K block PPDP");
 
         // K: (PP|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block PPDD");
+        //omptimers[thread_id].start("    K block PPDD");
 
         gpu::computeExchangeFockPPDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8464,12 +8426,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PPDD");
+        //omptimers[thread_id].stop("    K block PPDD");
 
         // K: (PD|DP)
         //     *  *
 
-        omptimers[thread_id].start("    K block PDDP");
+        //omptimers[thread_id].start("    K block PDDP");
 
         gpu::computeExchangeFockPDDP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8500,12 +8462,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PDDP");
+        //omptimers[thread_id].stop("    K block PDDP");
 
         // K: (PD|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block PDDD");
+        //omptimers[thread_id].start("    K block PDDD");
 
         gpu::computeExchangeFockPDDD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8739,14 +8701,14 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block PDDD");
+        //omptimers[thread_id].stop("    K block PDDD");
         eventListExchange[4].markStreamEvent(streamList[0].stream);
-        omptimers[thread_id].stop("  K block PD");
+        //omptimers[thread_id].stop("  K block PD");
     }
 
     if (pair_inds_count_for_K_dd > 0)
     {
-        omptimers[thread_id].start("  K block DD");
+        //omptimers[thread_id].start("  K block DD");
 
         const int32_t offset = 5 * max_pair_inds_count;
 
@@ -8856,7 +8818,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DS|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block DSDD");
+        //omptimers[thread_id].start("    K block DSDD");
 
         gpu::computeExchangeFockDSDD<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8887,12 +8849,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block DSDD");
+        //omptimers[thread_id].stop("    K block DSDD");
 
         // K: (DD|DS)
         //     *  *
 
-        omptimers[thread_id].start("    K block DDDS");
+        //omptimers[thread_id].start("    K block DDDS");
 
         gpu::computeExchangeFockDDDS<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8923,12 +8885,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block DDDS");
+        //omptimers[thread_id].stop("    K block DDDS");
 
         // K: (DP|DP)
         //     *  *
 
-        omptimers[thread_id].start("    K block DPDP");
+        //omptimers[thread_id].start("    K block DPDP");
 
         gpu::computeExchangeFockDPDP<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -8954,12 +8916,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block DPDP");
+        //omptimers[thread_id].stop("    K block DPDP");
 
         // K: (DP|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block DPDD");
+        //omptimers[thread_id].start("    K block DPDD");
 
         gpu::computeExchangeFockDPDD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -9164,12 +9126,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block DPDD");
+        //omptimers[thread_id].stop("    K block DPDD");
 
         // K: (DD|DP)
         //     *  *
 
-        omptimers[thread_id].start("    K block DDDP");
+        //omptimers[thread_id].start("    K block DDDP");
 
         gpu::computeExchangeFockDDDP0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -9374,12 +9336,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block DDDP");
+        //omptimers[thread_id].stop("    K block DDDP");
 
         // K: (DD|DD)
         //     *  *
 
-        omptimers[thread_id].start("    K block DDDD");
+        //omptimers[thread_id].start("    K block DDDD");
 
         gpu::computeExchangeFockDDDD0<<<num_blocks, threads_per_block, 0, streamList[0].stream>>>(
                            d_mat_K + offset,
@@ -9780,10 +9742,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        omptimers[thread_id].stop("    K block DDDD");
+        //omptimers[thread_id].stop("    K block DDDD");
         eventListExchange[5].markStreamEvent(streamList[0].stream);
-        omptimers[thread_id].stop("  K block DD");
+        //omptimers[thread_id].stop("  K block DD");
     }
+
+    omptimers[thread_id].stop("K compute");
 
     } // end of K kernel launches
 
@@ -10205,13 +10169,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    omptimers[thread_id].stop("K compute");
-    exchange_timer.stop();
-
-    auto exchange_elapsed_time = exchange_timer.getElapsedTime();
-
-    screening.setExchangeTime(gpu_id, exchange_elapsed_time);
-
     streamList[0].destroyStream();
     streamList[1].destroyStream();
     streamList[2].destroyStream();
@@ -10274,10 +10231,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto timer_summary = timer.getSummary();
     screening.setTimerSummary(timer_summary);
 
-    for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    for (int gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
-        auto gpu_timer_summary = omptimers[thread_id].getSummary();
-        screening.setGpuTimerSummary(thread_id, gpu_timer_summary);
+        auto gpu_timer_summary = omptimers[gpu_id].getSummary();
+        screening.setGpuTimerSummary(gpu_id, gpu_timer_summary);
     }
 
     return mat_Fock_sum;
