@@ -120,6 +120,10 @@ class DensityViewer:
         self._plt_iso_one = None
         self._plt_iso_two = None
 
+        # viewer size
+        self._viewer_width = 600
+        self._viewer_height = 450
+
     def read_hdf5(self, fname):
         """
         Reads the dictionary of densities from a checkpoint file.
@@ -770,7 +774,12 @@ class DensityViewer:
 
         return plt_iso_one, plt_iso_two
 
-    def _plot_using_py3dmol(self, molecule, basis, den_inp):
+    def _plot_using_py3dmol(self,
+                            molecule,
+                            basis,
+                            den_inp,
+                            width=600,
+                            height=450):
         """
         Plots the densities using py3dmol, with a widget to choose which.
 
@@ -807,12 +816,18 @@ class DensityViewer:
         # use a persistent output widget
         out = widgets.Output()
 
+        self._viewer_width = width
+        self._viewer_height = height
+
         # draw the first density by default
         with out:
             display(HTML(self._draw_density_html(den_key_list[0])))
 
         def update_view(change):
-            out.clear_output()
+            out.clear_output(wait=True)
+            with out:
+                display(HTML(self._draw_molecule_html()))
+            out.clear_output(wait=True)
             with out:
                 display(HTML(self._draw_density_html(change['new'])))
 
@@ -823,6 +838,30 @@ class DensityViewer:
         dropdown.observe(update_view, names='value')
 
         display(dropdown, out)
+
+    def _draw_molecule_html(self):
+        """
+        Generates HTML for molecule using py3dmol.
+
+        :return:
+            The HTML for molecule.
+        """
+
+        try:
+            import py3Dmol
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol')
+
+        viewer = py3Dmol.view(width=self._viewer_width,
+                              height=self._viewer_height)
+
+        viewer.addModel(self._molecule.get_xyz_string(), "xyz")
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})
+
+        viewer.zoomTo()
+
+        # self-contained HTML that is stable in ipywidgets
+        return viewer._make_html()
 
     def _draw_density_html(self, density_label):
         """
@@ -844,7 +883,8 @@ class DensityViewer:
         density_cube_data = self.compute_density(density_np)
         density_cube_str = self._get_density_cube_str(density_cube_data)
 
-        viewer = py3Dmol.view(width=600, height=450)
+        viewer = py3Dmol.view(width=self._viewer_width,
+                              height=self._viewer_height)
 
         viewer.addModel(density_cube_str, "cube")
         viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})
