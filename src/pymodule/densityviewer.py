@@ -464,7 +464,7 @@ class DensityViewer:
 
         return np_density
 
-    def plot(self, molecule, basis, den_inp):
+    def plot(self, molecule, basis, den_inp, width=600, height=450):
         """
         Plots the densities, with a widget to choose which.
 
@@ -478,15 +478,9 @@ class DensityViewer:
             and their labels).
         """
 
-        try:
-            import k3d
-        except ImportError:
-            self._plot_using_py3dmol(molecule, basis, den_inp)
-            return
+        self._plot_using_py3dmol(molecule, basis, den_inp, width, height)
 
-        self._plot_using_k3d(molecule, basis, den_inp)
-
-    def _plot_using_k3d(self, molecule, basis, den_inp):
+    def plot_using_k3d(self, molecule, basis, den_inp):
         """
         Plots the densities using k3d, with a widget to choose which.
 

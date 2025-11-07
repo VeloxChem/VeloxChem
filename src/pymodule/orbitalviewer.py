@@ -357,7 +357,7 @@ class OrbitalViewer:
 
         return np_orb
 
-    def plot(self, molecule, basis, mo_inp, label=''):
+    def plot(self, molecule, basis, mo_inp, label='', width=600, height=450):
         """
         Plots the orbitals, with a widget to choose which.
 
@@ -370,15 +370,9 @@ class OrbitalViewer:
             MolecularOrbitals, or a MolecularOrbitals object).
         """
 
-        try:
-            import k3d
-        except ImportError:
-            self._plot_using_py3dmol(molecule, basis, mo_inp, label)
-            return
+        self._plot_using_py3dmol(molecule, basis, mo_inp, label, width, height)
 
-        self._plot_using_k3d(molecule, basis, mo_inp, label)
-
-    def _plot_using_k3d(self, molecule, basis, mo_inp, label=''):
+    def plot_using_k3d(self, molecule, basis, mo_inp, label=''):
         """
         Plots the orbitals using k3d, with a widget to choose which.
 
