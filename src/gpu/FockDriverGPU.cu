@@ -3694,8 +3694,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.start("Total timing");
 
-    timer.start("Set device");
-
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
     CGpuDevices gpu_devices;
@@ -3704,13 +3702,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
-    auto gpu_rank = rank * num_gpus_per_node;
-
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
-
-    timer.stop("Set device");
+    gpuSafe(gpuSetDevice(0));
 
     timer.start("Prep. blocks");
 
@@ -3866,8 +3859,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
 
-    double *d_data_matrices_ABC;
-    gpuSafe(gpuMalloc(&d_data_matrices_ABC, 3 * mat_full.getNumberOfElements() * sizeof(double)));
+    auto d_data_matrices_ABC = screening.get_devptr_data_matrices_ABC();
 
     double *d_matrix_A = d_data_matrices_ABC;
     double *d_matrix_B = d_matrix_A + mat_full.getNumberOfElements();
@@ -3922,8 +3914,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     hipblasSafe(hipblasDestroy(handle));
 
 #endif
-
-    gpuSafe(gpuFree(d_data_matrices_ABC));
 
     timer.stop("Prep. Q_prime");
 

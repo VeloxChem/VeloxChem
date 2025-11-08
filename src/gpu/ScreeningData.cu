@@ -30,7 +30,7 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "ScreeningData.hpp"
+#include "GpuRuntime.hpp"
 
 #include <omp.h>
 
@@ -41,9 +41,13 @@
 
 #include "BoysFuncTable.hpp"
 #include "ErrorHandler.hpp"
+#include "GpuDevices.hpp"
+#include "GpuSafeChecks.hpp"
+#include "GpuWrapper.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
+#include "ScreeningData.hpp"
 #include "StringFormat.hpp"
 
 #define MATH_CONST_PI 3.14159265358979323846
@@ -121,6 +125,27 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     form_Q_and_D_inds_for_K(s_prim_count, p_prim_count, d_prim_count,
                             s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
                             s_prim_info, p_prim_info, d_prim_info);
+
+    const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
+
+    gpuSafe(gpuSetDevice(0));
+
+    gpuSafe(gpuMalloc(&d_data_matrices_ABC, 3 * cart_naos * cart_naos * sizeof(double)));
+}
+
+CScreeningData::~CScreeningData()
+{
+    gpuSafe(gpuSetDevice(0));
+
+    gpuSafe(gpuFree(d_data_matrices_ABC));
+
+    d_data_matrices_ABC = nullptr;
+}
+
+auto
+CScreeningData::get_devptr_data_matrices_ABC() const -> double*
+{
+    return d_data_matrices_ABC;
 }
 
 auto

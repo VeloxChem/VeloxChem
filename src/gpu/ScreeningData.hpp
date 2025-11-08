@@ -60,6 +60,10 @@ class CScreeningData
     std::string _timer_summary;
     std::vector<std::string> _gpu_timer_summary;
 
+    // gpu pointers
+    double* d_data_matrices_ABC{nullptr};
+
+    // cpu data
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
     CDenseMatrix _Q_matrix_sd;
@@ -216,6 +220,10 @@ class CScreeningData
 
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold, const int rank, const int nnodes);
+
+    ~CScreeningData();
+
+    auto get_devptr_data_matrices_ABC() const -> double*;
 
     auto getNumGpusPerNode() const -> const int64_t;
 
