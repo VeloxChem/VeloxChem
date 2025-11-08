@@ -3977,8 +3977,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     const auto boys_func_table = boysfunc::getFullBoysFuncTable();
     const auto boys_func_ft    = boysfunc::getBoysFuncFactors();
 
-    double *d_data_boys_func;
-    gpuSafe(gpuMalloc(&d_data_boys_func, (boys_func_table.size() + boys_func_table.size()) * sizeof(double)));
+    auto d_data_boys_func = screening.get_devptr_data_boys_func(gpu_id);
 
     double* d_boys_func_table = d_data_boys_func;
     double* d_boys_func_ft = d_boys_func_table + boys_func_table.size();
@@ -10259,8 +10258,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     omptimers[thread_id].stop("K compute");
 
     omptimers[thread_id].start("K finalize");
-
-    gpuSafe(gpuFree(d_data_boys_func));
 
     gpuSafe(gpuFree(d_data_spd_prim_info));
     gpuSafe(gpuFree(d_data_spd_prim_aoinds));

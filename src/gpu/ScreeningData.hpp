@@ -61,7 +61,9 @@ class CScreeningData
     std::vector<std::string> _gpu_timer_summary;
 
     // gpu pointers
-    double* d_data_matrices_ABC{nullptr};
+    double* _d_data_matrices_ABC;
+
+    std::vector<double*> _d_data_boys_func;
 
     // cpu data
     CDenseMatrix _Q_matrix_ss;
@@ -224,6 +226,8 @@ class CScreeningData
     ~CScreeningData();
 
     auto get_devptr_data_matrices_ABC() const -> double*;
+
+    auto get_devptr_data_boys_func(const int64_t gpu_id) const -> double*;
 
     auto getNumGpusPerNode() const -> const int64_t;
 

@@ -130,22 +130,49 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     gpuSafe(gpuSetDevice(0));
 
-    gpuSafe(gpuMalloc(&d_data_matrices_ABC, 3 * cart_naos * cart_naos * sizeof(double)));
+    gpuSafe(gpuMalloc(&_d_data_matrices_ABC, 3 * cart_naos * cart_naos * sizeof(double)));
+
+    const auto boys_func_table_size = boysfunc::getFullBoysFuncTableSize();
+    const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
+
+    _d_data_boys_func = std::vector<double*>(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        gpuSafe(gpuSetDevice(gpu_id));
+
+        gpuSafe(gpuMalloc(&_d_data_boys_func[gpu_id], (boys_func_table_size + boys_func_ft_size) * sizeof(double)));
+    }
+
+    gpuSafe(gpuSetDevice(0));
 }
 
 CScreeningData::~CScreeningData()
 {
     gpuSafe(gpuSetDevice(0));
 
-    gpuSafe(gpuFree(d_data_matrices_ABC));
+    gpuSafe(gpuFree(_d_data_matrices_ABC));
 
-    d_data_matrices_ABC = nullptr;
+    for (int64_t gpu_id = 0; gpu_id < static_cast<int64_t>(_d_data_boys_func.size()); gpu_id++)
+    {
+        gpuSafe(gpuSetDevice(gpu_id));
+
+        gpuSafe(gpuFree(_d_data_boys_func[gpu_id]));
+    }
+
+    gpuSafe(gpuSetDevice(0));
 }
 
 auto
 CScreeningData::get_devptr_data_matrices_ABC() const -> double*
 {
-    return d_data_matrices_ABC;
+    return _d_data_matrices_ABC;
+}
+
+auto
+CScreeningData::get_devptr_data_boys_func(const int64_t gpu_id) const -> double*
+{
+    return _d_data_boys_func[gpu_id];
 }
 
 auto
