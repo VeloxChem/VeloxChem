@@ -4120,19 +4120,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // sorted Q, D, and indices on device
 
-    double *d_data_mat_D_J;
-    gpuSafe(gpuMalloc(&d_data_mat_D_J, (max_prim_pair_count + max_prim_pair_count_local) * sizeof(double)));
+    auto d_data_mat_D_J = screening.get_devptr_data_mat_D_J(gpu_id);
 
     double *d_mat_D = d_data_mat_D_J;
     double *d_mat_J = d_mat_D + max_prim_pair_count;
 
-    double *d_data_mat_Q;
-    gpuSafe(gpuMalloc(&d_data_mat_Q, (ss_prim_pair_count +
-                                      sp_prim_pair_count +
-                                      sd_prim_pair_count +
-                                      pp_prim_pair_count +
-                                      pd_prim_pair_count +
-                                      dd_prim_pair_count) * sizeof(double)));
+    auto d_data_mat_Q = screening.get_devptr_data_mat_Q(gpu_id);
 
     double *d_ss_mat_Q = d_data_mat_Q;
     double *d_sp_mat_Q = d_ss_mat_Q + ss_prim_pair_count;
@@ -4141,19 +4134,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_pd_mat_Q = d_pp_mat_Q + pp_prim_pair_count;
     double *d_dd_mat_Q = d_pd_mat_Q + pd_prim_pair_count;
 
-    uint32_t *d_data_first_second_inds;
-    gpuSafe(gpuMalloc(&d_data_first_second_inds, (ss_prim_pair_count +
-                                                  ss_prim_pair_count +
-                                                  sp_prim_pair_count +
-                                                  sp_prim_pair_count +
-                                                  sd_prim_pair_count +
-                                                  sd_prim_pair_count +
-                                                  pp_prim_pair_count +
-                                                  pp_prim_pair_count +
-                                                  pd_prim_pair_count +
-                                                  pd_prim_pair_count +
-                                                  dd_prim_pair_count +
-                                                  dd_prim_pair_count) * sizeof(uint32_t)));
+    auto d_data_first_second_inds = screening.get_devptr_data_first_second_inds(gpu_id);
 
     uint32_t *d_ss_first_inds  = d_data_first_second_inds;
     uint32_t *d_ss_second_inds = d_ss_first_inds  + ss_prim_pair_count;
@@ -4168,13 +4149,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     uint32_t *d_dd_first_inds  = d_pd_second_inds + pd_prim_pair_count;
     uint32_t *d_dd_second_inds = d_dd_first_inds  + dd_prim_pair_count;
 
-    double *d_data_pair_data;
-    gpuSafe(gpuMalloc(&d_data_pair_data, (ss_pair_data.size() +
-                                          sp_pair_data.size() +
-                                          sd_pair_data.size() +
-                                          pp_pair_data.size() +
-                                          pd_pair_data.size() +
-                                          dd_pair_data.size()) * sizeof(double)));
+    auto d_data_pair_data = screening.get_devptr_data_pair_data(gpu_id);
 
     double *d_ss_pair_data = d_data_pair_data;
     double *d_sp_pair_data = d_ss_pair_data + ss_pair_data.size();
@@ -4183,13 +4158,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_pd_pair_data = d_pp_pair_data + pp_pair_data.size();
     double *d_dd_pair_data = d_pd_pair_data + pd_pair_data.size();
 
-    double *d_data_mat_Q_local;
-    gpuSafe(gpuMalloc(&d_data_mat_Q_local, (ss_prim_pair_count_local +
-                                            sp_prim_pair_count_local +
-                                            sd_prim_pair_count_local +
-                                            pp_prim_pair_count_local +
-                                            pd_prim_pair_count_local +
-                                            dd_prim_pair_count_local) * sizeof(double)));
+    auto d_data_mat_Q_local = screening.get_devptr_data_mat_Q_local(gpu_id);
 
     double *d_ss_mat_Q_local = d_data_mat_Q_local;
     double *d_sp_mat_Q_local = d_ss_mat_Q_local + ss_prim_pair_count_local;
@@ -4198,19 +4167,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_pd_mat_Q_local = d_pp_mat_Q_local + pp_prim_pair_count_local;
     double *d_dd_mat_Q_local = d_pd_mat_Q_local + pd_prim_pair_count_local;
 
-    uint32_t *d_data_first_second_inds_local;
-    gpuSafe(gpuMalloc(&d_data_first_second_inds_local, (ss_prim_pair_count_local +
-                                                        ss_prim_pair_count_local +
-                                                        sp_prim_pair_count_local +
-                                                        sp_prim_pair_count_local +
-                                                        sd_prim_pair_count_local +
-                                                        sd_prim_pair_count_local +
-                                                        pp_prim_pair_count_local +
-                                                        pp_prim_pair_count_local +
-                                                        pd_prim_pair_count_local +
-                                                        pd_prim_pair_count_local +
-                                                        dd_prim_pair_count_local +
-                                                        dd_prim_pair_count_local) * sizeof(uint32_t)));
+    auto d_data_first_second_inds_local = screening.get_devptr_data_first_second_inds_local(gpu_id);
 
     uint32_t *d_ss_first_inds_local  = d_data_first_second_inds_local;
     uint32_t *d_ss_second_inds_local = d_ss_first_inds_local  + ss_prim_pair_count_local;
@@ -4225,13 +4182,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     uint32_t *d_dd_first_inds_local  = d_pd_second_inds_local + pd_prim_pair_count_local;
     uint32_t *d_dd_second_inds_local = d_dd_first_inds_local  + dd_prim_pair_count_local;
 
-    double *d_data_pair_data_local;
-    gpuSafe(gpuMalloc(&d_data_pair_data_local, (ss_pair_data_local.size() +
-                                                sp_pair_data_local.size() +
-                                                sd_pair_data_local.size() +
-                                                pp_pair_data_local.size() +
-                                                pd_pair_data_local.size() +
-                                                dd_pair_data_local.size()) * sizeof(double)));
+    auto d_data_pair_data_local = screening.get_devptr_data_pair_data_local(gpu_id);
 
     double *d_ss_pair_data_local = d_data_pair_data_local;
     double *d_sp_pair_data_local = d_ss_pair_data_local + ss_pair_data_local.size();
@@ -6691,18 +6642,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("J compute");
-
-    omptimers[thread_id].start("J finalize");
-
-    gpuSafe(gpuFree(d_data_mat_D_J));
-    gpuSafe(gpuFree(d_data_mat_Q));
-    gpuSafe(gpuFree(d_data_first_second_inds));
-    gpuSafe(gpuFree(d_data_pair_data));
-    gpuSafe(gpuFree(d_data_mat_Q_local));
-    gpuSafe(gpuFree(d_data_first_second_inds_local));
-    gpuSafe(gpuFree(d_data_pair_data_local));
-
-    omptimers[thread_id].stop("J finalize");
 
     omptimers[thread_id].start("K prep.");
 

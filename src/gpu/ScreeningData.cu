@@ -138,8 +138,39 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
 
     _d_data_boys_func       = std::vector<double*>(num_gpus_per_node);
+
+    const auto s_prim_info_size = 5 * s_prim_count;
+    const auto p_prim_info_size = 5 * p_prim_count;
+    const auto d_prim_info_size = 5 * d_prim_count;
+
+    const auto s_prim_aoinds_size = 1 * s_prim_count;
+    const auto p_prim_aoinds_size = 3 * p_prim_count;
+    const auto d_prim_aoinds_size = 6 * d_prim_count;
+
     _d_data_spd_prim_info   = std::vector<double*>(num_gpus_per_node);
     _d_data_spd_prim_aoinds = std::vector<uint32_t*>(num_gpus_per_node);
+
+    const auto ss_prim_pair_count = _Q_ss_prim_pair_count;
+    const auto sp_prim_pair_count = _Q_sp_prim_pair_count;
+    const auto sd_prim_pair_count = _Q_sd_prim_pair_count;
+    const auto pp_prim_pair_count = _Q_pp_prim_pair_count;
+    const auto pd_prim_pair_count = _Q_pd_prim_pair_count;
+    const auto dd_prim_pair_count = _Q_dd_prim_pair_count;
+
+    // Note: this max_prim_pair_count will be larger than that used in J computation
+    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count,
+                                               pp_prim_pair_count, pd_prim_pair_count, dd_prim_pair_count});
+
+    const auto all_prim_pair_count = (ss_prim_pair_count + sp_prim_pair_count + sd_prim_pair_count +
+                                      pp_prim_pair_count + pd_prim_pair_count + dd_prim_pair_count);
+
+    _d_data_mat_D_J                 = std::vector<double*>(num_gpus_per_node);
+    _d_data_mat_Q                   = std::vector<double*>(num_gpus_per_node);
+    _d_data_first_second_inds       = std::vector<uint32_t*>(num_gpus_per_node);
+    _d_data_pair_data               = std::vector<double*>(num_gpus_per_node);
+    _d_data_mat_Q_local             = std::vector<double*>(num_gpus_per_node);
+    _d_data_first_second_inds_local = std::vector<uint32_t*>(num_gpus_per_node);
+    _d_data_pair_data_local         = std::vector<double*>(num_gpus_per_node);
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
@@ -147,17 +178,38 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
         gpuSafe(gpuMalloc(&_d_data_boys_func[gpu_id], (boys_func_table_size + boys_func_ft_size) * sizeof(double)));
 
-        const auto s_prim_info_size = 5 * s_prim_count;
-        const auto p_prim_info_size = 5 * p_prim_count;
-        const auto d_prim_info_size = 5 * d_prim_count;
-
         gpuSafe(gpuMalloc(&_d_data_spd_prim_info[gpu_id], (s_prim_info_size + p_prim_info_size + d_prim_info_size) * sizeof(double)));
 
-        const auto s_prim_aoinds_size = 1 * s_prim_count;
-        const auto p_prim_aoinds_size = 3 * p_prim_count;
-        const auto d_prim_aoinds_size = 6 * d_prim_count;
-
         gpuSafe(gpuMalloc(&_d_data_spd_prim_aoinds[gpu_id], (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size)* sizeof(uint32_t)));
+
+        const auto ss_prim_pair_count_local = static_cast<int64_t>(_ss_first_inds_local[gpu_id].size());
+        const auto sp_prim_pair_count_local = static_cast<int64_t>(_sp_first_inds_local[gpu_id].size());
+        const auto sd_prim_pair_count_local = static_cast<int64_t>(_sd_first_inds_local[gpu_id].size());
+        const auto pp_prim_pair_count_local = static_cast<int64_t>(_pp_first_inds_local[gpu_id].size());
+        const auto pd_prim_pair_count_local = static_cast<int64_t>(_pd_first_inds_local[gpu_id].size());
+        const auto dd_prim_pair_count_local = static_cast<int64_t>(_dd_first_inds_local[gpu_id].size());
+
+        const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local,
+                                                         sd_prim_pair_count_local, pp_prim_pair_count_local,
+                                                         pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+        const auto all_prim_pair_count_local = (ss_prim_pair_count_local + sp_prim_pair_count_local +
+                                                sd_prim_pair_count_local + pp_prim_pair_count_local +
+                                                pd_prim_pair_count_local + dd_prim_pair_count_local);
+
+        gpuSafe(gpuMalloc(&_d_data_mat_D_J[gpu_id], (max_prim_pair_count + max_prim_pair_count_local) * sizeof(double)));
+
+        gpuSafe(gpuMalloc(&_d_data_mat_Q[gpu_id], all_prim_pair_count * sizeof(double)));
+
+        gpuSafe(gpuMalloc(&_d_data_first_second_inds[gpu_id], all_prim_pair_count * 2 * sizeof(uint32_t)));
+
+        gpuSafe(gpuMalloc(&_d_data_pair_data[gpu_id], all_prim_pair_count * sizeof(double)));
+
+        gpuSafe(gpuMalloc(&_d_data_mat_Q_local[gpu_id], all_prim_pair_count_local * sizeof(double)));
+
+        gpuSafe(gpuMalloc(&_d_data_first_second_inds_local[gpu_id], all_prim_pair_count_local * 2 * sizeof(uint32_t)));
+
+        gpuSafe(gpuMalloc(&_d_data_pair_data_local[gpu_id], all_prim_pair_count_local * sizeof(double)));
     }
 
     gpuSafe(gpuSetDevice(0));
@@ -176,13 +228,31 @@ CScreeningData::~CScreeningData()
         gpuSafe(gpuSetDevice(gpu_id));
 
         gpuSafe(gpuFree(_d_data_boys_func[gpu_id]));
+
         gpuSafe(gpuFree(_d_data_spd_prim_info[gpu_id]));
         gpuSafe(gpuFree(_d_data_spd_prim_aoinds[gpu_id]));
+
+        gpuSafe(gpuFree(_d_data_mat_D_J[gpu_id]));
+        gpuSafe(gpuFree(_d_data_mat_Q[gpu_id]));
+        gpuSafe(gpuFree(_d_data_first_second_inds[gpu_id]));
+        gpuSafe(gpuFree(_d_data_pair_data[gpu_id]));
+        gpuSafe(gpuFree(_d_data_mat_Q_local[gpu_id]));
+        gpuSafe(gpuFree(_d_data_first_second_inds_local[gpu_id]));
+        gpuSafe(gpuFree(_d_data_pair_data_local[gpu_id]));
     }
 
     _d_data_boys_func.clear();
+
     _d_data_spd_prim_info.clear();
     _d_data_spd_prim_aoinds.clear();
+
+    _d_data_mat_D_J.clear();
+    _d_data_mat_Q.clear();
+    _d_data_first_second_inds.clear();
+    _d_data_pair_data.clear();
+    _d_data_mat_Q_local.clear();
+    _d_data_first_second_inds_local.clear();
+    _d_data_pair_data_local.clear();
 
     gpuSafe(gpuSetDevice(0));
 }
@@ -209,6 +279,48 @@ auto
 CScreeningData::get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*
 {
     return _d_data_spd_prim_aoinds[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_mat_D_J(const int64_t gpu_id) const -> double*
+{
+    return _d_data_mat_D_J[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_mat_Q(const int64_t gpu_id) const -> double*
+{
+    return _d_data_mat_Q[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_first_second_inds(const int64_t gpu_id) const -> uint32_t*
+{
+    return _d_data_first_second_inds[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_pair_data(const int64_t gpu_id) const -> double*
+{
+    return _d_data_pair_data[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_mat_Q_local(const int64_t gpu_id) const -> double*
+{
+    return _d_data_mat_Q_local[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_first_second_inds_local(const int64_t gpu_id) const -> uint32_t*
+{
+    return _d_data_first_second_inds_local[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_pair_data_local(const int64_t gpu_id) const -> double*
+{
+    return _d_data_pair_data_local[gpu_id];
 }
 
 auto
@@ -1477,6 +1589,13 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
     const auto pp_prim_pair_count = static_cast<int64_t>(sorted_pp_mat_Q.size());
     const auto pd_prim_pair_count = static_cast<int64_t>(sorted_pd_mat_Q.size());
     const auto dd_prim_pair_count = static_cast<int64_t>(sorted_dd_mat_Q.size());
+
+    _Q_ss_prim_pair_count = ss_prim_pair_count;
+    _Q_sp_prim_pair_count = sp_prim_pair_count;
+    _Q_sd_prim_pair_count = sd_prim_pair_count;
+    _Q_pp_prim_pair_count = pp_prim_pair_count;
+    _Q_pd_prim_pair_count = pd_prim_pair_count;
+    _Q_dd_prim_pair_count = dd_prim_pair_count;
 
     // std::stringstream ss;
     // ss << "Pair screening\n";

@@ -60,12 +60,28 @@ class CScreeningData
     std::string _timer_summary;
     std::vector<std::string> _gpu_timer_summary;
 
+    int64_t _Q_ss_prim_pair_count{0};
+    int64_t _Q_sp_prim_pair_count{0};
+    int64_t _Q_sd_prim_pair_count{0};
+    int64_t _Q_pp_prim_pair_count{0};
+    int64_t _Q_pd_prim_pair_count{0};
+    int64_t _Q_dd_prim_pair_count{0};
+
     // gpu pointers
     double* _d_data_matrices_ABC;
 
     std::vector<double*> _d_data_boys_func;
+
     std::vector<double*> _d_data_spd_prim_info;
     std::vector<uint32_t*> _d_data_spd_prim_aoinds;
+
+    std::vector<double*> _d_data_mat_D_J;
+    std::vector<double*> _d_data_mat_Q;
+    std::vector<uint32_t*> _d_data_first_second_inds;
+    std::vector<double*> _d_data_pair_data;
+    std::vector<double*> _d_data_mat_Q_local;
+    std::vector<uint32_t*> _d_data_first_second_inds_local;
+    std::vector<double*> _d_data_pair_data_local;
 
     // cpu data
     CDenseMatrix _Q_matrix_ss;
@@ -230,8 +246,17 @@ class CScreeningData
     auto get_devptr_data_matrices_ABC() const -> double*;
 
     auto get_devptr_data_boys_func(const int64_t gpu_id) const -> double*;
+
     auto get_devptr_data_spd_prim_info(const int64_t gpu_id) const -> double*;
     auto get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*;
+
+    auto get_devptr_data_mat_D_J(const int64_t gpu_id) const -> double*;
+    auto get_devptr_data_mat_Q(const int64_t gpu_id) const -> double*;
+    auto get_devptr_data_first_second_inds(const int64_t gpu_id) const -> uint32_t*;
+    auto get_devptr_data_pair_data(const int64_t gpu_id) const -> double*;
+    auto get_devptr_data_mat_Q_local(const int64_t gpu_id) const -> double*;
+    auto get_devptr_data_first_second_inds_local(const int64_t gpu_id) const -> uint32_t*;
+    auto get_devptr_data_pair_data_local(const int64_t gpu_id) const -> double*;
 
     auto getNumGpusPerNode() const -> const int64_t;
 
