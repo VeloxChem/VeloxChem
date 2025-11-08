@@ -64,6 +64,8 @@ class CScreeningData
     double* _d_data_matrices_ABC;
 
     std::vector<double*> _d_data_boys_func;
+    std::vector<double*> _d_data_spd_prim_info;
+    std::vector<uint32_t*> _d_data_spd_prim_aoinds;
 
     // cpu data
     CDenseMatrix _Q_matrix_ss;
@@ -228,6 +230,8 @@ class CScreeningData
     auto get_devptr_data_matrices_ABC() const -> double*;
 
     auto get_devptr_data_boys_func(const int64_t gpu_id) const -> double*;
+    auto get_devptr_data_spd_prim_info(const int64_t gpu_id) const -> double*;
+    auto get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*;
 
     auto getNumGpusPerNode() const -> const int64_t;
 

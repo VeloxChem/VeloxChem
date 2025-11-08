@@ -128,6 +128,8 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
 
+    // allocate device pointers
+
     gpuSafe(gpuSetDevice(0));
 
     gpuSafe(gpuMalloc(&_d_data_matrices_ABC, 3 * cart_naos * cart_naos * sizeof(double)));
@@ -135,13 +137,27 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     const auto boys_func_table_size = boysfunc::getFullBoysFuncTableSize();
     const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
 
-    _d_data_boys_func = std::vector<double*>(num_gpus_per_node);
+    _d_data_boys_func       = std::vector<double*>(num_gpus_per_node);
+    _d_data_spd_prim_info   = std::vector<double*>(num_gpus_per_node);
+    _d_data_spd_prim_aoinds = std::vector<uint32_t*>(num_gpus_per_node);
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
         gpuSafe(gpuSetDevice(gpu_id));
 
         gpuSafe(gpuMalloc(&_d_data_boys_func[gpu_id], (boys_func_table_size + boys_func_ft_size) * sizeof(double)));
+
+        const auto s_prim_info_size = 5 * s_prim_count;
+        const auto p_prim_info_size = 5 * p_prim_count;
+        const auto d_prim_info_size = 5 * d_prim_count;
+
+        gpuSafe(gpuMalloc(&_d_data_spd_prim_info[gpu_id], (s_prim_info_size + p_prim_info_size + d_prim_info_size) * sizeof(double)));
+
+        const auto s_prim_aoinds_size = 1 * s_prim_count;
+        const auto p_prim_aoinds_size = 3 * p_prim_count;
+        const auto d_prim_aoinds_size = 6 * d_prim_count;
+
+        gpuSafe(gpuMalloc(&_d_data_spd_prim_aoinds[gpu_id], (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size)* sizeof(uint32_t)));
     }
 
     gpuSafe(gpuSetDevice(0));
@@ -149,6 +165,8 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
 CScreeningData::~CScreeningData()
 {
+    // free device pointers
+
     gpuSafe(gpuSetDevice(0));
 
     gpuSafe(gpuFree(_d_data_matrices_ABC));
@@ -158,7 +176,13 @@ CScreeningData::~CScreeningData()
         gpuSafe(gpuSetDevice(gpu_id));
 
         gpuSafe(gpuFree(_d_data_boys_func[gpu_id]));
+        gpuSafe(gpuFree(_d_data_spd_prim_info[gpu_id]));
+        gpuSafe(gpuFree(_d_data_spd_prim_aoinds[gpu_id]));
     }
+
+    _d_data_boys_func.clear();
+    _d_data_spd_prim_info.clear();
+    _d_data_spd_prim_aoinds.clear();
 
     gpuSafe(gpuSetDevice(0));
 }
@@ -173,6 +197,18 @@ auto
 CScreeningData::get_devptr_data_boys_func(const int64_t gpu_id) const -> double*
 {
     return _d_data_boys_func[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_spd_prim_info(const int64_t gpu_id) const -> double*
+{
+    return _d_data_spd_prim_info[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*
+{
+    return _d_data_spd_prim_aoinds[gpu_id];
 }
 
 auto

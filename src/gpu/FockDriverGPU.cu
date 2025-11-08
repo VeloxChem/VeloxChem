@@ -149,19 +149,14 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     // Boys function (tabulated for order 0-28)
 
     const auto boys_func_table = boysfunc::getFullBoysFuncTable();
-
-    double* d_boys_func_table;
-
-    gpuSafe(gpuMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
-
     const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
-    double* d_boys_func_ft;
+    auto d_data_boys_func = screening.get_devptr_data_boys_func(gpu_id);
 
-    gpuSafe(gpuMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+    double* d_boys_func_table = d_data_boys_func;
+    double* d_boys_func_ft = d_boys_func_table + boys_func_table.size();
 
+    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice));
 
     // GTOs blocks and number of AOs
@@ -215,43 +210,28 @@ computeQMatrixOnGPU(const CMolecule& molecule,
         }
     }
 
-    // S gto block
+    // S, P, D gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
-
-    double*   d_s_prim_info;
-
-    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-
-    // P gto block
-
     std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
-
-    double*   d_p_prim_info;
-
-    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-
-    // D gto block
-
     std::vector<double>   d_prim_info(5 * d_prim_count);
+
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
     std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
 
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
-    double*   d_d_prim_info;
+    auto d_data_spd_prim_info = screening.get_devptr_data_spd_prim_info(gpu_id);
 
-    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+    double* d_s_prim_info = d_data_spd_prim_info;
+    double* d_p_prim_info = d_s_prim_info + s_prim_info.size();
+    double* d_d_prim_info = d_p_prim_info + p_prim_info.size();
 
+    gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
 
     // GTO block pairs
@@ -529,13 +509,6 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     }
 
     gpuSafe(gpuDeviceSynchronize());
-
-    gpuSafe(gpuFree(d_boys_func_table));
-    gpuSafe(gpuFree(d_boys_func_ft));
-
-    gpuSafe(gpuFree(d_s_prim_info));
-    gpuSafe(gpuFree(d_p_prim_info));
-    gpuSafe(gpuFree(d_d_prim_info));
 
     gpuSafe(gpuFree(d_mat_Q));
 
@@ -4027,11 +4000,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
-    double*   d_data_spd_prim_info;
-    gpuSafe(gpuMalloc(&d_data_spd_prim_info, (s_prim_info.size() + p_prim_info.size() + d_prim_info.size()) * sizeof(double)));
-
-    uint32_t* d_data_spd_prim_aoinds;
-    gpuSafe(gpuMalloc(&d_data_spd_prim_aoinds, (s_prim_aoinds.size() + p_prim_aoinds.size() + d_prim_aoinds.size())* sizeof(uint32_t)));
+    auto d_data_spd_prim_info = screening.get_devptr_data_spd_prim_info(gpu_id);
+    auto d_data_spd_prim_aoinds = screening.get_devptr_data_spd_prim_aoinds(gpu_id);
 
     double*   d_s_prim_info = d_data_spd_prim_info;
     double*   d_p_prim_info = d_s_prim_info + s_prim_info.size();
@@ -10258,9 +10228,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     omptimers[thread_id].stop("K compute");
 
     omptimers[thread_id].start("K finalize");
-
-    gpuSafe(gpuFree(d_data_spd_prim_info));
-    gpuSafe(gpuFree(d_data_spd_prim_aoinds));
 
     gpuSafe(gpuFree(d_mat_K));
     gpuSafe(gpuFree(d_data_pair_inds_for_K));
