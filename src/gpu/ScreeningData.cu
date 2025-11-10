@@ -132,8 +132,6 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     gpuSafe(gpuSetDevice(0));
 
-    gpuSafe(gpuMalloc(&_d_data_matrices_ABC, 3 * cart_naos * cart_naos * sizeof(double)));
-
     const auto boys_func_table_size = boysfunc::getFullBoysFuncTableSize();
     const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
 
@@ -179,6 +177,8 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     _d_data_spd_prim_info   = std::vector<double*>(num_gpus_per_node);
     _d_data_spd_prim_aoinds = std::vector<uint32_t*>(num_gpus_per_node);
 
+    _d_data_matrices_ABC = std::vector<double*>(num_gpus_per_node);
+
     _d_data_mat_D_J                 = std::vector<double*>(num_gpus_per_node);
     _d_data_mat_Q                   = std::vector<double*>(num_gpus_per_node);
     _d_data_first_second_inds       = std::vector<uint32_t*>(num_gpus_per_node);
@@ -222,6 +222,10 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
         const auto size_general_double = ((boys_func_table_size + boys_func_ft_size) +
                                           (s_prim_info_size + p_prim_info_size + d_prim_info_size));
         const auto size_general_uint32 = (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
+
+        // calculate preLinK size
+
+        const auto size_prelink_double = 3 * cart_naos * cart_naos;
 
         // calculate J size
 
@@ -323,8 +327,11 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
         // allocate data
 
-        gpuSafe(gpuMalloc(&_devptr_double[gpu_id], (size_general_double + std::max({size_J_double, size_K_double})) * sizeof(double)));
-        gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], (size_general_uint32 + std::max({size_J_uint32, size_K_uint32})) * sizeof(uint32_t)));
+        const auto size_JK_double = std::max({size_prelink_double, size_J_double, size_K_double});
+        const auto size_JK_uint32 = std::max({size_J_uint32, size_K_uint32});
+
+        gpuSafe(gpuMalloc(&_devptr_double[gpu_id], (size_general_double + size_JK_double) * sizeof(double)));
+        gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], (size_general_uint32 + size_JK_uint32) * sizeof(uint32_t)));
 
         // prepare genral data (Boys function and primitive AOs)
 
@@ -336,7 +343,11 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
         // _d_data_spd_prim_aoinds, (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size) * sizeof(uint32_t)
         _d_data_spd_prim_aoinds[gpu_id] = _devptr_uint32[gpu_id];
 
-        // prepare J data (this memory is also used by K data since computation of J and K do not overlap) 
+        // prepare preLinK pointers (the same memory is also used by J and K)
+
+        _d_data_matrices_ABC[gpu_id] = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
+
+        // prepare J pointers (the same memory is also used by preLinK and K)
 
         // double* pointers for J
         _d_data_mat_D_J[gpu_id]         = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
@@ -349,7 +360,7 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
         _d_data_first_second_inds[gpu_id]       = _d_data_spd_prim_aoinds[gpu_id] + (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
         _d_data_first_second_inds_local[gpu_id] = _d_data_first_second_inds[gpu_id] + all_prim_pair_count * 2;
 
-        // prepare K data (this memory is also used by J data since computation of J and K do not overlap) 
+        // prepare K pointers (the same memory is also used by preLinK and J)
 
         // double* pointers for K
         _d_data_mat_K[gpu_id]         = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
@@ -372,8 +383,6 @@ CScreeningData::~CScreeningData()
 
     gpuSafe(gpuSetDevice(0));
 
-    gpuSafe(gpuFree(_d_data_matrices_ABC));
-
     for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {
         gpuSafe(gpuSetDevice(gpu_id));
@@ -383,9 +392,10 @@ CScreeningData::~CScreeningData()
     }
 
     _d_data_boys_func.clear();
-
     _d_data_spd_prim_info.clear();
     _d_data_spd_prim_aoinds.clear();
+
+    _d_data_matrices_ABC.clear();
 
     _d_data_mat_D_J.clear();
     _d_data_mat_Q.clear();
@@ -410,12 +420,6 @@ CScreeningData::~CScreeningData()
 }
 
 auto
-CScreeningData::get_devptr_data_matrices_ABC() const -> double*
-{
-    return _d_data_matrices_ABC;
-}
-
-auto
 CScreeningData::get_devptr_data_boys_func(const int64_t gpu_id) const -> double*
 {
     return _d_data_boys_func[gpu_id];
@@ -431,6 +435,12 @@ auto
 CScreeningData::get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*
 {
     return _d_data_spd_prim_aoinds[gpu_id];
+}
+
+auto
+CScreeningData::get_devptr_data_matrices_ABC(const int64_t gpu_id) const -> double*
+{
+    return _d_data_matrices_ABC[gpu_id];
 }
 
 auto

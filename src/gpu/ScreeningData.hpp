@@ -68,12 +68,11 @@ class CScreeningData
     int64_t _Q_dd_prim_pair_count{0};
 
     // gpu pointers
-    double* _d_data_matrices_ABC;
-
     std::vector<double*> _d_data_boys_func;
-
     std::vector<double*> _d_data_spd_prim_info;
     std::vector<uint32_t*> _d_data_spd_prim_aoinds;
+
+    std::vector<double*> _d_data_matrices_ABC;
 
     std::vector<double*> _d_data_mat_D_J;
     std::vector<double*> _d_data_mat_Q;
@@ -254,12 +253,11 @@ class CScreeningData
 
     ~CScreeningData();
 
-    auto get_devptr_data_matrices_ABC() const -> double*;
-
     auto get_devptr_data_boys_func(const int64_t gpu_id) const -> double*;
-
     auto get_devptr_data_spd_prim_info(const int64_t gpu_id) const -> double*;
     auto get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*;
+
+    auto get_devptr_data_matrices_ABC(const int64_t gpu_id) const -> double*;
 
     auto get_devptr_data_mat_D_J(const int64_t gpu_id) const -> double*;
     auto get_devptr_data_mat_Q(const int64_t gpu_id) const -> double*;

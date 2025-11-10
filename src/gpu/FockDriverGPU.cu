@@ -3832,7 +3832,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
 
-    auto d_data_matrices_ABC = screening.get_devptr_data_matrices_ABC();
+    auto d_data_matrices_ABC = screening.get_devptr_data_matrices_ABC(0);
 
     double *d_matrix_A = d_data_matrices_ABC;
     double *d_matrix_B = d_matrix_A + mat_full.getNumberOfElements();
