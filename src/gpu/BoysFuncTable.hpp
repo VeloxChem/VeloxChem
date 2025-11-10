@@ -39,11 +39,11 @@
 
 namespace boysfunc {
 
-auto getBoysFuncFactorsSize() -> int;
+auto getBoysFuncFactorsSize() -> int64_t;
 
 auto getBoysFuncFactors() -> std::vector<double>;
 
-auto getFullBoysFuncTableSize() -> int;
+auto getFullBoysFuncTableSize() -> int64_t;
 
 auto getFullBoysFuncTable() -> std::vector<double>;
 

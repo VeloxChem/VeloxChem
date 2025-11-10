@@ -41,7 +41,7 @@
 namespace boysfunc {  // boysfunc namespace
 
 auto
-getBoysFuncFactorsSize() -> int
+getBoysFuncFactorsSize() -> int64_t
 {
     return 28;
 }
@@ -56,7 +56,7 @@ getBoysFuncFactors() -> std::vector<double>
 }
 
 auto
-getFullBoysFuncTableSize() -> int
+getFullBoysFuncTableSize() -> int64_t
 {
     return (28 + 1) * 121 * 7;
 }

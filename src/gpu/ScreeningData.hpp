@@ -60,12 +60,12 @@ class CScreeningData
     std::string _timer_summary;
     std::vector<std::string> _gpu_timer_summary;
 
-    size_t _Q_ss_prim_pair_count{0};
-    size_t _Q_sp_prim_pair_count{0};
-    size_t _Q_sd_prim_pair_count{0};
-    size_t _Q_pp_prim_pair_count{0};
-    size_t _Q_pd_prim_pair_count{0};
-    size_t _Q_dd_prim_pair_count{0};
+    int64_t _Q_ss_prim_pair_count{0};
+    int64_t _Q_sp_prim_pair_count{0};
+    int64_t _Q_sd_prim_pair_count{0};
+    int64_t _Q_pp_prim_pair_count{0};
+    int64_t _Q_pd_prim_pair_count{0};
+    int64_t _Q_dd_prim_pair_count{0};
 
     // gpu pointers
     double* _d_data_matrices_ABC;
@@ -91,11 +91,8 @@ class CScreeningData
     std::vector<uint32_t*> _d_data_pair_counts_displs_K;
     std::vector<double*> _d_data_pair_data_K;
 
-    std::vector<double*>   _devptr_J_double;
-    std::vector<uint32_t*> _devptr_J_uint32;
-
-    std::vector<double*>   _devptr_K_double;
-    std::vector<uint32_t*> _devptr_K_uint32;
+    std::vector<double*>   _devptr_double;
+    std::vector<uint32_t*> _devptr_uint32;
 
     // cpu data
     CDenseMatrix _Q_matrix_ss;
@@ -280,11 +277,8 @@ class CScreeningData
     auto get_devptr_data_D_inds_K(const int64_t gpu_id) const -> uint32_t*;
     auto get_devptr_data_pair_counts_displs_K(const int64_t gpu_id) const -> uint32_t*;
 
-    auto get_devptr_J_double(const int64_t gpu_id) const -> double*;
-    auto get_devptr_J_uint32(const int64_t gpu_id) const -> uint32_t*;
-
-    auto get_devptr_K_double(const int64_t gpu_id) const -> double*;
-    auto get_devptr_K_uint32(const int64_t gpu_id) const -> uint32_t*;
+    auto get_devptr_double(const int64_t gpu_id) const -> double*;
+    auto get_devptr_uint32(const int64_t gpu_id) const -> uint32_t*;
 
     auto getNumGpusPerNode() const -> const int64_t;
 

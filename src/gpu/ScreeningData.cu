@@ -137,8 +137,6 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     const auto boys_func_table_size = boysfunc::getFullBoysFuncTableSize();
     const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
 
-    _d_data_boys_func       = std::vector<double*>(num_gpus_per_node);
-
     const auto s_prim_info_size = 5 * s_prim_count;
     const auto p_prim_info_size = 5 * p_prim_count;
     const auto d_prim_info_size = 5 * d_prim_count;
@@ -146,9 +144,6 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     const auto s_prim_aoinds_size = 1 * s_prim_count;
     const auto p_prim_aoinds_size = 3 * p_prim_count;
     const auto d_prim_aoinds_size = 6 * d_prim_count;
-
-    _d_data_spd_prim_info   = std::vector<double*>(num_gpus_per_node);
-    _d_data_spd_prim_aoinds = std::vector<uint32_t*>(num_gpus_per_node);
 
     // Note: these counts are larger than those used in J computation
     const auto ss_prim_pair_count = _Q_ss_prim_pair_count;
@@ -180,6 +175,10 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     const auto all_prim_aoinds_size = (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
 
+    _d_data_boys_func       = std::vector<double*>(num_gpus_per_node);
+    _d_data_spd_prim_info   = std::vector<double*>(num_gpus_per_node);
+    _d_data_spd_prim_aoinds = std::vector<uint32_t*>(num_gpus_per_node);
+
     _d_data_mat_D_J                 = std::vector<double*>(num_gpus_per_node);
     _d_data_mat_Q                   = std::vector<double*>(num_gpus_per_node);
     _d_data_first_second_inds       = std::vector<uint32_t*>(num_gpus_per_node);
@@ -196,28 +195,19 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     _d_data_pair_counts_displs_K = std::vector<uint32_t*>(num_gpus_per_node);
     _d_data_pair_data_K          = std::vector<double*>(num_gpus_per_node);
 
-    _devptr_J_double = std::vector<double*>(num_gpus_per_node);
-    _devptr_J_uint32 = std::vector<uint32_t*>(num_gpus_per_node);
-
-    _devptr_K_double = std::vector<double*>(num_gpus_per_node);
-    _devptr_K_uint32 = std::vector<uint32_t*>(num_gpus_per_node);
+    _devptr_double = std::vector<double*>(num_gpus_per_node);
+    _devptr_uint32 = std::vector<uint32_t*>(num_gpus_per_node);
 
     for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
     {
         gpuSafe(gpuSetDevice(gpu_id));
 
-        gpuSafe(gpuMalloc(&_d_data_boys_func[gpu_id], (boys_func_table_size + boys_func_ft_size) * sizeof(double)));
-
-        gpuSafe(gpuMalloc(&_d_data_spd_prim_info[gpu_id], (s_prim_info_size + p_prim_info_size + d_prim_info_size) * sizeof(double)));
-
-        gpuSafe(gpuMalloc(&_d_data_spd_prim_aoinds[gpu_id], (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size)* sizeof(uint32_t)));
-
-        const auto ss_prim_pair_count_local = _ss_first_inds_local[gpu_id].size();
-        const auto sp_prim_pair_count_local = _sp_first_inds_local[gpu_id].size();
-        const auto sd_prim_pair_count_local = _sd_first_inds_local[gpu_id].size();
-        const auto pp_prim_pair_count_local = _pp_first_inds_local[gpu_id].size();
-        const auto pd_prim_pair_count_local = _pd_first_inds_local[gpu_id].size();
-        const auto dd_prim_pair_count_local = _dd_first_inds_local[gpu_id].size();
+        const auto ss_prim_pair_count_local = static_cast<int64_t>(_ss_first_inds_local[gpu_id].size());
+        const auto sp_prim_pair_count_local = static_cast<int64_t>(_sp_first_inds_local[gpu_id].size());
+        const auto sd_prim_pair_count_local = static_cast<int64_t>(_sd_first_inds_local[gpu_id].size());
+        const auto pp_prim_pair_count_local = static_cast<int64_t>(_pp_first_inds_local[gpu_id].size());
+        const auto pd_prim_pair_count_local = static_cast<int64_t>(_pd_first_inds_local[gpu_id].size());
+        const auto dd_prim_pair_count_local = static_cast<int64_t>(_dd_first_inds_local[gpu_id].size());
 
         const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local,
                                                          sd_prim_pair_count_local, pp_prim_pair_count_local,
@@ -227,7 +217,13 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
                                                 sd_prim_pair_count_local + pp_prim_pair_count_local +
                                                 pd_prim_pair_count_local + dd_prim_pair_count_local);
 
-        // allocate J data
+        // calculate general size
+
+        const auto size_general_double = ((boys_func_table_size + boys_func_ft_size) +
+                                          (s_prim_info_size + p_prim_info_size + d_prim_info_size));
+        const auto size_general_uint32 = (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
+
+        // calculate J size
 
         // d_data_mat_D_J, (max_prim_pair_count + max_prim_pair_count_local) * sizeof(double)
         //
@@ -275,21 +271,7 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
         const auto size_J_uint32 = (all_prim_pair_count * 2 +
                                     all_prim_pair_count_local * 2);
 
-        gpuSafe(gpuMalloc(&_devptr_J_double[gpu_id], size_J_double * sizeof(double)));
-        gpuSafe(gpuMalloc(&_devptr_J_uint32[gpu_id], size_J_uint32 * sizeof(uint32_t)));
-
-        // double* pointers
-        _d_data_mat_D_J[gpu_id]         = _devptr_J_double[gpu_id];
-        _d_data_mat_Q[gpu_id]           = _d_data_mat_D_J[gpu_id] + (max_prim_pair_count + max_prim_pair_count_local);
-        _d_data_pair_data[gpu_id]       = _d_data_mat_Q[gpu_id] + all_prim_pair_count;
-        _d_data_mat_Q_local[gpu_id]     = _d_data_pair_data[gpu_id] + all_prim_pair_count;
-        _d_data_pair_data_local[gpu_id] = _d_data_mat_Q_local[gpu_id] + all_prim_pair_count_local;
-
-        // uint32_t* pointers
-        _d_data_first_second_inds[gpu_id]       = _devptr_J_uint32[gpu_id];
-        _d_data_first_second_inds_local[gpu_id] = _d_data_first_second_inds[gpu_id] + all_prim_pair_count * 2;
-
-        // allocate K data
+        // calculate K size
 
         // d_mat_K, max_pair_inds_count * sizeof(double)
         //
@@ -339,17 +321,44 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
                                     cart_naos * cart_naos +
                                     all_prim_aoinds_size * 3 * 2);
 
-        gpuSafe(gpuMalloc(&_devptr_K_double[gpu_id], size_K_double * sizeof(double)));
-        gpuSafe(gpuMalloc(&_devptr_K_uint32[gpu_id], size_K_uint32 * sizeof(uint32_t)));
+        // allocate data
 
-        // double* pointers
-        _d_data_mat_K[gpu_id]         = _devptr_K_double[gpu_id];
+        gpuSafe(gpuMalloc(&_devptr_double[gpu_id], (size_general_double + std::max({size_J_double, size_K_double})) * sizeof(double)));
+        gpuSafe(gpuMalloc(&_devptr_uint32[gpu_id], (size_general_uint32 + std::max({size_J_uint32, size_K_uint32})) * sizeof(uint32_t)));
+
+        // prepare genral data (Boys function and primitive AOs)
+
+        // _d_data_boys_func, (boys_func_table_size + boys_func_ft_size) * sizeof(double)
+        // _d_data_spd_prim_info, (s_prim_info_size + p_prim_info_size + d_prim_info_size) * sizeof(double)
+        _d_data_boys_func[gpu_id] = _devptr_double[gpu_id];
+        _d_data_spd_prim_info[gpu_id] = _d_data_boys_func[gpu_id] + (boys_func_table_size + boys_func_ft_size);
+
+        // _d_data_spd_prim_aoinds, (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size) * sizeof(uint32_t)
+        _d_data_spd_prim_aoinds[gpu_id] = _devptr_uint32[gpu_id];
+
+        // prepare J data (this memory is also used by K data since computation of J and K do not overlap) 
+
+        // double* pointers for J
+        _d_data_mat_D_J[gpu_id]         = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
+        _d_data_mat_Q[gpu_id]           = _d_data_mat_D_J[gpu_id] + (max_prim_pair_count + max_prim_pair_count_local);
+        _d_data_pair_data[gpu_id]       = _d_data_mat_Q[gpu_id] + all_prim_pair_count;
+        _d_data_mat_Q_local[gpu_id]     = _d_data_pair_data[gpu_id] + all_prim_pair_count;
+        _d_data_pair_data_local[gpu_id] = _d_data_mat_Q_local[gpu_id] + all_prim_pair_count_local;
+
+        // uint32_t* pointers for J
+        _d_data_first_second_inds[gpu_id]       = _d_data_spd_prim_aoinds[gpu_id] + (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
+        _d_data_first_second_inds_local[gpu_id] = _d_data_first_second_inds[gpu_id] + all_prim_pair_count * 2;
+
+        // prepare K data (this memory is also used by J data since computation of J and K do not overlap) 
+
+        // double* pointers for K
+        _d_data_mat_K[gpu_id]         = _d_data_spd_prim_info[gpu_id] + (s_prim_info_size + p_prim_info_size + d_prim_info_size);
         _d_data_mat_D_full_AO[gpu_id] = _d_data_mat_K[gpu_id] + max_pair_inds_count;
         _d_data_Q_K[gpu_id]           = _d_data_mat_D_full_AO[gpu_id] + cart_naos * cart_naos;
         _d_data_pair_data_K[gpu_id]   = _d_data_Q_K[gpu_id] + cart_naos * cart_naos;
 
-        // uint32_t* pointers
-        _d_data_pair_inds_for_K[gpu_id]      = _devptr_K_uint32[gpu_id];
+        // uint32_t* pointers for K
+        _d_data_pair_inds_for_K[gpu_id]      = _d_data_spd_prim_aoinds[gpu_id] + (s_prim_aoinds_size + p_prim_aoinds_size + d_prim_aoinds_size);
         _d_data_D_inds_K[gpu_id]             = _d_data_pair_inds_for_K[gpu_id] + all_pair_inds_count * 2;
         _d_data_pair_counts_displs_K[gpu_id] = _d_data_D_inds_K[gpu_id] + cart_naos * cart_naos;
     }
@@ -365,20 +374,12 @@ CScreeningData::~CScreeningData()
 
     gpuSafe(gpuFree(_d_data_matrices_ABC));
 
-    for (int64_t gpu_id = 0; gpu_id < static_cast<int64_t>(_d_data_boys_func.size()); gpu_id++)
+    for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {
         gpuSafe(gpuSetDevice(gpu_id));
 
-        gpuSafe(gpuFree(_d_data_boys_func[gpu_id]));
-
-        gpuSafe(gpuFree(_d_data_spd_prim_info[gpu_id]));
-        gpuSafe(gpuFree(_d_data_spd_prim_aoinds[gpu_id]));
-
-        gpuSafe(gpuFree(_devptr_J_double[gpu_id]));
-        gpuSafe(gpuFree(_devptr_J_uint32[gpu_id]));
-
-        gpuSafe(gpuFree(_devptr_K_double[gpu_id]));
-        gpuSafe(gpuFree(_devptr_K_uint32[gpu_id]));
+        gpuSafe(gpuFree(_devptr_double[gpu_id]));
+        gpuSafe(gpuFree(_devptr_uint32[gpu_id]));
     }
 
     _d_data_boys_func.clear();
@@ -402,11 +403,8 @@ CScreeningData::~CScreeningData()
     _d_data_pair_counts_displs_K.clear();
     _d_data_pair_data_K.clear();
 
-    _devptr_J_double.clear();
-    _devptr_J_uint32.clear();
-
-    _devptr_K_double.clear();
-    _devptr_K_uint32.clear();
+    _devptr_double.clear();
+    _devptr_uint32.clear();
 
     gpuSafe(gpuSetDevice(0));
 }
