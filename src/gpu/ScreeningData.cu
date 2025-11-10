@@ -530,1098 +530,9 @@ CScreeningData::get_devptr_data_pair_data_K(const int64_t gpu_id) const -> doubl
 }
 
 auto
-CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void
-{
-    // Boys function
-
-    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
-
-    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
-
-    // GTO blocks
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
-
-    int64_t s_prim_count = 0;
-    int64_t p_prim_count = 0;
-    int64_t d_prim_count = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-        const auto npgtos = gto_block.getNumberOfPrimitives();
-
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
-        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
-        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
-    }
-
-    // S block
-
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
-
-    // P block
-
-    std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
-
-    // D block
-
-    std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
-
-    // GTO block pairs
-
-    _Q_matrix_ss = CDenseMatrix(s_prim_count, s_prim_count);
-    _Q_matrix_sp = CDenseMatrix(s_prim_count, p_prim_count * 3);
-    _Q_matrix_sd = CDenseMatrix(s_prim_count, d_prim_count * 6);
-    _Q_matrix_pp = CDenseMatrix(p_prim_count * 3, p_prim_count * 3);
-    _Q_matrix_pd = CDenseMatrix(p_prim_count * 3, d_prim_count * 6);
-    _Q_matrix_dd = CDenseMatrix(d_prim_count * 6, d_prim_count * 6);
-
-    _Q_matrix_ss.zero();
-    _Q_matrix_sp.zero();
-    _Q_matrix_sd.zero();
-    _Q_matrix_pp.zero();
-    _Q_matrix_pd.zero();
-    _Q_matrix_dd.zero();
-
-    // TODO distribute computation of Q matrices
-
-    const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
-    const int64_t d_cart_ind[6][2] = {{0,0}, {0,1}, {0,2}, {1,1}, {1,2}, {2,2}};
-
-    // S-S and S-P block pairs
-
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        const auto a_i = s_prim_info[i + s_prim_count * 0];
-        const auto c_i = s_prim_info[i + s_prim_count * 1];
-        const auto x_i = s_prim_info[i + s_prim_count * 2];
-        const auto y_i = s_prim_info[i + s_prim_count * 3];
-        const auto z_i = s_prim_info[i + s_prim_count * 4];
-
-        // S-S gto block pair
-
-        for (int64_t j = i; j < s_prim_count; j++)
-        {
-            const auto a_j = s_prim_info[j + s_prim_count * 0];
-            const auto c_j = s_prim_info[j + s_prim_count * 1];
-            const auto x_j = s_prim_info[j + s_prim_count * 2];
-            const auto y_j = s_prim_info[j + s_prim_count * 3];
-            const auto z_j = s_prim_info[j + s_prim_count * 4];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-
-            const auto a_ij = a_i + a_j;
-
-            const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
-
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
-
-            const auto F0_t = boysfunc::getBoysFunction(0.0, 0, boys_func_table.data(), boys_func_ft.data());
-
-            const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * F0_t[0]);
-
-            if (sqrt_eri_ijij > _pair_threshold)
-            {
-                _Q_matrix_ss.row(i)[j] = sqrt_eri_ijij;
-
-                if (i != j) _Q_matrix_ss.row(j)[i] = sqrt_eri_ijij;
-            }
-        }
-
-        // S-P gto block pair
-
-        for (int64_t j = 0; j < p_prim_count; j++)
-        {
-            const auto a_j = p_prim_info[j + p_prim_count * 0];
-            const auto c_j = p_prim_info[j + p_prim_count * 1];
-            const auto x_j = p_prim_info[j + p_prim_count * 2];
-            const auto y_j = p_prim_info[j + p_prim_count * 3];
-            const auto z_j = p_prim_info[j + p_prim_count * 4];
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-
-            const auto a_ij = a_i + a_j;
-
-            const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
-
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
-
-            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
-
-            const auto F1_t = boysfunc::getBoysFunction(0.0, 1, boys_func_table.data(), boys_func_ft.data());
-
-            for (int64_t j_cart = 0; j_cart < 3; j_cart++)
-            {
-                // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-                // J. Chem. Phys. 84, 3963-3974 (1986)
-
-                const auto b0 = j_cart;
-
-                const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
-                const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
-
-                            F1_t[0] * PB_0 * PB_0 + F1_t[1] * 0.25 / a_ij
-
-                            ));
-
-                // TODO: think about the ordering of cartesian components
-
-                if (sqrt_eri_ijij > _pair_threshold)
-                {
-                    _Q_matrix_sp.row(i)[j * 3 + j_cart] = sqrt_eri_ijij;
-                }
-            }
-        }
-
-        // S-D gto block pair
-
-        for (int64_t j = 0; j < d_prim_count; j++)
-        {
-            const auto a_j = d_prim_info[j + d_prim_count * 0];
-            const auto c_j = d_prim_info[j + d_prim_count * 1];
-            const auto x_j = d_prim_info[j + d_prim_count * 2];
-            const auto y_j = d_prim_info[j + d_prim_count * 3];
-            const auto z_j = d_prim_info[j + d_prim_count * 4];
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-
-            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_i + a_j) / (MATH_CONST_PI * (a_i + a_j + a_i + a_j)));
-
-            const auto F2_t = boysfunc::getBoysFunction(0.0, 2, boys_func_table.data(), boys_func_ft.data());
-
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-            const auto S1 = a_i + a_j;
-
-            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
-
-            for (int64_t j_cart = 0; j_cart < 6; j_cart++)
-            {
-                const auto b0 = d_cart_ind[j_cart][0];
-                const auto b1 = d_cart_ind[j_cart][1];
-
-                const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-                const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
-
-                const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
-
-                            F2_t[0] * (
-
-                                0.25 / ( S1 * S1 ) * (
-                                    delta[b0][b1] * delta[b0][b1]
-                                )
-
-                                + 0.5 / S1 * (
-                                    delta[b0][b1] * (PB_0 * PB_1 * 2.0)
-                                )
-
-                                + (
-                                    PB_0 * PB_0 * PB_1 * PB_1
-                                )
-
-                            )
-
-                            + F2_t[1] * (
-
-                                0.125 / ( S1 * S1 ) * (
-                                    delta[b0][b1] * delta[b0][b1] * ((-2.0))
-                                )
-
-                                + 0.25 / S1 * (
-                                    + (PB_0 * PB_0)
-                                    + (PB_1 * PB_1)
-                                )
-
-                            )
-
-                            + F2_t[2] * (
-
-                                0.0625 / ( S1 * S1 ) * (
-                                    1.0
-                                    + delta[b0][b1] * delta[b0][b1] * 2.0
-                                )
-
-                            )
-
-                            ));
-
-                if (sqrt_eri_ijij > _pair_threshold)
-                {
-                    _Q_matrix_sd.row(i)[j * 6 + j_cart] = sqrt_eri_ijij;
-                }
-            }
-        }
-    }
-
-    // P-P gto block pair
-
-    for (int64_t i = 0; i < p_prim_count; i++)
-    {
-        const auto a_i = p_prim_info[i + p_prim_count * 0];
-        const auto c_i = p_prim_info[i + p_prim_count * 1];
-        const auto x_i = p_prim_info[i + p_prim_count * 2];
-        const auto y_i = p_prim_info[i + p_prim_count * 3];
-        const auto z_i = p_prim_info[i + p_prim_count * 4];
-
-        for (int64_t j = i; j < p_prim_count; j++)
-        {
-            const auto a_j = p_prim_info[j + p_prim_count * 0];
-            const auto c_j = p_prim_info[j + p_prim_count * 1];
-            const auto x_j = p_prim_info[j + p_prim_count * 2];
-            const auto y_j = p_prim_info[j + p_prim_count * 3];
-            const auto z_j = p_prim_info[j + p_prim_count * 4];
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-
-            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_i + a_j) / (MATH_CONST_PI * (a_i + a_j + a_i + a_j)));
-
-            const auto F2_t = boysfunc::getBoysFunction(0.0, 2, boys_func_table.data(), boys_func_ft.data());
-
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-            const auto S1 = a_i + a_j;
-
-            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
-
-            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
-            {
-                const auto a0 = i_cart;
-
-                const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-
-                auto j_cart_start = (j == i ? i_cart : 0);
-
-                for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
-                {
-                    const auto b0 = j_cart;
-
-                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-
-                    const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
-
-                                F2_t[0] * (
-
-                                    0.5 / S1 * (
-                                        delta[a0][b0] * (PB_0 * PA_0 * 2.0)
-                                    )
-
-                                    + (
-
-                                        + PB_0 * PB_0 * PA_0 * PA_0
-                                    )
-
-                                    + 0.25 / ( S1 * S1 ) * (
-                                        delta[a0][b0] * delta[a0][b0]
-                                    )
-
-                                )
-
-                                + F2_t[1] * (
-
-                                    0.125 / ( S1 * S1 ) * (
-                                        delta[a0][b0] * delta[a0][b0] * ((-2.0))
-                                    )
-
-                                    + 0.25 / S1 * (
-                                        (PA_0 * PA_0)
-                                        + (PB_0 * PB_0)
-                                    )
-
-                                )
-
-                                + F2_t[2] * (
-
-                                    0.0625 / ( S1 * S1 ) * (
-                                        1.0
-                                        + delta[a0][b0] * delta[a0][b0] * 2.0
-                                    )
-
-                                )
-
-                                ));
-
-                    // TODO: think about the ordering of cartesian components
-
-                    if (sqrt_eri_ijij > _pair_threshold)
-                    {
-                        _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart] = sqrt_eri_ijij;
-
-                        if (i * 3 + i_cart != j * 3 + j_cart) _Q_matrix_pp.row(j * 3 + j_cart)[i * 3 + i_cart] = sqrt_eri_ijij;
-                    }
-                }
-            }
-        }
-
-        // P-D gto block pair
-
-        for (int64_t j = 0; j < d_prim_count; j++)
-        {
-            const auto a_j = d_prim_info[j + d_prim_count * 0];
-            const auto c_j = d_prim_info[j + d_prim_count * 1];
-            const auto x_j = d_prim_info[j + d_prim_count * 2];
-            const auto y_j = d_prim_info[j + d_prim_count * 3];
-            const auto z_j = d_prim_info[j + d_prim_count * 4];
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-
-            const auto a_ij = a_i + a_j;
-
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
-
-            const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
-
-            const auto F3_t = boysfunc::getBoysFunction(0.0, 3, boys_func_table.data(), boys_func_ft.data());
-
-            const auto S1 = a_ij;
-
-            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
-
-            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
-            {
-                const auto a0 = i_cart;
-
-                const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-
-                for (int64_t j_cart = 0; j_cart < 6; j_cart++)
-                {
-                    const auto b0 = d_cart_ind[j_cart][0];
-                    const auto b1 = d_cart_ind[j_cart][1];
-
-                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-                    const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
-
-                    const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
-
-                                F3_t[0] * (
-
-                                    0.25 / ( S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0)
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a0][b0] * delta[b0][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
-                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
-                                    )
-
-                                    + 0.5 / S1 * (
-                                        delta[b0][b1] * (PB_0 * PB_1 * PA_0 * PA_0 * 2.0)
-                                        + delta[a0][b1] * (PB_0 * PB_0 * PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b0] * (PB_0 * PB_1 * PB_1 * PA_0 * 2.0)
-                                    )
-
-                                    + (
-
-                                        + PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_0
-                                    )
-
-                                )
-
-                                + F3_t[1] * (
-
-                                    0.125 / ( S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0 * (-2.0))
-                                        + delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a0][b0] * (PB_0 * PA_0 * 2.0)
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0 * (-2.0))
-                                        + delta[a0][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * (-2.0))
-                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * (-2.0))
-                                        + delta[b0][b1] * (PB_0 * PB_1 * 2.0)
-                                        + delta[a0][b1] * delta[a0][b0] * (PB_0 * PB_1)
-                                    )
-
-                                    + 0.25 / S1 * (
-                                        (PB_0 * PB_0 * PA_0 * PA_0)
-                                        + (PB_1 * PB_1 * PA_0 * PA_0)
-                                        + (PB_0 * PB_0 * PB_1 * PB_1)
-                                    )
-
-                                    + 0.0625 / ( S1 * S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1]
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 4.0
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1]
-                                        + delta[a0][b0] * delta[a0][b0]
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
-                                        + delta[a0][b1] * delta[a0][b1]
-                                    )
-
-                                )
-
-                                + F3_t[2] * (
-
-                                    0.03125 / ( S1 * S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * ((-2.0))
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * ((-8.0))
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * ((-2.0))
-                                        + delta[a0][b0] * delta[a0][b0] * ((-2.0))
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * ((-2.0))
-                                        + delta[a0][b1] * delta[a0][b1] * ((-2.0))
-                                    )
-
-                                    + 0.0625 / ( S1 * S1 ) * (
-                                        (PA_0 * PA_0)
-                                        + delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0 * 2.0)
-                                        + delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_0 * (-1.0))
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0)
-                                        + delta[a0][b1] * (PB_1 * PA_0)
-                                        + delta[a0][b1] * (PB_1 * PA_0 * (-1.0))
-                                        + (PB_0 * PB_0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * 2.0)
-                                        + (PB_1 * PB_1)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * 2.0)
-                                    )
-
-                                )
-
-                                + F3_t[3] * (
-
-                                    0.015625 / ( S1 * S1 * S1 ) * (
-                                        1.0
-                                        + delta[b0][b1] * delta[b0][b1] * 2.0
-                                        + delta[a0][b0] * delta[a0][b0] * 2.0
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 5.0
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * 2.0
-                                        + delta[a0][b1] * delta[a0][b1]
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
-                                        + delta[a0][b1] * delta[a0][b1]
-                                    )
-
-                                )
-
-                                ));
-
-                    if (sqrt_eri_ijij > _pair_threshold)
-                    {
-                        _Q_matrix_pd.row(i * 3 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
-                    }
-                }
-            }
-        }
-    }
-
-    // D-D gto block pair
-
-    for (int64_t i = 0; i < d_prim_count; i++)
-    {
-        const auto a_i = d_prim_info[i + d_prim_count * 0];
-        const auto c_i = d_prim_info[i + d_prim_count * 1];
-        const auto x_i = d_prim_info[i + d_prim_count * 2];
-        const auto y_i = d_prim_info[i + d_prim_count * 3];
-        const auto z_i = d_prim_info[i + d_prim_count * 4];
-
-        for (int64_t j = i; j < d_prim_count; j++)
-        {
-            const auto a_j = d_prim_info[j + d_prim_count * 0];
-            const auto c_j = d_prim_info[j + d_prim_count * 1];
-            const auto x_j = d_prim_info[j + d_prim_count * 2];
-            const auto y_j = d_prim_info[j + d_prim_count * 3];
-            const auto z_j = d_prim_info[j + d_prim_count * 4];
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-
-            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-            // J. Chem. Phys. 84, 3963-3974 (1986)
-
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_i + a_j) / (MATH_CONST_PI * (a_i + a_j + a_i + a_j)));
-
-            const auto F4_t = boysfunc::getBoysFunction(0.0, 4, boys_func_table.data(), boys_func_ft.data());
-
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-            const auto S1 = a_i + a_j;
-
-            const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
-
-            for (int64_t i_cart = 0; i_cart < 6; i_cart++)
-            {
-                const auto a0 = d_cart_ind[i_cart][0];
-                const auto a1 = d_cart_ind[i_cart][1];
-
-                const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-                const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];
-
-                auto j_cart_start = (j == i ? i_cart : 0);
-
-                for (int64_t j_cart = j_cart_start; j_cart < 6; j_cart++)
-                {
-                    const auto b0 = d_cart_ind[j_cart][0];
-                    const auto b1 = d_cart_ind[j_cart][1];
-
-                    const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-                    const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
-
-                    const auto sqrt_eri_ijij = std::sqrt(Lambda * S_ij_00 * S_ij_00 * (
-
-                                F4_t[0] * (
-
-                                    0.125 / ( S1 * S1 * S1 ) * (
-                                        delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * (PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * (PA_0 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a0][a1] * delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * (PB_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * (PB_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * (PB_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * (PB_0 * PB_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * (PB_0 * PB_1 * 2.0)
-                                    )
-
-                                    + 0.25 / ( S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0 * PA_1 * PA_1)
-                                        + delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[b0][b1] * (PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0 * PA_0 * PA_0)
-                                        + delta[a1][b0] * delta[a1][b1] * (PB_0 * PB_1 * PA_0 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1 * PA_0 * PA_0)
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[b0][b1] * (PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[b0][b1] * (PB_0 * PB_1 * PA_0 * PA_1 * 4.0)
-                                        + delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * PA_0 * PA_1 * 4.0)
-                                        + delta[a1][b0] * delta[a0][b1] * (PB_0 * PB_1 * PA_0 * PA_1 * 4.0)
-                                        + delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * PA_0 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_0 * PB_1 * PA_0 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b0] * (PB_0 * PB_1 * PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * PA_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * PA_1 * PA_1)
-                                        + delta[a0][a1] * delta[a0][b1] * (PB_0 * PB_0 * PB_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b0] * (PB_0 * PB_1 * PB_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PB_1)
-                                    )
-
-                                    + 0.5 / S1 * (
-                                        delta[b0][b1] * (PB_0 * PB_1 * PA_0 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a1][b1] * (PB_0 * PB_0 * PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * (PB_0 * PB_1 * PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a0][b1] * (PB_0 * PB_0 * PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * (PB_0 * PB_1 * PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_1 * 2.0)
-                                    )
-
-                                    + (
-
-                                        + PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_0 * PA_1 * PA_1
-                                    )
-
-                                    + 0.0625 / ( S1 * S1 * S1 * S1 ) * (
-                                        delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1]
-                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * 2.0
-                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * 2.0
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1]
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * 2.0
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1]
-                                    )
-
-                                )
-
-                                + F4_t[1] * (
-
-                                    0.03125 / ( S1 * S1 * S1 * S1 ) * (
-                                        delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * ((-4.0))
-                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * ((-8.0))
-                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * ((-8.0))
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * ((-4.0))
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * ((-8.0))
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * ((-4.0))
-                                    )
-
-                                    + 0.0625 / ( S1 * S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0)
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * (PA_0 * PA_0 * 4.0)
-                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * (PA_0 * PA_0)
-                                        + delta[a1][b0] * delta[a1][b0] * (PA_0 * PA_0)
-                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * (PA_0 * PA_0)
-                                        + delta[a1][b1] * delta[a1][b1] * (PA_0 * PA_0)
-                                        + delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_1 * (-4.0))
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * (PA_0 * PA_1 * (-2.0))
-                                        + delta[a0][b1] * delta[a1][b0] * delta[b0][b1] * (PA_0 * PA_1)
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * (PA_0 * PA_1 * (-2.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * (PA_0 * PA_1)
-                                        + delta[a0][b0] * delta[a1][b0] * (PA_0 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * (PA_0 * PA_1)
-                                        + delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * (PA_0 * PA_1)
-                                        + delta[a0][b1] * delta[a1][b1] * (PA_0 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_0 * (-2.0))
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * (PB_0 * PA_0 * (-4.0))
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b1] * (PB_0 * PA_0)
-                                        + delta[a0][a1] * delta[a1][b1] * delta[b0][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b0] * (PB_0 * PA_0 * 2.0)
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PA_0 * (-2.0))
-                                        + delta[a1][b1] * delta[a1][b0] * delta[a0][b1] * (PB_0 * PA_0)
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * (PB_1 * PA_0 * (-2.0))
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * (PB_1 * PA_0)
-                                        + delta[a0][a1] * delta[a1][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b0] * delta[b0][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b0] * delta[a1][b1] * (PB_1 * PA_0)
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PA_0)
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * (PB_1 * PA_0 * (-5.0))
-                                        + delta[b0][b1] * delta[b0][b1] * (PA_1 * PA_1)
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * (PA_1 * PA_1 * 4.0)
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * (PA_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b0] * (PA_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * (PA_1 * PA_1)
-                                        + delta[a0][b1] * delta[a0][b1] * (PA_1 * PA_1)
-                                        + delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_1 * (-2.0))
-                                        + delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PA_1 * (-2.0))
-                                        + delta[a0][b1] * delta[a0][a1] * delta[b0][b1] * (PB_0 * PA_1)
-                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PA_1)
-                                        + delta[a0][a1] * delta[a0][b0] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_1)
-                                        + delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * (PB_0 * PA_1 * (-4.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b1] * (PB_0 * PA_1)
-                                        + delta[a1][b0] * delta[b0][b1] * (PB_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * (PB_1 * PA_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * (PB_1 * PA_1)
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * (PB_1 * PA_1 * (-2.0))
-                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PA_1)
-                                        + delta[a0][a1] * delta[a0][b1] * (PB_1 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * (PB_1 * PA_1)
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * (PB_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * (PB_1 * PA_1 * (-5.0))
-                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * (PB_0 * PB_1 * (-4.0))
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * (-2.0))
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * (PB_0 * PB_1 * (-1.0))
-                                        + delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0)
-                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * 4.0)
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_0)
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0)
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * (PB_0 * PB_0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
-                                        + delta[a1][b0] * delta[a1][b1] * (PB_0 * PB_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_1)
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * (PB_0 * PB_1)
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1)
-                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * 2.0)
-                                        + delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1)
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * 4.0)
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * (PB_1 * PB_1)
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_1 * PB_1)
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * (PB_1 * PB_1)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
-                                    )
-
-                                    + 0.125 / ( S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0 * PA_1 * PA_1 * (-2.0))
-                                        + delta[a1][b1] * delta[b0][b1] * (PB_0 * PA_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * (PB_0 * PA_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_0 * PA_0 * PA_1 * (-2.0))
-                                        + delta[a1][b1] * (PB_1 * PA_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0 * PA_0 * PA_0 * (-2.0))
-                                        + delta[b0][b1] * (PB_0 * PB_1 * PA_0 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a1][b1] * (PB_0 * PB_1 * PA_0 * PA_0 * (-1.0))
-                                        + delta[a1][b1] * delta[a1][b0] * (PB_0 * PB_1 * PA_0 * PA_0)
-                                        + delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1 * PA_0 * PA_0 * (-2.0))
-                                        + delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * (PB_0 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0 * PA_1 * PA_1 * (-2.0))
-                                        + delta[a0][b1] * (PB_1 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * PA_0 * PA_1 * (-1.0))
-                                        + delta[a0][a1] * (PB_0 * PB_0 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b1] * delta[a0][b1] * (PB_0 * PB_0 * PA_0 * PA_1)
-                                        + delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * PA_0 * PA_1 * (-2.0))
-                                        + delta[a0][b1] * delta[a1][b0] * (PB_0 * PB_1 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b1] * (PB_0 * PB_1 * PA_0 * PA_1 * (-2.0))
-                                        + delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1 * PA_0 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * PA_0 * PA_1 * (-1.0))
-                                        + delta[a0][a1] * (PB_1 * PB_1 * PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b0] * (PB_1 * PB_1 * PA_0 * PA_1)
-                                        + delta[a0][b1] * (PB_0 * PB_0 * PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b0] * (PB_0 * PB_1 * PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * PA_1 * PA_1 * (-2.0))
-                                        + delta[b0][b1] * (PB_0 * PB_1 * PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * PA_1 * PA_1 * (-1.0))
-                                        + delta[a0][b1] * delta[a0][b0] * (PB_0 * PB_1 * PA_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * PA_1 * PA_1 * (-2.0))
-                                        + delta[a1][b1] * (PB_0 * PB_0 * PB_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b1] * (PB_0 * PB_0 * PB_1 * PA_1 * (-1.0))
-                                        + delta[a0][b1] * delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PA_1)
-                                        + delta[a1][b0] * (PB_0 * PB_1 * PB_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b0] * (PB_0 * PB_1 * PB_1 * PA_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a0][a1] * (PB_0 * PB_1 * PB_1 * PA_1)
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PB_1 * (-2.0))
-                                    )
-
-                                    + 0.25 / S1 * (
-                                        (PB_0 * PB_0 * PA_0 * PA_0 * PA_1 * PA_1)
-                                        + (PB_1 * PB_1 * PA_0 * PA_0 * PA_1 * PA_1)
-                                        + (PB_0 * PB_0 * PB_1 * PB_1 * PA_0 * PA_0)
-                                        + (PB_0 * PB_0 * PB_1 * PB_1 * PA_1 * PA_1)
-                                    )
-
-                                )
-
-                                + F4_t[2] * (
-
-                                    0.03125 / ( S1 * S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0 * (-2.0))
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * (PA_0 * PA_0 * (-8.0))
-                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * (PA_0 * PA_0 * (-2.0))
-                                        + delta[a1][b0] * delta[a1][b0] * (PA_0 * PA_0 * (-2.0))
-                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * (PA_0 * PA_0 * (-2.0))
-                                        + delta[a1][b1] * delta[a1][b1] * (PA_0 * PA_0 * (-2.0))
-                                        + delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_1 * 4.0)
-                                        + delta[a0][b0] * delta[a1][b0] * (PA_0 * PA_1 * (-1.0))
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * (PA_0 * PA_1)
-                                        + delta[a0][b1] * delta[a1][b1] * (PA_0 * PA_1)
-                                        + delta[a0][a1] * (PA_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b0] * (PA_0 * PA_1)
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * (PA_0 * PA_1)
-                                        + delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * (PA_0 * PA_1 * (-1.0))
-                                        + delta[a1][b1] * delta[a0][b1] * (PA_0 * PA_1)
-                                        + delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * (PA_0 * PA_1 * (-1.0))
-                                        + delta[a0][b1] * delta[a1][b1] * (PA_0 * PA_1 * (-2.0))
-                                        + delta[a0][a1] * delta[a1][b1] * delta[b0][b1] * (PB_0 * PA_0 * (-1.0))
-                                        + delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_0)
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_0)
-                                        + delta[a0][b0] * (PB_0 * PA_0 * 2.0)
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0 * (-2.0))
-                                        + delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_0)
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PA_0 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b1] * (PB_1 * PA_0 * (-1.0))
-                                        + delta[a0][b0] * delta[b0][b1] * (PB_1 * PA_0)
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * (PB_1 * PA_0 * (-2.0))
-                                        + delta[a0][a1] * delta[a1][b1] * (PB_1 * PA_0)
-                                        + delta[a0][b0] * delta[b0][b1] * (PB_1 * PA_0 * (-1.0))
-                                        + delta[a0][b1] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * (PB_1 * PA_0 * 6.0)
-                                        + delta[b0][b1] * delta[b0][b1] * (PA_1 * PA_1 * (-2.0))
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * (PA_1 * PA_1 * (-8.0))
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * (PA_1 * PA_1 * (-2.0))
-                                        + delta[a0][b0] * delta[a0][b0] * (PA_1 * PA_1 * (-2.0))
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * (PA_1 * PA_1 * (-2.0))
-                                        + delta[a0][b1] * delta[a0][b1] * (PA_1 * PA_1 * (-2.0))
-                                        + delta[a1][b1] * delta[b0][b1] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * (PB_0 * PA_1 * 2.0)
-                                        + delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_1 * (-2.0))
-                                        + delta[a0][a1] * delta[a0][b0] * (PB_0 * PA_1 * (-1.0))
-                                        + delta[a0][a1] * delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_1)
-                                        + delta[a0][a1] * delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a0][a1] * (PB_0 * PA_1)
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a0][b1] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * (PB_0 * PA_1 * 2.0)
-                                        + delta[a1][b1] * (PB_1 * PA_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b1] * (PB_1 * PA_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * (PB_1 * PA_1 * 6.0)
-                                        + delta[a0][b1] * delta[a0][a1] * (PB_1 * PA_1)
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * (PB_1 * PA_1 * (-2.0))
-                                        + delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0 * (-2.0))
-                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * (-8.0))
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_0 * (-2.0))
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * (-2.0))
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * (PB_0 * PB_0 * (-2.0))
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * (-2.0))
-                                        + delta[a1][b0] * delta[a1][b1] * (PB_0 * PB_1 * (-1.0))
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1)
-                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * (PB_0 * PB_1 * 4.0)
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1 * (-2.0))
-                                        + delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1 * (-2.0))
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * (-8.0))
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * (PB_1 * PB_1 * (-2.0))
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_1 * PB_1 * (-2.0))
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * (PB_1 * PB_1 * (-2.0))
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * (-2.0))
-                                        + delta[b0][b1] * (PB_0 * PB_1 * 2.0)
-                                        + delta[a1][b1] * delta[a1][b0] * (PB_0 * PB_1)
-                                        + delta[a0][b0] * delta[a0][b1] * (PB_0 * PB_1)
-                                        + delta[a0][b1] * delta[a0][b0] * (PB_0 * PB_1)
-                                    )
-
-                                    + 0.0625 / ( S1 * S1 ) * (
-                                        (PA_0 * PA_0 * PA_1 * PA_1)
-                                        + delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0 * PA_1 * PA_1 * 2.0)
-                                        + delta[a1][b1] * delta[b0][b1] * (PB_0 * PA_0 * PA_0 * PA_1 * (-1.0))
-                                        + delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_0 * PA_0 * PA_1)
-                                        + delta[a1][b1] * (PB_1 * PA_0 * PA_0 * PA_1)
-                                        + delta[a1][b1] * (PB_1 * PA_0 * PA_0 * PA_1 * (-1.0))
-                                        + (PB_0 * PB_0 * PA_0 * PA_0)
-                                        + delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0 * PA_0 * PA_0 * 2.0)
-                                        + (PB_1 * PB_1 * PA_0 * PA_0)
-                                        + delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1 * PA_0 * PA_0 * 2.0)
-                                        + delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_0 * PA_1 * PA_1 * (-1.0))
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0 * PA_1 * PA_1)
-                                        + delta[a0][b1] * (PB_1 * PA_0 * PA_1 * PA_1)
-                                        + delta[a0][b1] * (PB_1 * PA_0 * PA_1 * PA_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * PA_0 * PA_1)
-                                        + delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1 * PA_0 * PA_1 * (-1.0))
-                                        + delta[a0][b1] * (PB_0 * PB_0 * PB_1 * PA_0)
-                                        + delta[a0][b1] * (PB_0 * PB_0 * PB_1 * PA_0 * (-1.0))
-                                        + delta[a0][b0] * (PB_0 * PB_1 * PB_1 * PA_0)
-                                        + delta[a0][b0] * (PB_0 * PB_1 * PB_1 * PA_0 * (-1.0))
-                                        + (PB_0 * PB_0 * PA_1 * PA_1)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0 * PA_1 * PA_1 * 2.0)
-                                        + (PB_1 * PB_1 * PA_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1 * PA_1 * PA_1 * 2.0)
-                                        + (PB_0 * PB_0 * PB_1 * PB_1)
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * PB_1 * PB_1 * 2.0)
-                                    )
-
-                                    + 0.015625 / ( S1 * S1 * S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1]
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * 4.0
-                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1]
-                                        + delta[a1][b0] * delta[a1][b0]
-                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1]
-                                        + delta[a1][b1] * delta[a1][b1]
-                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * 8.0
-                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * 19.0
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * 2.0
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * 4.0
-                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * 17.0
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * 2.0
-                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * 4.0
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * delta[b0][b1]
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0]
-                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * 2.0
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1]
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * 7.0
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * 15.0
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * 3.0
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1]
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1]
-                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * 3.0
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * delta[a0][b1]
-                                        + delta[a0][a1] * delta[a0][a1]
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0]
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1]
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * 2.0
-                                        + delta[a0][b0] * delta[a0][b0]
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 3.0
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
-                                        + delta[a0][b1] * delta[a0][b1]
-                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * 3.0
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * 7.0
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * delta[a1][b1]
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * 3.0
-                                    )
-
-                                )
-
-                                + F4_t[3] * (
-
-                                    0.0078125 / ( S1 * S1 * S1 * S1 ) * (
-                                        delta[b0][b1] * delta[b0][b1] * ((-2.0))
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * ((-8.0))
-                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * ((-2.0))
-                                        + delta[a1][b0] * delta[a1][b0] * ((-2.0))
-                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * ((-2.0))
-                                        + delta[a1][b1] * delta[a1][b1] * ((-2.0))
-                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * ((-8.0))
-                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * ((-22.0))
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * ((-4.0))
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * ((-8.0))
-                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * ((-18.0))
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * ((-4.0))
-                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * ((-8.0))
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * delta[b0][b1] * ((-2.0))
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * ((-2.0))
-                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * ((-4.0))
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * ((-2.0))
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * ((-6.0))
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * ((-14.0))
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * ((-6.0))
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * ((-2.0))
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * ((-2.0))
-                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * ((-6.0))
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * ((-2.0))
-                                        + delta[a0][a1] * delta[a0][a1] * ((-2.0))
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * ((-2.0))
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * ((-2.0))
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * ((-4.0))
-                                        + delta[a0][b0] * delta[a0][b0] * ((-2.0))
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * ((-6.0))
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * ((-2.0))
-                                        + delta[a0][b1] * delta[a0][b1] * ((-2.0))
-                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * ((-6.0))
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * ((-6.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * ((-2.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * ((-6.0))
-                                    )
-
-                                    + 0.015625 / ( S1 * S1 * S1 ) * (
-                                        (PA_0 * PA_0)
-                                        + delta[b0][b1] * delta[b0][b1] * (PA_0 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[a1][b0] * (PA_0 * PA_0 * 2.0)
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * (PA_0 * PA_0 * 5.0)
-                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * (PA_0 * PA_0 * 2.0)
-                                        + delta[a1][b1] * delta[a1][b1] * (PA_0 * PA_0)
-                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1] * (PA_0 * PA_0)
-                                        + delta[a1][b1] * delta[a1][b1] * (PA_0 * PA_0)
-                                        + delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * (PA_0 * PA_1 * (-1.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * (PA_0 * PA_1)
-                                        + delta[a0][b0] * (PB_0 * PA_0)
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * (PB_0 * PA_0)
-                                        + delta[a0][b0] * (PB_0 * PA_0 * (-1.0))
-                                        + delta[b0][b1] * delta[a0][b1] * (PB_0 * PA_0)
-                                        + delta[a0][b1] * delta[b0][b1] * (PB_0 * PA_0 * (-1.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PA_0 * (-1.0))
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b0] * (PB_1 * PA_0)
-                                        + delta[a0][b1] * (PB_1 * PA_0)
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * (PB_1 * PA_0 * 2.0)
-                                        + delta[a0][b1] * (PB_1 * PA_0 * (-1.0))
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * (PB_1 * PA_0 * (-2.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PA_0 * (-1.0))
-                                        + (PA_1 * PA_1)
-                                        + delta[b0][b1] * delta[b0][b1] * (PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][b0] * (PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * (PA_1 * PA_1 * 5.0)
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * (PA_1 * PA_1 * 2.0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PA_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1] * (PA_1 * PA_1)
-                                        + delta[a0][b1] * delta[a0][b1] * (PA_1 * PA_1)
-                                        + delta[a1][b1] * delta[b0][b1] * (PB_0 * PA_1 * (-1.0))
-                                        + delta[b0][b1] * delta[a1][b1] * (PB_0 * PA_1)
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a0][b1] * (PB_0 * PA_1)
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b1] * (PB_0 * PA_1 * (-1.0))
-                                        + delta[a1][b1] * (PB_1 * PA_1)
-                                        + delta[a1][b1] * (PB_1 * PA_1 * (-1.0))
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a0][b0] * (PB_1 * PA_1)
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * (PB_1 * PA_1 * (-2.0))
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * (PB_1 * PA_1)
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a0][b0] * (PB_1 * PA_1)
-                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PA_1 * (-1.0))
-                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * (PB_1 * PA_1 * (-1.0))
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * (PB_1 * PA_1)
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * (PB_0 * PB_1)
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * (PB_0 * PB_1 * (-1.0))
-                                        + (PB_0 * PB_0)
-                                        + delta[a1][b1] * delta[a1][b1] * (PB_0 * PB_0 * 2.0)
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_0 * PB_0 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * (PB_0 * PB_0 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * (PB_0 * PB_0 * 4.0)
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * (PB_0 * PB_0 * 2.0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
-                                        + delta[a0][b1] * delta[a0][b1] * (PB_0 * PB_0)
-                                        + (PB_1 * PB_1)
-                                        + delta[a1][b0] * delta[a1][b0] * (PB_1 * PB_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][a1] * (PB_1 * PB_1 * 2.0)
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * (PB_1 * PB_1 * 2.0)
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * (PB_1 * PB_1 * 4.0)
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * (PB_1 * PB_1 * 2.0)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
-                                        + delta[a0][b0] * delta[a0][b0] * (PB_1 * PB_1)
-                                    )
-
-                                )
-
-                                + F4_t[4] * (
-
-                                    0.00390625 / ( S1 * S1 * S1 * S1 ) * (
-                                        1.0
-                                        + delta[b0][b1] * delta[b0][b1] * 2.0
-                                        + delta[a1][b0] * delta[a1][b0] * 2.0
-                                        + delta[a1][b0] * delta[b0][b1] * delta[a1][b1] * 5.0
-                                        + delta[a1][b1] * delta[a1][b0] * delta[b0][b1] * 2.0
-                                        + delta[a1][b1] * delta[a1][b1]
-                                        + delta[a1][b0] * delta[a1][b1] * delta[b0][b1]
-                                        + delta[a1][b1] * delta[a1][b1]
-                                        + delta[a0][a1] * delta[a0][a1] * 2.0
-                                        + delta[a0][a1] * delta[a0][a1] * delta[b0][b1] * delta[b0][b1] * 4.0
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b0] * 2.0
-                                        + delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * delta[a0][b1] * 10.0
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b0] * delta[b0][b1] * 3.0
-                                        + delta[a0][a1] * delta[a1][b1] * delta[a0][b1] * 2.0
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b0] * 4.0
-                                        + delta[a0][a1] * delta[a0][b0] * delta[b0][b1] * delta[a1][b1] * 7.0
-                                        + delta[a0][a1] * delta[a1][b0] * delta[a0][b1] * delta[b0][b1] * 2.0
-                                        + delta[a0][a1] * delta[a0][b1] * delta[a1][b1] * 4.0
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b1] * delta[b0][b1]
-                                        + delta[a0][b0] * delta[a0][a1] * delta[a1][b0] * 2.0
-                                        + delta[a0][b0] * delta[a0][a1] * delta[b0][b1] * delta[a1][b1] * 3.0
-                                        + delta[a0][b0] * delta[a0][b0]
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 2.0
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a0][b0] * delta[a1][b1]
-                                        + delta[a0][b0] * delta[a1][b1] * delta[a1][b0] * delta[a0][b1]
-                                        + delta[a0][b0] * delta[a0][b0] * delta[a1][b1] * delta[a1][b1] * 2.0
-                                        + delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * delta[a1][b1] * 5.0
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b0] * delta[b0][b1] * 4.0
-                                        + delta[a0][b1] * delta[a0][a1] * delta[a1][b1] * 2.0
-                                        + delta[a0][b1] * delta[a0][b0] * delta[b0][b1] * 2.0
-                                        + delta[a0][b1] * delta[a0][b1]
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a0][b0] * delta[a1][b1]
-                                        + delta[a0][b1] * delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * 2.0
-                                        + delta[a0][b1] * delta[a0][b0] * delta[a1][b0] * delta[a1][b1] * 3.0
-                                        + delta[a0][a1] * delta[a0][b0] * delta[a1][b1] * delta[b0][b1] * 2.0
-                                        + delta[a0][b0] * delta[a0][b0]
-                                        + delta[a0][b0] * delta[b0][b1] * delta[a0][b1] * 3.0
-                                        + delta[a0][b0] * delta[a0][b1] * delta[b0][b1]
-                                        + delta[a0][b1] * delta[a0][b1]
-                                        + delta[a1][b0] * delta[a0][b0] * delta[a0][b1] * delta[a1][b1] * 3.0
-                                        + delta[a1][b0] * delta[a1][b0] * delta[a0][b1] * delta[a0][b1] * 2.0
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a0][b0] * delta[a1][b1]
-                                        + delta[a1][b1] * delta[a0][b0] * delta[a1][b0] * delta[a0][b1] * 3.0
-                                    )
-
-                                )
-
-                                ));
-
-                    if (sqrt_eri_ijij > _pair_threshold)
-                    {
-                        _Q_matrix_dd.row(i * 6 + i_cart)[j * 6 + j_cart] = sqrt_eri_ijij;
-
-                        if (i * 6 + i_cart != j * 6 + j_cart) _Q_matrix_dd.row(j * 6 + j_cart)[i * 6 + i_cart] = sqrt_eri_ijij;
-                    }
-                }
-            }
-        }
-    }
-}
-
-auto
 CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecularBasis& basis) -> void
 {
     gpuSafe(gpuSetDevice(0));
-
-    // Boys function (tabulated for order 0-28)
-
-    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
-    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
-
-    double* d_boys_func_table;
-    double* d_boys_func_ft;
-
-    gpuSafe(gpuMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice));
 
     // GTOs blocks and number of AOs
 
@@ -1688,33 +599,21 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
     gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
 
-    double* d_s_prim_info;
-    double* d_p_prim_info;
-    double* d_d_prim_info;
-
-    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-
     // GTO block pairs
 
-    std::vector<uint32_t> ss_first_inds_local;
-    std::vector<uint32_t> sp_first_inds_local;
-    std::vector<uint32_t> sd_first_inds_local;
-    std::vector<uint32_t> pp_first_inds_local;
-    std::vector<uint32_t> pd_first_inds_local;
-    std::vector<uint32_t> dd_first_inds_local;
+    std::vector<uint32_t> ss_first_inds;
+    std::vector<uint32_t> sp_first_inds;
+    std::vector<uint32_t> sd_first_inds;
+    std::vector<uint32_t> pp_first_inds;
+    std::vector<uint32_t> pd_first_inds;
+    std::vector<uint32_t> dd_first_inds;
 
-    std::vector<uint32_t> ss_second_inds_local;
-    std::vector<uint32_t> sp_second_inds_local;
-    std::vector<uint32_t> sd_second_inds_local;
-    std::vector<uint32_t> pp_second_inds_local;
-    std::vector<uint32_t> pd_second_inds_local;
-    std::vector<uint32_t> dd_second_inds_local;
+    std::vector<uint32_t> ss_second_inds;
+    std::vector<uint32_t> sp_second_inds;
+    std::vector<uint32_t> sd_second_inds;
+    std::vector<uint32_t> pp_second_inds;
+    std::vector<uint32_t> pd_second_inds;
+    std::vector<uint32_t> dd_second_inds;
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -1722,8 +621,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
         for (int64_t j = i; j < s_prim_count; j++)
         {
-            ss_first_inds_local.push_back(i);
-            ss_second_inds_local.push_back(j);
+            ss_first_inds.push_back(i);
+            ss_second_inds.push_back(j);
         }
 
         // S-P gto block pair
@@ -1732,8 +631,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
         {
             for (int64_t s = 0; s < 3; s++)
             {
-                sp_first_inds_local.push_back(i);
-                sp_second_inds_local.push_back(j * 3 + s);
+                sp_first_inds.push_back(i);
+                sp_second_inds.push_back(j * 3 + s);
             }
         }
 
@@ -1743,8 +642,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
         {
             for (int64_t s = 0; s < 6; s++)
             {
-                sd_first_inds_local.push_back(i);
-                sd_second_inds_local.push_back(j * 6 + s);
+                sd_first_inds.push_back(i);
+                sd_second_inds.push_back(j * 6 + s);
             }
         }
     }
@@ -1761,8 +660,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
                 for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
                 {
-                    pp_first_inds_local.push_back(i * 3 + i_cart);
-                    pp_second_inds_local.push_back(j * 3 + j_cart);
+                    pp_first_inds.push_back(i * 3 + i_cart);
+                    pp_second_inds.push_back(j * 3 + j_cart);
                 }
             }
         }
@@ -1775,8 +674,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
             {
                 for (int64_t j_cart = 0; j_cart < 6; j_cart++)
                 {
-                    pd_first_inds_local.push_back(i * 3 + i_cart);
-                    pd_second_inds_local.push_back(j * 6 + j_cart);
+                    pd_first_inds.push_back(i * 3 + i_cart);
+                    pd_second_inds.push_back(j * 6 + j_cart);
                 }
             }
         }
@@ -1794,24 +693,26 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
                 for (int64_t j_cart = j_cart_start; j_cart < 6; j_cart++)
                 {
-                    dd_first_inds_local.push_back(i * 6 + i_cart);
-                    dd_second_inds_local.push_back(j * 6 + j_cart);
+                    dd_first_inds.push_back(i * 6 + i_cart);
+                    dd_second_inds.push_back(j * 6 + j_cart);
                 }
             }
         }
     }
 
-    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
-    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
-    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
-    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
-    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
-    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+    const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
+    const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
+    const auto sd_prim_pair_count = static_cast<int64_t>(sd_first_inds.size());
+    const auto pp_prim_pair_count = static_cast<int64_t>(pp_first_inds.size());
+    const auto pd_prim_pair_count = static_cast<int64_t>(pd_first_inds.size());
+    const auto dd_prim_pair_count = static_cast<int64_t>(dd_first_inds.size());
 
-    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
-                                                     pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
+    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count,
+                                               pp_prim_pair_count, pd_prim_pair_count, dd_prim_pair_count});
 
-    std::vector<double> h_mat_Q(max_prim_pair_count_local);
+    // Q on host
+
+    std::vector<double> h_mat_Q(max_prim_pair_count);
 
     _Q_matrix_ss = CDenseMatrix(s_prim_count, s_prim_count);
     _Q_matrix_sp = CDenseMatrix(s_prim_count, p_prim_count * 3);
@@ -1827,54 +728,75 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
     _Q_matrix_pd.zero();
     _Q_matrix_dd.zero();
 
-    // Q on device
+    // Boys function (tabulated for order 0-28)
 
-    double *d_mat_Q;
+    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
+    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
 
-    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
-    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
-    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
-    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
-    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
-    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+    // size of memory allocation
 
-    gpuSafe(gpuMalloc(&d_mat_Q, max_prim_pair_count_local * sizeof(double)));
+    const auto count_double = (max_prim_pair_count +
+                               static_cast<int64_t>(boys_func_table.size()) +
+                               static_cast<int64_t>(boys_func_ft.size()) +
+                               static_cast<int64_t>(s_prim_info.size()) +
+                               static_cast<int64_t>(p_prim_info.size()) +
+                               static_cast<int64_t>(d_prim_info.size()));
 
-    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    const auto count_uint32 = (ss_prim_pair_count + sp_prim_pair_count + sd_prim_pair_count +
+                               pp_prim_pair_count + pd_prim_pair_count + dd_prim_pair_count) * 2;
 
-    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    // memory allocation
 
-    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    double* d_data_double;
+    uint32_t* d_data_uint32;
 
-    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_data_double, count_double * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data_uint32, count_uint32 * sizeof(uint32_t)));
 
-    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    double* d_mat_Q           = d_data_double;
+    double* d_boys_func_table = d_mat_Q + max_prim_pair_count;
+    double* d_boys_func_ft    = d_boys_func_table + static_cast<int64_t>(boys_func_table.size());
+    double* d_s_prim_info     = d_boys_func_ft + static_cast<int64_t>(boys_func_ft.size());
+    double* d_p_prim_info     = d_s_prim_info + static_cast<int64_t>(s_prim_info.size());
+    double* d_d_prim_info     = d_p_prim_info + static_cast<int64_t>(p_prim_info.size());
 
-    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
-    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    uint32_t* d_ss_first_inds  = d_data_uint32;
+    uint32_t* d_sp_first_inds  = d_ss_first_inds + ss_prim_pair_count;
+    uint32_t* d_sd_first_inds  = d_sp_first_inds + sp_prim_pair_count;
+    uint32_t* d_pp_first_inds  = d_sd_first_inds + sd_prim_pair_count;
+    uint32_t* d_pd_first_inds  = d_pp_first_inds + pp_prim_pair_count;
+    uint32_t* d_dd_first_inds  = d_pd_first_inds + pd_prim_pair_count;
+    uint32_t* d_ss_second_inds = d_dd_first_inds + dd_prim_pair_count; 
+    uint32_t* d_sp_second_inds = d_ss_second_inds + ss_prim_pair_count;
+    uint32_t* d_sd_second_inds = d_sp_second_inds + sp_prim_pair_count;
+    uint32_t* d_pp_second_inds = d_sd_second_inds + sd_prim_pair_count;
+    uint32_t* d_pd_second_inds = d_pp_second_inds + pp_prim_pair_count;
+    uint32_t* d_dd_second_inds = d_pd_second_inds + pd_prim_pair_count;
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_first_inds, ss_first_inds.data(), ss_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_first_inds, sp_first_inds.data(), sp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_first_inds, sd_first_inds.data(), sd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_first_inds, pp_first_inds.data(), pp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuMemcpy(d_pd_first_inds, pd_first_inds.data(), pd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuMemcpy(d_dd_first_inds, dd_first_inds.data(), dd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_prim_pair_count * sizeof(uint32_t), gpuMemcpyHostToDevice));
 
     gpuSafe(gpuDeviceSynchronize());
 
@@ -1882,28 +804,28 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     // Q: SS
 
-    if (ss_prim_pair_count_local > 0)
+    if (ss_prim_pair_count > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
-        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+        dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
         gpu::computeQMatrixSS<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
-                           d_ss_first_inds_local,
-                           d_ss_second_inds_local,
-                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           d_ss_first_inds,
+                           d_ss_second_inds,
+                           static_cast<uint32_t>(ss_prim_pair_count),
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost));
 
-        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+        for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
         {
-            const auto i = ss_first_inds_local[ij];
-            const auto j = ss_second_inds_local[ij];
+            const auto i = ss_first_inds[ij];
+            const auto j = ss_second_inds[ij];
 
             _Q_matrix_ss.row(i)[j] = h_mat_Q[ij];
 
@@ -1913,11 +835,11 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     // Q: SP
 
-    if (sp_prim_pair_count_local > 0)
+    if (sp_prim_pair_count > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
-        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+        dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
         gpu::computeQMatrixSP<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
@@ -1925,18 +847,18 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            static_cast<uint32_t>(s_prim_count),
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
-                           d_sp_first_inds_local,
-                           d_sp_second_inds_local,
-                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           d_sp_first_inds,
+                           d_sp_second_inds,
+                           static_cast<uint32_t>(sp_prim_pair_count),
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost));
 
-        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+        for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
         {
-            const auto i = sp_first_inds_local[ij];
-            const auto j = sp_second_inds_local[ij];
+            const auto i = sp_first_inds[ij];
+            const auto j = sp_second_inds[ij];
 
             _Q_matrix_sp.row(i)[j] = h_mat_Q[ij];
         }
@@ -1944,11 +866,11 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     // Q: SD
 
-    if (sd_prim_pair_count_local > 0)
+    if (sd_prim_pair_count > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
-        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+        dim3 num_blocks((sd_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
         gpu::computeQMatrixSD<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
@@ -1956,18 +878,18 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            static_cast<uint32_t>(s_prim_count),
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
-                           d_sd_first_inds_local,
-                           d_sd_second_inds_local,
-                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           d_sd_first_inds,
+                           d_sd_second_inds,
+                           static_cast<uint32_t>(sd_prim_pair_count),
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost));
 
-        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+        for (int64_t ij = 0; ij < sd_prim_pair_count; ij++)
         {
-            const auto i = sd_first_inds_local[ij];
-            const auto j = sd_second_inds_local[ij];
+            const auto i = sd_first_inds[ij];
+            const auto j = sd_second_inds[ij];
 
             _Q_matrix_sd.row(i)[j] = h_mat_Q[ij];
         }
@@ -1975,28 +897,28 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     // Q: PP
 
-    if (pp_prim_pair_count_local > 0)
+    if (pp_prim_pair_count > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
-        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+        dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
         gpu::computeQMatrixPP<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
-                           d_pp_first_inds_local,
-                           d_pp_second_inds_local,
-                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           d_pp_first_inds,
+                           d_pp_second_inds,
+                           static_cast<uint32_t>(pp_prim_pair_count),
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost));
 
-        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+        for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
         {
-            const auto i = pp_first_inds_local[ij];
-            const auto j = pp_second_inds_local[ij];
+            const auto i = pp_first_inds[ij];
+            const auto j = pp_second_inds[ij];
 
             _Q_matrix_pp.row(i)[j] = h_mat_Q[ij];
 
@@ -2006,11 +928,11 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     // Q: PD
 
-    if (pd_prim_pair_count_local > 0)
+    if (pd_prim_pair_count > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
-        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+        dim3 num_blocks((pd_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
         gpu::computeQMatrixPD<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
@@ -2018,18 +940,18 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
                            static_cast<uint32_t>(p_prim_count),
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
-                           d_pd_first_inds_local,
-                           d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           d_pd_first_inds,
+                           d_pd_second_inds,
+                           static_cast<uint32_t>(pd_prim_pair_count),
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost));
 
-        for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+        for (int64_t ij = 0; ij < pd_prim_pair_count; ij++)
         {
-            const auto i = pd_first_inds_local[ij];
-            const auto j = pd_second_inds_local[ij];
+            const auto i = pd_first_inds[ij];
+            const auto j = pd_second_inds[ij];
 
             _Q_matrix_pd.row(i)[j] = h_mat_Q[ij];
         }
@@ -2037,28 +959,28 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     // Q: DD
 
-    if (dd_prim_pair_count_local > 0)
+    if (dd_prim_pair_count > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
-        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+        dim3 num_blocks((dd_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x);
 
         gpu::computeQMatrixDD<<<num_blocks, threads_per_block>>>(
                            d_mat_Q,
                            d_d_prim_info,
                            static_cast<uint32_t>(d_prim_count),
-                           d_dd_first_inds_local,
-                           d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           d_dd_first_inds,
+                           d_dd_second_inds,
+                           static_cast<uint32_t>(dd_prim_pair_count),
                            d_boys_func_table,
                            d_boys_func_ft);
 
-        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count * sizeof(double), gpuMemcpyDeviceToHost));
 
-        for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+        for (int64_t ij = 0; ij < dd_prim_pair_count; ij++)
         {
-            const auto i = dd_first_inds_local[ij];
-            const auto j = dd_second_inds_local[ij];
+            const auto i = dd_first_inds[ij];
+            const auto j = dd_second_inds[ij];
 
             _Q_matrix_dd.row(i)[j] = h_mat_Q[ij];
 
@@ -2068,27 +990,8 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpuSafe(gpuFree(d_boys_func_table));
-    gpuSafe(gpuFree(d_boys_func_ft));
-
-    gpuSafe(gpuFree(d_s_prim_info));
-    gpuSafe(gpuFree(d_p_prim_info));
-    gpuSafe(gpuFree(d_d_prim_info));
-
-    gpuSafe(gpuFree(d_mat_Q));
-
-    gpuSafe(gpuFree(d_ss_first_inds_local));
-    gpuSafe(gpuFree(d_ss_second_inds_local));
-    gpuSafe(gpuFree(d_sp_first_inds_local));
-    gpuSafe(gpuFree(d_sp_second_inds_local));
-    gpuSafe(gpuFree(d_sd_first_inds_local));
-    gpuSafe(gpuFree(d_sd_second_inds_local));
-    gpuSafe(gpuFree(d_pp_first_inds_local));
-    gpuSafe(gpuFree(d_pp_second_inds_local));
-    gpuSafe(gpuFree(d_pd_first_inds_local));
-    gpuSafe(gpuFree(d_pd_second_inds_local));
-    gpuSafe(gpuFree(d_dd_first_inds_local));
-    gpuSafe(gpuFree(d_dd_second_inds_local));
+    gpuSafe(gpuFree(d_data_double));
+    gpuSafe(gpuFree(d_data_uint32));
 }
 
 auto

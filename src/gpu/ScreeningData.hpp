@@ -239,8 +239,6 @@ class CScreeningData
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_dd;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_dd;
 
-    auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
-
     auto _computeQMatricesOnGPU(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
     auto _sortQ(const int64_t s_prim_count,
