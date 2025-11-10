@@ -241,6 +241,8 @@ class CScreeningData
 
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
+    auto _computeQMatricesOnGPU(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
+
     auto _sortQ(const int64_t s_prim_count,
                 const int64_t p_prim_count,
                 const int64_t d_prim_count,

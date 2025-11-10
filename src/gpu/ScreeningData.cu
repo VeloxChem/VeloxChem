@@ -41,12 +41,14 @@
 
 #include "BoysFuncTable.hpp"
 #include "ErrorHandler.hpp"
+#include "GpuConstants.hpp"
 #include "GpuDevices.hpp"
 #include "GpuSafeChecks.hpp"
 #include "GpuWrapper.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
+#include "OneElectronIntegrals.hpp"
 #include "ScreeningData.hpp"
 #include "StringFormat.hpp"
 
@@ -70,7 +72,7 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     _density_threshold = density_threshold;
 
-    _computeQMatrices(molecule, basis);
+    _computeQMatricesOnGPU(molecule, basis);
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -381,8 +383,6 @@ CScreeningData::~CScreeningData()
 {
     // free device pointers
 
-    gpuSafe(gpuSetDevice(0));
-
     for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {
         gpuSafe(gpuSetDevice(gpu_id));
@@ -390,6 +390,8 @@ CScreeningData::~CScreeningData()
         gpuSafe(gpuFree(_devptr_double[gpu_id]));
         gpuSafe(gpuFree(_devptr_uint32[gpu_id]));
     }
+
+    gpuSafe(gpuSetDevice(0));
 
     _d_data_boys_func.clear();
     _d_data_spd_prim_info.clear();
@@ -1600,6 +1602,493 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
             }
         }
     }
+}
+
+auto
+CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecularBasis& basis) -> void
+{
+    gpuSafe(gpuSetDevice(0));
+
+    // Boys function (tabulated for order 0-28)
+
+    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
+    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
+
+    double* d_boys_func_table;
+    double* d_boys_func_ft;
+
+    gpuSafe(gpuMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+
+    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+    int64_t d_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
+    }
+
+    // Cartesian to spherical index mapping for P and D
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind_coef] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind_coef;
+            }
+        }
+        else if (gto_ang == 2)
+        {
+            auto d_map = gto_block.getCartesianToSphericalMappingForD();
+
+            for (const auto& [cart_ind, sph_ind_coef] : d_map)
+            {
+                cart_sph_d[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // S, P, D gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<double>   d_prim_info(5 * d_prim_count);
+
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+
+    double* d_s_prim_info;
+    double* d_p_prim_info;
+    double* d_d_prim_info;
+
+    gpuSafe(gpuMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_d_prim_info, d_prim_info.size() * sizeof(double)));
+
+    gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+
+    // GTO block pairs
+
+    std::vector<uint32_t> ss_first_inds_local;
+    std::vector<uint32_t> sp_first_inds_local;
+    std::vector<uint32_t> sd_first_inds_local;
+    std::vector<uint32_t> pp_first_inds_local;
+    std::vector<uint32_t> pd_first_inds_local;
+    std::vector<uint32_t> dd_first_inds_local;
+
+    std::vector<uint32_t> ss_second_inds_local;
+    std::vector<uint32_t> sp_second_inds_local;
+    std::vector<uint32_t> sd_second_inds_local;
+    std::vector<uint32_t> pp_second_inds_local;
+    std::vector<uint32_t> pd_second_inds_local;
+    std::vector<uint32_t> dd_second_inds_local;
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        // S-S gto block pair
+
+        for (int64_t j = i; j < s_prim_count; j++)
+        {
+            ss_first_inds_local.push_back(i);
+            ss_second_inds_local.push_back(j);
+        }
+
+        // S-P gto block pair
+
+        for (int64_t j = 0; j < p_prim_count; j++)
+        {
+            for (int64_t s = 0; s < 3; s++)
+            {
+                sp_first_inds_local.push_back(i);
+                sp_second_inds_local.push_back(j * 3 + s);
+            }
+        }
+
+        // S-D gto block pair
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            for (int64_t s = 0; s < 6; s++)
+            {
+                sd_first_inds_local.push_back(i);
+                sd_second_inds_local.push_back(j * 6 + s);
+            }
+        }
+    }
+
+    for (int64_t i = 0; i < p_prim_count; i++)
+    {
+        // P-P gto block pair
+
+        for (int64_t j = i; j < p_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                auto j_cart_start = (j == i ? i_cart : 0);
+
+                for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
+                {
+                    pp_first_inds_local.push_back(i * 3 + i_cart);
+                    pp_second_inds_local.push_back(j * 3 + j_cart);
+                }
+            }
+        }
+
+        // P-D gto block pair
+
+        for (int64_t j = 0; j < d_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
+            {
+                for (int64_t j_cart = 0; j_cart < 6; j_cart++)
+                {
+                    pd_first_inds_local.push_back(i * 3 + i_cart);
+                    pd_second_inds_local.push_back(j * 6 + j_cart);
+                }
+            }
+        }
+    }
+
+    for (int64_t i = 0; i < d_prim_count; i++)
+    {
+        // D-D gto block pair
+
+        for (int64_t j = i; j < d_prim_count; j++)
+        {
+            for (int64_t i_cart = 0; i_cart < 6; i_cart++)
+            {
+                auto j_cart_start = (j == i ? i_cart : 0);
+
+                for (int64_t j_cart = j_cart_start; j_cart < 6; j_cart++)
+                {
+                    dd_first_inds_local.push_back(i * 6 + i_cart);
+                    dd_second_inds_local.push_back(j * 6 + j_cart);
+                }
+            }
+        }
+    }
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto sd_prim_pair_count_local = static_cast<int64_t>(sd_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+    const auto pd_prim_pair_count_local = static_cast<int64_t>(pd_first_inds_local.size());
+    const auto dd_prim_pair_count_local = static_cast<int64_t>(dd_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, sd_prim_pair_count_local,
+                                                     pp_prim_pair_count_local, pd_prim_pair_count_local, dd_prim_pair_count_local});
+
+    std::vector<double> h_mat_Q(max_prim_pair_count_local);
+
+    _Q_matrix_ss = CDenseMatrix(s_prim_count, s_prim_count);
+    _Q_matrix_sp = CDenseMatrix(s_prim_count, p_prim_count * 3);
+    _Q_matrix_sd = CDenseMatrix(s_prim_count, d_prim_count * 6);
+    _Q_matrix_pp = CDenseMatrix(p_prim_count * 3, p_prim_count * 3);
+    _Q_matrix_pd = CDenseMatrix(p_prim_count * 3, d_prim_count * 6);
+    _Q_matrix_dd = CDenseMatrix(d_prim_count * 6, d_prim_count * 6);
+
+    _Q_matrix_ss.zero();
+    _Q_matrix_sp.zero();
+    _Q_matrix_sd.zero();
+    _Q_matrix_pp.zero();
+    _Q_matrix_pd.zero();
+    _Q_matrix_dd.zero();
+
+    // Q on device
+
+    double *d_mat_Q;
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_sd_first_inds_local, *d_sd_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+    uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
+    uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
+
+    gpuSafe(gpuMalloc(&d_mat_Q, max_prim_pair_count_local * sizeof(double)));
+
+    gpuSafe(gpuMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    gpuSafe(gpuMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    gpuSafe(gpuMalloc(&d_sd_first_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_sd_second_inds_local, sd_prim_pair_count_local * sizeof(uint32_t)));
+
+    gpuSafe(gpuMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    gpuSafe(gpuMalloc(&d_pd_first_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_pd_second_inds_local, pd_prim_pair_count_local * sizeof(uint32_t)));
+
+    gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+    gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
+
+    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+
+    gpuSafe(gpuDeviceSynchronize());
+
+    // compute Q
+
+    // Q: SS
+
+    if (ss_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::computeQMatrixSS<<<num_blocks, threads_per_block>>>(
+                           d_mat_Q,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_ss_first_inds_local,
+                           d_ss_second_inds_local,
+                           static_cast<uint32_t>(ss_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+        {
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
+
+            _Q_matrix_ss.row(i)[j] = h_mat_Q[ij];
+
+            if (i != j) _Q_matrix_ss.row(j)[i] = h_mat_Q[ij];
+        }
+    }
+
+    // Q: SP
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::computeQMatrixSP<<<num_blocks, threads_per_block>>>(
+                           d_mat_Q,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_sp_first_inds_local,
+                           d_sp_second_inds_local,
+                           static_cast<uint32_t>(sp_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+        {
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
+
+            _Q_matrix_sp.row(i)[j] = h_mat_Q[ij];
+        }
+    }
+
+    // Q: SD
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::computeQMatrixSD<<<num_blocks, threads_per_block>>>(
+                           d_mat_Q,
+                           d_s_prim_info,
+                           static_cast<uint32_t>(s_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_sd_first_inds_local,
+                           d_sd_second_inds_local,
+                           static_cast<uint32_t>(sd_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+        {
+            const auto i = sd_first_inds_local[ij];
+            const auto j = sd_second_inds_local[ij];
+
+            _Q_matrix_sd.row(i)[j] = h_mat_Q[ij];
+        }
+    }
+
+    // Q: PP
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::computeQMatrixPP<<<num_blocks, threads_per_block>>>(
+                           d_mat_Q,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_pp_first_inds_local,
+                           d_pp_second_inds_local,
+                           static_cast<uint32_t>(pp_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+        {
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
+
+            _Q_matrix_pp.row(i)[j] = h_mat_Q[ij];
+
+            if (i != j) _Q_matrix_pp.row(j)[i] = h_mat_Q[ij];
+        }
+    }
+
+    // Q: PD
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::computeQMatrixPD<<<num_blocks, threads_per_block>>>(
+                           d_mat_Q,
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
+        {
+            const auto i = pd_first_inds_local[ij];
+            const auto j = pd_second_inds_local[ij];
+
+            _Q_matrix_pd.row(i)[j] = h_mat_Q[ij];
+        }
+    }
+
+    // Q: DD
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::computeQMatrixDD<<<num_blocks, threads_per_block>>>(
+                           d_mat_Q,
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+
+        gpuSafe(gpuMemcpy(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
+        {
+            const auto i = dd_first_inds_local[ij];
+            const auto j = dd_second_inds_local[ij];
+
+            _Q_matrix_dd.row(i)[j] = h_mat_Q[ij];
+
+            if (i != j) _Q_matrix_dd.row(j)[i] = h_mat_Q[ij];
+        }
+    }
+
+    gpuSafe(gpuDeviceSynchronize());
+
+    gpuSafe(gpuFree(d_boys_func_table));
+    gpuSafe(gpuFree(d_boys_func_ft));
+
+    gpuSafe(gpuFree(d_s_prim_info));
+    gpuSafe(gpuFree(d_p_prim_info));
+    gpuSafe(gpuFree(d_d_prim_info));
+
+    gpuSafe(gpuFree(d_mat_Q));
+
+    gpuSafe(gpuFree(d_ss_first_inds_local));
+    gpuSafe(gpuFree(d_ss_second_inds_local));
+    gpuSafe(gpuFree(d_sp_first_inds_local));
+    gpuSafe(gpuFree(d_sp_second_inds_local));
+    gpuSafe(gpuFree(d_sd_first_inds_local));
+    gpuSafe(gpuFree(d_sd_second_inds_local));
+    gpuSafe(gpuFree(d_pp_first_inds_local));
+    gpuSafe(gpuFree(d_pp_second_inds_local));
+    gpuSafe(gpuFree(d_pd_first_inds_local));
+    gpuSafe(gpuFree(d_pd_second_inds_local));
+    gpuSafe(gpuFree(d_dd_first_inds_local));
+    gpuSafe(gpuFree(d_dd_second_inds_local));
 }
 
 auto
