@@ -100,8 +100,6 @@ computeQMatrixOnGPU(const CMolecule& molecule,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     int64_t s_prim_count = 0;
@@ -140,11 +138,8 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    // TODO: double check by using different number of gpus per MPI
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // Boys function (tabulated for order 0-28)
 
@@ -556,8 +551,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -581,10 +574,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // GTOs blocks and number of AOs
 
@@ -1145,8 +1136,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -1168,10 +1157,8 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // Boys function (tabulated for order 0-28)
 
@@ -1715,8 +1702,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -1742,10 +1727,8 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // GTOs blocks and number of AOs
 
@@ -2341,8 +2324,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -2368,10 +2349,8 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // GTOs blocks and number of AOs
 
@@ -2950,8 +2929,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
@@ -2977,10 +2954,8 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     // GTOs blocks and number of AOs
 
@@ -3671,8 +3646,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
 
@@ -3934,10 +3907,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     omptimers[thread_id].start("Boys func. prep.");
 

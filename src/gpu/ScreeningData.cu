@@ -132,8 +132,6 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     // allocate device pointers
 
-    gpuSafe(gpuSetDevice(0));
-
     const auto boys_func_table_size = boysfunc::getFullBoysFuncTableSize();
     const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
 
@@ -417,8 +415,6 @@ CScreeningData::~CScreeningData()
 
     _devptr_double.clear();
     _devptr_uint32.clear();
-
-    gpuSafe(gpuSetDevice(0));
 }
 
 auto
@@ -1205,8 +1201,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
 
     // form local vectors
 
-    // TODO: use uint2 for pair indices
-
     _ss_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
     _ss_second_inds_local = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
     _ss_mat_Q_local       = std::vector<std::vector<double>>(_num_gpus_per_node);
@@ -1370,8 +1364,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
                 const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
                 const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-                // TODO: try storing x/y/z/a in double4
 
                 _sp_pair_data_local[gpu_id][idx] = S_ij_00;
             }
@@ -1715,8 +1707,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     const auto pd_prim_pair_count = static_cast<int64_t>(sorted_pd_mat_Q_D.size());
     const auto dd_prim_pair_count = static_cast<int64_t>(sorted_dd_mat_Q_D.size());
 
-    // TODO: use uint2 for pair indices
-
     _ss_mat_Q       = std::vector<double>  (ss_prim_pair_count);
     _ss_mat_D       = std::vector<double>  (ss_prim_pair_count);
     _ss_first_inds  = std::vector<uint32_t>(ss_prim_pair_count);
@@ -1756,8 +1746,6 @@ CScreeningData::sortQD(const int64_t s_prim_count,
         const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-        // TODO: try storing x/y/z/a in double4
 
         _ss_pair_data[ij] = S_ij_00;
     }
@@ -2341,10 +2329,6 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
                                         const int64_t naos,
                                         const double* dens_ptr) const -> CDenseMatrix
 {
-    // TODO: consider using only upper triangluar part to generate D_abs_full,
-    // particularly the SS, PP and DD blocks. Otherwise the input density must
-    // be symmetric or antisymmetric.
-
     const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
 
     CDenseMatrix mat_D_abs_full(cart_naos, cart_naos);
@@ -3167,8 +3151,6 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 {
     // TODO consider determining the maximum density associated
     // with the ik pair (i.e. max_D_jl for ik)
-
-    // TODO: use uint2 for pair indices
 
     std::vector<std::tuple<double, int64_t, int64_t>> ss_Qp_ik;
     std::vector<std::tuple<double, int64_t, int64_t>> sp_Qp_ik;
