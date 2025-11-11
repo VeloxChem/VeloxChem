@@ -2829,11 +2829,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 {
     CGpuDevices gpu_devices;
 
-    const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
-    // auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
     // GTOs blocks and number of AOs
 
@@ -2875,59 +2871,14 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    gpuSafe(gpuSetDevice(gpu_id));
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
-
-    double* d_gto_info;
-
-    gpuSafe(gpuMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
-
-    uint32_t* d_ao_inds;
-
-    gpuSafe(gpuMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     // Fxc matrix
 
     mat_Fxc_omp[gpu_id].zero();
-
-    // GTOs on grid points
-
-    double *d_mat_Fxc_full, *d_gs_den_mat_full, *d_rw_den_mat_full;
-    double *d_den_mat, *d_gto_values, *d_gto_values_x, *d_gto_values_y, *d_gto_values_z;
-    double *d_mat_F, *d_mat_G_gga;
-    double *d_mat_Fxc, *d_mat_Fxc_gga;
-
-    // TODO: use smaller size for sub matrices such as d_den_mat, d_mat_Fxc, d_mat_Fxc_gga
-
-    gpuSafe(gpuMalloc(&d_den_mat, naos * naos * sizeof(double)));
-
-    gpuSafe(gpuMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gto_values_x, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gto_values_y, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_gto_values_z, naos * max_npoints_per_box * sizeof(double)));
-
-    gpuSafe(gpuMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_G_gga, naos * max_npoints_per_box * sizeof(double)));
-
-    gpuSafe(gpuMalloc(&d_mat_Fxc, naos * naos * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_Fxc_gga, naos * naos * sizeof(double)));
-
-    gpuSafe(gpuMalloc(&d_gs_den_mat_full, naos * naos * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_rw_den_mat_full, naos * naos * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_mat_Fxc_full, naos * naos * sizeof(double)));
-
-    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
-
-    dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-    dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
-
-        gpu::zeroMatrix<<<num_blocks, threads_per_block>>>(d_mat_Fxc_full, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
 
     // density and functional derivatives
 
@@ -2964,22 +2915,6 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     auto v2rhosigma = v2rhosigma_data.data();
     auto v2sigma2   = v2sigma2_data.data();
 
-    double *d_rho, *d_rhograd, *d_sigma, *d_rhow, *d_rhowgrad;
-    double *d_vsigma, *d_v2rho2, *d_v2rhosigma, *d_v2sigma2;
-
-    gpuSafe(gpuMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_rhograd, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_sigma, dim->sigma * max_npoints_per_box * sizeof(double)));
-
-    gpuSafe(gpuMalloc(&d_rhow, dim->rho * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_rhowgrad, dim->rho * 3 * max_npoints_per_box * sizeof(double)));
-
-    gpuSafe(gpuMalloc(&d_vsigma, dim->vsigma * max_npoints_per_box * sizeof(double)));
-
-    gpuSafe(gpuMalloc(&d_v2rho2, dim->v2rho2 * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_v2rhosigma, dim->v2rhosigma * max_npoints_per_box * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_v2sigma2, dim->v2sigma2 * max_npoints_per_box * sizeof(double)));
-
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
@@ -2990,17 +2925,114 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     auto n_total_grid_points = molecularGrid.getNumberOfGridPoints();
 
-    double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
+    // TODO: use smaller size for sub matrices such as d_den_mat, d_mat_Fxc, d_mat_Fxc_gga
 
-    gpuSafe(gpuMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    // d_gto_info,          5 * max_ncgtos * max_npgtos,               sizeof(double)
+    // d_den_mat,           naos * naos,                               sizeof(double)
+    // d_gto_values,        naos * max_npoints_per_box,                sizeof(double)
+    // d_gto_values_x,      naos * max_npoints_per_box,                sizeof(double)
+    // d_gto_values_y,      naos * max_npoints_per_box,                sizeof(double)
+    // d_gto_values_z,      naos * max_npoints_per_box,                sizeof(double)
+    // d_mat_F,             naos * max_npoints_per_box,                sizeof(double)
+    // d_mat_G_gga,         naos * max_npoints_per_box,                sizeof(double)
+    // d_mat_Fxc,           naos * naos,                               sizeof(double)
+    // d_mat_Fxc_gga,       naos * naos,                               sizeof(double)
+    // d_gs_den_mat_full,   naos * naos,                               sizeof(double)
+    // d_rw_den_mat_full,   naos * naos,                               sizeof(double)
+    // d_mat_Fxc_full,      naos * naos,                               sizeof(double)
+    // d_rho,               dim->rho * max_npoints_per_box,            sizeof(double)
+    // d_rhograd,           dim->rho * 3 * max_npoints_per_box,        sizeof(double)
+    // d_sigma,             dim->sigma * max_npoints_per_box,          sizeof(double)
+    // d_rhow,              dim->rho * max_npoints_per_box,            sizeof(double)
+    // d_rhowgrad,          dim->rho * 3 * max_npoints_per_box,        sizeof(double)
+    // d_vsigma,            dim->vsigma * max_npoints_per_box,         sizeof(double)
+    // d_v2rho2,            dim->v2rho2 * max_npoints_per_box,         sizeof(double)
+    // d_v2rhosigma,        dim->v2rhosigma * max_npoints_per_box,     sizeof(double)
+    // d_v2sigma2,          dim->v2sigma2 * max_npoints_per_box,       sizeof(double)
+    // d_grid_x,            n_total_grid_points,                       sizeof(double)
+    // d_grid_y,            n_total_grid_points,                       sizeof(double)
+    // d_grid_z,            n_total_grid_points,                       sizeof(double)
+    // d_grid_w,            n_total_grid_points,                       sizeof(double)
+
+    const auto count_double = (5 * max_ncgtos * max_npgtos +
+                               naos * naos +
+                               naos * max_npoints_per_box +
+                               naos * max_npoints_per_box +
+                               naos * max_npoints_per_box +
+                               naos * max_npoints_per_box +
+                               naos * max_npoints_per_box +
+                               naos * max_npoints_per_box +
+                               naos * naos +
+                               naos * naos +
+                               naos * naos +
+                               naos * naos +
+                               naos * naos +
+                               dim->rho * max_npoints_per_box +
+                               dim->rho * 3 * max_npoints_per_box +
+                               dim->sigma * max_npoints_per_box +
+                               dim->rho * max_npoints_per_box +
+                               dim->rho * 3 * max_npoints_per_box +
+                               dim->vsigma * max_npoints_per_box +
+                               dim->v2rho2 * max_npoints_per_box +
+                               dim->v2rhosigma * max_npoints_per_box +
+                               dim->v2sigma2 * max_npoints_per_box +
+                               n_total_grid_points +
+                               n_total_grid_points +
+                               n_total_grid_points +
+                               n_total_grid_points);
+
+    // d_ao_inds, naos, sizeof(uint32_t)
+
+    const auto count_uint32 = naos;
+
+    double* d_data_double;
+    uint32_t* d_data_uint32;
+
+    gpuSafe(gpuMalloc(&d_data_double, count_double * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data_uint32, count_uint32 * sizeof(uint32_t)));
+
+    double* d_gto_info        = d_data_double;
+    double* d_den_mat         = d_gto_info        + 5 * max_ncgtos * max_npgtos;
+    double* d_gto_values      = d_den_mat         + naos * naos;
+    double* d_gto_values_x    = d_gto_values      + naos * max_npoints_per_box;
+    double* d_gto_values_y    = d_gto_values_x    + naos * max_npoints_per_box;
+    double* d_gto_values_z    = d_gto_values_y    + naos * max_npoints_per_box;
+    double* d_mat_F           = d_gto_values_z    + naos * max_npoints_per_box;
+    double* d_mat_G_gga       = d_mat_F           + naos * max_npoints_per_box;
+    double* d_mat_Fxc         = d_mat_G_gga       + naos * max_npoints_per_box;
+    double* d_mat_Fxc_gga     = d_mat_Fxc         + naos * naos;
+    double* d_gs_den_mat_full = d_mat_Fxc_gga     + naos * naos;
+    double* d_rw_den_mat_full = d_gs_den_mat_full + naos * naos;
+    double* d_mat_Fxc_full    = d_rw_den_mat_full + naos * naos;
+    double* d_rho             = d_mat_Fxc_full    + naos * naos;
+    double* d_rhograd         = d_rho             + dim->rho * max_npoints_per_box;
+    double* d_sigma           = d_rhograd         + dim->rho * 3 * max_npoints_per_box;
+    double* d_rhow            = d_sigma           + dim->sigma * max_npoints_per_box;
+    double* d_rhowgrad        = d_rhow            + dim->rho * max_npoints_per_box;
+    double* d_vsigma          = d_rhowgrad        + dim->rho * 3 * max_npoints_per_box;
+    double* d_v2rho2          = d_vsigma          + dim->vsigma * max_npoints_per_box;
+    double* d_v2rhosigma      = d_v2rho2          + dim->v2rho2 * max_npoints_per_box;
+    double* d_v2sigma2        = d_v2rhosigma      + dim->v2rhosigma * max_npoints_per_box;
+    double* d_grid_x          = d_v2sigma2        + dim->v2sigma2 * max_npoints_per_box;
+    double* d_grid_y          = d_grid_x          + n_total_grid_points;
+    double* d_grid_z          = d_grid_y          + n_total_grid_points;
+    double* d_grid_w          = d_grid_z          + n_total_grid_points;
+
+    uint32_t* d_ao_inds = d_data_uint32;
+
+    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
 
     gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+    dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::zeroMatrix<<<num_blocks, threads_per_block>>>(d_mat_Fxc_full, static_cast<uint32_t>(naos), static_cast<uint32_t>(naos));
 
     gpuSafe(gpuDeviceSynchronize());
 
@@ -3262,37 +3294,8 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     gpuSafe(gpuMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
 
-    gpuSafe(gpuFree(d_gto_info));
-    gpuSafe(gpuFree(d_ao_inds));
-
-    gpuSafe(gpuFree(d_den_mat));
-    gpuSafe(gpuFree(d_gto_values));
-    gpuSafe(gpuFree(d_gto_values_x));
-    gpuSafe(gpuFree(d_gto_values_y));
-    gpuSafe(gpuFree(d_gto_values_z));
-    gpuSafe(gpuFree(d_mat_F));
-    gpuSafe(gpuFree(d_mat_G_gga));
-    gpuSafe(gpuFree(d_mat_Fxc));
-    gpuSafe(gpuFree(d_mat_Fxc_gga));
-    gpuSafe(gpuFree(d_gs_den_mat_full));
-    gpuSafe(gpuFree(d_rw_den_mat_full));
-    gpuSafe(gpuFree(d_mat_Fxc_full));
-
-    gpuSafe(gpuFree(d_rho));
-    gpuSafe(gpuFree(d_rhograd));
-    gpuSafe(gpuFree(d_rhow));
-    gpuSafe(gpuFree(d_rhowgrad));
-    gpuSafe(gpuFree(d_sigma));
-
-    gpuSafe(gpuFree(d_vsigma));
-    gpuSafe(gpuFree(d_v2rho2));
-    gpuSafe(gpuFree(d_v2rhosigma));
-    gpuSafe(gpuFree(d_v2sigma2));
-
-    gpuSafe(gpuFree(d_grid_x));
-    gpuSafe(gpuFree(d_grid_y));
-    gpuSafe(gpuFree(d_grid_z));
-    gpuSafe(gpuFree(d_grid_w));
+    gpuSafe(gpuFree(d_data_double));
+    gpuSafe(gpuFree(d_data_uint32));
 
     }
     }
