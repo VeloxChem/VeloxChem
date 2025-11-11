@@ -116,11 +116,11 @@ class TestEvb:
                     assert False
 
             # compare val1 with val2
-            if type1 is dict:
+            if isinstance(val1, dict):
                 self._compare_dict(val1, val2)
-            elif type1 is float or type1 is np.float64:
+            elif isinstance(val1, (float, np.float64)):
                 assert abs(val1 - val2) < float_tol
-            elif type1 is list or type1 is np.ndarray:
+            elif isinstance(val1, (list, np.ndarray)):
                 assert np.allclose(val1, val2, atol=float_tol)
             else:
                 assert val1 == val2

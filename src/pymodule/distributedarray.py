@@ -36,7 +36,6 @@ import time as tm
 import h5py
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import mpi_size_limit
 
 
 class DistributedArray:
@@ -73,52 +72,53 @@ class DistributedArray:
             return
 
         if self.rank == root:
-            # determine counts and displacements for scatter
+            sendbuf = array
+            dtype = sendbuf.dtype
+            # determine row_counts and displacements
             ave, res = divmod(array.shape[0], self.nodes)
-            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-            displacements = [sum(counts[:p]) for p in range(self.nodes)]
-
-            # determine batch size for number of columns
-            batch_size = mpi_size_limit() // (array.itemsize * array.shape[0])
-            batch_size = max(1, batch_size)
             if array.ndim == 1:
-                n_total = 1
+                ncols = 1
             elif array.ndim == 2:
-                n_total = array.shape[1]
+                ncols = array.shape[1]
+            ndim = array.ndim
+            row_counts = [
+                ave + 1 if p < res else ave for p in range(self.nodes)
+            ]
+            row_counts = np.array(row_counts)
         else:
-            counts = None
-            batch_size = None
-            n_total = None
-        batch_size = comm.bcast(batch_size, root=root)
-        n_total = comm.bcast(n_total, root=root)
+            sendbuf = None
+            dtype = None
+            ndim, ncols = None, None
+            row_counts = None
 
-        if n_total == 0:
-            counts = comm.bcast(counts, root=root)
-            self.data = np.zeros((counts[self.rank], 0))
+        dtype = self.comm.bcast(dtype, root=root)
+        ndim, ncols = self.comm.bcast((ndim, ncols), root=root)
+        row_counts = self.comm.bcast(row_counts, root=root)
+
+        if ncols == 0:
+            self.data = np.zeros((row_counts[self.rank], 0), dtype=dtype)
             return
 
-        for batch_start in range(0, n_total, batch_size):
-            batch_end = min(batch_start + batch_size, n_total)
+        elem_counts = ncols * row_counts
 
-            if self.rank == root:
-                if array.ndim == 1:
-                    array_list = [
-                        array[displacements[p]:displacements[p] + counts[p]]
-                        for p in range(self.nodes)
-                    ]
-                elif array.ndim == 2:
-                    array_list = [
-                        array[displacements[p]:displacements[p] + counts[p],
-                              batch_start:batch_end] for p in range(self.nodes)
-                    ]
-            else:
-                array_list = None
+        displacements = [np.sum(elem_counts[:p]) for p in range(self.nodes)]
+        displacements = np.array(displacements)
 
-            recvbuf = comm.scatter(array_list, root=root)
-            if self.data is None:
-                self.data = recvbuf
-            else:
-                self.data = np.hstack((self.data, recvbuf))
+        if ndim == 1:
+            recvbuf = np.zeros(row_counts[self.rank], dtype=dtype)
+        elif ndim == 2:
+            recvbuf = np.zeros((row_counts[self.rank], ncols), dtype=dtype)
+
+        if dtype == np.dtype('float64'):
+            mpi_data_type = MPI.DOUBLE
+        elif dtype == np.dtype('complex128'):
+            mpi_data_type = MPI.C_DOUBLE_COMPLEX
+
+        self.comm.Scatterv([sendbuf, elem_counts, displacements, mpi_data_type],
+                           recvbuf,
+                           root=root)
+
+        self.data = recvbuf
 
     def __sizeof__(self):
         """
@@ -215,6 +215,7 @@ class DistributedArray:
 
         data = None
 
+        # TODO: use Gatherv
         if self.data.ndim == 1:
             data = self.comm.gather(self.data, root=root)
         elif self.data.ndim == 2 and col is not None:
@@ -261,6 +262,7 @@ class DistributedArray:
         if factor is not None:
             mat *= factor
 
+        # TODO: use Reduce
         mat = self.comm.reduce(mat, op=MPI.SUM, root=root)
 
         return mat
@@ -283,6 +285,7 @@ class DistributedArray:
         if factor is not None:
             mat *= factor
 
+        # TODO: use Allreduce
         mat = self.comm.allreduce(mat, op=MPI.SUM)
 
         return mat

@@ -2253,7 +2253,7 @@ class PolarizabilityGradient:
 
         response_functions = lr_results.get('response_functions', None)
         keys = list(response_functions.keys())
-        is_complex_response = response_functions[keys[0]].dtype is np.dtype('complex128')
+        is_complex_response = (response_functions[keys[0]].dtype == np.dtype('complex128'))
 
         if is_complex_response != self.is_complex:
             error_text = 'Mismatch between LR results and polgrad settings!'

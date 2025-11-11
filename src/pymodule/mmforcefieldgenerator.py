@@ -2349,6 +2349,10 @@ class MMForceFieldGenerator:
         k = k - 1
         l = l - 1
 
+        # in case the input indices are in reversed order
+        if (i, j, k, l) not in self.dihedrals:
+            i, j, k, l = l, k, j, i
+
         # Exctract the original dihedral parameters
         original_dihedral = self.dihedrals[(i, j, k, l)]
         if original_dihedral['multiple']:

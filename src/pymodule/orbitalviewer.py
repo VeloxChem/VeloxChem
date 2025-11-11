@@ -111,6 +111,10 @@ class OrbitalViewer:
         self._plt_iso_one = None
         self._plt_iso_two = None
 
+        # viewer size
+        self._viewer_width = 600
+        self._viewer_height = 450
+
     def help_string_k3d(self):
 
         return ('Unable to import k3d. Please install k3d via pip or conda,\n' +
@@ -353,7 +357,7 @@ class OrbitalViewer:
 
         return np_orb
 
-    def plot(self, molecule, basis, mo_inp, label=''):
+    def plot(self, molecule, basis, mo_inp, label='', width=600, height=450):
         """
         Plots the orbitals, with a widget to choose which.
 
@@ -366,15 +370,9 @@ class OrbitalViewer:
             MolecularOrbitals, or a MolecularOrbitals object).
         """
 
-        try:
-            import k3d
-        except ImportError:
-            self._plot_using_py3dmol(molecule, basis, mo_inp, label)
-            return
+        self._plot_using_py3dmol(molecule, basis, mo_inp, label, width, height)
 
-        self._plot_using_k3d(molecule, basis, mo_inp, label)
-
-    def _plot_using_k3d(self, molecule, basis, mo_inp, label=''):
+    def plot_using_k3d(self, molecule, basis, mo_inp, label=''):
         """
         Plots the orbitals using k3d, with a widget to choose which.
 
@@ -745,7 +743,13 @@ class OrbitalViewer:
 
         return plt_iso_one, plt_iso_two
 
-    def _plot_using_py3dmol(self, molecule, basis, mo_inp, label=''):
+    def _plot_using_py3dmol(self,
+                            molecule,
+                            basis,
+                            mo_inp,
+                            label='',
+                            width=600,
+                            height=450):
         """
         Plots the orbitals using py3dmol, with a widget to choose which.
 
@@ -838,17 +842,26 @@ class OrbitalViewer:
         # use a persistent output widget
         out = widgets.Output()
 
+        self._viewer_width = width
+        self._viewer_height = height
+
         # draw the first orbital by default
         with out:
             display(HTML(self._draw_orbital_html(self._i_orb)))
 
         def update_view_alpha(change):
-            out.clear_output()
+            out.clear_output(wait=True)
+            with out:
+                display(HTML(self._draw_molecule_html()))
+            out.clear_output(wait=True)
             with out:
                 display(HTML(self._draw_orbital_html(change['new'], 'alpha')))
 
         def update_view_beta(change):
-            out.clear_output()
+            out.clear_output(wait=True)
+            with out:
+                display(HTML(self._draw_molecule_html()))
+            out.clear_output(wait=True)
             with out:
                 display(HTML(self._draw_orbital_html(change['new'], 'beta')))
 
@@ -866,6 +879,30 @@ class OrbitalViewer:
             display(hbox, out)
         else:
             display(dropdown, out)
+
+    def _draw_molecule_html(self):
+        """
+        Generates HTML for molecule using py3dmol.
+
+        :return:
+            The HTML for molecule.
+        """
+
+        try:
+            import py3Dmol
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol')
+
+        viewer = py3Dmol.view(width=self._viewer_width,
+                              height=self._viewer_height)
+
+        viewer.addModel(self._molecule.get_xyz_string(), "xyz")
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})
+
+        viewer.zoomTo()
+
+        # self-contained HTML that is stable in ipywidgets
+        return viewer._make_html()
 
     def _draw_orbital_html(self, i_orb, spin='alpha'):
         """
@@ -895,7 +932,8 @@ class OrbitalViewer:
         orbital_cube_str = self._get_orbital_cube_str(orbital_cube_data,
                                                       f'({spin})')
 
-        viewer = py3Dmol.view(width=600, height=450)
+        viewer = py3Dmol.view(width=self._viewer_width,
+                              height=self._viewer_height)
 
         viewer.addModel(orbital_cube_str, "cube")
         viewer.setStyle({"stick": {}, "sphere": {"scale": 0.1}})

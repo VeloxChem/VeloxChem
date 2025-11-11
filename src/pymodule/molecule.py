@@ -459,7 +459,7 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3, H2_factor=1.7):
     covalent_radii_in_au = self.covalent_radii_to_numpy()
 
     natoms = coords_in_au.shape[0]
-    connectivity_matrix = np.zeros((natoms, natoms), dtype='int32')
+    connectivity_matrix = np.zeros((natoms, natoms), dtype=int)
     labels = self.get_labels()
 
     for i in range(natoms):
