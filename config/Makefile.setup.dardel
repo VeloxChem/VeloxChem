@@ -54,7 +54,7 @@ CXX_REL_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 
 DEVCC_REL_FLG := -fPIC -fopenmp -std=c++17 -O3 $(XC_INC)
-DEVCC_DEB_FLG := -fPIC -fopenmp -std=c++17 -O3 $(XC_INC)
+DEVCC_DEB_FLG := -fPIC -fopenmp -std=c++17 -O3 $(XC_INC) -g
 DEVICE_LIB := -lhipblas
 #DEVICE_LIB := -lhipblas -lhipsolver
 

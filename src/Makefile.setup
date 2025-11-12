@@ -51,7 +51,7 @@ CXX_REL_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 
 DEVCC_REL_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC)
-DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC)
+DEVCC_DEB_FLG := -Xcompiler -fPIC -Xcompiler -fopenmp -std=c++17 -O3 $(XC_INC) -g
 DEVICE_LIB := -L$(CUDA_LIB_DIR) -lcudart -lcublas -lcusolver
 
 MACLIBS :=
