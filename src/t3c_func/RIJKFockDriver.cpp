@@ -547,3 +547,9 @@ CRIJKFockDriver::_comp_j_vector(const std::vector<double>& mvector) const -> std
     
     return jvec;
 }
+
+auto
+CRIJKFockDriver::get_indices_of_bq_vectors() const -> std::vector<size_t>
+{
+    return _bq_vectors.indices();
+}

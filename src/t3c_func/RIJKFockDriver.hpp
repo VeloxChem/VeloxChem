@@ -162,6 +162,10 @@ class CRIJKFockDriver
     /// @return The batch of transformed B^Q vectors.
     auto compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const size_t bstart, const size_t bend) const -> std::vector<CSubMatrix>;
     
+    /// @brief Returns the indices of local B^Q vectors.
+    /// @return The indices of local B^Q vectors.
+    auto get_indices_of_bq_vectors() const -> std::vector<size_t>;
+
     private:
     
     /// The reduced indices mask for screened B^Q vectors.

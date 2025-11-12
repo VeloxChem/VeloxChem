@@ -440,3 +440,10 @@ class RIJKFockDriver:
             basis_ri = MolecularBasis(auxiliary_basis)
             
         return self._ri_drv.estimate_memory_for_bq_vectors(screener, molecule, basis_ri, ithreshold, self.rank, self.nodes)
+    
+    def get_indices_of_bq_vectors(self):
+        """
+        Returns the indices of local B^Q vectors.
+        """
+
+        return self._ri_drv.get_indices_of_bq_vectors()
