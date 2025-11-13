@@ -1027,42 +1027,6 @@ CScreeningData::getGpuTimerSummary() const -> const std::vector<std::string>
 }
 
 auto
-CScreeningData::getQMatrixSS() const -> const CDenseMatrix&
-{
-    return _Q_matrix_ss;
-}
-
-auto
-CScreeningData::getQMatrixSP() const -> const CDenseMatrix&
-{
-    return _Q_matrix_sp;
-}
-
-auto
-CScreeningData::getQMatrixSD() const -> const CDenseMatrix&
-{
-    return _Q_matrix_sd;
-}
-
-auto
-CScreeningData::getQMatrixPP() const -> const CDenseMatrix&
-{
-    return _Q_matrix_pp;
-}
-
-auto
-CScreeningData::getQMatrixPD() const -> const CDenseMatrix&
-{
-    return _Q_matrix_pd;
-}
-
-auto
-CScreeningData::getQMatrixDD() const -> const CDenseMatrix&
-{
-    return _Q_matrix_dd;
-}
-
-auto
 CScreeningData::_sortQ(const int64_t s_prim_count,
                        const int64_t p_prim_count,
                        const int64_t d_prim_count,

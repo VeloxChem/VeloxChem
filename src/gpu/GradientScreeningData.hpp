@@ -270,13 +270,6 @@ class CGradientScreeningData
 
     auto getCartesianAOtoAtomIndices() const -> const std::vector<uint32_t>&;
 
-    auto getQMatrixSS() const -> const CDenseMatrix&;
-    auto getQMatrixSP() const -> const CDenseMatrix&;
-    auto getQMatrixSD() const -> const CDenseMatrix&;
-    auto getQMatrixPP() const -> const CDenseMatrix&;
-    auto getQMatrixPD() const -> const CDenseMatrix&;
-    auto getQMatrixDD() const -> const CDenseMatrix&;
-
     auto sortQD(const int64_t s_prim_count,
                 const int64_t p_prim_count,
                 const int64_t d_prim_count,

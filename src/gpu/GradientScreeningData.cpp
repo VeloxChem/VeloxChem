@@ -1336,42 +1336,6 @@ CGradientScreeningData::getCartesianAOtoAtomIndices() const -> const std::vector
 }
 
 auto
-CGradientScreeningData::getQMatrixSS() const -> const CDenseMatrix&
-{
-    return _Q_matrix_ss;
-}
-
-auto
-CGradientScreeningData::getQMatrixSP() const -> const CDenseMatrix&
-{
-    return _Q_matrix_sp;
-}
-
-auto
-CGradientScreeningData::getQMatrixSD() const -> const CDenseMatrix&
-{
-    return _Q_matrix_sd;
-}
-
-auto
-CGradientScreeningData::getQMatrixPP() const -> const CDenseMatrix&
-{
-    return _Q_matrix_pp;
-}
-
-auto
-CGradientScreeningData::getQMatrixPD() const -> const CDenseMatrix&
-{
-    return _Q_matrix_pd;
-}
-
-auto
-CGradientScreeningData::getQMatrixDD() const -> const CDenseMatrix&
-{
-    return _Q_matrix_dd;
-}
-
-auto
 CGradientScreeningData::_sortQ(const int64_t                s_prim_count,
                                const int64_t                p_prim_count,
                                const int64_t                d_prim_count,

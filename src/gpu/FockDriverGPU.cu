@@ -3992,13 +3992,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[thread_id].start("J prep.");
 
-    const auto ss_mat_Q_orig = screening.getQMatrixSS();
-    const auto sp_mat_Q_orig = screening.getQMatrixSP();
-    const auto sd_mat_Q_orig = screening.getQMatrixSD();
-    const auto pp_mat_Q_orig = screening.getQMatrixPP();
-    const auto pd_mat_Q_orig = screening.getQMatrixPD();
-    const auto dd_mat_Q_orig = screening.getQMatrixDD();
-
     const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
     const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
     const auto& sd_first_inds_local = screening.get_sd_first_inds_local(gpu_id);
