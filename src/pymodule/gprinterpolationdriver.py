@@ -48,7 +48,7 @@ from .atommapper import AtomMapper
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
-from.veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
 
@@ -81,12 +81,16 @@ class GPRInterpolationDriver:
         self.standardize = standardize
         self.dtype = dtype
         self.device = device
+        self.verbose_diagnostics = False
+        self._kernel_diag_cache = {}
+        self._diag_cache_version = 0
         self.scale_mode = "robust"   # or "phys" once you wire the feature types
         self.x_floor = 0.01          # minimum per-feature scale (tune 0.02–0.10)
         self._safe_dists = []
         self._sigma_thresh_dyn = 0.0
         self._ensure_sim_state()
         self._ensure_dist_state()
+        self.cause = 'none'
         
 
         self.X_raw = self._ensure_2d(x0)
@@ -150,17 +154,10 @@ class GPRInterpolationDriver:
         for k in kernels[1:]:
             base_kernel = base_kernel + k
 
-        # Likelihood
-        self.likelihood = gpytorch.likelihoods.GaussianLikelihood(
-            noise_prior=LogNormalPrior(-4.6, 0.5)  # ~0.01 median in standardized units
-        ).to(self.device).double()
-
-        # Model with grouped kernel
-
         self.likelihood = gpytorch.likelihoods.GaussianLikelihood(
             noise_prior=gpytorch.priors.LogNormalPrior(-4.6, 0.5),  # ~0.01
             noise_constraint=gpytorch.constraints.Interval(1e-4, 5e-2),
-        )
+        ).to(self.device).double()
         scaled_kernel = gpytorch.kernels.ScaleKernel(
             base_kernel,
             outputscale_prior=gpytorch.priors.LogNormalPrior(0.0, 0.5),
@@ -169,28 +166,9 @@ class GPRInterpolationDriver:
         self.model = ExactDeltaE(X, y, self.likelihood, base_kernel=base_kernel, nu=1.5).to(self.device).double()
         self.model.covar_module = scaled_kernel
         self.model = self.model.to(self.device).double()
-        # Reasonable outputscale constraint/prior
-        # self.model.covar_module.register_constraint("raw_outputscale", Interval(1e-4, 1e2))
-        # self.model.covar_module.register_prior("os_prior", LogNormalPrior(0.0, 0.5), "raw_outputscale")
 
-        # # Noise lower/upper bounds (keep a floor to avoid 1e-6 collapse)
-        # self.likelihood.noise_covar.register_constraint("raw_noise", Interval(1e-4, 5e-2))
-
-        
-        # self.likelihood = gpytorch.likelihoods.GaussianLikelihood().to(self.device).double()
-        # self.model = ExactDeltaE(X, y, self.likelihood).to(self.device).double()
-
-        # self.base = self.model.covar_module.base_kernel
-
-        # self.base = self.model.covar_module.base_kernel
-        # self.base.register_constraint("raw_lengthscale", Interval(1e-2, 1e5))
-        # self.model.covar_module.register_constraint("raw_outputscale", Interval(1e-4, 1e2))
-        # self.likelihood.noise_covar.register_constraint("raw_noise", Interval(1e-6, 5e-2))
-
-
-
-        # self.model.train(); self.likelihood.train()
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
+        self._invalidate_kernel_cache()
   
 
     def _ensure_sim_state(self):
@@ -325,33 +303,54 @@ class GPRInterpolationDriver:
 
 
     def _assert_and_clean_finite(self):
-        # Coerce shapes
+        # Ensure shapes
         self.X_raw = self._ensure_2d(self.X_raw)
         self.y_raw = self._ensure_1d(self.y_raw)
 
-        # Row filtering
-        Xfin = torch.isfinite(self.X_raw).all(dim=1)
-        yfin = torch.isfinite(self.y_raw)
-        keep_rows = Xfin & yfin
-        if keep_rows.sum() < self.X_raw.shape[0]:
-            self.X_raw = self.X_raw[keep_rows]
-            self.y_raw = self.y_raw[keep_rows]
+        # ---------- 1) ROW filter ----------
+        row_ok_X = torch.isfinite(self.X_raw).all(dim=1)   # (N,)
+        row_ok_y = torch.isfinite(self.y_raw)              # (N,)
+        row_ok   = row_ok_X & row_ok_y
+        if row_ok.sum() == 0:
+            raise RuntimeError("No valid rows in (X,y): all rows contain non-finite values.")
+        if row_ok.sum() < self.X_raw.shape[0]:
+            self.X_raw = self.X_raw[row_ok]
+            self.y_raw = self.y_raw[row_ok]
 
-        # Sanitize
+        N, D = self.X_raw.shape
+
+        # ---------- 2) COLUMN mask (decide BEFORE sanitizing) ----------
+        col_finite_ok = torch.isfinite(self.X_raw).all(dim=0)   # (D,)
+        if not col_finite_ok.any():
+            raise RuntimeError("No finite feature columns in X_raw.")
+
+        if N >= 3:
+            med = self.X_raw.median(dim=0).values
+            mad = (self.X_raw - med).abs().median(dim=0).values
+            col_var_ok = (1.4826 * mad) > 1e-8
+            col_ok = col_finite_ok & col_var_ok
+            if not col_ok.any():
+
+                col_ok = col_finite_ok
+        else:
+
+            col_ok = col_finite_ok
+
+
         self.X_raw = torch.nan_to_num(self.X_raw, nan=0.0, posinf=1e12, neginf=-1e12)
         self.y_raw = torch.nan_to_num(self.y_raw, nan=0.0, posinf=1e12, neginf=-1e12)
 
-        # Column mask: only for finiteness, not for zero variance
-        col_ok = torch.isfinite(self.X_raw).all(dim=0)
 
         if getattr(self, "_keep_cols", None) is None:
+
             self._keep_cols = col_ok
         else:
-            # Do not allow the mask length to change later
-            if self._keep_cols.numel() != self.X_raw.shape[1]:
+            if self._keep_cols.numel() != D:
                 raise RuntimeError(
-                    f"Frozen mask length {self._keep_cols.numel()} != X_raw width {self.X_raw.shape[1]}"
+                    f"Frozen mask length {self._keep_cols.numel()} != X_raw width {D}"
                 )
+
+
 
     def _fit_data(self):
         self._assert_and_clean_finite()
@@ -456,117 +455,17 @@ class GPRInterpolationDriver:
             self.X_raw = X_new.contiguous()
             self.y_raw = y_new.contiguous()
 
-            # If you have a GPyTorch ExactGP model attached
-            if hasattr(self, "model"):
-                try:
-                    # Works for ExactGP models
-                    self.model.set_train_data(inputs=self.X_raw, targets=self.y_raw, strict=False)
-                except AttributeError:
-                    # Fallback: some custom models don’t implement set_train_data
-                    pass
+            # # If you have a GPyTorch ExactGP model attached
+            # self._fit_data()
+            # X_tr, y_tr = self._transform(self.X_raw, self.y_raw)
+            # if hasattr(self, "model"):
+            #     self.model.set_train_data(inputs=X_tr, targets=y_tr, strict=False)
 
         # If you cache kernels/factorizations, invalidate them here
         if hasattr(self, "_cached_chol"):
             self._cached_chol = None
+        self._invalidate_kernel_cache()
 
-
-
-    # def _fit_data(self):
-    #     self._assert_and_clean_finite()  # see patch from earlier message
-
-    #     # Means
-    #     self.X_mean = self.X_raw.mean(dim=0)
-    #     self.y_mean = self.y_raw.mean(dim=0)
-
-    #     # Scales (robust)
-    #     self.X_std  = self._compute_feature_scale(self.X_raw)
-    #     self.y_std  = self.y_raw.std(dim=0, unbiased=False).clamp_min(1e-6) 
-
-    # def _transform(self, X, y=None):
-        
-    #     if not self.standardize:
-    #         return (X, y) if y is not None else X
-        
-    #     Xn = (X - self.X_mean) / self.X_std
-    #     if y is None: return Xn
-    #     yn = (y - self.y_mean) / self.y_std
-        
-    #     return Xn, yn
-
-    # def add_data(self, X_new, y_new):
-    #     X_new = self._apply_keep_cols(X_new)
-    #     y_new = self._ensure_1d(y_new)
-    #     self.X_raw = torch.cat([self.X_raw, X_new.to(self.dtype).to(self.device)], dim=0)
-    #     self.y_raw = torch.cat([self.y_raw, y_new.to(self.dtype).to(self.device)], dim=0)
-
-
-    # def add_data(self, X_new, y_new):
-    #     """Append new (x, ΔE) pairs and keep model object; no re-init."""
-    #     Xn = torch.as_tensor(X_new, dtype=self.dtype, device=self.device)
-    #     yn = torch.as_tensor(y_new, dtype=self.dtype, device=self.device)
-    #     self.X_raw = torch.cat([self.X_raw, Xn], dim=0)
-    #     self.y_raw = torch.cat([self.y_raw, yn], dim=0)
-
-    # def refit(self, steps="auto"):
-    #     """
-    #     Recompute scalers, update train data in-place, and refit hyperparams.
-    #     'steps="auto"' uses BoTorch’s LBFGS fit; or pass an int to do N Adam steps.
-    #     """
-
-    #     print("y_std (raw):", self.y_std)  # before transform
-    #     print("X_std (raw) min/med/max:", self.X_std.min(), self.X_std.median(), self.X_std.max())
-    #     print("lengthscale:", self.model.covar_module.base_kernel.lengthscale)
-    #     print("outputscale:", self.model.covar_module.outputscale)
-    #     print("noise:", self.likelihood.noise)
-    #     # Re-standardize with ALL data (most stable for small/medium n)
-    #     print('differnet x and y', self.X_raw, self.y_raw)
-        
- 
-    #     self._fit_data()
-    #     print("y_std:", self.y_std.item())
-    #     X_tr, y_tr = self._transform(self.X_raw, self.y_raw)
-        
-
-    #     # ---- Update training data on the model (version-safe) ----
-    #     if hasattr(self.model, "set_train_data"):
-    #         # Newer gpytorch
-    #         self.model.set_train_data(X_tr, y_tr, strict=False)
-    #     else:
-    #         # Older gpytorch fallback
-    #         # NOTE: train_inputs is a tuple for single-input models
-    #         self.model.train_inputs = (X_tr,)
-    #         self.model.train_targets = y_tr
-    #         if hasattr(self.model, "_clear_cache"):
-    #             self.model._clear_cache()
-
-    #     # Warm-started optimization (params are already near a good solution)
-    #     self.model.train(); self.likelihood.train()
-    #     if steps == "auto":
-    #         self.model.train(); self.likelihood.train()
-    #         optimizer = torch.optim.LBFGS(self.model.parameters(), lr=0.5, max_iter=60, line_search_fn="strong_wolfe")
-    #         def closure():
-    #             optimizer.zero_grad(set_to_none=True)
-    #             out = self.model(X_tr)
-    #             loss = -self.mll(out, y_tr)
-    #             loss.backward()
-    #             return loss
-    #         optimizer.step(closure)
-    #     else:
-    #         opt = torch.optim.Adam(self.model.parameters(), lr=0.05)
-    #         for _ in range(int(steps)):
-    #             opt.zero_grad()
-    #             out = self.model(X_tr)
-    #             loss = -self.mll(out, y_tr)
-    #             loss.backward()
-    #             opt.step()
-
-    #     # ---- Report fitted hypers ----
-    #     self.model.eval(); self.likelihood.eval()
-    #     with torch.no_grad():
-    #         print("lengthscale:", self.model.covar_module.base_kernel.lengthscale)
-    #         print("outputscale:", self.model.covar_module.outputscale)
-    #         print("noise:", self.likelihood.noise)
-    
 
     def refit(self, steps="auto", verbose=True):
         
@@ -581,7 +480,7 @@ class GPRInterpolationDriver:
             old_keep = int(self._keep_cols.sum()) if getattr(self, "_keep_cols", None) is not None else None
         except Exception:
             old_keep = None
-        self._keep_cols = None   # <- let _fit_data recompute keep mask from current X_raw
+        # self._keep_cols = None   # <- let _fit_data recompute keep mask from current X_raw
         self._fit_data()         # now scalers *and* mask match the full dataset
 
         if verbose:
@@ -618,32 +517,12 @@ class GPRInterpolationDriver:
 
         # (re)attach train data and optimize as you already do
         self.model.set_train_data(X_tr, y_tr, strict=False)
+        self._invalidate_kernel_cache()
 
-        
-        # with torch.no_grad():
-        #     d = torch.cdist(X_tr, X_tr, p=2)
-        #     d.fill_diagonal_(float('inf'))
-        #     print("min pairwise dist:", torch.min(d).item())
-        # # Update train data
-        # self.model.set_train_data(X_tr, y_tr, strict=False)
 
         if steps == "auto":
             self._train_once(X_tr, y_tr, adam_steps=80, lbfgs_max_iter=80)
-            # def closure():
-            #     optimizer.zero_grad(set_to_none=True)
-            #     out = self.model(X_tr)
-            #     loss = -self.mll(out, y_tr)
-            #     loss.backward()
-            #     return loss
-            # optimizer.step(closure)
-        # else:
-        #     opt = torch.optim.Adam(self.model.parameters(), lr=0.05)
-        #     for _ in range(int(steps)):
-        #         opt.zero_grad()
-        #         loss = -self.mll(self.model(X_tr), y_tr)
-        #         loss.backward()
-        #         opt.step()
-        # X_std, y_std are standardized training data
+
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             pred = self.likelihood(self.model(X_tr))
             mu  = pred.mean
@@ -664,9 +543,13 @@ class GPRInterpolationDriver:
             print("noise:", self.likelihood.noise)
         
         self._r_nn_med = float('nan')
+        prev = getattr(self, "_d_thresh_dyn", None)
+        self._r_nn_med = float('nan')                 # force recompute of median NN in new metric
         if hasattr(self, "_dist_events"): self._dist_events.clear()
-        self._d_thresh_dyn = 1.0
-        
+        if prev is None:
+            print('prev', prev)
+            self._d_thresh_dyn = 1.0 
+
 
         print("#kept dims:", int(self._keep_cols.sum()) if self._keep_cols is not None else -1)
         print("X_std min/median/max:", self.X_std.min().item(), self.X_std.median().item(), self.X_std.max().item())
@@ -801,12 +684,13 @@ class GPRInterpolationDriver:
         return mean, std
     
     @torch.no_grad()
-    def predict_latent(self, X_query, return_std=True):
+    def predict_latent(self, X_query, return_std=True, diagnostics=False):
         # same preprocessing
         Xq = self._transform(X_query)
         self.model.eval()
-        self.kernel_summary()
-        self.calibration_report()
+        if diagnostics or self.verbose_diagnostics:
+            self.kernel_summary()
+            self.calibration_report()
         with gpytorch.settings.fast_pred_var():
             fdist = self.model(Xq)  # LATENT: no likelihood -> epistemic only
         if not return_std:
@@ -820,40 +704,6 @@ class GPRInterpolationDriver:
 
         return mean.detach().cpu().numpy(), std.detach().cpu().numpy()
 
-    # def predict(self, X_query, return_std=True, verbose=False):
-    #     Xq = self._transform(X_query)                 # ensures 2D + masked + standardized
-    #     self.model.eval(); self.likelihood.eval()
-    #     with gpytorch.settings.fast_pred_var():
-    #         pred = self.likelihood(self.model(Xq))
-
-    #     # Diagnostics (optional)
-    #     if verbose:
-    #         xq_raw = self._ensure_2d(X_query).detach().cpu().numpy()
-    #         Xq_std = Xq.detach().cpu().numpy()
-    #         print("Xq_raw norm:", np.linalg.norm(xq_raw, axis=1))
-    #         print("Xq_std norm:", np.linalg.norm(Xq_std, axis=1))
-    #         Xtr = ((self.X_raw - self.X_mean)/self.X_std).detach().cpu().numpy()
-    #         dists = np.linalg.norm(Xtr[:,None,:] - Xq_std[None,:,:], axis=2)
-    #         print("nearest dist per query:", dists.min(axis=0))
-
-    #         with gpytorch.settings.fast_pred_var():
-    #             fdist = self.model(Xq)
-    #             ydist = pred
-    #         f_std = fdist.variance.sqrt() * (self.y_std if self.standardize else 1.0)
-    #         y_std = ydist.variance.sqrt() * (self.y_std if self.standardize else 1.0)
-    #         print("latent std (per query):", f_std.flatten().tolist(),
-    #             "observed std:", y_std.flatten().tolist())
-
-    #     # Unstandardize
-    #     if self.standardize:
-    #         mean = pred.mean * self.y_std + self.y_mean
-    #         var  = pred.variance * (self.y_std ** 2)
-    #     else:
-    #         mean, var = pred.mean, pred.variance
-
-    #     mean = mean.detach().cpu().numpy()
-    #     std  = var.sqrt().detach().cpu().numpy() if return_std else None
-    #     return mean, std
 
     def reset_distance_history(self):
         if hasattr(self, "_safe_dists"): del self._safe_dists
@@ -874,7 +724,7 @@ class GPRInterpolationDriver:
 
     def update_similarity_threshold(self,
                                 q_good=0.25, q_bad=0.75,
-                                min_good=1, min_bad=1,
+                                min_good=1, min_bad=2,
                                 cap_min=0.20, cap_max=0.95,
                                 prior_thresh=0.40,   # your conservative prior
                                 prior_strength=8,    # how many pseudo-events the prior counts for
@@ -882,6 +732,25 @@ class GPRInterpolationDriver:
                                 max_drop=0.02):
         if not getattr(self, "_sim_events", None):
             return
+        
+        # -------- robust small-n quantiles --------
+        def robust_q(arr, q):
+            arr = np.asarray(arr).ravel()
+            n = arr.size
+            arr.sort()
+            if n <= 4:
+                # no trimming; linear interp
+                if n == 1:
+                    return float(arr[0])
+                idx = q * (n - 1)
+                lo, hi = int(np.floor(idx)), int(np.ceil(idx))
+                return float(arr[lo] + (idx - lo) * (arr[hi] - arr[lo]))
+            # light, adaptive trimming only when we have enough samples
+            lo_q = 0.0 if n < 20 else 0.05
+            hi_q = 1.0 if n < 200 else 0.995
+            lo, hi = np.quantile(arr, [lo_q, hi_q])
+            arr = arr[(arr >= lo) & (arr <= hi)]
+            return float(np.quantile(arr, q))
 
         # unpack
         s = np.array([e["s"] for e in self._sim_events], float)
@@ -903,38 +772,21 @@ class GPRInterpolationDriver:
             # With zero bads, still allow gentle learning from good-only evidence:
             # keep threshold near prior but nudge toward a higher quantile of "good".
             if n_good >= min_good and n_bad == 0:
-                gq = 0.5 if n_good < 5 else max(q_good, 0.4)  # median for very small n
-                s_lo_good = float(np.quantile(np.sort(good), gq))
-                cand_evidence = s_lo_good
-                cand_evidence = float(np.clip(cand_evidence, cap_min, cap_max))
+                s_lo_good = robust_q(good, 0.25 if n_good >= 5 else 0.50)  # low quantile or median
+                if s_lo_good is None:
+                    return
+                cand_evidence = float(np.clip(s_lo_good, cap_min, cap_max))
                 prev = getattr(self, "_s_thresh_dyn", prior_thresh)
-                # shrink to prior with strong weight since n_bad==0
-                w_prior = prior_strength / (prior_strength + max(1, n_good))
-                cand = w_prior * prior_thresh + (1 - w_prior) * cand_evidence
-                cand = max(cand, prev - max_drop)
-                # smaller alpha when data scarce
-                alpha = min(alpha_max, alpha_base * n_tot / (n_tot + 10))
-                self._s_thresh_dyn = (1 - alpha) * prev + alpha * cand
-            return
 
-        # -------- robust small-n quantiles --------
-        def robust_q(arr, q):
-            arr = np.asarray(arr).ravel()
-            n = arr.size
-            arr.sort()
-            if n <= 4:
-                # no trimming; linear interp
-                if n == 1:
-                    return float(arr[0])
-                idx = q * (n - 1)
-                lo, hi = int(np.floor(idx)), int(np.ceil(idx))
-                return float(arr[lo] + (idx - lo) * (arr[hi] - arr[lo]))
-            # light, adaptive trimming only when we have enough samples
-            lo_q = 0.0 if n < 20 else 0.05
-            hi_q = 1.0 if n < 200 else 0.995
-            lo, hi = np.quantile(arr, [lo_q, hi_q])
-            arr = arr[(arr >= lo) & (arr <= hi)]
-            return float(np.quantile(arr, q))
+                # Do not increase when we only have good evidence
+                cand = min(prev, cand_evidence)
+
+                # gentle smoothing + symmetric caps
+                cand = np.clip(cand, prev - max_drop, prev + 0.0)  # no upward move
+                alpha = min(alpha_max, alpha_base * n_good / (n_good + 10))
+                self._s_thresh_dyn = (1 - alpha) * prev + alpha * cand
+                return
+
 
         # adapt quantiles for tiny samples
         qg = q_good if n_good >= 5 else 0.50         # median when few good
@@ -953,36 +805,13 @@ class GPRInterpolationDriver:
         # -------- shrinkage toward a prior when data are scarce --------
         w_prior = prior_strength / (prior_strength + n_tot)
         cand = w_prior * prior_thresh + (1 - w_prior) * cand_evidence
-
+        max_rise = 0.02
         prev = getattr(self, "_s_thresh_dyn", prior_thresh)
-        cand = max(cand, prev - max_drop)  # avoid sudden plunges
-
-        # smaller alpha when sample is tiny; caps at alpha_max
+        cand = np.clip(cand, prev - max_drop, prev + max_rise)   # e.g. max_rise=0.02
         alpha = min(alpha_max, alpha_base * n_tot / (n_tot + 10))
         self._s_thresh_dyn = (1 - alpha) * prev + alpha * cand
 
     
-    
-    # def update_similarity_threshold(self, s_value: float, abs_residual: float, T: float,
-    #                             q: float = 0.05, Nmin: int = 5,
-    #                             cap_min: float = 0.05, cap_max: float = 0.8, alpha: float = 0.2):
-    #     """
-    #     Learn a *min* similarity cutoff (lower s means farther). We keep the q-th percentile
-    #     of s among *accurate* cases (|residual| <= 0.5*T), smooth with EWMA, and cap.
-    #     """
-    #     if len(self.X_raw) < Nmin or abs_residual > 0.5*T:
-    #         return
-    #     if not hasattr(self, "_safe_sims"):
-    #         self._safe_sims = []
-    #     self._safe_sims.append(float(s_value))
-    #     if len(self._safe_sims) > 2000:
-    #         self._safe_sims = self._safe_sims[-2000:]
-
-    #     if len(self._safe_sims) >= 20:
-    #         s_q = float(np.quantile(np.array(self._safe_sims), q))  # low percentile → boundary of “safe closeness”
-    #         s_q = float(np.clip(s_q, cap_min, cap_max))
-    #         prev = getattr(self, "_s_thresh_dyn", s_q)
-    #         self._s_thresh_dyn = (1 - alpha)*prev + alpha*s_q
 
     def _ensure_dist_state(self):
         if not hasattr(self, "_dist_events"):
@@ -1021,6 +850,19 @@ class GPRInterpolationDriver:
         
         return X_std * scale  # Y
 
+    def _invalidate_kernel_cache(self):
+        self._diag_cache_version = getattr(self, "_diag_cache_version", 0) + 1
+        self._kernel_diag_cache = {}
+
+    def _get_group_diag(self, kernel, Xtr_std):
+        cache_key = (id(kernel), self._diag_cache_version, Xtr_std.shape[0])
+        diag = self._kernel_diag_cache.get(cache_key)
+        if diag is None:
+            with torch.no_grad():
+                diag = torch.diag(kernel(Xtr_std, Xtr_std).evaluate()).clamp_min(1e-12)
+            self._kernel_diag_cache[cache_key] = diag
+        return diag
+
     def _nn_r_stats(self, Xtr_std, groups):
         Y = self._metric_whiten(Xtr_std, groups)
         D = torch.cdist(Y, Y)          # r_eff between all pairs
@@ -1033,12 +875,12 @@ class GPRInterpolationDriver:
             m, *_ = self._nn_r_stats(Xtr_std, groups)
             self._r_nn_med = max(1e-8, m)   # avoid divide-by-zero
 
-    def record_distance_event(self, d_norm, added, abs_residual, T, cause="none"):
+    def record_distance_event(self, d_norm, added, abs_residual, T):
         self._ensure_dist_state()
         d  = float(d_norm) if d_norm is not None else np.inf
         ar = float(abs_residual) if (abs_residual is not None) else np.inf
         t  = float(T) if (T is not None) else 1.0
-        self._dist_events.append((d, bool(added), ar, t, str(cause)))
+        self._dist_events.append((d, bool(added), ar, t, str(self.cause)))
 
     def _compute_d_norm(self, Xq_std: torch.Tensor, Xtr_std: torch.Tensor, groups: dict) -> float:
         """
@@ -1060,101 +902,74 @@ class GPRInterpolationDriver:
         return r_raw / float(self._r_nn_med)
 
     def update_distance_threshold(self,
-                                q_good=0.95, q_bad=0.25,
-                                min_good=1, min_bad=1,
-                                cap_min=0.6, cap_max=1.6,          # tighter around 1.0 (normalized scale)
-                                prior_thresh=1.0, prior_strength=8,
-                                alpha_base=0.20, alpha_max=0.35,
-                                max_rise=0.10, max_drop=0.10):
-        """
-        Learn a *max* allowed effective distance. Conservative boundary between:
-          - high end of 'good' distances (no add & accurate), and
-          - low end of 'bad' distances (added).
-        Works from n=1 with small-n safeguards.
-        """
+        q_good=0.95, q_bad=0.25,
+        min_good=2, min_bad=2,
+        cap_min=0.9, cap_max=1.8,           # wider band
+        prior_thresh=1.2, prior_strength=12, # more realistic prior
+        alpha_base=0.20, alpha_max=0.35,
+        max_rise=0.10, max_drop=0.10):
+
         self._ensure_dist_state()
-        if not self._dist_events:
-            return
+        if not self._dist_events: return
 
         d, added, ar, t, cause = map(np.asarray, zip(*self._dist_events))
-        good_mask = (~added) & np.isfinite(ar) & (ar <= 0.25 * t)
-        bad_mask  = added
+        good_mask = (~added) & np.isfinite(ar) & (ar <= 0.25*t)
+        # count only distance-caused adds if you have it; otherwise fall back to 'added'
+        bad_mask  = (added) & (np.asarray(cause, object) == "distance")
 
-        good = d[good_mask]
-        bad  = d[bad_mask]
+        good = d[good_mask]; bad = d[bad_mask]
         n_good, n_bad = good.size, bad.size
         n_tot = n_good + n_bad
+        prev = getattr(self, "_d_thresh_dyn", prior_thresh)
 
-        # robust quantile with adaptive trimming for bigger n
         def robust_q(arr, q):
             arr = np.asarray(arr).ravel()
-            n = arr.size
-            if n == 0:
-                return None
-            arr.sort()
+            if arr.size == 0: return None
+            arr.sort(); n = arr.size
             if n <= 4:
-                # simple linear interpolation
-                if n == 1:
-                    return float(arr[0])
-                idx = q * (n - 1)
-                lo, hi = int(np.floor(idx)), int(np.ceil(idx))
-                return float(arr[lo] + (idx - lo) * (arr[hi] - arr[lo]))
-            # light trimming only when we have enough samples
+                if n == 1: return float(arr[0])
+                idx = q*(n-1); lo, hi = int(np.floor(idx)), int(np.ceil(idx))
+                return float(arr[lo] + (idx-lo)*(arr[hi]-arr[lo]))
             lo_q = 0.0 if n < 20 else 0.05
             hi_q = 1.0 if n < 200 else 0.995
             lo, hi = np.quantile(arr, [lo_q, hi_q])
             arr = arr[(arr >= lo) & (arr <= hi)]
             return float(np.quantile(arr, q))
 
-        prev = getattr(self, "_d_thresh_dyn", prior_thresh)
-
-        # Case A: we have only good so far (n_bad == 0) → set near high tail of good + a tiny cushion
+        # Good-only: let the max distance creep up toward the good tail
+        print('n good, min good', n_good, min_good)
         if n_good >= min_good and n_bad == 0:
-            qg = 0.80 if n_good < 5 else q_good
-            d_hi_good = robust_q(good, qg)
-            if d_hi_good is None:
-                return
-            cand_evidence = d_hi_good + 0.05  # small cushion
-            cand_evidence = float(np.clip(cand_evidence, cap_min, cap_max))
-            # shrink strongly to prior while evidence is scarce
+            d_hi_good = robust_q(good, 0.80 if n_good < 5 else q_good)
+            if d_hi_good is None: return
+            cand_evidence = float(np.clip(d_hi_good + 0.05, cap_min, cap_max))
             w_prior = prior_strength / (prior_strength + max(1, n_good))
-            cand = w_prior * prior_thresh + (1 - w_prior) * cand_evidence
-            # limit step size (distance is a *max* threshold; allow both rise/drop caps)
+            cand = w_prior*prior_thresh + (1 - w_prior)*cand_evidence
             cand = np.clip(cand, prev - max_drop, prev + max_rise)
             alpha = min(alpha_max, alpha_base * n_tot / (n_tot + 10))
-            self._d_thresh_dyn = (1 - alpha) * prev + alpha * cand
+            self._d_thresh_dyn = (1 - alpha)*prev + alpha*cand
+
+            print('In first check', self._d_thresh_dyn)
             return
 
-        # Case B: if either class undersized but not zero, wait (or you can keep Case A behavior)
-        if n_good < min_good or n_bad < min_bad:
-            return
+        if n_good < min_good or n_bad < min_bad: return
 
-        # Case C: both present → pick boundary between 'good' high tail and 'bad' low tail
-        qg = q_good
-        qb = 0.0 if n_bad < 5 else q_bad    # with few bads, use min(bad)
-        d_hi_good = robust_q(good, qg)
-        d_lo_bad  = robust_q(bad,  qb)
-        if d_hi_good is None or d_lo_bad is None:
-            return
+        d_hi_good = robust_q(good, q_good)
+        d_lo_bad  = robust_q(bad,  q_bad)
+        if d_hi_good is None or d_lo_bad is None: return
+        if n_bad <= 4: d_lo_bad -= 0.05*(5 - n_bad)
 
-        # Small safety margin when bads are very few → push boundary lower (stricter)
-        if n_bad <= 4:
-            d_lo_bad -= 0.05 * (5 - n_bad)  # −0.20, −0.15, −0.10, −0.05
-
-        cand_evidence = min(d_hi_good, d_lo_bad)  # conservative max distance
-        cand_evidence = float(np.clip(cand_evidence, cap_min, cap_max))
-
-        # shrink toward prior
+        # balanced boundary (less strict than min(...))
+        cand_evidence = float(np.clip(0.5*(d_hi_good + d_lo_bad), cap_min, cap_max))
         w_prior = prior_strength / (prior_strength + n_tot)
-        cand = w_prior * prior_thresh + (1 - w_prior) * cand_evidence
-
-        # limit per-update movement
+        cand = w_prior*prior_thresh + (1 - w_prior)*cand_evidence
         cand = np.clip(cand, prev - max_drop, prev + max_rise)
-
         alpha = min(alpha_max, alpha_base * n_tot / (n_tot + 10))
-        self._d_thresh_dyn = (1 - alpha) * prev + alpha * cand
+        self._d_thresh_dyn = (1 - alpha)*prev + alpha*cand
+        print('>t the end', self._d_thresh_dyn)
+        
 
     def get_distance_threshold(self, default=1.0) -> float:
+
         self._ensure_dist_state()
         return float(self._d_thresh_dyn if hasattr(self, "_d_thresh_dyn") else default)
 
@@ -1250,6 +1065,9 @@ class GPRInterpolationDriver:
             "none"
         )
 
+        self.cause = cause
+        self.record_similarity_event(s_max, False, abs_residual=abs(s_max - s_thresh), T=T)
+        self.record_distance_event(d_norm, False, abs_residual=abs(d_thresh - d_norm), T=T)
 
         if should_add_by_risk:
             return True, {"cause": cause, "s_max": s_max, "s_thresh": s_thresh,
@@ -1266,8 +1084,7 @@ class GPRInterpolationDriver:
         with torch.no_grad():
             K_q_tr = ker(Xq_std, Xtr_std).evaluate()
             K_q_q  = ker(Xq_std, Xq_std).evaluate()[0, 0]
-            K_trtr = ker(Xtr_std, Xtr_std).evaluate()
-            diag   = torch.diag(K_trtr).clamp_min(1e-12)
+            diag   = self._get_group_diag(ker, Xtr_std)
             s = (K_q_tr / torch.sqrt(K_q_q * diag)).cpu().numpy().ravel()
         s = np.clip(s, 1e-9, 1.0)
         # temper by group size to offset high-D shrinkage
@@ -1400,25 +1217,8 @@ class GPRInterpolationDriver:
         Yq = self._metric_whiten(Xq_std, groups)
         Yt = self._metric_whiten(Xtr_std, groups)
         return float(torch.cdist(Yq, Yt).min().cpu())
-    # def _nn_r_stats(self, Xtr_std: torch.Tensor, groups: dict):
-    #     """Return median and a couple quantiles of training NN distances in r_eff."""
-    #     # Compute r_eff between all pairs (use a batched trick if N is big)
-    #     # Here: simple O(N^2) for clarity; optimize as needed.
-    #     N = Xtr_std.shape[0]
-    #     vals = []
-    #     for i in range(N):
-    #         # min r_eff from point i to others
-    #         xq = Xtr_std[i:i+1, :]
-    #         # reuse the same r_eff core but pass Xtr_std[mask]
-    #         mask = torch.ones(N, dtype=torch.bool, device=Xtr_std.device); mask[i] = False
-    #         r_i = self._min_effective_distance(xq, Xtr_std[mask], groups)
-    #         vals.append(r_i)
-    #     arr = np.array(vals, float)
-    #     return float(np.median(arr)), float(np.quantile(arr, 0.1)), float(np.quantile(arr, 0.9))
 
 
-    
-    # --- risk scoring: higher = worse (more likely to add) ---
     def _sigmoid(self, x):  # numerically stable logistic
         return 1.0 / (1.0 + np.exp(-np.clip(x, -20, 20)))
 

@@ -110,6 +110,7 @@ class LinearResponseEigenSolver(LinearSolver):
         super().__init__(comm, ostream)
 
         self.nstates = 3
+        self.spin_flip = False
 
         self.core_excitation = False
         self.num_core_orbitals = 0
@@ -399,6 +400,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 ses = np.linalg.multi_dot([s2ug.T, e2uu_inv, s2ug])
 
                 evals, evecs = np.linalg.eigh(e2gg)
+                
                 tmat = np.linalg.multi_dot(
                     [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
                 ses_tilde = np.linalg.multi_dot([tmat.T, ses, tmat])

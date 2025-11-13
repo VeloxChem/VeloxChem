@@ -99,12 +99,13 @@ def _init_worker(z_matrix, impes_dict, sym_dict, sym_datapoints, dps, idx, expon
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
-
+    
     driver = InterpolationDriver(z_matrix)
-    driver.use_symmetry = True
+    driver.use_symmetry = False
     driver.update_settings(impes_dict)
     driver.symmetry_information = sym_dict
     driver.qm_symmetry_data_points = sym_datapoints
+    driver.impes_coordinate.inv_sqrt_masses = dps[0].inv_sqrt_masses
     driver.distance_thrsh = 1000
     driver.exponent_p = exponent_p_q[0]
     driver.exponent_q = exponent_p_q[1]
@@ -148,7 +149,7 @@ def _eval_structure(payload):
     # Residuals in kcal/mol
     dE_res  = (E_interp - E_qm) * conv                                          # ()
     dg_full = (G_interp - G_qm_flat) * conv                                     # (D,)
-
+    
     # ----- loss (your anisotropic force term) -----
     g_sub   = dg_full[idx]
     h_sub   = (G_qm_flat[idx]) * conv
@@ -170,7 +171,7 @@ def _eval_structure(payload):
         L_F = L_iso
 
     loss_s = 1.0 * e_x * L_e + 0.5 * (1.0 - e_x) * L_F
-
+    
     # ----- gradient wrt alphas (vector length M) -----
     # dE/dα
     dE_dα = (w_dα * (P - E_interp)) * (conv / S)                                 # (M,)

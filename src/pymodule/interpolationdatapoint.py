@@ -210,9 +210,12 @@ class InterpolationDatapoint:
         coords = self.cartesian_coordinates.reshape((n_atoms * 3))
 
         self.b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
+        # self.b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
         if self.use_inverse_bond_length or self.use_cosine_dihedral:
             self.original_b_matrix = np.zeros((len(self.z_matrix), n_atoms * 3))
+            # self.original_b_matrix = np.zeros((len(self.internal_coordinates), n_atoms * 3))
 
+        prev_dihedral = None
         for i, z in enumerate(self.z_matrix):
             q = self.internal_coordinates[i]
             derivative = q.derivative(coords).reshape(-1)
@@ -223,14 +226,35 @@ class InterpolationDatapoint:
                 self.b_matrix[i, :derivative.shape[0]] = -r_inv_2 * derivative
                 
                 self.original_b_matrix[i, :derivative.shape[0]] = derivative
+            elif len(z) == 4 and self.use_cosine_dihedral:
+                if prev_dihedral != z:
+                    prev_dihedral = z
+                    phi = q.value(coords)
+                    phi_dev_1 = -1.0 * np.sin(phi)
+
+                    self.b_matrix[i, :derivative.shape[0]] =  phi_dev_1 * derivative
+                    
+                    self.original_b_matrix[i, :derivative.shape[0]] = derivative
+
+                else:
+                    phi = q.value(coords)
+                    phi_dev_1 = np.cos(phi)
+                
+                    self.b_matrix[i, :derivative.shape[0]] =  phi_dev_1 * derivative
+                    
+                    self.original_b_matrix[i, :derivative.shape[0]] = derivative
+                
+
             else:
                 self.b_matrix[i, :derivative.shape[0]] = derivative
                 if self.use_inverse_bond_length:
                     self.original_b_matrix[i] = derivative
 
         if self.inv_sqrt_masses is not None:
+            print('using_inverse masses')
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
-            self.original_b_matrix = self.original_b_matrix * self.inv_sqrt_masses
+            if self.use_inverse_bond_length:
+                self.original_b_matrix = self.original_b_matrix * self.inv_sqrt_masses
 
             # self.b_matrix[i] = derivative
         # self.b_matrix = self.b_matrix * self.inv_sqrt_masses[np.newaxis, :]
@@ -248,9 +272,11 @@ class InterpolationDatapoint:
         n_atoms = self.cartesian_coordinates.shape[0]
         coords = self.cartesian_coordinates.reshape((n_atoms * 3))
 
+        # self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
         self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
-        
 
+        
+        prev_dihedral = None
         for i, z in enumerate(self.z_matrix):
             q = self.internal_coordinates[i]
             second_derivative = q.second_derivative(coords).reshape(-1, n_atoms * 3)
@@ -266,6 +292,31 @@ class InterpolationDatapoint:
                         self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
                 # self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
 
+            elif len(z) == 4 and self.use_cosine_dihedral:
+                
+                if prev_dihedral != z:
+                    prev_dihedral = z
+                    phi = q.value(coords)
+                    phi_dev_1 = -1.0 * np.sin(phi)
+                    phi_dev_2 = -1.0 * np.cos(phi)
+                    self.b2_matrix[i] = phi_dev_1 * second_derivative
+
+                    for m in range(n_atoms):
+                        for n in range(n_atoms):
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += phi_dev_2 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+            
+                else:
+                    
+                    phi = q.value(coords)
+                    phi_dev_1 =  1.0 * np.cos(phi)
+                    phi_dev_2 = -1.0 * np.sin(phi)
+                    self.b2_matrix[i] = phi_dev_1 * second_derivative
+
+                    for m in range(n_atoms):
+                        for n in range(n_atoms):
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += phi_dev_2 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+            
+            
             else:
                 self.b2_matrix[i] = second_derivative
         
@@ -326,35 +377,6 @@ class InterpolationDatapoint:
         gradient_flat = self.gradient.flatten()
         self.internal_gradient = np.dot(g_minus_matrix, np.dot(self.b_matrix, gradient_flat))
 
-    def ginv_from_Bmw_capped(self, Bmw, phys_rank, rcond=1e-9, kappa_max=1e6):
-        """
-        G = Bmw Bmw^T, return a stable G^{-1}.
-        - keep up to phys_rank singular triplets via relative rcond
-        - cap the maximum inverse eigenvalue at inv_cap = kappa_max / s0^2
-        """
-        U, s, Vt = np.linalg.svd(Bmw, full_matrices=False)
-        if s.size == 0 or s[0] == 0.0:
-            raise RuntimeError("Degenerate Bmw.")
-
-        k = min(phys_rank, s.size)
-        U_k, s_k = U[:, :k], s[:k]
-        s0 = s_k[0]
-
-        strong = (s_k / s0) > rcond
-        inv_cap = kappa_max / (s0**2)          # max allowed inverse value
-        lam = 1.0 / inv_cap                    # ridge used for weak modes
-
-        inv_vals = np.empty_like(s_k)
-        inv_vals[strong] = 1.0 / (s_k[strong]**2)
-        inv_vals[~strong] = 1.0 / (s_k[~strong]**2 + lam)
-
-        # enforce the cap on all modes (also clips any borderline strong ones)
-        inv_vals = np.minimum(inv_vals, inv_cap)
-
-        Ginv = U_k @ np.diag(inv_vals) @ U_k.T
-        cond_est = float(s0 / max(s_k[-1], s0/1e12))
-        return Ginv, k, cond_est, inv_vals
-
 
     def transform_hessian_to_internal_coordinates(self, tol=1e-6):
         """
@@ -372,6 +394,7 @@ class InterpolationDatapoint:
             self.calculate_b2_matrix()
 
         dimension = self.gradient.shape[0] * 3 - 6
+
         if self.gradient.shape[0] == 2:
             dimension += 1
 
@@ -383,7 +406,7 @@ class InterpolationDatapoint:
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
 
         number_of_positive_values = np.count_nonzero(s_inv)
-        print(number_of_positive_values, s_inv, s)
+
         # If more elements are zero than allowed, restore the largest ones
         if number_of_positive_values > dimension:
             print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
@@ -399,8 +422,7 @@ class InterpolationDatapoint:
             # Restore the largest elements among those set to zero
             for idx in sorted_zero_indices[:num_to_restore]:
                 s_inv[idx] = 1 / s[idx]
-        
-        # g_minus_matrix_func, keep_idx_size, cond_est, inv_vals = self.ginv_from_Bmw_capped(g_matrix, dimension, rcond=tol)
+
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
         b2_gradient = np.einsum("qxy,q->xy", self.b2_matrix, self.internal_gradient)
@@ -514,6 +536,7 @@ class InterpolationDatapoint:
         # vice-versa.
  
         self.calculate_b_matrix() 
+        self.calculate_b2_matrix()
 
         self.compute_internal_coordinates_values()
 
@@ -575,14 +598,21 @@ class InterpolationDatapoint:
         coords = self.cartesian_coordinates.reshape((n_atoms * 3))
 
         int_coords = []
-
+        prev_dihedral = None
         for q in self.internal_coordinates:
             if (isinstance(q, geometric.internal.Distance) and
                     self.use_inverse_bond_length):
                 int_coords.append(1.0 / q.value(coords))
             elif (isinstance(q, geometric.internal.Dihedral) and
                   self.use_cosine_dihedral):
-                int_coords.append(np.cos(q.value(coords)))
+                
+                if prev_dihedral != q:
+                    print('I am chaning the internal dihedral')
+                    prev_dihedral = q 
+                    int_coords.append(np.cos(q.value(coords)))
+                else:
+                       
+                    int_coords.append(np.sin(q.value(coords)))
             else:
                 int_coords.append((q.value(coords)))
 
@@ -683,6 +713,10 @@ class InterpolationDatapoint:
                                data=self.internal_gradient,
                                compression='gzip')
 
+            full_label = label + "_cartesian_gradient"
+            h5f.create_dataset(full_label,
+                               data=self.gradient,
+                               compression='gzip')
             # write Hessian in internal coordinates
             full_label = label + "_hessian"
             h5f.create_dataset(full_label,
@@ -781,6 +815,7 @@ class InterpolationDatapoint:
             gradient_label = label + "_gradient"
             hessian_label = label + "_hessian"
             cart_hess_label = label + "_cartesian_hessian"
+            cart_grad_label = label + "_cartesian_gradient"
             coords_label = label + "_internal_coordinates"
             cart_coords_label = label + "_cartesian_coordinates"
             mapping_masks_label = label + "_masks"
@@ -796,6 +831,7 @@ class InterpolationDatapoint:
             self.point_label = label
             self.energy = np.array(h5f.get(energy_label))
             self.internal_gradient = np.array(h5f.get(gradient_label))
+            self.gradient = np.array(h5f.get(cart_grad_label))
             self.internal_hessian = np.array(h5f.get(hessian_label))
             self.hessian = np.array(h5f.get(cart_hess_label))
             self.internal_coordinates_values = np.array(h5f.get(coords_label))

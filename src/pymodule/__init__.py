@@ -176,6 +176,7 @@ from .cphfsolver import CphfSolver
 from .hessianorbitalresponse import HessianOrbitalResponse
 from .hessianorbitalresponseunrest import UnrestrictedHessianOrbitalResponse
 from .tdhfhessiandriver import TdhfHessianDriver
+from .tddfthessiandriver import TddftHessianDriver
 from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis

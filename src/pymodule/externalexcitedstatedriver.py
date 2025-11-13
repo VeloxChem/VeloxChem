@@ -158,6 +158,12 @@ export LD_LIBRARY_PATH=~/minconda3/envs/vlxenv/lib/
 # Run the orca command
 source $(conda info --base)/etc/profile.d/conda.sh
 conda deactivate
+ORCAPATH=/usr/qc/ORCA6/orca_6_0_0_shared_openmpi416
+export PATH=$ORCAPATH:$PATH
+export NBOEXE=/usr/qc/nbo7/bin/nbo7.i4.exe
+OPENMPI=/usr/qc/openmpi-4.1.1
+export PATH=$OPENMPI/bin:$PATH
+export LD_LIBRARY_PATH=$OPENMPI/lib64:$LD_LIBRARY_PATH
 {orca_path} $1 > $2
 """
         elif self.program == 'OpenQP':
@@ -333,7 +339,7 @@ openqp $1 > $2
                     else:
                         print("Excited state energy not found.")
                 else:
-                    excited_state_match = re.search(r'Total Energy\s*:\s*([-0-9.]+)', content)
+                    excited_state_match = re.search(r'FINAL SINGLE POINT ENERGY\s*:\s*([-0-9.]+)', content)
                     if excited_state_match:
                         gs_energy = float(excited_state_match.group(1))
                     else:
@@ -494,6 +500,7 @@ openqp $1 > $2
                             file.write(f'!{self.basis_set_label}\n')
                     file.write(f'%{self.method}\n')
                     file.write(f'NROOTS {self.roots_to_check}\n')
+                    file.write(f'tda False\n')
                     file.write(f'sf {self.spin_flip}\n')
                     file.write('END\n')
                     if self.libxc:
@@ -501,7 +508,7 @@ openqp $1 > $2
                             file.write(f'method dft\n')
                             file.write(f'functional {self.xc_func}\n')
                             file.write('END\n')
-                    file.write(f'%maxcore 3000\n')
+                    file.write(f'%maxcore 12000\n')
                     file.write(f'%PAL\n')
                     file.write(f'nprocs {self.nprocs}\n')
                     file.write('END\n')

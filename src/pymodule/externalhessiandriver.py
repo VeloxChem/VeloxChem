@@ -658,7 +658,13 @@ conda activate vlxenv_new_compile
                         file.write(f'!{self.qm_driver.method} {self.qm_driver.xc_func} {self.qm_driver.dispersion} {basis_set} freq\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
-                    file.write(f'nprocs {self.qm_driver.nprocs * 4}\n')
+                    requested_procs = self.qm_driver.nprocs * 4
+                    available_procs = os.cpu_count()
+                    if available_procs is not None:
+                        nprocs = min(requested_procs, available_procs)
+                    else:
+                        nprocs = requested_procs
+                    file.write(f'nprocs {nprocs}\n')
                     file.write('END\n')
                     file.write(f'* xyz {self.qm_driver.charge} {self.qm_driver.spin} \n')
                     print('File is printed', file)

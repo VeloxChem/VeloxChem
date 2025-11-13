@@ -158,6 +158,7 @@ class InterpolationDriver():
         # Name lables for the QM data points
         self.labels = None
         self.use_inverse_bond_length = True
+        self.use_cosine_dihedral = True
 
         self._input_keywords = {
             'im_settings': {
@@ -171,6 +172,7 @@ class InterpolationDriver():
                 'imforcefield_file':
                     ('str', 'the name of the chk file with QM data'),
                     'use_inverse_bond_length': ('bool', 'whether to use inverse bond lengths in the Z-matrix'),
+                    'use_cosine_dihedral':('bool', 'wether to use cosine and sin for the diehdral in the Z-matrix'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
@@ -236,13 +238,21 @@ class InterpolationDriver():
         if self.impes_coordinate.use_inverse_bond_length:
             remove_from_label += "_rinv"
             z_matrix_label += '_rinv'
+        
         else:
             remove_from_label += "_r"
             z_matrix_label += '_r'
-        remove_from_label += "_dihedral"
+        
+        if self.impes_coordinate.use_cosine_dihedral:
+            remove_from_label += "_cosine"
+            z_matrix_label += '_cosine'
+        else:
+            remove_from_label += "_dihedral"
+            z_matrix_label += '_dihedral'
+        
         remove_from_label += "_energy"
 
-        z_matrix_label += '_dihedral'
+        
         z_matrix_bonds = z_matrix_label + '_bonds'
         z_matrix_angles = z_matrix_label + '_angles'
         z_matrix_dihedrals = z_matrix_label + '_dihedrals'
@@ -251,9 +261,11 @@ class InterpolationDriver():
             
         labels = []
         counter = 0
-        for key in keys:
-            if remove_from_label in key:
 
+        for key in keys:
+
+            if remove_from_label in key:
+           
                 label = key.replace(remove_from_label, "")
                 if label not in labels:
                     labels.append(label)
@@ -268,6 +280,7 @@ class InterpolationDriver():
 
 
         h5f.close()
+
         return labels, z_matrix
 
     def define_impes_coordinate(self, coordinates):
@@ -566,7 +579,7 @@ class InterpolationDriver():
 
         else:
             for i, data_point in enumerate(self.qm_data_points[:]):
-                
+
                 distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_distance(data_point)
               
 
@@ -647,6 +660,147 @@ class InterpolationDriver():
         # self.sum_of_weights      = W_i.sum()          # if you really need it later
         self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
         
+    def greedy_interpolation(self):
+
+        natms = self.impes_coordinate.cartesian_coordinates.shape[0]
+
+        sum_weights = 0.0
+        sum_weights_cart = 0.0
+        potentials = []
+        gradients = []
+        hessian_error = []
+        self.weights = {}
+        beysian_error = []
+        weights_cart = []
+        averaged_int_dists = []
+        weight_gradients_cart = []
+        used_labels = []
+        self.potentials = []
+        self.gradients = []
+        self.dw_dalpha_list = []
+        self.dw_dX_dalpha_list = []
+
+        masses = self.molecule.get_masses().copy()
+        masses_cart = np.repeat(masses, 3)
+        sqrt_masses = np.sqrt(masses_cart)
+
+        sum_weight_gradients_cart = np.zeros((natms, 3))
+
+        distances_and_gradients = []
+        min_distance = float('inf')
+        self.time_step_reducer = False
+
+
+        ## determine the best optimal set for the interpolation of the current structure
+        ## to generate the best Potential and Gradient approximation possible
+
+
+
+        
+        if not self.use_symmetry and 1==2:
+            for i, data_point in enumerate(self.qm_data_points[:]):
+                
+                distance, denominator, weight_gradient, distance_vector, dihedral_dist = self.cartesian_distance(data_point)
+
+                if abs(distance) < min_distance:
+                    min_distance = abs(distance)
+
+                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vector))
+        
+        elif self.weightfunction_type == 'cartesian-hessian':
+            for i, data_point in enumerate(self.qm_data_points[:]):
+                
+                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_hessian_distance(data_point)
+              
+                if abs(distance) < min_distance:
+                    min_distance = abs(distance)
+
+                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
+
+        else:
+            for i, data_point in enumerate(self.qm_data_points[:]):
+
+                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _ = self.cartesian_distance(data_point)
+              
+
+                if abs(distance) < min_distance:
+                    min_distance = abs(distance)
+
+                distances_and_gradients.append((distance, dihedral_dist, i, denominator, weight_gradient, distance_vec))
+
+        close_distances = None
+        close_distances = [
+            (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index) 
+            for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients 
+            if abs(distance) <= min_distance + self.distance_thrsh + 1000]
+
+        for qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, distance_vector, label_idx in close_distances:
+            
+            weight_cart = 1.0 / (denominator_cart)
+
+            sum_weights_cart += weight_cart
+            sum_weight_gradients_cart += weight_grad_cart
+
+            potential, gradient_mw, r_i = self.compute_potential(qm_data_point, self.impes_coordinate.internal_coordinates_values)
+            gradient = sqrt_masses * gradient_mw.reshape(-1)
+            gradient = gradient.reshape(gradient_mw.shape)
+            gradients.append(gradient)
+            averaged_int_dists.append(qm_data_point.internal_coordinates_values)
+
+            hessian_error.append(r_i)
+            potentials.append(potential)
+            used_labels.append(label_idx)
+            weights_cart.append(weight_cart)
+            self.potentials.append(potential)
+            self.gradients.append(gradient)
+            weight_gradients_cart.append(weight_grad_cart)
+  
+        # --- initialise accumulators -------------------------------------------------
+        self.impes_coordinate.energy    = 0.0
+        self.impes_coordinate.gradient  = np.zeros((natms, 3))
+        self.impes_coordinate.NAC       = np.zeros((natms, 3))       # if you need it
+
+        # --- 1.  raw (unnormalised) weights and their gradients ----------------------
+        w_i          = np.array(weights_cart, dtype=np.float64)        # ← rename
+        grad_w_i     = np.array(weight_gradients_cart, dtype=np.float64)   # shape (n_pts, natms, 3)
+
+        S            = w_i.sum()                         # Σ wᵢ
+        sum_grad_w   = grad_w_i.sum(axis=0)              # Σ ∇wᵢ      shape (natms, 3)
+        # for lbl, wi in zip(used_labels, w_i):
+        #     self.weights[lbl] = wi
+        self.sum_of_weights = S
+        self.sum_of_weights_grad = sum_grad_w
+
+        # --- 2.  normalised weights and their gradients ------------------------------
+        W_i          = w_i / S
+        grad_W_i     = (grad_w_i * S - w_i[:, None, None] * sum_grad_w) / S**2
+
+        # --- 3.  accumulate energy and gradient --------------------------------------
+        potentials   = np.array(potentials, dtype=np.float64)        # Uᵢ
+        gradients    = np.array(gradients,  dtype=np.float64)        # ∇Uᵢ  shape (n_pts, natms, 3)
+
+        self.impes_coordinate.energy   = np.dot(W_i, potentials)     # Σ Wᵢ Uᵢ
+
+        # ∇U = Σ Wᵢ ∇Uᵢ  +  Σ Uᵢ ∇Wᵢ
+        # if len(self.symmetry_information[3]) != natms:
+        #     self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1))
+        #     # self.impes_coordinate.gradient[self.symmetry_information[4]] += (gradients[:, self.symmetry_information[4], :].sum(axis=0))
+        #     # Add contributions only to the selected rows
+            
+        #     self.impes_coordinate.gradient[self.symmetry_information[3]] = np.tensordot(potentials, grad_W_i, axes=1)
+        # else:
+
+        self.impes_coordinate.gradient = (np.tensordot(W_i, gradients, axes=1) + np.tensordot(potentials, grad_W_i, axes=1))
+
+
+        # --- 4.  book-keeping (optional) ---------------------------------------------
+        for lbl, Wi in zip(used_labels, W_i):
+            self.weights[lbl] = Wi
+
+        # self.sum_of_weights      = W_i.sum()          # if you really need it later
+        self.averaged_int_dist   = np.tensordot(W_i, averaged_int_dists, axes=1)
+
+
 
     def read_qm_data_points(self):
         """ Reads the QM data points to be used for interpolation
@@ -918,10 +1072,10 @@ class InterpolationDriver():
         
             # for bond_idx, element_bond in enumerate(self.impes_coordinate.z_matrix[:self.symmetry_information[-1][0]]):
             #     dist_check[bond_idx] = (1.0 / org_int_coords[bond_idx]) - (1.0 / data_point.internal_coordinates_values[bond_idx])
-            for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
+            if not self.use_cosine_dihedral:
+                for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]): 
 
-                dist_check[i] = np.sin(dist_org[i])
-
+                    dist_check[i] = np.sin(dist_org[i])
   
             self.bond_rmsd.append(np.sqrt(np.mean(np.sum((dist_org[:self.symmetry_information[-1][0]])**2))))
             self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[self.symmetry_information[-1][0]:self.symmetry_information[-1][1]]**2))))
@@ -936,11 +1090,11 @@ class InterpolationDriver():
             #     grad[bond_idx] *= -1.0 / (org_int_coords[bond_idx])**2
             #     dist_hessian[bond_idx] *= -1.0 / (org_int_coords[bond_idx])**2
 
-            for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]):
-                
-                
-                grad[i] *= np.cos(dist_org[i])
-                dist_hessian[i] *= np.cos(dist_org[i])
+            if not self.use_cosine_dihedral:
+                for i, element in enumerate(self.impes_coordinate.z_matrix[self.symmetry_information[-1][1]:], start=self.symmetry_information[-1][1]):
+                    
+                    grad[i] *= np.cos(dist_org[i])
+                    dist_hessian[i] *= np.cos(dist_org[i])
             
             
             # bond_break_idx = self.z_matrix.index([2,6])
@@ -954,6 +1108,7 @@ class InterpolationDriver():
             # self.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
             
             pes_prime = (np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian))).reshape(natm, 3)
+            # pes_prime += np.tensordot(self.impes_coordinate.b2_matrix, (grad + dist_hessian), axes=([0],[0])).reshape(natm,3)
 
             return pes, pes_prime, (grad + dist_hessian)
 
@@ -1153,7 +1308,7 @@ class InterpolationDriver():
                     
         return  denominator, weight_gradient
 
-    def shepard_weight_gradient(self, distance_vector, distance, confidence_radius,):
+    def shepard_weight_gradient(self, distance_vector, distance, confidence_radius):
         """ Returns the derivative of an unormalized Shepard interpolation
             weight with respect to the Cartesian coordinates in
             self.impes_coordinate
@@ -1374,7 +1529,7 @@ class InterpolationDriver():
         lam_hi  = 10.0 * lam_med
         w_clip  = np.clip(w, lam_lo, lam_hi)
         H_clip  = (U * w_clip) @ U.T
-        H_clip = H_spd
+        # H_clip = H_clip
  
         distance_2     = (distance_vector.reshape(-1) @ ((1.0 * H_clip) @ distance_vector.reshape(-1)))
         distance = np.sqrt(distance_2)
@@ -1428,7 +1583,7 @@ class InterpolationDriver():
         return distance, dihedral_dist, denominator, weight_gradient, distance_vector, grad_s
 
 
-    def determine_important_internal_coordinates(self, qm_energy, qm_gradient, molecule, z_matrix, datapoints, error_source='energy'):
+    def determine_important_internal_coordinates(self, qm_energy, qm_gradient, molecule, z_matrix, datapoints):
         """Determines the most important internal coordinates
            leading to the large deviation.
         """
@@ -1471,6 +1626,7 @@ class InterpolationDriver():
             check_molecule = Molecule(molecule.get_labels(), datapoint.cartesian_coordinates, 'bohr')
             print(check_molecule.get_xyz_string())
             print(dihedral_difference)
+            
 
             N = len(z_matrix)
 
@@ -1504,13 +1660,18 @@ class InterpolationDriver():
             # The sum of partial_energies should match the total second-order approx:
             # total_energy_diff = sum(partial_energies)
 
+            masses = molecule.get_masses().copy()
+            masses_cart = np.repeat(masses, 3)
+            sqrt_masses = np.sqrt(masses_cart)
+
             variable_part = sum(partial_energies)        # Hartree
             E_pred_check  = datapoint.energy + variable_part
 
-            pred_E, pred_G, _ = self.compute_potential(datapoint, self.impes_coordinate.internal_coordinates_values)
+            pred_E, pred_G_mw, _ = self.compute_potential(datapoint, self.impes_coordinate.internal_coordinates_values)
+            pred_G = sqrt_masses * pred_G_mw.reshape(-1)
+            pred_G = pred_G.reshape(pred_G_mw.shape)
             pred_im_G_int = self.transform_gradient_to_internal_coordinates(molecule, pred_G, self.impes_coordinate.b_matrix)
             pred_qm_G_int = self.transform_gradient_to_internal_coordinates(molecule, qm_gradient, self.impes_coordinate.b_matrix)
- 
 
             print("max energy diff",
                 abs((E_pred_check - pred_E)))
@@ -1518,6 +1679,7 @@ class InterpolationDriver():
             g_pred_check = partial_gradient              # already Hartree/bohr
             max_grad_diff = np.max(np.abs(g_pred_check - pred_im_G_int))
             print("max grad diff", max_grad_diff)
+
 
             delta_E = abs(qm_energy - pred_E)
             delta_G = np.linalg.norm(pred_qm_G_int - pred_im_G_int)
@@ -1532,70 +1694,61 @@ class InterpolationDriver():
             sum_abs_pg   = abs_pg.sum()
 
             # effective displacements already computed as internal_coord_elem_distance (Δq_eff)
-            eps = 1e-12
+            eps    = 1e-12
             dq_eff = np.array(internal_coord_elem_distance)
-            abs_pE = np.abs(partial_energies)
-            abs_work = np.abs(delta_g) * np.abs(dq_eff)      # |Δg_i| * |Δq_i,eff|
 
-            w_raw = abs_pE * abs_work                        # energy-active AND force-mismatch where you actually are
-            w = w_raw / (w_raw.sum() + eps)
+            # --- energy part, includes gradient mismatch via abs_work ---
+            abs_pE   = np.abs(partial_energies)
+            abs_work = np.abs(delta_g) * np.abs(dq_eff)          # |Δg_i| |Δq_i|
+            w_E_raw  = abs_pE * abs_work
+            w_E      = w_E_raw / (w_E_raw.sum() + eps)
+            e_i      = delta_E * w_E                             # Σ e_i = ΔE
 
-            important_single_E_err = delta_E * w   
-            
-            print('Partial energies', abs_pE, delta_g, abs_pE * np.abs(delta_g))
-            wE_raw  = abs_pE * np.abs(delta_g)            # or: np.abs(Delta_q_eff * delta_g)
-            w_E_1    = wE_raw / (wE_raw.sum() + eps)
-            single_E_err_1 = delta_E * w_E_1
-            
-            print('Sum weights 1', wE_raw, wE_raw.sum() + eps, w_E_1.sum(), sum(abs_pE), sum(abs_pg))
-
-            w_E_2          = abs_pE / (abs_pE.sum() + eps)     # weights  Σw=1
-            single_E_err = delta_E * w_E_2                     # each coord’s share
-
-
-            print(' \n\n Energy error with QM 1: ', single_E_err_1 * hartree_in_kcalpermol(), 
-                  "sum_1_kcal =", single_E_err_1.sum() * hartree_in_kcalpermol(), '2', single_E_err * hartree_in_kcalpermol(),
-                  "sum_1_kcal =", single_E_err.sum() * hartree_in_kcalpermol(), '\n\n')
-
-    
-            # Here:  weight_i  = |partial_G_i|  / Σ|partial_G|
-            abs_pG       = np.abs(partial_gradient)
-            sum_abs_pG   = abs_pG.sum()
-            if sum_abs_pG < eps:                             # force already perfect
-                w_G          = np.zeros_like(abs_pG)
-                single_G_err = np.zeros_like(abs_pG)
+            # --- gradient part (your existing decomposition) ---
+            abs_pG     = np.abs(partial_gradient)
+            sum_abs_pG = abs_pG.sum()
+            if sum_abs_pG < eps:
+                w_G = np.zeros_like(abs_pG)
+                g_i = np.zeros_like(abs_pG)
             else:
-                w_G          = abs_pG / sum_abs_pG
-                single_G_err = delta_G * w_G
+                w_G = abs_pG / (sum_abs_pG + eps)
+                g_i = delta_G * w_G                              # Σ g_i = ΔG
 
-            assert np.allclose(single_E_err.sum(), delta_E, atol=1e-12)
-            assert np.allclose(single_G_err.sum(), delta_G, atol=1e-12)
+            # --- put both on an energy-like scale ---
+            E_kcal = e_i * hartree_in_kcalpermol()
 
-            print('Error with QM ', np.allclose(single_E_err.sum(), delta_E, atol=1e-12), np.allclose(single_G_err.sum(), delta_G, atol=1e-12))
-            
-            # for grad_idx, individual_contrib in enumerate(partial_energies):
-                
-            #     energy_error = delta_E * (abs(individual_contrib) / sum(abs(partial_energies)))  # each coord’s share
-            #     single_weight = abs(individual_contrib) / sum(abs(partial_energies))
-            #     weights.append(single_weight)
-            #     single_energy_error.append(energy_error * hartree_in_kcalpermol())
+            L_ref         = 0.1                                  # bohr, choose sensibly
+            G_as_energy   = g_i * L_ref                          # Hartree
+            G_kcal        = G_as_energy * hartree_in_kcalpermol()
+            print('Gradient in kcal', G_kcal)
+            lambda_grad   = 0.5                                  # 0…1, how much you care about gradient
+            score_i_kcal  = (1.0 - lambda_grad) * E_kcal + lambda_grad * G_kcal
+            score_i_kcal  = np.maximum(score_i_kcal, 0.0)
 
-            #     gradient_error = delta_G * w_G[grad_idx]     # share of |Δg|
-            #     single_gradient_error.append(gradient_error  * hartree_in_kcalpermol() * bohr_in_angstrom())
-            
-            # Pair each energy error with its corresponding partial energy and internal coordinate
-            contributions_energy = list(zip(partial_energies, important_single_E_err * hartree_in_kcalpermol(), w, z_matrix))
-            # contributions_gradient = list(zip(partial_gradient, single_gradient_error, w_G, z_matrix))
+            w_tot = score_i_kcal / (score_i_kcal.sum() + eps)
 
+            # for bookkeeping: check sums
+            assert np.allclose(e_i.sum(), delta_E, atol=1e-12)
+            assert np.allclose(g_i.sum(), delta_G, atol=1e-12)
 
-            # Sort contributions by the energy error in descending order
-            sorted_contributions = sorted(contributions_energy, key=lambda x: x[1], reverse=True)
-            
-            print('Delta E (kcal/mol):', delta_E * hartree_in_kcalpermol())
+            # --- final per-coordinate entry ---
+            contributions = list(
+                zip(
+                    partial_energies,
+                    E_kcal,              # energy-error share (kcal/mol)
+                    G_kcal,              # gradient-error share in energy units (kcal/mol)
+                    w_tot,               # combined weight
+                    z_matrix,
+                )
+            )
 
-            # --- selection using the SAME weights ---
-            sorted_weights = np.array([c[2] for c in sorted_contributions])
-            sorted_coords = [tuple(int(x) for x in c[3]) for c in sorted_contributions]
+            sorted_contributions = sorted(
+                contributions,
+                key=lambda x: x[1] + x[2],        # total error = energy + gradient part
+                reverse=True,
+            )
+            sorted_weights = np.array([c[3] for c in sorted_contributions])
+            sorted_coords  = [tuple(int(x) for x in c[4]) for c in sorted_contributions]
 
             selected_idx = []
             if selection_rule == 'relative':
@@ -1634,12 +1787,18 @@ class InterpolationDriver():
                 constraints.append(tuple(dev_dihedral))
 
             print('Top contributors (first 10):')
-            for i, (pE, e_kcal, w_i, coord) in enumerate(sorted_contributions[:10]):
+            for i, (pE, e_kcal, g_kcal, w_i, coord) in enumerate(sorted_contributions[:10]):
                 picked = 'SELECTED' if i in selected_idx else ''
+                print(f"{i:2d} {tuple(int(x) for x in coord)}:"
+                    f" |pE|={abs(pE):.3e} Ha,"
+                    f" E_share={e_kcal:.3f} kcal/mol,"
+                    f" G_share={g_kcal:.3f} kcal/mol,"
+                    f" w_tot={w_i:.3f} {picked}")
                 print(f" {i:2d} {tuple(int(x) for x in coord)}: |pE|={abs(pE):.3e} Ha, share={e_kcal:.3f} kcal/mol, w={w_i:.3f} {picked}")
                 print('Sum of energy-weights:', float(sorted_weights.sum()))
                 print('Selected constraints so far:', constraints)
-
+            
+            exit()
 
             return constraints
 
@@ -1701,7 +1860,7 @@ class InterpolationDriver():
         
         # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
         number_of_positive_values = np.count_nonzero(s_inv)
-        
+        print(number_of_positive_values, dimension)
         # If more elements are zero than allowed, restore the largest ones
         if number_of_positive_values > dimension:
             print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')

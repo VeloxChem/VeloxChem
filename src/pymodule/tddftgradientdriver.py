@@ -89,6 +89,7 @@ class TddftGradientDriver(GradientDriver):
         self._scf_drv = scf_drv
 
         self._rsp_results = None
+        self.reseted_rsp_results = False
 
         self._block_size_factor = 4
 
@@ -193,6 +194,8 @@ class TddftGradientDriver(GradientDriver):
         scf_results_sanity_check(self, self._scf_drv.scf_tensors)
         dft_sanity_check(self, 'compute')
 
+        # self._rsp_results = None
+
         if self.rank == mpi_master():
             all_states = list(np.arange(1, len(rsp_results['eigenvalues']) + 1))
             if self.state_deriv_index is not None:
@@ -255,11 +258,11 @@ class TddftGradientDriver(GradientDriver):
         :param rsp_results:
             The results of the RPA or TDA calculation.
         """
-
+        
         scf_tensors = self._scf_drv.scf_tensors
-        if self._rsp_results is None:
+        if self._rsp_results is None or not self.reseted_rsp_results:
             self._rsp_results = rsp_results
-
+        self.reseted_rsp_results = False
         self.ostream.print_info('Computing orbital response...')
         self.ostream.print_blank()
         self.ostream.flush()
@@ -728,6 +731,7 @@ class TddftGradientDriver(GradientDriver):
         assert_msg_critical(rsp_drv.is_converged,
                             'TddftGradientDriver: response did not converge')
         self._rsp_results = rsp_results
+        self.reseted_rsp_results = True
 
         if self.rank == mpi_master():
             scf_ene = scf_results['scf_energy']

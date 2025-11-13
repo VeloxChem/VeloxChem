@@ -332,7 +332,7 @@ openqp $1 > $2
                     hessians_qchem[f'excited_state_{root + 1}'] = matrix
                     hessians.append(hessians_qchem[f'excited_state_{root + 1}'])
                     print('Hessian matrix extracted successfully.')
-                    if matrix is None:
+                    if hessians is None:
                         print('No hessian data found')
                         exit()
 
@@ -343,7 +343,7 @@ openqp $1 > $2
         
             pattern = os.path.join(current_path, 'current_*')
             files_to_remove = glob.glob(pattern)
-            
+            print('hessian', hessians)
             for path in files_to_remove:
                 try:
                     if os.path.isfile(path):
@@ -776,7 +776,14 @@ openqp $1 > $2
                         file.write('END\n')
                     file.write(f'%maxcore 3000\n')
                     file.write(f'%PAL\n')
-                    file.write(f'nprocs {self.qm_driver.nprocs * 3}\n')
+                    requested_procs = self.qm_driver.nprocs * 3
+                    available_procs = os.cpu_count()
+                    if available_procs is not None:
+                        nprocs = min(requested_procs, available_procs)
+                    else:
+                        nprocs = requested_procs
+                    print(nprocs)
+                    file.write(f'nprocs {nprocs}\n')
                     file.write('END\n')
                     file.write(f'* xyzfile {self.qm_driver.charge} {self.qm_driver.spin} {full_path}\n')
             
