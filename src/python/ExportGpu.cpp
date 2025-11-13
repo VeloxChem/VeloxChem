@@ -323,6 +323,8 @@ export_gpu(py::module& m)
 
     m.def("transform_density", &gpu::transformDensity, "Transforms density matrix (spherical to Cartesian).");
 
+    m.def("compute_mixed_basis_overlap_integrals_gpu", &gpu::computeMixedBasisOverlapIntegralsOnGPU, "Computes mixed-basis overlap integral matrix using GPU.");
+
     m.def("compute_overlap_and_kinetic_energy_integrals_gpu", &gpu::computeOverlapAndKineticEnergyIntegralsOnGPU, "Computes one-electron integral matrices using GPU.");
 
     m.def("compute_overlap_gradient_gpu", &gpu::computeOverlapGradientOnGPU, "Computes overlap integral gradient using GPU.");

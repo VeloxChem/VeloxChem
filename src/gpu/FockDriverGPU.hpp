@@ -49,6 +49,11 @@ auto computeQMatrixOnGPU(const CMolecule& molecule,
                          const int64_t rank,
                          const int64_t nnodes) -> CDenseMatrix;
 
+auto computeMixedBasisOverlapIntegralsOnGPU(const CMolecule& molecule,
+                                            const CMolecularBasis& basis_1,
+                                            const CMolecularBasis& basis_2,
+                                            const int64_t num_gpus_per_node) -> CDenseMatrix;
+
 auto computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
                                                   const CMolecularBasis& basis,
                                                   const CScreeningData& screening,

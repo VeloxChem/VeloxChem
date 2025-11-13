@@ -778,7 +778,8 @@ class ScfDriver:
 
         sad_drv = SadGuessDriver()
 
-        return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type)
+        return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type,
+                               self._get_num_gpus_per_node())
 
     def gen_initial_density_proj(self, molecule, ao_basis, valence_basis,
                                  valence_mo):

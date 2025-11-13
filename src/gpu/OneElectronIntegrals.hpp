@@ -38,6 +38,66 @@
 namespace gpu {  // gpu namespace
 
 __global__ void
+computeMixedBasisOverlapSS(double*         mat_S,
+                           const double*   s_prim_info_1,
+                           const uint32_t  s_prim_count_1,
+                           const double*   s_prim_info_2,
+                           const uint32_t  s_prim_count_2,
+                           const uint32_t* first_inds_local,
+                           const uint32_t* second_inds_local,
+                           const uint32_t  ss_prim_pair_count_local);
+
+__global__ void
+computeMixedBasisOverlapSP(double*         mat_S,
+                           const double*   s_prim_info,
+                           const uint32_t  s_prim_count,
+                           const double*   p_prim_info,
+                           const uint32_t  p_prim_count,
+                           const uint32_t* sp_first_inds_local,
+                           const uint32_t* sp_second_inds_local,
+                           const uint32_t  sp_prim_pair_count_local);
+
+__global__ void
+computeMixedBasisOverlapSD(double*         mat_S,
+                           const double*   s_prim_info,
+                           const uint32_t  s_prim_count,
+                           const double*   d_prim_info,
+                           const uint32_t  d_prim_count,
+                           const uint32_t* sd_first_inds_local,
+                           const uint32_t* sd_second_inds_local,
+                           const uint32_t  sd_prim_pair_count_local);
+
+__global__ void
+computeMixedBasisOverlapPP(double*         mat_S,
+                           const double*   p_prim_info_1,
+                           const uint32_t  p_prim_count_1,
+                           const double*   p_prim_info_2,
+                           const uint32_t  p_prim_count_2,
+                           const uint32_t* pp_first_inds_local,
+                           const uint32_t* pp_second_inds_local,
+                           const uint32_t  pp_prim_pair_count_local);
+
+__global__ void
+computeMixedBasisOverlapPD(double*         mat_S,
+                           const double*   p_prim_info,
+                           const uint32_t  p_prim_count,
+                           const double*   d_prim_info,
+                           const uint32_t  d_prim_count,
+                           const uint32_t* pd_first_inds_local,
+                           const uint32_t* pd_second_inds_local,
+                           const uint32_t  pd_prim_pair_count_local);
+
+__global__ void
+computeMixedBasisOverlapDD(double*         mat_S,
+                           const double*   d_prim_info_1,
+                           const uint32_t  d_prim_count_1,
+                           const double*   d_prim_info_2,
+                           const uint32_t  d_prim_count_2,
+                           const uint32_t* dd_first_inds_local,
+                           const uint32_t* dd_second_inds_local,
+                           const uint32_t  dd_prim_pair_count_local);
+
+__global__ void
 computeOverlapAndKineticEnergySS(double*         mat_S,
                                  double*         mat_T,
                                  const double*   s_prim_info,
