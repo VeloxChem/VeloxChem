@@ -113,6 +113,21 @@ class CRIJKFockDriver
                                      const int               rank,
                                      const int               nodes) -> void;
     
+    
+    /// @brief Computes B^Q vectors in screened, distributed form.
+    /// @param screener The ERIs screener.
+    /// @param molecule The molecule.
+    /// @param aux_basis The auxilary molecular  basis.
+    /// @param metric The B^Q vector transformation metric.
+    /// @param ithreshold The integer threshold of significant pairs screening.
+    /// @param indices The vector of Q indices on local MPI rank.
+    auto local_compute_screened_bq_vectors(const CT4CScreener&        screener,
+                                           const CMolecule&           molecule,
+                                           const CMolecularBasis&     aux_basis,
+                                           const CSubMatrix&          metric,
+                                           const int                  ithreshold,
+                                           const std::vector<size_t>& indices) -> void;
+    
     /// @brief Computes Coulomb Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.
