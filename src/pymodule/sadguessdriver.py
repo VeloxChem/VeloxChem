@@ -32,7 +32,6 @@
 
 import numpy as np
 
-from .veloxchemlib import OverlapDriver
 from .veloxchemlib import matmul_gpu
 from .errorhandler import assert_msg_critical
 

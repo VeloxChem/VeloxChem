@@ -1,34 +1,34 @@
-from mpi4py import MPI
 import numpy as np
 
-from veloxchem.veloxchemlib import OverlapDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.sadguessdriver import SadGuessDriver
+from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
 class TestInitialGuess:
 
     def test_sad_guess(self):
 
-        if MPI.COMM_WORLD.Get_rank() == 0:
+        molstr = """
+        O   0.0   0.0   0.0
+        H   0.0   1.4   1.1
+        H   0.0  -1.4   1.1
+        """
+        mol = Molecule.read_molecule_string(molstr, 'au')
 
-            molstr = """
-            O   0.0   0.0   0.0
-            H   0.0   1.4   1.1
-            H   0.0  -1.4   1.1
-            """
-            mol = Molecule.read_molecule_string(molstr, 'au')
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+        min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
-            bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
-            min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
+        scf_drv = ScfRestrictedDriver()
 
-            ovl_drv = OverlapDriver()
-            ovl_mat = ovl_drv.compute(mol, bas)
-            S = ovl_mat.get_full_matrix().to_numpy()
+        S12, S22 = scf_drv._comp_mixed_basis_overlap(mol, min_bas, bas)
+        S = S22
+
+        if scf_drv.rank == 0:
 
             saddrv = SadGuessDriver()
-            D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')
 
             assert D.ndim == 2
             assert D.shape[0] == 24
@@ -50,7 +50,7 @@ class TestInitialGuess:
             mol.set_charge(charge + 2)
             mol.set_multiplicity(multiplicity)
 
-            D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')
 
             assert mol.number_of_electrons() == 8
             assert mol.number_of_alpha_electrons() == 4
@@ -63,7 +63,7 @@ class TestInitialGuess:
             mol.set_charge(charge - 2)
             mol.set_multiplicity(multiplicity)
 
-            D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, S12, S22, 'restricted')
 
             assert mol.number_of_electrons() == 12
             assert mol.number_of_alpha_electrons() == 6
@@ -76,7 +76,7 @@ class TestInitialGuess:
             mol.set_charge(charge + 1)
             mol.set_multiplicity(multiplicity + 1)
 
-            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            Da, Db = saddrv.compute(mol, min_bas, bas, S12, S22, 'unrestricted')
 
             assert mol.number_of_electrons() == 9
             assert mol.number_of_alpha_electrons() == 5
@@ -90,7 +90,7 @@ class TestInitialGuess:
             mol.set_charge(charge - 1)
             mol.set_multiplicity(multiplicity + 1)
 
-            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            Da, Db = saddrv.compute(mol, min_bas, bas, S12, S22, 'unrestricted')
 
             assert mol.number_of_electrons() == 11
             assert mol.number_of_alpha_electrons() == 6
@@ -104,7 +104,7 @@ class TestInitialGuess:
             mol.set_charge(charge)
             mol.set_multiplicity(multiplicity + 2)
 
-            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            Da, Db = saddrv.compute(mol, min_bas, bas, S12, S22, 'unrestricted')
 
             assert mol.number_of_electrons() == 10
             assert mol.number_of_alpha_electrons() == 6
@@ -113,4 +113,4 @@ class TestInitialGuess:
             assert abs(np.sum(Da * S) - 6.) < 1.0e-13
             assert abs(np.sum(Db * S) - 4.) < 1.0e-13
 
-        MPI.COMM_WORLD.barrier()
+        scf_drv.comm.barrier()
