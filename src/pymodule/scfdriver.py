@@ -48,7 +48,8 @@ from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            dot_product_gpu, integrate_vxc_fock_gpu,
                            compute_overlap_and_kinetic_energy_integrals_gpu,
                            compute_nuclear_potential_integrals_gpu,
-                           compute_point_charges_integrals_gpu)
+                           compute_point_charges_integrals_gpu,
+                           compute_mixed_basis_overlap_integrals_gpu)
 from .profiler import Profiler
 from .griddriver import GridDriver
 from .molecularbasis import MolecularBasis
@@ -638,12 +639,16 @@ class ScfDriver:
         # DIIS method
         if self.acc_type.upper() == 'DIIS':
 
+            if not self.restart:
+                S12, S22 = self._comp_mixed_basis_overlap(
+                    molecule, min_basis, ao_basis)
+
             if self.rank == mpi_master():
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
-                        molecule, ao_basis, min_basis)
+                        molecule, min_basis, ao_basis, S12, S22)
                 naos = den_mat.shape[0]
             else:
                 naos = None
@@ -670,12 +675,16 @@ class ScfDriver:
 
             val_basis = ao_basis.reduce_to_valence_basis()
 
+            if not self.restart:
+                S12, S22 = self._comp_mixed_basis_overlap(
+                    molecule, min_basis, val_basis)
+
             if self.rank == mpi_master():
                 if self.restart:
                     den_mat = self.gen_initial_density_restart(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
-                        molecule, val_basis, min_basis)
+                        molecule, min_basis, val_basis, S12, S22)
                 naos = den_mat.shape[0]
             else:
                 naos = None
@@ -760,17 +769,50 @@ class ScfDriver:
 
         return self.scf_tensors
 
-    def gen_initial_density_sad(self, molecule, ao_basis, min_basis):
+    def _comp_mixed_basis_overlap(self, molecule, basis_1, basis_2):
+        """
+        Computes mixed basis overlap integrals.
+
+        :param molecule:
+            The molecule.
+        :param basis_1:
+            The first AO basis.
+        :param basis_2:
+            The second AO basis.
+
+        :return:
+            The mixed basis overlap.
+        """
+
+        S12 = compute_mixed_basis_overlap_integrals_gpu(
+            molecule, basis_1, basis_2, self._get_num_gpus_per_node(),
+            self.rank, self.nodes)
+        S22 = compute_mixed_basis_overlap_integrals_gpu(
+            molecule, basis_2, basis_2, self._get_num_gpus_per_node(),
+            self.rank, self.nodes)
+
+        S12_partial = S12.to_numpy()
+        S22_partial = S22.to_numpy()
+
+        S12 = np.zeros(S12_partial.shape)
+        S22 = np.zeros(S22_partial.shape)
+
+        self.comm.Reduce(S12_partial, S12, op=MPI.SUM, root=mpi_master())
+        self.comm.Reduce(S22_partial, S22, op=MPI.SUM, root=mpi_master())
+
+        return S12, S22
+
+    def gen_initial_density_sad(self, molecule, min_basis, ao_basis, S12, S22):
         """
         Computes initial AO density using superposition of atomic densities
         scheme.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
-            The AO basis.
         :param min_basis:
             The minimal AO basis for generation of atomic densities.
+        :param ao_basis:
+            The AO basis.
 
         :return:
             The AO density matrix.
@@ -778,8 +820,8 @@ class ScfDriver:
 
         sad_drv = SadGuessDriver()
 
-        return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type,
-                               self._get_num_gpus_per_node())
+        return sad_drv.compute(molecule, min_basis, ao_basis, S12, S22,
+                               self.scf_type)
 
     def gen_initial_density_proj(self, molecule, ao_basis, valence_basis,
                                  valence_mo):

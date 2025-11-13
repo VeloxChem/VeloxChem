@@ -809,15 +809,7 @@ class SadGuessDriver:
 
         return aoinds_atoms
 
-    def compute(self, molecule, basis_1, basis_2, density_type):
-
-        ovl_drv = OverlapDriver()
-
-        S12mat = ovl_drv.compute(molecule, basis_1, basis_2)
-        S22mat = ovl_drv.compute(molecule, basis_2)
-
-        S12 = S12mat.get_full_matrix().to_numpy()
-        S22 = S22mat.get_full_matrix().to_numpy()
+    def compute(self, molecule, basis_1, basis_2, S12, S22, density_type):
 
         return self._comp_sad_guess(molecule, basis_1, basis_2, S12, S22,
                                     density_type)

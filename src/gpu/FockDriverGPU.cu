@@ -546,7 +546,9 @@ auto
 computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                                        const CMolecularBasis& basis_1,
                                        const CMolecularBasis& basis_2,
-                                       const int64_t          num_gpus_per_node) -> CDenseMatrix
+                                       const int64_t          num_gpus_per_node,
+                                       const int64_t          rank,
+                                       const int64_t          nnodes) -> CDenseMatrix
 {
     const auto gto_blocks_1 = gtofunc::makeGtoBlocks(basis_1, molecule);
     const auto naos_1 = gtofunc::getNumberOfAtomicOrbitals(gto_blocks_1);
@@ -568,6 +570,8 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     if (thread_id < num_gpus_per_node)
     {
     auto gpu_id = thread_id;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
 
     gpuSafe(gpuSetDevice(gpu_id));
 
@@ -750,7 +754,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
 
     // S-S gto block pair and S-P gto block pair
 
-    for (int64_t i = gpu_id; i < s_prim_count_1; i+=num_gpus_per_node)
+    for (int64_t i = gpu_rank; i < s_prim_count_1; i+=gpu_count)
     {
         // S-S gto block pair
 
@@ -785,7 +789,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
 
     // P-P gto block pair and P-D gto block pair
 
-    for (int64_t i = gpu_id; i < p_prim_count_1; i+=num_gpus_per_node)
+    for (int64_t i = gpu_rank; i < p_prim_count_1; i+=gpu_count)
     {
         // P-S gto block pair
 
@@ -829,7 +833,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
 
     // D-D gto block pair
 
-    for (int64_t i = gpu_id; i < d_prim_count_1; i+=num_gpus_per_node)
+    for (int64_t i = gpu_rank; i < d_prim_count_1; i+=gpu_count)
     {
         // D-S gto block pair
 
