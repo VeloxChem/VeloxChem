@@ -76,7 +76,6 @@
 #include "GtoInfo.hpp"
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
-#include "MatrixFunc.hpp"
 #include "MultiTimer.hpp"
 #include "OneElectronIntegrals.hpp"
 #include "StringFormat.hpp"

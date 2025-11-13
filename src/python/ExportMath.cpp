@@ -46,10 +46,7 @@
 #include "ExportGeneral.hpp"
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
-#include "Matrix.hpp"
-#include "MatrixFunc.hpp"
 #include "MatrixIndex.hpp"
-#include "MatrixType.hpp"
 #include "SubMatrix.hpp"
 
 namespace py = pybind11;
@@ -118,15 +115,6 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDens
 auto
 export_math(py::module& m) -> void
 {
-    // exposing enum from MatrixType.hpp
-
-    // clang-format off
-    py::enum_<mat_t>(m, "mat_t")
-        .value("symm", mat_t::symm)
-        .value("antisymm", mat_t::antisymm)
-        .value("gen", mat_t::gen);
-    // clang-format on
-
     // exposing functions from MathIndex.hpp
 
     m.def("uplo_index", &mathfunc::uplo_index, "Gets index of upper triangular matrix.");
@@ -156,22 +144,6 @@ export_math(py::module& m) -> void
           "Gets number of Cartesian components of given pair of angular momentums.");
 
     m.def("angular_component_to_str", &angmom::getStringOfAngularMomentum, "Gets string of angular momentum component.");
-
-    // exposing functions from MatrixFunc.hpp
-
-    m.def(
-        "make_matrix",
-        [](const CMolecularBasis& basis, const mat_t mat_type) -> std::shared_ptr<CMatrix> {
-            return std::make_shared<CMatrix>(matfunc::makeMatrix(basis, mat_type));
-        },
-        "Creates matrix for given basis.");
-
-    m.def(
-        "make_matrix",
-        [](const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) -> std::shared_ptr<CMatrix> {
-            return std::make_shared<CMatrix>(matfunc::makeMatrix(bra_basis, ket_basis));
-        },
-        "Creates matrix for given pair of bases.");
 
     // CSubMatrix class
 
@@ -232,68 +204,6 @@ export_math(py::module& m) -> void
         .def("offset_of_columns", &CSubMatrix::getOffsetOfColumns, "Gets offset of columns in submatrix.")
         .def("number_of_rows", &CSubMatrix::getNumberOfRows, "Gets number of rows in submatrix.")
         .def("number_of_columns", &CSubMatrix::getNumberOfColumns, "Gets number of columns in submatrix.");
-
-    // CMatrix class
-
-    PyClass<CMatrix>(m, "Matrix")
-        .def(py::init<>())
-        .def(py::init<const std::map<T2Pair, CSubMatrix>&, const mat_t>())
-        .def(py::init<const CMatrix&>())
-        .def("add", py::overload_cast<const CSubMatrix&, const T2Pair&>(&CMatrix::add), "Adds submatrix to matrix.")
-        .def("add", py::overload_cast<const T4Index&, const T2Pair&>(&CMatrix::add), "Adds submatrix to matrix.")
-        .def("set_type", &CMatrix::setType, "Sets matrix type.")
-        .def("zero", &CMatrix::zero, "Sets values of matrix to zero.")
-        .def(
-            "set_values",
-            [](CMatrix& self, const py::array_t<double>& values) -> void {
-                if (values.ndim() == 2)
-                {
-                    const auto nrows = static_cast<py::ssize_t>(self.getNumberOfRows());
-
-                    const auto ncols = static_cast<py::ssize_t>(self.getNumberOfColumns());
-
-                    if ((nrows == values.shape(0)) && (ncols == values.shape(1)))
-                    {
-                        for (auto tpair : self.getAngularPairs())
-                        {
-                            auto submat = self.getSubMatrix(tpair);
-
-                            const auto [row_off, col_off, nrows, ncols] = submat->getDimensions();
-
-                            for (int64_t i = 0; i < nrows; i++)
-                            {
-                                for (int64_t j = 0; j < ncols; j++)
-                                {
-                                    submat->at(i, j, false) = values.at(i + row_off, j + col_off);
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            "Sets values of matrix using numpy array.")
-        .def("get_type", &CMatrix::getType, "Gets matrix type.")
-        .def("get_angular_pairs", &CMatrix::getAngularPairs, "Gets vector of angular pairs for stored submatrices.")
-        .def(
-            "get_submatrix",
-            [](const CMatrix& self, const T2Pair& angpair) -> std::shared_ptr<CSubMatrix> {
-                if (auto submat = self.getSubMatrix(angpair); submat != nullptr)
-                {
-                    return std::make_shared<CSubMatrix>(*submat);
-                }
-                else
-                {
-                    return std::make_shared<CSubMatrix>();
-                }
-            },
-            "Gets specific submatrix from matrix.")
-        .def("is_angular_order", &CMatrix::isAngularOrder, "Checks if submatrix with this angular pair is stored in matrix.")
-        .def("number_of_rows", &CMatrix::getNumberOfRows, "Number of rows in matrix.")
-        .def("number_of_columns", &CMatrix::getNumberOfColumns, "Number of columns in matrix.")
-        .def(
-            "get_full_matrix",
-            [](const CMatrix& self) -> std::shared_ptr<CSubMatrix> { return std::make_shared<CSubMatrix>(self.getFullMatrix()); },
-            "Creates full matrix representation of matrix.");
 
     // CDenseMatrix class
 

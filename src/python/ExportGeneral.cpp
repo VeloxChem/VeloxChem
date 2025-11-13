@@ -40,7 +40,6 @@
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
 #include "GtoBlock.hpp"
-#include "OpenMPFunc.hpp"
 #include "StringFormat.hpp"
 
 namespace py = pybind11;

@@ -37,7 +37,6 @@
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "GtoBlock.hpp"
-#include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"

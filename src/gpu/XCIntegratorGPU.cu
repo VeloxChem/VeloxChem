@@ -55,7 +55,6 @@
 #include "GtoValuesGgaGPU.hpp"
 #include "GtoValuesMggaGPU.hpp"
 #include "MathFunc.hpp"
-#include "MatrixFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"

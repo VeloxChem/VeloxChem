@@ -55,7 +55,6 @@ from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .submatrix import SubMatrix
-from .matrix import Matrix
 from .sadguessdriver import SadGuessDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver

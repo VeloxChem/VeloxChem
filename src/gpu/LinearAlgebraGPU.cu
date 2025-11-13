@@ -67,7 +67,6 @@
 #include "GpuDevices.hpp"
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
-#include "MatrixFunc.hpp"
 #include "MultiTimer.hpp"
 #include "StringFormat.hpp"
 
