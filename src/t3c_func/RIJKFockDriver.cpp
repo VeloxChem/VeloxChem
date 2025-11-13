@@ -448,9 +448,8 @@ CRIJKFockDriver::compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMat
         std::vector<CSubMatrix> movecs(bend - bstart, CSubMatrix());
         
         // set up AOs, MOs indices
-           
-        const auto nmos = lambda_p.number_of_columns();
-               
+        const auto nmos_p = lambda_p.number_of_columns();
+        const auto nmos_h = lambda_h.number_of_columns();
         const auto naos = lambda_p.number_of_rows();
         
         // set up pointers to OMP data
@@ -472,11 +471,11 @@ CRIJKFockDriver::compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMat
             
             ptr_bq_vectors->reduced_unpack_data(bqao, *ptr_bq_mask, i);
             
-            auto tmat = CSubMatrix({0, 0, naos, nmos}, 0.0);
+            auto tmat = CSubMatrix({0, 0, naos, nmos_h}, 0.0);
             
             sdenblas::serialMultAB(tmat, bqao, *ptr_math);
             
-            auto lmat = CSubMatrix({0, 0, nmos, nmos}, 0.0);
+            auto lmat = CSubMatrix({0, 0, nmos_p, nmos_h}, 0.0);
             
             sdenblas::serialMultAtB(lmat, *ptr_matp, tmat);
             
