@@ -59,6 +59,7 @@
 #include <utility>
 #include <vector>
 
+#include "ChunkedMemcpyGPU.hpp"
 #include "LinearAlgebraGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "GpuConstants.hpp"
@@ -90,8 +91,8 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
     double* d_A = d_data;
     double* d_B = d_A + n;
 
-    gpuSafe(gpuMemcpy(d_A, A, n * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_B, B, n * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n);
+    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, n);
 
 #if defined(USE_CUDA)
 
@@ -138,7 +139,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     double* d_X = d_data;
     double* d_Y = d_X + n;
 
-    gpuSafe(gpuMemcpy(d_Y, weighted_data, n * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_Y, weighted_data, n);
 
 #if defined(USE_CUDA)
 
@@ -149,7 +150,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     {
         double alpha = weights[i];
 
-        cudaSafe(cudaMemcpy(d_X, data_pointers[i], n * sizeof(double), cudaMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_X, data_pointers[i], n);
 
         cublasSafe(cublasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
     }
@@ -165,7 +166,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
     {
         double alpha = weights[i];
 
-        hipSafe(hipMemcpy(d_X, data_pointers[i], n * sizeof(double), hipMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_X, data_pointers[i], n);
 
         hipblasSafe(hipblasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
     }
@@ -174,7 +175,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
 #endif
 
-    gpuSafe(gpuMemcpy(weighted_data, d_Y, n * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(weighted_data, d_Y, n);
 
     gpuSafe(gpuFree(d_data));
 }
@@ -200,8 +201,8 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     double* d_B = d_A + nao * nao;
     double* d_C = d_B + nao * nao;
 
-    gpuSafe(gpuMemcpy(d_A, F, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_B, D, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, F, nao * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_B, D, nao * nao);
 
 #if defined(USE_CUDA)
 
@@ -216,7 +217,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
 
     // S^T(FD)^T (=> FDS)
-    cudaSafe(cudaMemcpy(d_A, S, nao * nao * sizeof(double), cudaMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, S, nao * nao);
 
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
 
@@ -231,7 +232,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     double* d_X = d_A;  // note: nao >= nmo
     double* d_Y = d_B;  // note: nao >= nmo
 
-    cudaSafe(cudaMemcpy(d_X, X, nmo * nao * sizeof(double), cudaMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo * nao);
 
     auto op_X  = (trans_X == std::string("N")) ? CUBLAS_OP_N : CUBLAS_OP_T;
     auto op_XT = (trans_X == std::string("N")) ? CUBLAS_OP_T : CUBLAS_OP_N;
@@ -251,7 +252,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     // (EX)^T X (=> X^T(E)X)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 
-    cudaSafe(cudaMemcpy(errvec, d_C, nmo * nmo * sizeof(double), cudaMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(errvec, d_C, nmo * nmo);
 
     cublasSafe(cublasDestroy(handle));
 
@@ -268,7 +269,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
 
     // S^T(FD)^T (=> FDS)
-    hipSafe(hipMemcpy(d_A, S, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, S, nao * nao);
 
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
 
@@ -283,7 +284,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     double* d_X = d_A;  // note: nao >= nmo
     double* d_Y = d_B;  // note: nao >= nmo
 
-    hipSafe(hipMemcpy(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo * nao);
 
     auto op_X  = (trans_X == std::string("N")) ? HIPBLAS_OP_N : HIPBLAS_OP_T;
     auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
@@ -303,7 +304,7 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     // (EX)^T X (=> X^T(E)X)
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_C, nmo));
 
-    hipSafe(hipMemcpy(errvec, d_C, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(errvec, d_C, nmo * nmo);
 
     hipblasSafe(hipblasDestroy(handle));
 
@@ -333,8 +334,8 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     double* d_X = d_F + nao * nao;
     double* d_Y = d_X + nmo * nao;
 
-    gpuSafe(gpuMemcpy(d_F, F, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_X, X, nmo * nao * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_F, F, nao * nao);
+    gpu::chunkedMemcpyHostToDevice<double>(d_X, X, nmo * nao);
 
 #if defined(USE_CUDA)
 
@@ -359,7 +360,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     // (FX)^T X (=> X^T(F)X)
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 
-    cudaSafe(cudaMemcpy(transformed_F, d_F, nmo * nmo * sizeof(double), cudaMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(transformed_F, d_F, nmo * nmo);
 
     cublasSafe(cublasDestroy(handle));
 
@@ -386,7 +387,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     // (FX)^T X (=> X^T(F)X)
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, op_XT, nmo, nmo, nao, &alpha, d_Y, nmo, d_X, lda_X, &beta, d_F, nmo));
 
-    hipSafe(hipMemcpy(transformed_F, d_F, nmo * nmo * sizeof(double), hipMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(transformed_F, d_F, nmo * nmo);
 
     hipblasSafe(hipblasDestroy(handle));
 
@@ -417,8 +418,8 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
     double* d_B = d_A + m * k;
     double* d_C = d_B + k * n;
 
-    gpuSafe(gpuMemcpy(d_A, A, m * k * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_B, B, k * n * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, m * k);
+    gpu::chunkedMemcpyHostToDevice<double>(d_B, B, k * n);
 
 #if defined(USE_CUDA)
 
@@ -438,7 +439,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     cublasSafe(cublasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 
-    cudaSafe(cudaMemcpy(C, d_C, m * n * sizeof(double), cudaMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(C, d_C, m * n);
 
     cublasSafe(cublasDestroy(handle));
 
@@ -460,7 +461,7 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
     hipblasSafe(hipblasDgemm(handle, op_B, op_A, n, m, k, &alpha, d_B, lda_B, d_A, lda_A, &beta, d_C, n));
 
-    hipSafe(hipMemcpy(C, d_C, m * n * sizeof(double), hipMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(C, d_C, m * n);
 
     hipblasSafe(hipblasDestroy(handle));
 
@@ -490,7 +491,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     cudaSafe(cudaMalloc(&d_D, n * sizeof(double)));
     cudaSafe(cudaMalloc(&d_info, sizeof(int32_t)));
 
-    cudaSafe(cudaMemcpy(d_A, A, n * n * sizeof(double), cudaMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n * n);
 
     cusolverDnHandle_t handle;
     cusolverSafe(cusolverDnCreate(&handle));
@@ -503,9 +504,9 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 
     cusolverSafe(cusolverDnDestroy(handle));
 
-    cudaSafe(cudaMemcpy(A, d_A, n * n * sizeof(double), cudaMemcpyDeviceToHost));
-    cudaSafe(cudaMemcpy(D, d_D, n * sizeof(double), cudaMemcpyDeviceToHost));
-    cudaSafe(cudaMemcpy(&info, d_info, sizeof(int32_t), cudaMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n * n);
+    gpu::chunkedMemcpyDeviceToHost<double>(D, d_D, n);
+    gpu::chunkedMemcpyDeviceToHost<int32_t>(&info, d_info, 1);
 
     // TODO: check info
 
@@ -527,7 +528,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     //hipSafe(hipMalloc(&d_A, n * ldda * sizeof(double)));
     //hipblasSafe(hipblasSetMatrix(n, n, sizeof(double), A, n, d_A, ldda));
     hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
-    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_A, A, n * n);
 
     auto nb = magma_get_dsytrd_nb(n);
     auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
@@ -552,7 +553,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     }
 
     //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
-    hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(A, d_A, n * n);
 
     hipSafe(hipFree(d_A));
 
