@@ -61,6 +61,7 @@
 
 #include "ScreeningData.hpp"
 #include "BoysFuncTable.hpp"
+#include "ChunkedMemcpyGPU.hpp"
 #include "FockDriverGPU.hpp"
 #include "ElectricDipoleIntegrals.hpp"
 #include "LinearMomentumIntegrals.hpp"
@@ -933,32 +934,32 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuMalloc(&d_dd_first_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
     gpuSafe(gpuMalloc(&d_dd_second_inds_local, dd_prim_pair_count_local * sizeof(uint32_t)));
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_ps_first_inds_local, ps_first_inds_local.data(), ps_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ps_second_inds_local, ps_second_inds_local.data(), ps_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ps_first_inds_local, ps_first_inds_local.data(), ps_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ps_second_inds_local, ps_second_inds_local.data(), ps_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local, sd_first_inds_local.data(), sd_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_ds_first_inds_local, ds_first_inds_local.data(), ds_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ds_second_inds_local, ds_second_inds_local.data(), ds_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ds_first_inds_local, ds_first_inds_local.data(), ds_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ds_second_inds_local, ds_second_inds_local.data(), ds_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local, pd_first_inds_local.data(), pd_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_dp_first_inds_local, dp_first_inds_local.data(), dp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dp_second_inds_local, dp_second_inds_local.data(), dp_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dp_first_inds_local, dp_first_inds_local.data(), dp_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dp_second_inds_local, dp_second_inds_local.data(), dp_prim_pair_count_local);
 
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local, dd_first_inds_local.data(), dd_prim_pair_count_local);
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_prim_pair_count_local);
 
     S_matrices[gpu_id].zero();
 
@@ -4679,11 +4680,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_matrix_B = d_matrix_A + mat_full.getNumberOfElements();
     double *d_matrix_C = d_matrix_B + mat_full.getNumberOfElements();
 
-    gpuSafe(gpuMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements());
 
     mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, d_prim_count, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds, cart_naos, cart_dens_ptr);
 
-    gpuSafe(gpuMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements());
 
     const auto all_prim_count = mat_full.getNumberOfRows();
 
@@ -4790,8 +4791,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     double* d_boys_func_table = d_data_boys_func;
     double* d_boys_func_ft = d_boys_func_table + boys_func_table.size();
 
-    gpuSafe(gpuMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_table, boys_func_table.data(), boys_func_table.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size());
 
     omptimers[thread_id].stop("Boys func. prep.");
 
@@ -4846,13 +4847,13 @@ computeFockOnGPU(const              CMolecule& molecule,
     uint32_t* d_p_prim_aoinds = d_s_prim_aoinds + s_prim_aoinds.size();
     uint32_t* d_d_prim_aoinds = d_p_prim_aoinds + p_prim_aoinds.size();
 
-    gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info, s_prim_info.data(), s_prim_info.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info, p_prim_info.data(), p_prim_info.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info, d_prim_info.data(), d_prim_info.size());
 
-    gpuSafe(gpuMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size());
 
     omptimers[thread_id].stop("GTO block prep.");
 
@@ -5019,59 +5020,59 @@ computeFockOnGPU(const              CMolecule& molecule,
     double *d_pd_pair_data_local = d_pp_pair_data_local + pp_pair_data_local.size();
     double *d_dd_pair_data_local = d_pd_pair_data_local + pd_pair_data_local.size();
 
-    gpuSafe(gpuMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_Q, ss_mat_Q.data(), ss_mat_Q.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_Q, sp_mat_Q.data(), sp_mat_Q.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_Q, sd_mat_Q.data(), sd_mat_Q.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_Q, pp_mat_Q.data(), pp_mat_Q.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_Q, pd_mat_Q.data(), pd_mat_Q.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_Q, dd_mat_Q.data(), dd_mat_Q.size());
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds,  ss_first_inds.data(),  ss_first_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds, ss_second_inds.data(), ss_second_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds,  sp_first_inds.data(),  sp_first_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds, sp_second_inds.data(), sp_second_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds,  sd_first_inds.data(),  sd_first_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds, sd_second_inds.data(), sd_second_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds,  pp_first_inds.data(),  pp_first_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds, pp_second_inds.data(), pp_second_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds,  pd_first_inds.data(),  pd_first_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds, pd_second_inds.data(), pd_second_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds,  dd_first_inds.data(),  dd_first_inds.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds, dd_second_inds.data(), dd_second_inds.size());
 
-    gpuSafe(gpuMemcpy(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_ss_pair_data, ss_pair_data.data(), ss_pair_data.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sp_pair_data, sp_pair_data.data(), sp_pair_data.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sd_pair_data, sd_pair_data.data(), sd_pair_data.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pp_pair_data, pp_pair_data.data(), pp_pair_data.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pd_pair_data, pd_pair_data.data(), pd_pair_data.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_dd_pair_data, dd_pair_data.data(), dd_pair_data.size());
 
-    gpuSafe(gpuMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_mat_Q_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_mat_Q_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sd_mat_Q_local, sd_mat_Q_local.data(), sd_mat_Q_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_mat_Q_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pd_mat_Q_local, pd_mat_Q_local.data(), pd_mat_Q_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_dd_mat_Q_local, dd_mat_Q_local.data(), dd_mat_Q_local.size());
 
-    gpuSafe(gpuMemcpy(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size()  * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_first_inds_local,  ss_first_inds_local.data(),  ss_first_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ss_second_inds_local, ss_second_inds_local.data(), ss_second_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_first_inds_local,  sp_first_inds_local.data(),  sp_first_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sp_second_inds_local, sp_second_inds_local.data(), sp_second_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_first_inds_local,  sd_first_inds_local.data(),  sd_first_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_sd_second_inds_local, sd_second_inds_local.data(), sd_second_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_first_inds_local,  pp_first_inds_local.data(),  pp_first_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pp_second_inds_local, pp_second_inds_local.data(), pp_second_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_first_inds_local,  pd_first_inds_local.data(),  pd_first_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_pd_second_inds_local, pd_second_inds_local.data(), pd_second_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_first_inds_local,  dd_first_inds_local.data(),  dd_first_inds_local.size());
+    gpu::chunkedMemcpyHostToDevice<uint32_t>(d_dd_second_inds_local, dd_second_inds_local.data(), dd_second_inds_local.size());
 
-    gpuSafe(gpuMemcpy(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_ss_pair_data_local, ss_pair_data_local.data(), ss_pair_data_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sp_pair_data_local, sp_pair_data_local.data(), sp_pair_data_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_sd_pair_data_local, sd_pair_data_local.data(), sd_pair_data_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pp_pair_data_local, pp_pair_data_local.data(), pp_pair_data_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size());
 
     mat_Fock_omp[gpu_id].zero();
 
