@@ -1373,12 +1373,18 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuFree(d_ss_second_inds_local));
     gpuSafe(gpuFree(d_sp_first_inds_local));
     gpuSafe(gpuFree(d_sp_second_inds_local));
+    gpuSafe(gpuFree(d_ps_first_inds_local));
+    gpuSafe(gpuFree(d_ps_second_inds_local));
     gpuSafe(gpuFree(d_sd_first_inds_local));
     gpuSafe(gpuFree(d_sd_second_inds_local));
+    gpuSafe(gpuFree(d_ds_first_inds_local));
+    gpuSafe(gpuFree(d_ds_second_inds_local));
     gpuSafe(gpuFree(d_pp_first_inds_local));
     gpuSafe(gpuFree(d_pp_second_inds_local));
     gpuSafe(gpuFree(d_pd_first_inds_local));
     gpuSafe(gpuFree(d_pd_second_inds_local));
+    gpuSafe(gpuFree(d_dp_first_inds_local));
+    gpuSafe(gpuFree(d_dp_second_inds_local));
     gpuSafe(gpuFree(d_dd_first_inds_local));
     gpuSafe(gpuFree(d_dd_second_inds_local));
 
