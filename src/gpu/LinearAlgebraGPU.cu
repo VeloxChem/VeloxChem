@@ -75,16 +75,20 @@ namespace gpu {  // gpu namespace
 auto
 computeDotProduct(const double* A, const double* B, const int64_t size) -> double
 {
-    // Note: Should only be called from MPI master rank
-
     gpuSafe(gpuSetDevice(0));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
     auto n = static_cast<int32_t>(size);
 
-    double *d_A, *d_B;
+    double* d_data;
 
-    gpuSafe(gpuMalloc(&d_A, n * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_B, n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, n * 2 * sizeof(double)));
+
+    double* d_A = d_data;
+    double* d_B = d_A + n;
 
     gpuSafe(gpuMemcpy(d_A, A, n * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_B, B, n * sizeof(double), gpuMemcpyHostToDevice));
@@ -111,8 +115,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 
 #endif
 
-    gpuSafe(gpuFree(d_A));
-    gpuSafe(gpuFree(d_B));
+    gpuSafe(gpuFree(d_data));
 
     return dot_product;
 }
@@ -120,16 +123,20 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 auto
 computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size) -> void
 {
-    // Note: Should only be called from MPI master rank
-
     gpuSafe(gpuSetDevice(0));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
     auto n = static_cast<int32_t>(size);
 
-    double *d_X, *d_Y;
+    double* d_data;
 
-    gpuSafe(gpuMalloc(&d_X, n * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_Y, n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, n * 2 * sizeof(double)));
+
+    double* d_X = d_data;
+    double* d_Y = d_X + n;
 
     gpuSafe(gpuMemcpy(d_Y, weighted_data, n * sizeof(double), gpuMemcpyHostToDevice));
 
@@ -169,26 +176,29 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
     gpuSafe(gpuMemcpy(weighted_data, d_Y, n * sizeof(double), gpuMemcpyDeviceToHost));
 
-    gpuSafe(gpuFree(d_X));
-    gpuSafe(gpuFree(d_Y));
+    gpuSafe(gpuFree(d_data));
 }
 
 auto
 computeErrorVector(double* errvec, const double* X, const double* F, const double* D, const double* S,
                    const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
 {
-    // Note: Should only be called from MPI master rank
-
     gpuSafe(gpuSetDevice(0));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
     auto nmo = static_cast<int32_t>(nmo_inp);
     auto nao = static_cast<int32_t>(nao_inp);
 
-    double *d_A, *d_B, *d_C;
+    double* d_data;
 
-    gpuSafe(gpuMalloc(&d_A, nao * nao * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_B, nao * nao * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_C, nao * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, nao * nao * 3 * sizeof(double)));
+
+    double* d_A = d_data;
+    double* d_B = d_A + nao * nao;
+    double* d_C = d_B + nao * nao;
 
     gpuSafe(gpuMemcpy(d_A, F, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_B, D, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
@@ -299,27 +309,29 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
 
 #endif
 
-    gpuSafe(gpuFree(d_A));
-    gpuSafe(gpuFree(d_B));
-    gpuSafe(gpuFree(d_C));
+    gpuSafe(gpuFree(d_data));
 }
 
 auto
 transformMatrix(double* transformed_F, const double* X, const double* F,
                 const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
 {
-    // Note: Should only be called from MPI master rank
-
     gpuSafe(gpuSetDevice(0));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
     auto nmo = static_cast<int32_t>(nmo_inp);
     auto nao = static_cast<int32_t>(nao_inp);
 
-    double *d_F, *d_X, *d_Y;
+    double* d_data;
 
-    gpuSafe(gpuMalloc(&d_F, nao * nao * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_X, nmo * nao * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_Y, nmo * nao * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, (nao * nao + nmo * nao + nmo * nao) * sizeof(double)));
+
+    double* d_F = d_data;
+    double* d_X = d_F + nao * nao;
+    double* d_Y = d_X + nmo * nao;
 
     gpuSafe(gpuMemcpy(d_F, F, nao * nao * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_X, X, nmo * nao * sizeof(double), gpuMemcpyHostToDevice));
@@ -380,32 +392,30 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
 
 #endif
 
-    gpuSafe(gpuFree(d_F));
-    gpuSafe(gpuFree(d_X));
-    gpuSafe(gpuFree(d_Y));
+    gpuSafe(gpuFree(d_data));
 }
 
 auto
 computeMatrixMultiplication(double* C, const double* A, const double* B, const std::string& trans_A, const std::string& trans_B,
                             const int64_t m_inp, const int64_t k_inp, const int64_t n_inp) -> void
 {
-    // Note: Should only be called from MPI master rank
-
-    // TODO: allow computeMatrixMultiplication on non-master MPI rank
-
-    // TODO: matmul on multiple GPUs
-
     gpuSafe(gpuSetDevice(0));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
     auto m = static_cast<int32_t>(m_inp);
     auto k = static_cast<int32_t>(k_inp);
     auto n = static_cast<int32_t>(n_inp);
 
-    double *d_A, *d_B, *d_C;
+    double* d_data;
 
-    gpuSafe(gpuMalloc(&d_A, m * k * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_B, k * n * sizeof(double)));
-    gpuSafe(gpuMalloc(&d_C, m * n * sizeof(double)));
+    gpuSafe(gpuMalloc(&d_data, (m * k + k * n + m * n) * sizeof(double)));
+
+    double* d_A = d_data;
+    double* d_B = d_A + m * k;
+    double* d_C = d_B + k * n;
 
     gpuSafe(gpuMemcpy(d_A, A, m * k * sizeof(double), gpuMemcpyHostToDevice));
     gpuSafe(gpuMemcpy(d_B, B, k * n * sizeof(double), gpuMemcpyHostToDevice));
@@ -456,19 +466,17 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 
 #endif
 
-    gpuSafe(gpuFree(d_A));
-    gpuSafe(gpuFree(d_B));
-    gpuSafe(gpuFree(d_C));
+    gpuSafe(gpuFree(d_data));
 }
 
 auto
 diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 {
-    // Note: Should only be called from MPI master rank
-
-    // TODO: allow diagonalizeMatrix on non-master MPI rank
-
     gpuSafe(gpuSetDevice(0));
+
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
 #if defined(USE_CUDA)
 
@@ -561,9 +569,9 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 auto
 diagonalizeMatrixMultiGPU(double* A, double* D, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
 {
-    // Note: Should only be called from MPI master rank
-
-    // TODO: allow diagonalizeMatrix on non-master MPI rank
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string(__func__) + std::string(": should not be called in omp parallel reigion"));
 
     magmaSafe(magma_init());
 
