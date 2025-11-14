@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "AOIndices.hpp"
+#include "ChunkedMemcpyGPU.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GpuConstants.hpp"
@@ -3019,13 +3020,13 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     uint32_t* d_ao_inds = d_data_uint32;
 
-    gpuSafe(gpuMemcpy(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_gs_den_mat_full, gsDensityMatrix.alphaDensity(0), naos * naos);
+    gpu::chunkedMemcpyHostToDevice<double>(d_rw_den_mat_full, rwDensityMatrix.alphaDensity(0), naos * naos);
 
-    gpuSafe(gpuMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_x, xcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_y, ycoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_z, zcoords, n_total_grid_points);
+    gpu::chunkedMemcpyHostToDevice<double>(d_grid_w, weights, n_total_grid_points);
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -3119,7 +3120,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        gpuSafe(gpuMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<uint32_t>(d_ao_inds, ao_inds_int32.data(), aocount);
 
         // sub density matrix for ground-state rho
 
@@ -3167,19 +3168,19 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
         // functional evaluation
 
-        gpuSafe(gpuMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), gpuMemcpyDeviceToHost));
-        gpuSafe(gpuMemcpy(sigma, d_sigma, dim->sigma * npoints * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(rho, d_rho, dim->rho * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(rhograd, d_rhograd, dim->rho * 3 * npoints);
+        gpu::chunkedMemcpyDeviceToHost<double>(sigma, d_sigma, dim->sigma * npoints);
 
         xcfun_copy.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
         xcfun_copy.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        gpuSafe(gpuMemcpy(d_vsigma, vsigma, dim->vsigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_vsigma, vsigma, dim->vsigma * npoints);
 
-        gpuSafe(gpuMemcpy(d_v2rho2, v2rho2, dim->v2rho2 * npoints * sizeof(double), gpuMemcpyHostToDevice));
-        gpuSafe(gpuMemcpy(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints * sizeof(double), gpuMemcpyHostToDevice));
-        gpuSafe(gpuMemcpy(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints * sizeof(double), gpuMemcpyHostToDevice));
+        gpu::chunkedMemcpyHostToDevice<double>(d_v2rho2, v2rho2, dim->v2rho2 * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_v2rhosigma, v2rhosigma, dim->v2rhosigma * npoints);
+        gpu::chunkedMemcpyHostToDevice<double>(d_v2sigma2, v2sigma2, dim->v2sigma2 * npoints);
 
         // compute partial contribution to Fxc matrix and distribute partial
 
@@ -3291,7 +3292,7 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
 
     gpuSafe(gpuDeviceSynchronize());
 
-    gpuSafe(gpuMemcpy(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos * sizeof(double), gpuMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_Fxc_omp[gpu_id].values(), d_mat_Fxc_full, naos * naos);
 
     gpuSafe(gpuFree(d_data_double));
     gpuSafe(gpuFree(d_data_uint32));

@@ -714,9 +714,9 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuMalloc(&d_p_prim_info_1, p_prim_info_1.size() * sizeof(double)));
     gpuSafe(gpuMalloc(&d_d_prim_info_1, d_prim_info_1.size() * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_s_prim_info_1, s_prim_info_1.data(), s_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_p_prim_info_1, p_prim_info_1.data(), p_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_info_1, d_prim_info_1.data(), d_prim_info_1.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info_1, s_prim_info_1.data(), s_prim_info_1.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info_1, p_prim_info_1.data(), p_prim_info_1.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info_1, d_prim_info_1.data(), d_prim_info_1.size());
 
     double*   d_s_prim_info_2;
     double*   d_p_prim_info_2;
@@ -726,9 +726,9 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuMalloc(&d_p_prim_info_2, p_prim_info_2.size() * sizeof(double)));
     gpuSafe(gpuMalloc(&d_d_prim_info_2, d_prim_info_2.size() * sizeof(double)));
 
-    gpuSafe(gpuMemcpy(d_s_prim_info_2, s_prim_info_2.data(), s_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_p_prim_info_2, p_prim_info_2.data(), p_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_info_2, d_prim_info_2.data(), d_prim_info_2.size() * sizeof(double), gpuMemcpyHostToDevice));
+    gpu::chunkedMemcpyHostToDevice<double>(d_s_prim_info_2, s_prim_info_2.data(), s_prim_info_2.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_p_prim_info_2, p_prim_info_2.data(), p_prim_info_2.size());
+    gpu::chunkedMemcpyHostToDevice<double>(d_d_prim_info_2, d_prim_info_2.data(), d_prim_info_2.size());
 
     // GTO block pairs
 
@@ -985,7 +985,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_ss_second_inds_local,
                            static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, ss_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -1017,7 +1017,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_sp_second_inds_local,
                            static_cast<uint32_t>(sp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, sp_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -1059,7 +1059,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_ps_first_inds_local,
                            static_cast<uint32_t>(ps_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, ps_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, ps_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < ps_prim_pair_count_local; ij++)
         {
@@ -1100,7 +1100,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_sd_second_inds_local,
                            static_cast<uint32_t>(sd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, sd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -1142,7 +1142,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_ds_first_inds_local,
                            static_cast<uint32_t>(ds_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, ds_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, ds_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < ds_prim_pair_count_local; ij++)
         {
@@ -1183,7 +1183,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_pp_second_inds_local,
                            static_cast<uint32_t>(pp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, pp_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -1231,7 +1231,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_pd_second_inds_local,
                            static_cast<uint32_t>(pd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, pd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -1280,7 +1280,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_dp_first_inds_local,
                            static_cast<uint32_t>(dp_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, dp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, dp_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < dp_prim_pair_count_local; ij++)
         {
@@ -1328,7 +1328,7 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
                            d_dd_second_inds_local,
                            static_cast<uint32_t>(dd_prim_pair_count_local));
 
-        gpuSafe(gpuMemcpy(mat_S.data(), d_mat_S, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_S.data(), d_mat_S, dd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
