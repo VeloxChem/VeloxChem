@@ -4704,7 +4704,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
 
-    cudaSafe(cudaMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), cudaMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
 
     cublasSafe(cublasDestroy(handle));
 
@@ -4724,7 +4724,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
 
-    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
+    gpu::chunkedMemcpyDeviceToHost<double>(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements());
 
     hipblasSafe(hipblasDestroy(handle));
 
@@ -5299,7 +5299,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuDeviceSynchronize());
         }
 
-        gpuSafe(gpuMemcpy(mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, ss_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -5531,7 +5531,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             gpuSafe(gpuDeviceSynchronize());
         }
 
-        gpuSafe(gpuMemcpy(mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, sp_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -5769,7 +5769,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block PPDD");
         }
 
-        gpuSafe(gpuMemcpy(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, pp_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -6021,7 +6021,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block SDDD");
         }
 
-        gpuSafe(gpuMemcpy(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, sd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
         {
@@ -6403,7 +6403,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block PDDD");
         }
 
-        gpuSafe(gpuMemcpy(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, pd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -7432,7 +7432,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             //omptimers[thread_id].stop("    J block DDDD");
         }
 
-        gpuSafe(gpuMemcpy(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_J.data(), d_mat_J, dd_prim_pair_count_local);
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -8036,7 +8036,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -8397,7 +8397,7 @@ computeFockOnGPU(const              CMolecule& molecule,
                            omega,
                            eri_threshold);
 
-        gpuSafe(gpuMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
         {
@@ -8778,7 +8778,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block PDPD");
 
-        gpuSafe(gpuMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
         {
@@ -9181,7 +9181,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block SDDD");
 
-        gpuSafe(gpuMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sd; ik++)
         {
@@ -9792,7 +9792,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block PDDD");
 
-        gpuSafe(gpuMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pd; ik++)
         {
@@ -10894,7 +10894,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         //omptimers[thread_id].stop("    K block DDDD");
 
-        gpuSafe(gpuMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), gpuMemcpyDeviceToHost));
+        gpu::chunkedMemcpyDeviceToHost<double>(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd);
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_dd; ik++)
         {

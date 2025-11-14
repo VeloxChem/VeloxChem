@@ -65,6 +65,28 @@ void chunkedMemcpyHostToDevice(T* d_ptr, const T* h_ptr, size_t total_count)
     }
 }
 
+template <typename T>
+void chunkedMemcpyDeviceToHost(T* h_ptr, const T* d_ptr, size_t total_count)
+{
+    // number of elements in a chunk of maximum 8 MB
+    const size_t chunk_count = std::min(8 * 1024 * 1024 / sizeof(T), total_count);
+
+    std::vector<T> chunk_data(chunk_count);
+
+    size_t offset = 0;
+
+    while (offset < total_count)
+    {
+        size_t copy_count = std::min(chunk_count, total_count - offset);
+
+        gpuSafe(gpuMemcpy(chunk_data.data(), d_ptr + offset, copy_count * sizeof(T), gpuMemcpyDeviceToHost));
+
+        std::memcpy(h_ptr + offset, chunk_data.data(), copy_count * sizeof(T));
+
+        offset += copy_count;
+    }
+}
+
 }  // namespace gpu
 
 #endif
