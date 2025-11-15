@@ -135,8 +135,6 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
@@ -519,8 +517,6 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_second_inds_local));
     gpuSafe(gpuFree(d_dd_first_inds_local));
     gpuSafe(gpuFree(d_dd_second_inds_local));
-
-    }
     }
 
     CDenseMatrix Q_matrix_sum(all_prim_count, all_prim_count);
@@ -567,8 +563,6 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
@@ -967,6 +961,8 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
+#pragma omp barrier
+
     // SS
 
     if (ss_prim_pair_count_local > 0)
@@ -1360,6 +1356,8 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_s_prim_info_1));
     gpuSafe(gpuFree(d_p_prim_info_1));
     gpuSafe(gpuFree(d_d_prim_info_1));
@@ -1388,8 +1386,6 @@ computeMixedBasisOverlapIntegralsOnGPU(const CMolecule&       molecule,
     gpuSafe(gpuFree(d_dp_second_inds_local));
     gpuSafe(gpuFree(d_dd_first_inds_local));
     gpuSafe(gpuFree(d_dd_second_inds_local));
-
-    }
     }
 
     CDenseMatrix S(naos_1, naos_2);
@@ -1440,8 +1436,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
@@ -1624,6 +1618,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     auto& mat_kinetic_energy = T_matrices[gpu_id];
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // SS
 
@@ -1921,6 +1917,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_s_prim_info));
     gpuSafe(gpuFree(d_p_prim_info));
     gpuSafe(gpuFree(d_d_prim_info));
@@ -1940,8 +1938,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_second_inds_local));
     gpuSafe(gpuFree(d_dd_first_inds_local));
     gpuSafe(gpuFree(d_dd_second_inds_local));
-
-    }
     }
 
     std::vector<CDenseMatrix> ST_matrices(2);
@@ -2023,8 +2019,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
@@ -2227,6 +2221,8 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     gpu::chunkedMemcpyHostToDevice<double>(d_points_info, points_info_ptr, npoints * 4);
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // SS
 
@@ -2515,6 +2511,8 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_boys_func_table));
     gpuSafe(gpuFree(d_boys_func_ft));
 
@@ -2538,8 +2536,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_dd_second_inds_local));
 
     gpuSafe(gpuFree(d_points_info));
-
-    }
     }
 
     CDenseMatrix V_matrix(naos, naos);
@@ -2593,8 +2589,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
@@ -2781,6 +2775,8 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     auto& mat_mu_z = MZ_matrices[gpu_id];
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // SS
 
@@ -3129,6 +3125,8 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_s_prim_info));
     gpuSafe(gpuFree(d_p_prim_info));
     gpuSafe(gpuFree(d_d_prim_info));
@@ -3149,8 +3147,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_second_inds_local));
     gpuSafe(gpuFree(d_dd_first_inds_local));
     gpuSafe(gpuFree(d_dd_second_inds_local));
-
-    }
     }
 
     std::vector<CDenseMatrix> edip_matrices(3);
@@ -3215,8 +3211,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
@@ -3403,6 +3397,8 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     auto& mat_mu_z = MZ_matrices[gpu_id];
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // SS
 
@@ -3733,6 +3729,8 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_s_prim_info));
     gpuSafe(gpuFree(d_p_prim_info));
     gpuSafe(gpuFree(d_d_prim_info));
@@ -3753,8 +3751,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_second_inds_local));
     gpuSafe(gpuFree(d_dd_first_inds_local));
     gpuSafe(gpuFree(d_dd_second_inds_local));
-
-    }
     }
 
     std::vector<CDenseMatrix> lmom_matrices(3);
@@ -3820,8 +3816,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
@@ -4008,6 +4002,8 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     auto& mat_mu_z = MZ_matrices[gpu_id];
 
     gpuSafe(gpuDeviceSynchronize());
+
+#pragma omp barrier
 
     // SS
 
@@ -4356,6 +4352,8 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
 
     gpuSafe(gpuDeviceSynchronize());
 
+#pragma omp barrier
+
     gpuSafe(gpuFree(d_s_prim_info));
     gpuSafe(gpuFree(d_p_prim_info));
     gpuSafe(gpuFree(d_d_prim_info));
@@ -4376,8 +4374,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     gpuSafe(gpuFree(d_pd_second_inds_local));
     gpuSafe(gpuFree(d_dd_first_inds_local));
     gpuSafe(gpuFree(d_dd_second_inds_local));
-
-    }
     }
 
     std::vector<CDenseMatrix> amom_matrices(3);
@@ -4771,8 +4767,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id < num_gpus_per_node)
-    {
     auto gpu_id = thread_id;
 
     gpuSafe(gpuSetDevice(gpu_id));
@@ -4854,6 +4848,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpu::chunkedMemcpyHostToDevice<uint32_t>(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size());
 
     omptimers[thread_id].stop("GTO block prep.");
+
+#pragma omp barrier
 
     // GTO block pairs
 
@@ -5077,6 +5073,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("J prep.");
+
+#pragma omp barrier
 
     omptimers[thread_id].start("J compute");
 
@@ -7470,6 +7468,8 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[thread_id].stop("J compute");
 
+#pragma omp barrier
+
     omptimers[thread_id].start("K prep.");
 
     // K preparation
@@ -7712,6 +7712,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("K prep.");
+
+#pragma omp barrier
 
     omptimers[thread_id].start("K compute");
 
@@ -10933,7 +10935,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     gpuSafe(gpuDeviceSynchronize());
 
     omptimers[thread_id].stop("K compute");
-    }
     }
 
     timer.stop("Compute Fockmat");

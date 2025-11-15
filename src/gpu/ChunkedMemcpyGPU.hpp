@@ -63,6 +63,8 @@ void chunkedMemcpyHostToDevice(T* d_ptr, const T* h_ptr, size_t total_count)
 
         offset += copy_count;
     }
+
+    gpuSafe(gpuDeviceSynchronize());
 }
 
 template <typename T>
@@ -85,6 +87,8 @@ void chunkedMemcpyDeviceToHost(T* h_ptr, const T* d_ptr, size_t total_count)
 
         offset += copy_count;
     }
+
+    gpuSafe(gpuDeviceSynchronize());
 }
 
 }  // namespace gpu
