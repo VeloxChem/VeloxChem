@@ -32,8 +32,6 @@
 
 #include "GpuRuntime.hpp"
 
-#include <omp.h>
-
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -1251,18 +1249,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
         _dd_mat_Q_local[gpu_id]       = std::vector<double>(dd_batch_size);
 
         _dd_pair_data_local[gpu_id]   = std::vector<double>(dd_batch_size);
-    }
 
-    // auto nthreads = omp_get_max_threads();
-    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
-
-    #pragma omp parallel
-    {
-        auto thread_id = omp_get_thread_num();
-
-        if (thread_id < _num_gpus_per_node)
         {
-            auto gpu_id = thread_id;
             auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
             auto gpu_count = nnodes * _num_gpus_per_node;
 
@@ -3254,18 +3242,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
 
         _local_pair_inds_i_for_K_dd[gpu_id] = std::vector<uint32_t>(dd_batch_size);
         _local_pair_inds_k_for_K_dd[gpu_id] = std::vector<uint32_t>(dd_batch_size);
-    }
 
-    // auto nthreads = omp_get_max_threads();
-    // auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
-
-    #pragma omp parallel
-    {
-        auto thread_id = omp_get_thread_num();
-
-        if (thread_id < _num_gpus_per_node)
         {
-            auto gpu_id = thread_id;
             auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
             auto gpu_count = nnodes * _num_gpus_per_node;
 
