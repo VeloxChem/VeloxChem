@@ -237,7 +237,7 @@ class TdaEigenSolver(LinearSolver):
             nocc = None
 
         # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        eri_dict = None
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
@@ -343,6 +343,7 @@ class TdaEigenSolver(LinearSolver):
                                                         basis, eri_dict,
                                                         dft_dict, pe_dict, 2.0,
                                                         'symm', profiler)
+
                     fock_mat_local += self._comp_lr_fock(
                         tdens_antisymm, molecule, basis, eri_dict, dft_dict,
                         pe_dict, 0.0, 'antisymm', profiler)
@@ -421,8 +422,10 @@ class TdaEigenSolver(LinearSolver):
 
         # compute 1e dipole integrals
 
+        eri_dict = self._init_eri(molecule, basis)
         integrals = self._comp_onee_integrals(molecule, basis,
                                               eri_dict['screening'])
+        eri_dict = None
 
         # print converged excited states
 

@@ -1119,8 +1119,6 @@ class LinearSolver:
             The profiler.
         """
 
-        #screening = eri_dict['screening']
-
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
@@ -1145,40 +1143,14 @@ class LinearSolver:
                                                 prefac_coulomb, full_k_coef,
                                                 0.0, flag_exchange,
                                                 self.eri_thresh,
-                                                self.prelink_thresh, local_screening,
-                                                self.rank, self.nodes)
-
-                    """
-                    coulomb_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in local_screening.get_coulomb_time()
-                    ])
-
-                    exchange_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in local_screening.get_exchange_time()
-                    ])
-                    """
+                                                self.prelink_thresh, local_screening)
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
                                                       flag_exchange,
                                                       self.eri_thresh,
                                                       self.prelink_thresh,
-                                                      local_screening,
-                                                      self.rank, self.nodes)
-
-                    """
-                    coulomb_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in local_screening.get_coulomb_time()
-                    ])
-
-                    exchange_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in local_screening.get_exchange_time()
-                    ])
-                    """
+                                                      local_screening)
 
                 else:
                     # global hybrid
@@ -1186,62 +1158,21 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         self.xcfun.get_frac_exact_exchange(), 0.0,
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
-                        local_screening, self.rank, self.nodes)
-
-                    """
-                    coulomb_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in local_screening.get_coulomb_time()
-                    ])
-
-                    exchange_timing += np.array([
-                        float(dt.split()[0])
-                        for dt in local_screening.get_exchange_time()
-                    ])
-                    """
+                        local_screening)
 
             else:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dens,
                                             prefac_coulomb, 0.0, 0.0,
                                             flag_exchange, self.eri_thresh,
-                                            self.prelink_thresh, local_screening,
-                                            self.rank, self.nodes)
-
-                """
-                coulomb_timing += np.array([
-                    float(dt.split()[0]) for dt in local_screening.get_coulomb_time()
-                ])
-
-                exchange_timing += np.array([
-                    float(dt.split()[0])
-                    for dt in local_screening.get_exchange_time()
-                ])
-                """
+                                            self.prelink_thresh, local_screening)
 
         else:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
                                         1.0, 0.0, flag_exchange,
                                         self.eri_thresh, self.prelink_thresh,
-                                        local_screening, self.rank, self.nodes)
-
-            """
-            coulomb_timing += np.array(
-                [float(dt.split()[0]) for dt in local_screening.get_coulomb_time()])
-
-            exchange_timing += np.array(
-                [float(dt.split()[0]) for dt in local_screening.get_exchange_time()])
-            """
-
-        #all_eri_timing = local_comm.allgather(coulomb_timing + exchange_timing)
-        #all_eri_timing = np.array(all_eri_timing).reshape(-1)
-        #max_eri_timing = np.max(all_eri_timing)
-        #if max_eri_timing > 0.0:
-        #    eri_load_imb = 1.0 - np.sum(all_eri_timing) / (
-        #        all_eri_timing.size * max_eri_timing)
-        #else:
-        #    eri_load_imb = 0.0
+                                        local_screening)
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)

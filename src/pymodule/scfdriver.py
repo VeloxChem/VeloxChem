@@ -1662,8 +1662,7 @@ class ScfDriver:
                                                        2.0, full_k_coef, 0.0,
                                                        'symm', self.eri_thresh,
                                                        self.prelink_thresh,
-                                                       screener, self.rank,
-                                                       self.nodes)
+                                                       screener)
 
                     for line in screener.get_timer_summary().splitlines():
                         key, val = line.split(':')
@@ -1686,8 +1685,7 @@ class ScfDriver:
                                                       0.0, erf_k_coef, omega,
                                                       'symm', self.eri_thresh,
                                                       self.prelink_thresh,
-                                                      screener, self.rank,
-                                                      self.nodes)
+                                                      screener)
 
                     for line in screener.get_timer_summary().splitlines():
                         key, val = line.split(':')
@@ -1714,8 +1712,7 @@ class ScfDriver:
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dmat, 2.0,
                         self.xcfun.get_frac_exact_exchange(), 0.0, 'symm',
-                        self.eri_thresh, self.prelink_thresh, screener,
-                        self.rank, self.nodes)
+                        self.eri_thresh, self.prelink_thresh, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
                     for line in screener.get_timer_summary().splitlines():
@@ -1739,8 +1736,7 @@ class ScfDriver:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 0.0,
                                             0.0, 'symm', self.eri_thresh,
-                                            self.prelink_thresh, screener,
-                                            self.rank, self.nodes)
+                                            self.prelink_thresh, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
                 for line in screener.get_timer_summary().splitlines():
@@ -1764,8 +1760,7 @@ class ScfDriver:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 1.0, 0.0,
                                         'symm', self.eri_thresh,
-                                        self.prelink_thresh, screener,
-                                        self.rank, self.nodes)
+                                        self.prelink_thresh, screener)
             fock_mat_local = fock_mat.to_numpy()
 
             for line in screener.get_timer_summary().splitlines():

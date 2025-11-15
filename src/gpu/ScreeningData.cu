@@ -32,6 +32,8 @@
 
 #include "GpuRuntime.hpp"
 
+#include <omp.h>
+
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -74,9 +76,9 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
-    int64_t s_prim_count = 0;
-    int64_t p_prim_count = 0;
-    int64_t d_prim_count = 0;
+    _s_prim_count = 0;
+    _p_prim_count = 0;
+    _d_prim_count = 0;
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -87,67 +89,65 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
         if (gto_ang == 0)
         {
-            s_prim_count += npgtos * ncgtos;
+            _s_prim_count += npgtos * ncgtos;
         }
         else if (gto_ang == 1)
         {
-            p_prim_count += npgtos * ncgtos;
+            _p_prim_count += npgtos * ncgtos;
         }
         else if (gto_ang == 2)
         {
-            d_prim_count += npgtos * ncgtos;
+            _d_prim_count += npgtos * ncgtos;
         }
     }
 
     // S gto block
 
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+    _s_prim_info.resize(5 * _s_prim_count);
+    _s_prim_aoinds.resize(1 * _s_prim_count);
 
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForS(_s_prim_info.data(), _s_prim_aoinds.data(), _s_prim_count, gto_blocks);
 
     // P gto block
 
-    std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+    _p_prim_info.resize(5 * _p_prim_count);
+    _p_prim_aoinds.resize(3 * _p_prim_count);
 
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForP(_p_prim_info.data(), _p_prim_aoinds.data(), _p_prim_count, gto_blocks);
 
     // D gto block
 
-    std::vector<double>   d_prim_info(5 * d_prim_count);
-    std::vector<uint32_t> d_prim_aoinds(6 * d_prim_count);
+    _d_prim_info.resize(5 * _d_prim_count);
+    _d_prim_aoinds.resize(6 * _d_prim_count);
 
-    gtoinfo::updatePrimitiveInfoForD(d_prim_info.data(), d_prim_aoinds.data(), d_prim_count, gto_blocks);
+    gtoinfo::updatePrimitiveInfoForD(_d_prim_info.data(), _d_prim_aoinds.data(), _d_prim_count, gto_blocks);
 
-    _sortQ(s_prim_count, p_prim_count, d_prim_count, s_prim_info, p_prim_info, d_prim_info);
+    _sortQ();
 
-    form_Q_and_D_inds_for_K(s_prim_count, p_prim_count, d_prim_count,
-                            s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
-                            s_prim_info, p_prim_info, d_prim_info);
+    form_Q_and_D_inds_for_K();
 
-    const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
+    const auto cart_naos = _s_prim_count + _p_prim_count * 3 + _d_prim_count * 6;
 
     // allocate device pointers
 
     const auto boys_func_table_size = boysfunc::getFullBoysFuncTableSize();
     const auto boys_func_ft_size    = boysfunc::getBoysFuncFactorsSize();
 
-    const auto s_prim_info_size = 5 * s_prim_count;
-    const auto p_prim_info_size = 5 * p_prim_count;
-    const auto d_prim_info_size = 5 * d_prim_count;
+    const auto s_prim_info_size = 5 * _s_prim_count;
+    const auto p_prim_info_size = 5 * _p_prim_count;
+    const auto d_prim_info_size = 5 * _d_prim_count;
 
-    const auto s_prim_aoinds_size = 1 * s_prim_count;
-    const auto p_prim_aoinds_size = 3 * p_prim_count;
-    const auto d_prim_aoinds_size = 6 * d_prim_count;
+    const auto s_prim_aoinds_size = 1 * _s_prim_count;
+    const auto p_prim_aoinds_size = 3 * _p_prim_count;
+    const auto d_prim_aoinds_size = 6 * _d_prim_count;
 
     // Note: these counts are larger than those used in J computation
-    const auto ss_prim_pair_count = _Q_ss_prim_pair_count;
-    const auto sp_prim_pair_count = _Q_sp_prim_pair_count;
-    const auto sd_prim_pair_count = _Q_sd_prim_pair_count;
-    const auto pp_prim_pair_count = _Q_pp_prim_pair_count;
-    const auto pd_prim_pair_count = _Q_pd_prim_pair_count;
-    const auto dd_prim_pair_count = _Q_dd_prim_pair_count;
+    const auto ss_prim_pair_count = s_prim_aoinds_size * (s_prim_aoinds_size + 1) / 2;
+    const auto sp_prim_pair_count = s_prim_aoinds_size * p_prim_aoinds_size;
+    const auto sd_prim_pair_count = s_prim_aoinds_size * d_prim_aoinds_size;
+    const auto pp_prim_pair_count = p_prim_aoinds_size * (p_prim_aoinds_size + 1) / 2;
+    const auto pd_prim_pair_count = p_prim_aoinds_size * d_prim_aoinds_size;
+    const auto dd_prim_pair_count = d_prim_aoinds_size * (d_prim_aoinds_size + 1) / 2;
 
     const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, sd_prim_pair_count,
                                                pp_prim_pair_count, pd_prim_pair_count, dd_prim_pair_count});
@@ -156,12 +156,12 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
                                       pp_prim_pair_count + pd_prim_pair_count + dd_prim_pair_count);
 
     // Note: these counts are larger than those used in K computation
-    const auto pair_inds_count_for_K_ss = s_prim_aoinds_size * (s_prim_aoinds_size + 1) / 2;
-    const auto pair_inds_count_for_K_sp = s_prim_aoinds_size * p_prim_aoinds_size;
-    const auto pair_inds_count_for_K_sd = s_prim_aoinds_size * d_prim_aoinds_size;
-    const auto pair_inds_count_for_K_pp = p_prim_aoinds_size * (p_prim_aoinds_size + 1) / 2;
-    const auto pair_inds_count_for_K_pd = p_prim_aoinds_size * d_prim_aoinds_size;
-    const auto pair_inds_count_for_K_dd = d_prim_aoinds_size * (d_prim_aoinds_size + 1) / 2;
+    const auto pair_inds_count_for_K_ss = ss_prim_pair_count;
+    const auto pair_inds_count_for_K_sp = sp_prim_pair_count;
+    const auto pair_inds_count_for_K_sd = sd_prim_pair_count;
+    const auto pair_inds_count_for_K_pp = pp_prim_pair_count;
+    const auto pair_inds_count_for_K_pd = pd_prim_pair_count;
+    const auto pair_inds_count_for_K_dd = dd_prim_pair_count;
 
     const auto max_pair_inds_count = std::max({pair_inds_count_for_K_ss, pair_inds_count_for_K_sp, pair_inds_count_for_K_pp,
                                                pair_inds_count_for_K_sd, pair_inds_count_for_K_pd, pair_inds_count_for_K_dd});
@@ -200,12 +200,12 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
     {
         gpuSafe(gpuSetDevice(gpu_id));
 
-        const auto ss_prim_pair_count_local = static_cast<int64_t>(_ss_first_inds_local[gpu_id].size());
-        const auto sp_prim_pair_count_local = static_cast<int64_t>(_sp_first_inds_local[gpu_id].size());
-        const auto sd_prim_pair_count_local = static_cast<int64_t>(_sd_first_inds_local[gpu_id].size());
-        const auto pp_prim_pair_count_local = static_cast<int64_t>(_pp_first_inds_local[gpu_id].size());
-        const auto pd_prim_pair_count_local = static_cast<int64_t>(_pd_first_inds_local[gpu_id].size());
-        const auto dd_prim_pair_count_local = static_cast<int64_t>(_dd_first_inds_local[gpu_id].size());
+        const auto ss_prim_pair_count_local = ss_prim_pair_count;
+        const auto sp_prim_pair_count_local = sp_prim_pair_count;
+        const auto sd_prim_pair_count_local = sd_prim_pair_count;
+        const auto pp_prim_pair_count_local = pp_prim_pair_count;
+        const auto pd_prim_pair_count_local = pd_prim_pair_count;
+        const auto dd_prim_pair_count_local = dd_prim_pair_count;
 
         const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local,
                                                          sd_prim_pair_count_local, pp_prim_pair_count_local,
@@ -377,8 +377,11 @@ CScreeningData::CScreeningData(const CMolecule& molecule,
 
 CScreeningData::~CScreeningData()
 {
-    // free device pointers
+    errors::assertMsgCritical(
+        !omp_in_parallel(),
+        std::string("CScreeningData destructor: should never be called in omp parallel reigion"));
 
+    // free device pointers
     for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {
         gpuSafe(gpuSetDevice(gpu_id));
@@ -388,31 +391,6 @@ CScreeningData::~CScreeningData()
     }
 
     gpuSafe(gpuSetDevice(0));
-
-    _d_data_boys_func.clear();
-    _d_data_spd_prim_info.clear();
-    _d_data_spd_prim_aoinds.clear();
-
-    _d_data_matrices_ABC.clear();
-
-    _d_data_mat_D_J.clear();
-    _d_data_mat_Q.clear();
-    _d_data_first_second_inds.clear();
-    _d_data_pair_data.clear();
-    _d_data_mat_Q_local.clear();
-    _d_data_first_second_inds_local.clear();
-    _d_data_pair_data_local.clear();
-
-    _d_data_mat_K.clear();
-    _d_data_pair_inds_for_K.clear();
-    _d_data_mat_D_full_AO.clear();
-    _d_data_Q_K.clear();
-    _d_data_D_inds_K.clear();
-    _d_data_pair_counts_displs_K.clear();
-    _d_data_pair_data_K.clear();
-
-    _devptr_double.clear();
-    _devptr_uint32.clear();
 }
 
 auto
@@ -1025,13 +1003,16 @@ CScreeningData::getGpuTimerSummary() const -> const std::vector<std::string>
 }
 
 auto
-CScreeningData::_sortQ(const int64_t s_prim_count,
-                       const int64_t p_prim_count,
-                       const int64_t d_prim_count,
-                       const std::vector<double>& s_prim_info,
-                       const std::vector<double>& p_prim_info,
-                       const std::vector<double>& d_prim_info) -> void
+CScreeningData::_sortQ() -> void
 {
+    const auto s_prim_count = _s_prim_count;
+    const auto p_prim_count = _p_prim_count;
+    const auto d_prim_count = _d_prim_count;
+
+    const auto& s_prim_info = _s_prim_info;
+    const auto& p_prim_info = _p_prim_info;
+    const auto& d_prim_info = _d_prim_info;
+
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_ss_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_sp_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_sd_mat_Q;
@@ -1143,13 +1124,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
     const auto pp_prim_pair_count = static_cast<int64_t>(sorted_pp_mat_Q.size());
     const auto pd_prim_pair_count = static_cast<int64_t>(sorted_pd_mat_Q.size());
     const auto dd_prim_pair_count = static_cast<int64_t>(sorted_dd_mat_Q.size());
-
-    _Q_ss_prim_pair_count = ss_prim_pair_count;
-    _Q_sp_prim_pair_count = sp_prim_pair_count;
-    _Q_sd_prim_pair_count = sd_prim_pair_count;
-    _Q_pp_prim_pair_count = pp_prim_pair_count;
-    _Q_pd_prim_pair_count = pd_prim_pair_count;
-    _Q_dd_prim_pair_count = dd_prim_pair_count;
 
     // std::stringstream ss;
     // ss << "Pair screening\n";
@@ -2394,16 +2368,20 @@ auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
     return mat_D_abs_full;
 }
 
-auto CScreeningData::form_Q_and_D_inds_for_K(const int64_t                s_prim_count,
-                                             const int64_t                p_prim_count,
-                                             const int64_t                d_prim_count,
-                                             const std::vector<uint32_t>& s_prim_aoinds,
-                                             const std::vector<uint32_t>& p_prim_aoinds,
-                                             const std::vector<uint32_t>& d_prim_aoinds,
-                                             const std::vector<double>&   s_prim_info,
-                                             const std::vector<double>&   p_prim_info,
-                                             const std::vector<double>&   d_prim_info) -> void
+auto CScreeningData::form_Q_and_D_inds_for_K() -> void
 {
+    const auto s_prim_count = _s_prim_count;
+    const auto p_prim_count = _p_prim_count;
+    const auto d_prim_count = _d_prim_count;
+
+    const auto& s_prim_aoinds = _s_prim_aoinds;
+    const auto& p_prim_aoinds = _p_prim_aoinds;
+    const auto& d_prim_aoinds = _d_prim_aoinds;
+
+    const auto& s_prim_info = _s_prim_info;
+    const auto& p_prim_info = _p_prim_info;
+    const auto& d_prim_info = _d_prim_info;
+
     // Q_ss and D_ss for K
 
     int64_t ss_prim_pair_count_for_K = 0;

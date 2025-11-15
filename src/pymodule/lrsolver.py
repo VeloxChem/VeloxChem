@@ -198,6 +198,9 @@ class LinearResponseSolver(LinearSolver):
         b_grad = self.get_prop_grad(self.b_operator, self.b_components,
                                     molecule, basis, scf_tensors,
                                     eri_dict['screening'])
+
+        eri_dict = None
+
         if self.rank == mpi_master():
             v_grad = {
                 (op, w): v for op, v in zip(self.b_components, b_grad)
@@ -458,9 +461,11 @@ class LinearResponseSolver(LinearSolver):
         self._dist_e2bung = None
 
         # calculate response functions
+        eri_dict = self._init_eri(molecule, basis)
         a_grad = self.get_prop_grad(self.a_operator, self.a_components,
                                     molecule, basis, scf_tensors,
                                     eri_dict['screening'])
+        eri_dict = None
 
         if self.is_converged:
             if self.rank == mpi_master():

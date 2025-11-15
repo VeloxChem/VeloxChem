@@ -310,6 +310,8 @@ class C6Driver(LinearSolver):
                                             molecule, basis, scf_tensors,
                                             eri_dict['screening'])
 
+        eri_dict = None
+
         points, weights = np.polynomial.legendre.leggauss(self.n_points)
         imagfreqs = [self.w0 * (1 - t) / (1 + t) for t in points]
         imagfreqs = np.append(imagfreqs, 0.0)
@@ -607,9 +609,11 @@ class C6Driver(LinearSolver):
         self._dist_e2bung = None
 
         # calculate response functions
+        eri_dict = self._init_eri(molecule, basis)
         a_grad = self.get_complex_prop_grad(self.a_operator, self.a_components,
                                             molecule, basis, scf_tensors,
                                             eri_dict['screening'])
+        eri_dict = None
 
         if self.is_converged:
             if self.rank == mpi_master():

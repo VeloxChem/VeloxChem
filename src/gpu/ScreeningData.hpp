@@ -60,12 +60,16 @@ class CScreeningData
     std::string _timer_summary;
     std::vector<std::string> _gpu_timer_summary;
 
-    int64_t _Q_ss_prim_pair_count{0};
-    int64_t _Q_sp_prim_pair_count{0};
-    int64_t _Q_sd_prim_pair_count{0};
-    int64_t _Q_pp_prim_pair_count{0};
-    int64_t _Q_pd_prim_pair_count{0};
-    int64_t _Q_dd_prim_pair_count{0};
+    // primitive AO data
+    int64_t               _s_prim_count;
+    int64_t               _p_prim_count;
+    int64_t               _d_prim_count;
+    std::vector<double>   _s_prim_info;
+    std::vector<double>   _p_prim_info;
+    std::vector<double>   _d_prim_info;
+    std::vector<uint32_t> _s_prim_aoinds;
+    std::vector<uint32_t> _p_prim_aoinds;
+    std::vector<uint32_t> _d_prim_aoinds;
 
     // gpu pointers
     std::vector<double*> _d_data_boys_func;
@@ -241,12 +245,7 @@ class CScreeningData
 
     auto _computeQMatricesOnGPU(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
-    auto _sortQ(const int64_t s_prim_count,
-                const int64_t p_prim_count,
-                const int64_t d_prim_count,
-                const std::vector<double>& s_prim_info,
-                const std::vector<double>& p_prim_info,
-                const std::vector<double>& d_prim_info) -> void;
+    auto _sortQ() -> void;
 
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold, const int rank, const int nnodes);
@@ -458,15 +457,7 @@ class CScreeningData
                             const int64_t naos,
                             const double* dens_ptr) const -> CDenseMatrix;
 
-    auto form_Q_and_D_inds_for_K(const int64_t                s_prim_count,
-                                 const int64_t                p_prim_count,
-                                 const int64_t                d_prim_count,
-                                 const std::vector<uint32_t>& s_prim_aoinds,
-                                 const std::vector<uint32_t>& p_prim_aoinds,
-                                 const std::vector<uint32_t>& d_prim_aoinds,
-                                 const std::vector<double>&   s_prim_info,
-                                 const std::vector<double>&   p_prim_info,
-                                 const std::vector<double>&   d_prim_info) -> void;
+    auto form_Q_and_D_inds_for_K() -> void;
 
     auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
 };

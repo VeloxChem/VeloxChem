@@ -400,7 +400,7 @@ class CphfSolver(LinearSolver):
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        eri_dict = None
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
