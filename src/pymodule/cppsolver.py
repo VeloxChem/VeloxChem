@@ -380,7 +380,7 @@ class ComplexResponse(LinearSolver):
         nocc = molecule.number_of_alpha_electrons()
 
         # ERI information
-        eri_dict = None
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
@@ -422,12 +422,13 @@ class ComplexResponse(LinearSolver):
         if not self.nonlinear:
             prop_grad_t0 = tm.time()
 
-            eri_dict = self._init_eri(molecule, basis)
+            # we can skip reset_mpi here since screening have not been adapted
+            # to another MPI communicator
+            # eri_dict['screening'].reset_mpi(self.rank, self.nodes)
             b_grad = self.get_complex_prop_grad(self.b_operator,
                                                 self.b_components, molecule,
                                                 basis, scf_tensors,
                                                 eri_dict['screening'])
-            eri_dict = None
 
             prop_grad_dt = tm.time() - prop_grad_t0
             self.ostream.print_info(
@@ -1019,12 +1020,13 @@ class ComplexResponse(LinearSolver):
 
         # calculate response functions
         if not self.nonlinear:
-            eri_dict = self._init_eri(molecule, basis)
+            # we need reset_mpi here since screening may have been adapted to
+            # local communicators during Fock builds
+            eri_dict['screening'].reset_mpi(self.rank, self.nodes)
             a_grad = self.get_complex_prop_grad(self.a_operator,
                                                 self.a_components, molecule,
                                                 basis, scf_tensors,
                                                 eri_dict['screening'])
-            eri_dict = None
 
             if self.is_converged:
                 if self.rank == mpi_master():

@@ -722,10 +722,6 @@ class LinearSolver:
 
         num_gpus_per_node = self._get_num_gpus_per_node()
 
-        local_screening = ScreeningData(molecule, basis, num_gpus_per_node,
-                                        self.pair_thresh, self.density_thresh,
-                                        local_comm.Get_rank(), local_comm.Get_size())
-
         if profiler is not None:
             profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
@@ -885,7 +881,7 @@ class LinearSolver:
                 coulomb_coef = 0.0 if symm_flag == 'antisymm' else 2.0
                 fock_mat_local = self._comp_lr_fock(dens, molecule, basis, eri_dict,
                                                     dft_dict, pe_dict, coulomb_coef,
-                                                    symm_flag, local_screening, local_comm,
+                                                    symm_flag, local_comm,
                                                     profiler)
 
                 comm_t0 = tm.time()
@@ -1095,7 +1091,6 @@ class LinearSolver:
                       pe_dict,
                       prefac_coulomb,
                       flag_exchange,
-                      local_screening,
                       local_comm,
                       profiler=None):
         """
@@ -1118,6 +1113,8 @@ class LinearSolver:
         :param profiler:
             The profiler.
         """
+
+        eri_dict['screening'].reset_mpi(local_comm.Get_rank(), local_comm.Get_size())
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
@@ -1143,14 +1140,14 @@ class LinearSolver:
                                                 prefac_coulomb, full_k_coef,
                                                 0.0, flag_exchange,
                                                 self.eri_thresh,
-                                                self.prelink_thresh, local_screening)
+                                                self.prelink_thresh, eri_dict['screening'])
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
                                                       0.0, erf_k_coef, omega,
                                                       flag_exchange,
                                                       self.eri_thresh,
                                                       self.prelink_thresh,
-                                                      local_screening)
+                                                      eri_dict['screening'])
 
                 else:
                     # global hybrid
@@ -1158,21 +1155,21 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         self.xcfun.get_frac_exact_exchange(), 0.0,
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
-                        local_screening)
+                        eri_dict['screening'])
 
             else:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dens,
                                             prefac_coulomb, 0.0, 0.0,
                                             flag_exchange, self.eri_thresh,
-                                            self.prelink_thresh, local_screening)
+                                            self.prelink_thresh, eri_dict['screening'])
 
         else:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
                                         1.0, 0.0, flag_exchange,
                                         self.eri_thresh, self.prelink_thresh,
-                                        local_screening)
+                                        eri_dict['screening'])
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -1189,7 +1186,7 @@ class LinearSolver:
                 integrate_fxc_fock_gpu(fock_mat, molecule, basis, dens,
                                        gs_density, molgrid,
                                        self.xcfun.get_func_label(),
-                                       local_screening.get_num_gpus_per_node(),
+                                       eri_dict['screening'].get_num_gpus_per_node(),
                                        self.rank, self.nodes)
 
             if profiler is not None:

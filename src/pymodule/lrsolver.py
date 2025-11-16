@@ -195,11 +195,12 @@ class LinearResponseSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # right-hand side (gradient)
+        # we can skip reset_mpi here since screening have not been adapted
+        # to another MPI communicator
+        # eri_dict['screening'].reset_mpi(self.rank, self.nodes)
         b_grad = self.get_prop_grad(self.b_operator, self.b_components,
                                     molecule, basis, scf_tensors,
                                     eri_dict['screening'])
-
-        eri_dict = None
 
         if self.rank == mpi_master():
             v_grad = {
@@ -461,11 +462,12 @@ class LinearResponseSolver(LinearSolver):
         self._dist_e2bung = None
 
         # calculate response functions
-        eri_dict = self._init_eri(molecule, basis)
+        # we need reset_mpi here since screening may have been adapted to
+        # local communicators during Fock builds
+        eri_dict['screening'].reset_mpi(self.rank, self.nodes)
         a_grad = self.get_prop_grad(self.a_operator, self.a_components,
                                     molecule, basis, scf_tensors,
                                     eri_dict['screening'])
-        eri_dict = None
 
         if self.is_converged:
             if self.rank == mpi_master():

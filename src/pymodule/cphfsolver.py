@@ -400,7 +400,7 @@ class CphfSolver(LinearSolver):
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         # ERI information
-        eri_dict = None
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
@@ -806,6 +806,8 @@ class CphfSolver(LinearSolver):
                 local_comm.Bcast(symm_vec_ao, root=mpi_master())
 
                 symm_dens = AODensityMatrix([symm_vec_ao], denmat.rest)
+
+                # TODO: revisit this part
 
                 # create Fock matrices and contract with two-electron integrals
                 coulomb_coef = 2.0

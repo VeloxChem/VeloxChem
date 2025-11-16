@@ -252,6 +252,8 @@ class CScreeningData
 
     ~CScreeningData();
 
+    auto reset_mpi(const int rank, const int nnodes) -> void;
+
     auto get_devptr_data_boys_func(const int64_t gpu_id) const -> double*;
     auto get_devptr_data_spd_prim_info(const int64_t gpu_id) const -> double*;
     auto get_devptr_data_spd_prim_aoinds(const int64_t gpu_id) const -> uint32_t*;

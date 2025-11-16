@@ -394,6 +394,16 @@ CScreeningData::~CScreeningData()
 }
 
 auto
+CScreeningData::reset_mpi(const int rank, const int nnodes) -> void
+{
+    _rank = rank;
+
+    _nnodes = nnodes;
+
+    _sortQ();
+}
+
+auto
 CScreeningData::get_devptr_data_boys_func(const int64_t gpu_id) const -> double*
 {
     return _d_data_boys_func[gpu_id];

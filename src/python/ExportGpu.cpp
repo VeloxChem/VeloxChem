@@ -71,6 +71,7 @@ export_gpu(py::module& m)
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
         .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t, const double, const double, const int, const int>())
         .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
+        .def("reset_mpi", &CScreeningData::reset_mpi)
         .def("get_timer_summary", &CScreeningData::getTimerSummary)
         .def("get_gpu_timer_summary", &CScreeningData::getGpuTimerSummary)
         .def(

@@ -237,7 +237,7 @@ class TdaEigenSolver(LinearSolver):
             nocc = None
 
         # ERI information
-        eri_dict = None
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
@@ -422,10 +422,11 @@ class TdaEigenSolver(LinearSolver):
 
         # compute 1e dipole integrals
 
-        eri_dict = self._init_eri(molecule, basis)
+        # we need reset_mpi here since screening may have been adapted to
+        # local communicators during Fock builds
+        eri_dict['screening'].reset_mpi(self.rank, self.nodes)
         integrals = self._comp_onee_integrals(molecule, basis,
                                               eri_dict['screening'])
-        eri_dict = None
 
         # print converged excited states
 

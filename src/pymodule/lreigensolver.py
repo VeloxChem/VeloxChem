@@ -240,7 +240,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 'LinearResponseEigenSolver: too many excited states')
 
         # ERI information
-        eri_dict = None
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
@@ -511,7 +511,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # calculate properties
         if self.is_converged:
-            eri_dict = self._init_eri(molecule, basis)
+            # we need reset_mpi here since screening may have been adapted to
+            # local communicators during Fock builds
+            eri_dict['screening'].reset_mpi(self.rank, self.nodes)
 
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,
                                            basis, scf_tensors,
@@ -748,8 +750,6 @@ class LinearResponseEigenSolver(LinearSolver):
                     excitation_details.append(
                         self.get_excitation_details(eigvec, mo_occ.shape[1],
                                                     mo_vir.shape[1]))
-
-            eri_dict = None
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
