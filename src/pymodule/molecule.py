@@ -33,6 +33,7 @@
 from pathlib import Path
 import numpy as np
 import math
+import os
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom, mpi_master
@@ -989,16 +990,15 @@ def _Molecule_show(self,
                 last_line = lines[-2]
                 lines = lines[:-2]
                 for key in sorted(dashed_bonds):
-                    line = f" {key[0] + 1:<2} {key[1] + 1:<2} 0.5  0"
+                    line = f"{key[0] + 1:>3}{key[1] + 1:>3}0.5  0"
                     lines.append(line)
                 lines.append(last_line)
 
-                splitline = re.split(r'(\s+)', lines[3])
-                splitline[4] = str(int(splitline[4]) + len(dashed_bonds))
-                splitline[3] = " " * (2 - len(splitline[4]))
-                lines[3] = ''.join(splitline)
+                old_header = lines[3]
+                header_begin = f"{self.number_of_atoms():<3}{len(bonds)+len(dashed_bonds):<3}"
+                header = header_begin + old_header[6:]
+                lines[3] = header
                 sdf = '\n'.join(lines)
-
             viewer.addModel(sdf, 'sdf')
 
         if atom_indices or atom_labels:
@@ -1344,7 +1344,7 @@ def _Molecule_contains_water_molecule(self):
         connected_atoms = self._find_connected_atoms(i, conn)
         if len(connected_atoms) != 3:
             continue
-        
+
         connected_atoms.remove(i)
         connected_atoms = list(connected_atoms)
         if labels[connected_atoms[0]] == 'H' and labels[

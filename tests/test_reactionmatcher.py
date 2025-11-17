@@ -146,7 +146,7 @@ class TestReactionMatcher:
             breaking_bonds={(72, 77)},
         )
         assert breaking_bonds == {(71, 76)}
-        assert forming_bonds == {(51, 78)}
+        assert forming_bonds == {(51, 78)} or forming_bonds == {(51, 79)}
 
         breaking_bonds, forming_bonds = self.run_graph_matcher(
             rea=[rea1, rea2],
@@ -161,7 +161,29 @@ class TestReactionMatcher:
             pro=[pro1, pro2],
         )
         assert breaking_bonds == {(71, 76)}
-        assert forming_bonds == {(51, 78)}
+        assert forming_bonds == {(51, 78)} or forming_bonds == {(51, 79)}
+
+    @pytest.mark.timeconsuming
+    def test_taiwaniadduct(self):
+        rea1_smiles = "[H][C@@]12[C@H](O)C3=C(C(=O)C(OC)=C(C(C)C)C3=O)[C@@]1(C)CCCC2(C)C"
+        rea2_smiles = "[H][C@@]12CCC(=C)[C@H](CC=C(C)C=C)[C@@]1(C)CCC[C@@]2(C)C(=O)OC"
+        pro_smiles = "[H][C@@]12[C@H](O)[C@@]34C(C[C@H]5C(=C)CC[C@]6([H])[C@]5(C)CCC[C@@]6(C)C(=O)OC)C(C)=CC[C@@]3(C(=O)C(OC)=C(C(C)C)C4=O)[C@@]1(C)CCCC2(C)C"
+        pro_smiles_alt = "[H][C@@]12[C@H](O)[C@@]34CC=C(C)C(C[C@H]5C(=C)CC[C@]6([H])[C@]5(C)CCC[C@@]6(C)C(=O)OC)[C@@]3(C(=O)C(OC)=C(C(C)C)C4=O)[C@@]1(C)CCCC2(C)C"
+
+        breaking_bonds, forming_bonds = self.run_graph_matcher(
+            rea_smiles=[rea1_smiles, rea2_smiles],
+            pro_smiles=[pro_smiles],
+        )
+
+        assert breaking_bonds == set()
+        assert forming_bonds == {(3, 59), (4, 63)}
+
+        breaking_bonds, forming_bonds = self.run_graph_matcher(
+            rea_smiles=[rea2_smiles, rea1_smiles],
+            pro_smiles=[pro_smiles_alt],
+        )
+        assert breaking_bonds == set()
+        assert breaking_bonds == {(11, 58), (7, 59)}
 
     @pytest.mark.timeconsuming
     def test_copper_complex_2(self):

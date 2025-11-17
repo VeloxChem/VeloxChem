@@ -84,8 +84,7 @@ class ReactionForceFieldBuilder():
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-        
-        
+
         self.calculate_resp: bool = True
         self.optimize_mol: bool = False
         self.reparameterize_bonds: bool = False
@@ -95,7 +94,7 @@ class ReactionForceFieldBuilder():
         self.optimize_conformer_snapshots: int = 10
         self.optimize_temp: int = 600
         self.optimize_dist_restraint_offset = 0.5  # Angstrom
-        self.optimize_dist_restraint_k = 250000.0  # kJ mol^-1 nm^-2
+        self.optimize_dist_restraint_k = 100000.0  # kJ mol^-1 nm^-2
         self.mm_opt_constrain_bonds: bool = True
         self.water_model: str = 'cspce'
         self.product_mapping: dict[int, int] | None = None  # one-indexed
@@ -335,12 +334,16 @@ class ReactionForceFieldBuilder():
         else:
             if self.calculate_resp:
                 if max(molecule.get_masses()) > 84:
-                    basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
+                    basis = MolecularBasis.read(molecule,
+                                                "STO-6G",
+                                                ostream=None)
                     self.ostream.print_info(
                         f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
                     )
                 else:
-                    basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
+                    basis = MolecularBasis.read(molecule,
+                                                "6-31G*",
+                                                ostream=None)
                 if molecule.get_multiplicity() == 1:
                     scf_drv = ScfRestrictedDriver()
                 else:
@@ -380,12 +383,15 @@ class ReactionForceFieldBuilder():
                     water_model=self.water_model,
                 )
             else:
-                self.ostream.print_info("Assigning partial charges based on electronegativity")
-                partial_charges = molecule.get_partial_charges(molecule.get_charge())
+                self.ostream.print_info(
+                    "Assigning partial charges based on electronegativity")
+                partial_charges = molecule.get_partial_charges(
+                    molecule.get_charge())
                 forcefield.partial_charges = partial_charges
                 self.ostream.print_info("Creating topology")
                 self.ostream.flush()
-                forcefield.create_topology(molecule, water_model=self.water_model)
+                forcefield.create_topology(molecule,
+                                           water_model=self.water_model)
 
         # Reparameterize the forcefield if necessary and requested
         unknown_pairs = set()
@@ -694,51 +700,66 @@ class ReactionForceFieldBuilder():
         top = modeller.getTopology()
         pos = modeller.getPositions()
 
-        mmsys = ff.createSystem(
-            top,
-            nonbondedMethod=mmapp.CutoffNonPeriodic,
-            nonbondedCutoff=1.0 * mmunit.nanometers,
-        )
-        mmsys_bak = copy.deepcopy(mmsys)
-        if self.mm_opt_constrain_bonds:
-            mmsys = self._add_reaction_bonds(forcefield, mmsys, changing_bonds,
-                                             note)
+        exiting = False
+        while not exiting:
+            try:
+                mmsys = ff.createSystem(
+                    top,
+                    nonbondedMethod=mmapp.CutoffNonPeriodic,
+                    nonbondedCutoff=1.0 * mmunit.nanometers,
+                )
+                mmsys_bak = copy.deepcopy(mmsys)
+                if self.mm_opt_constrain_bonds:
+                    mmsys = self._add_reaction_bonds(forcefield, mmsys,
+                                                     changing_bonds, note)
 
-        with open(f'{name}_sys.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(mmsys))
+                with open(f'{name}_sys.xml', 'w') as f:
+                    f.write(mm.XmlSerializer.serialize(mmsys))
 
-        opm_dyn = OpenMMDynamics()
-        opm_dyn.ostream.mute()
-        opm_dyn.openmm_platform = "CPU"
+                opm_dyn = OpenMMDynamics()
+                opm_dyn.ostream.mute()
+                opm_dyn.openmm_platform = "CPU"
 
-        opm_dyn.pdb = pdb
-        opm_dyn.system = mmsys
+                opm_dyn.pdb = pdb
+                opm_dyn.system = mmsys
 
-        self.ostream.print_info(
-            f"Running conformational sampling with {self.optimize_steps*self.optimize_conformer_snapshots} steps and {self.optimize_conformer_snapshots} snapshots at {self.optimize_temp} K for {note} molecule."
-        )
-        self.ostream.flush()
-        try:
-            conformers_dict = opm_dyn.conformational_sampling(
-                ensemble='NVT',
-                nsteps=self.optimize_steps * self.optimize_conformer_snapshots,
-                snapshots=self.optimize_conformer_snapshots,
-                temperature=self.optimize_temp,
-            )
+                self.ostream.print_info(
+                    f"Running conformational sampling with {self.optimize_steps*self.optimize_conformer_snapshots} steps and {self.optimize_conformer_snapshots} snapshots at {self.optimize_temp} K for {note} molecule."
+                )
+                self.ostream.print_info(
+                    "This can be turned off with optimize_ff = False.")
+                self.ostream.flush()
+                conformers_dict = opm_dyn.conformational_sampling(
+                    ensemble='NVT',
+                    nsteps=self.optimize_steps *
+                    self.optimize_conformer_snapshots,
+                    snapshots=self.optimize_conformer_snapshots,
+                    temperature=self.optimize_temp,
+                )
 
-            min_arg = np.argmin(conformers_dict['energies'])
-            new_molecule = conformers_dict['molecules'][min_arg]
-            self.ostream.print_info(
-                f"Found {len(conformers_dict['molecules'])} conformers with energies {conformers_dict['energies']} during optimization of the {note} molecule."
-            )
-            self.ostream.flush()
-        except Exception as e:
-            self.ostream.print_warning(
-                f"OpenMM optimization of the {note} molecule failed with error: {e}. Reverting to original geometry."
-            )
-            self.ostream.flush()
-            new_molecule = forcefield.molecule
-            
+                min_arg = np.argmin(conformers_dict['energies'])
+                new_molecule = conformers_dict['molecules'][min_arg]
+                self.ostream.print_info(
+                    f"Found {len(conformers_dict['molecules'])} conformers with energies {conformers_dict['energies']} during optimization of the {note} molecule."
+                )
+                self.ostream.flush()
+                exiting = True
+
+            except Exception as e:
+                if self.optimize_dist_restraint_offset < 2.5:
+                    self.optimize_dist_restraint_offset += 0.5
+                    self.ostream.print_warning(
+                        f"OpenMM optimization of the {note} molecule failed with error: {e}. Increasing distance restraint offset to {self.optimize_dist_restraint_offset} angstrom and retrying."
+                    )
+                    self.ostream.flush()
+                else:
+                    self.ostream.print_warning(
+                        f"OpenMM optimization of the {note} molecule failed with error: {e}. Reverting to original geometry."
+                    )
+                    self.ostream.flush()
+                    new_molecule = forcefield.molecule
+                    exiting = True
+        self.optimize_dist_restraint_offset = 0.5  # Reset for next use
         new_molecule.set_charge(forcefield.molecule.get_charge())
         new_molecule.set_multiplicity(forcefield.molecule.get_multiplicity())
         os.unlink(f'{name}.xml')

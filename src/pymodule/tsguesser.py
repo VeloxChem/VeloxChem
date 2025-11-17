@@ -174,8 +174,8 @@ class TransitionStateGuesser():
         return self.results
 
     def build_forcefields(self,
-                          reactant_mol,
-                          product_mol,
+                          product,
+                          reactant,
                           constraints=None,
                           **build_forcefields_kwargs):
         if self.mute_ff_build:
@@ -186,8 +186,8 @@ class TransitionStateGuesser():
             self.ffbuilder.ostream.mute()
 
         self.reactant, self.product, self.forming_bonds, self.breaking_bonds, reactants, products, product_mapping = self.ffbuilder.build_forcefields(
-            reactant=reactant_mol,
-            product=product_mol,
+            reactant=product,
+            product=reactant,
             **build_forcefields_kwargs,
         )
 
@@ -344,6 +344,7 @@ class TransitionStateGuesser():
                         conformer_search=True,
                         forward_init_pos=forward_init_pos,
                         backward_init_pos=backward_init_pos,
+                        skip_backward=True,
                     )
                     for l in scan_dict_peak_conf.keys():
                         scan_dict[l] += scan_dict_peak_conf[l]
@@ -383,6 +384,7 @@ class TransitionStateGuesser():
                             conformer_search=True,
                             forward_init_pos=forward_init_pos,
                             backward_init_pos=backward_init_pos,
+                            skip_backward=True,
                         )
                         for l in scan_dict_discont_conf.keys():
                             scan_dict[l] += scan_dict_discont_conf[l]
@@ -452,7 +454,7 @@ class TransitionStateGuesser():
         return discont_indices
 
     def _run_mm_scan(self, lambda_vals, rea_sim, pro_sim, conformer_search,
-                     forward_init_pos, backward_init_pos):
+                     forward_init_pos, backward_init_pos,skip_backward=False):
         pos = copy.copy(forward_init_pos)
         results = {}
         self._print_mm_header(lambda_vals=lambda_vals,
@@ -479,7 +481,7 @@ class TransitionStateGuesser():
 
             self._print_mm_iter(l, e1, e2, v, e_int, n_conf)
             
-        if self.mm_scan_backward:
+        if self.mm_scan_backward and not skip_backward:
             self.ostream.print_info("mm_scan_backward turned on. Scanning in reverse direction.")
             self.ostream.flush()
             lambda_vals_rev = list(reversed(lambda_vals))
@@ -733,7 +735,8 @@ class TransitionStateGuesser():
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
                 )
-        lambda_vec = ts_results.get('lambda_vec', None)
+        lambda_vec = ts_results['lambda_vec']
+        # lambda_vec = [float(f) for f in lambda_vec]
 
         # if there are scf energies, get the best scf energies and everything corresponding to that
         # otherwise, get the best mm energies
@@ -744,18 +747,18 @@ class TransitionStateGuesser():
                 ts_results['scan'])
             xyzs = []
             mm_energies = []
-            for i, l in enumerate(lambda_vec):
+            for i, l in enumerate(ts_results['scan'].keys()):
                 idx = scan_indices[i]
                 conformer = ts_results['scan'][l][idx]
                 xyzs.append(conformer['xyz'])
                 mm_energies.append(conformer['v'])
         else:
-            final_lambda = ts_results.get('max_mm_lambda', None)
+            final_lambda = ts_results['max_mm_lambda']
             scf_energies = None
             mm_energies, E1, E2, scan_indices = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
                 ts_results['scan'])
             xyzs = []
-            for i, l in enumerate(lambda_vec):
+            for i, l in enumerate(ts_results['scan'].keys()):
                 idx = scan_indices[i]
                 conformer = ts_results['scan'][l][idx]
                 xyzs.append(conformer['xyz'])
