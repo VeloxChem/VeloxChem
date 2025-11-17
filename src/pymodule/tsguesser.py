@@ -735,62 +735,87 @@ class TransitionStateGuesser():
                 raise ValueError(
                     "No results provided. Provide either ts_results or filename."
                 )
-        lambda_vec = ts_results['lambda_vec']
-        # lambda_vec = [float(f) for f in lambda_vec]
+        lambda_vec = [round(float(l),3) for l in ts_results['lambda_vec']]
 
         # if there are scf energies, get the best scf energies and everything corresponding to that
         # otherwise, get the best mm energies
 
         if ts_results['scan'][0][0].get('scf_energy', None) is not None:
-            final_lambda = ts_results.get('max_scf_lambda', None)
-            scf_energies, scan_indices = TransitionStateGuesser._get_best_scf_E_from_scan_dict(
-                ts_results['scan'])
-            xyzs = []
-            mm_energies = []
-            for i, l in enumerate(ts_results['scan'].keys()):
-                idx = scan_indices[i]
-                conformer = ts_results['scan'][l][idx]
-                xyzs.append(conformer['xyz'])
-                mm_energies.append(conformer['v'])
+            final_lambda = round(float(ts_results.get('max_scf_lambda', 0)),3)
         else:
-            final_lambda = ts_results['max_mm_lambda']
-            scf_energies = None
-            mm_energies, E1, E2, scan_indices = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
-                ts_results['scan'])
-            xyzs = []
-            for i, l in enumerate(ts_results['scan'].keys()):
-                idx = scan_indices[i]
-                conformer = ts_results['scan'][l][idx]
-                xyzs.append(conformer['xyz'])
+            final_lambda = round(float(ts_results['max_mm_lambda']),3)
+                
 
         forming_bonds = set(ts_results.get('forming_bonds', None))
         breaking_bonds = set(ts_results.get('breaking_bonds', None))
         bonds = set(ts_results.get('static_bonds', None))
         dashed_bonds = forming_bonds | breaking_bonds
 
+        # lambda_slider = step=
         ipywidgets.interact(
-            TransitionStateGuesser._show_iteration,
-            mm_energies=ipywidgets.fixed(mm_energies),
-            scf_energies=ipywidgets.fixed(scf_energies),
-            xyzs=ipywidgets.fixed(xyzs),
-            lambda_vec=ipywidgets.fixed(lambda_vec),
-            bonds=ipywidgets.fixed(bonds),
-            dashed_bonds=ipywidgets.fixed(dashed_bonds),
-            step=ipywidgets.SelectionSlider(
+            TransitionStateGuesser._show_iteration_inter,
+            step = ipywidgets.SelectionSlider(
                 options=lambda_vec,
                 description='Lambda',
                 value=final_lambda,
             ),
+            lambda_vec=ipywidgets.fixed(lambda_vec),
+            scan = ipywidgets.fixed(ts_results['scan']),
+            bonds=ipywidgets.fixed(bonds),
+            dashed_bonds=ipywidgets.fixed(dashed_bonds),
             **mol_show_kwargs,
         )
 
     @staticmethod
-    def _show_iteration(
-        mm_energies,
-        xyzs,
-        lambda_vec,
+    def _show_iteration_inter(
         step,
-        scf_energies=None,
+        lambda_vec,
+        scan,
+        bonds=None,
+        dashed_bonds=None,
+        **mol_show_kwargs,):
+        
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+        
+        # conformer_dropdown = 
+        options = list(range(len(scan[step])))
+        best_index = 0
+        min_energy = None
+        if scan[0][0].get('scf_energy', None) is not None:
+            for i, conf in enumerate(scan[step]):
+                if min_energy is None or conf['scf_energy'] < min_energy:
+                    min_energy = conf['scf_energy']
+                    best_index = i
+        else:
+            for i, conf in enumerate(scan[step]):
+                if min_energy is None or conf['v'] < min_energy:
+                    min_energy = conf['v']
+                    best_index = i
+        ipywidgets.interact(
+            TransitionStateGuesser._show_iteration,
+            step=ipywidgets.fixed(step),
+            conformer_id = ipywidgets.Dropdown(
+                options=options, 
+                description='Conf. ID', 
+                value=best_index,
+            ),
+            lambda_vec=ipywidgets.fixed(lambda_vec),
+            scan = ipywidgets.fixed(scan),
+            bonds=ipywidgets.fixed(bonds),
+            dashed_bonds=ipywidgets.fixed(dashed_bonds),
+            **mol_show_kwargs,
+        )
+
+
+    @staticmethod
+    def _show_iteration(
+        step,
+        conformer_id,
+        lambda_vec,
+        scan,
         bonds=None,
         dashed_bonds=None,
         **mol_show_kwargs,
@@ -804,14 +829,32 @@ class TransitionStateGuesser():
         except ImportError:
             raise ImportError('matplotlib is required for this functionality.')
 
-        rel_mm_energies = np.asarray(mm_energies) - np.min(mm_energies)
-
+        # todo add a nicer visualisation to this
+        mm_energies,_,_,_ = TransitionStateGuesser._get_best_mm_E_from_scan_dict(
+            scan)
+        mm_min = np.min(mm_energies)
+        rel_mm_energies = np.asarray(mm_energies) - mm_min
+        
         lam_index = np.where(lambda_vec == np.array(step))[0][0]
-        xyz_i = xyzs[lam_index]
+        xyz_i = scan[step][conformer_id]['xyz']
         total_steps = len(rel_mm_energies) - 1
         x = np.linspace(0, lambda_vec[-1], 100)
         y = np.interp(x, lambda_vec, rel_mm_energies)
         fig, ax1 = plt.subplots(figsize=(6.5, 4))
+        
+        print(f"Energies for conformers:")
+        if scan[0][0].get('scf_energy', None) is not None:
+            scf_energies,_ = TransitionStateGuesser._get_best_scf_E_from_scan_dict(
+                scan)
+            scf_min = np.min(scf_energies)
+            rel_scf_energies = np.asarray(scf_energies) - scf_min
+            for i, conf in enumerate(scan[step]):
+                print(f"  Conf. ID {i}: Relative MM energy = {conf['v']-mm_min:.3f} kJ/mol, Relative SCF energy = {conf['scf_energy']-scf_min:.3f} kJ/mol")
+        else:
+            rel_scf_energies = None
+            for i, conf in enumerate(scan[step]):
+                print(f"  Conf. ID {i}: Relative MM energy = {conf['v']-mm_min:.3f} kJ/mol")
+            
         ax1.plot(
             x,
             y,
@@ -844,9 +887,8 @@ class TransitionStateGuesser():
         ax1.set_xlabel(r'$\lambda$')
         ax1.set_ylabel('Relative MM energy [kJ/mol]')
 
-        if scf_energies is not None:
+        if rel_scf_energies is not None:
             ax2 = ax1.twinx()
-            rel_scf_energies = scf_energies - np.min(scf_energies)
             ax2.plot(
                 x,
                 np.interp(x, lambda_vec, rel_scf_energies),
@@ -1049,7 +1091,7 @@ class TransitionStateGuesser():
             }
 
             # Lambda vector
-            results['lambda_vec'] = hf['lambda_vec'][()]
+            results['lambda_vec'] = [float(l) for l in hf['lambda_vec'][()]]
 
             # Reactant and product forcefields and xyz
             reactant_ff = MMForceFieldGenerator.load_forcefield_from_json_string(
@@ -1169,7 +1211,7 @@ class TransitionStateGuesser():
     def _print_scf_iter(self, l, scf_E, mm_E, dif, conf_index):
 
         valstr = "{:6.2f}   {:7d}   {:15.3f}   {:14.3f}".format(
-            l, conf_index, dif, mm_E)
+            l, conf_index+1, dif, mm_E)
         self.ostream.print_header(valstr)
         self.ostream.flush()
 
