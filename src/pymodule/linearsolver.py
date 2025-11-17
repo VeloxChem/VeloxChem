@@ -1123,7 +1123,7 @@ class LinearSolver:
         coulomb_timing = 0.0
         exchange_timing = 0.0
 
-        fock_mat, fock_mat_erf_k = None, None
+        fock_mat = None
 
         if self._dft:
 
@@ -1136,40 +1136,33 @@ class LinearSolver:
                     erf_k_coef = -self.xcfun.get_rs_beta()
                     omega = self.xcfun.get_rs_omega()
 
-                    fock_mat = compute_fock_gpu(molecule, basis, dens,
-                                                prefac_coulomb, full_k_coef,
-                                                0.0, flag_exchange,
-                                                self.eri_thresh,
-                                                self.prelink_thresh, eri_dict['screening'])
-
-                    fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
-                                                      0.0, erf_k_coef, omega,
-                                                      flag_exchange,
-                                                      self.eri_thresh,
-                                                      self.prelink_thresh,
-                                                      eri_dict['screening'])
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dens, prefac_coulomb,
+                        [full_k_coef, erf_k_coef], [0.0, omega],
+                        flag_exchange, self.eri_thresh, self.prelink_thresh,
+                        eri_dict['screening'])
 
                 else:
                     # global hybrid
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dens, prefac_coulomb,
-                        self.xcfun.get_frac_exact_exchange(), 0.0,
+                        [self.xcfun.get_frac_exact_exchange()], [0.0],
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
                         eri_dict['screening'])
 
             else:
                 # pure DFT
-                fock_mat = compute_fock_gpu(molecule, basis, dens,
-                                            prefac_coulomb, 0.0, 0.0,
-                                            flag_exchange, self.eri_thresh,
-                                            self.prelink_thresh, eri_dict['screening'])
+                fock_mat = compute_fock_gpu(
+                    molecule, basis, dens, prefac_coulomb, [0.0], [0.0],
+                    flag_exchange, self.eri_thresh, self.prelink_thresh,
+                    eri_dict['screening'])
 
         else:
             # Hartree-Fock
-            fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
-                                        1.0, 0.0, flag_exchange,
-                                        self.eri_thresh, self.prelink_thresh,
-                                        eri_dict['screening'])
+            fock_mat = compute_fock_gpu(
+                molecule, basis, dens, prefac_coulomb, [1.0], [0.0],
+                flag_exchange, self.eri_thresh, self.prelink_thresh,
+                eri_dict['screening'])
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -1193,9 +1186,6 @@ class LinearSolver:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
 
         fock_mat_local = fock_mat.to_numpy()
-        if fock_mat_erf_k is not None:
-            # add contribution from range-separation
-            fock_mat_local += fock_mat_erf_k.to_numpy()
 
         return fock_mat_local
 

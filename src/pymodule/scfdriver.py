@@ -1658,11 +1658,11 @@ class ScfDriver:
                     erf_k_coef = -self.xcfun.get_rs_beta()
                     omega = self.xcfun.get_rs_omega()
 
-                    fock_mat_full_k = compute_fock_gpu(molecule, basis, dmat,
-                                                       2.0, full_k_coef, 0.0,
-                                                       'symm', self.eri_thresh,
-                                                       self.prelink_thresh,
-                                                       screener)
+                    fock_mat = compute_fock_gpu(
+                        molecule, basis, dmat, 2.0, [full_k_coef, erf_k_coef],
+                        [0.0, omega], 'symm', self.eri_thresh,
+                        self.prelink_thresh, screener)
+                    fock_mat_local = fock_mat.to_numpy()
 
                     for line in screener.get_timer_summary().splitlines():
                         key, val = line.split(':')
@@ -1680,38 +1680,12 @@ class ScfDriver:
                             if key not in gpu_timer_summary[idx]:
                                 gpu_timer_summary[idx][key] = 0.0
                             gpu_timer_summary[idx][key] += val
-
-                    fock_mat_erf_k = compute_fock_gpu(molecule, basis, dmat,
-                                                      0.0, erf_k_coef, omega,
-                                                      'symm', self.eri_thresh,
-                                                      self.prelink_thresh,
-                                                      screener)
-
-                    for line in screener.get_timer_summary().splitlines():
-                        key, val = line.split(':')
-                        key = key.strip()
-                        val = float(val.replace('sec', '').strip())
-                        if key not in timer_summary:
-                            timer_summary[key] = 0.0
-                        timer_summary[key] += val
-
-                    for idx, gpu_timer_lines in enumerate(screener.get_gpu_timer_summary()):
-                        for line in gpu_timer_lines.splitlines():
-                            key, val = line.split(':')
-                            key = key.strip()
-                            val = float(val.replace('sec', '').strip())
-                            if key not in gpu_timer_summary[idx]:
-                                gpu_timer_summary[idx][key] = 0.0
-                            gpu_timer_summary[idx][key] += val
-
-                    fock_mat_local = (fock_mat_full_k.to_numpy() +
-                                      fock_mat_erf_k.to_numpy())
 
                 else:
                     # global hybrid
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dmat, 2.0,
-                        self.xcfun.get_frac_exact_exchange(), 0.0, 'symm',
+                        [self.xcfun.get_frac_exact_exchange()], [0.0], 'symm',
                         self.eri_thresh, self.prelink_thresh, screener)
                     fock_mat_local = fock_mat.to_numpy()
 
@@ -1734,9 +1708,9 @@ class ScfDriver:
 
             else:
                 # pure DFT
-                fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 0.0,
-                                            0.0, 'symm', self.eri_thresh,
-                                            self.prelink_thresh, screener)
+                fock_mat = compute_fock_gpu(
+                    molecule, basis, dmat, 2.0, [0.0], [0.0], 'symm',
+                    self.eri_thresh, self.prelink_thresh, screener)
                 fock_mat_local = fock_mat.to_numpy()
 
                 for line in screener.get_timer_summary().splitlines():
@@ -1758,9 +1732,9 @@ class ScfDriver:
 
         else:
             # Hartree-Fock
-            fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 1.0, 0.0,
-                                        'symm', self.eri_thresh,
-                                        self.prelink_thresh, screener)
+            fock_mat = compute_fock_gpu(
+                molecule, basis, dmat, 2.0, [1.0], [0.0], 'symm',
+                self.eri_thresh, self.prelink_thresh, screener)
             fock_mat_local = fock_mat.to_numpy()
 
             for line in screener.get_timer_summary().splitlines():

@@ -4463,8 +4463,6 @@ transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const 
     auto cart_dens_ptr = cart_dens_mat.values();
     auto sph_dens_ptr = densityMatrix.alphaDensity(0);
 
-    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
-
     for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
         for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
@@ -4494,8 +4492,8 @@ computeFockOnGPU(const              CMolecule& molecule,
                  const              CMolecularBasis& basis,
                  const              CAODensityMatrix& densityMatrix,
                  const double       prefac_coulomb,
-                 const double       frac_exact_exchange,
-                 const double       omega,
+                 const std::vector<double>& frac_exact_exchange_values,
+                 const std::vector<double>& omega_values,
                  const std::string& flag_K,
                  const double       eri_threshold,
                  const double       prelink_threshold,
@@ -4625,8 +4623,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto cart_dens_ptr = cart_dens_mat.values();
     auto sph_dens_ptr = densityMatrix.alphaDensity(0);
 
-    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
-
     for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
         for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
@@ -4666,7 +4662,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // TODO distribute computation of Q_prime
 
-    auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
+    auto mat_full = screening.get_mat_Q_full();
 
     auto d_data_matrices_ABC = screening.get_devptr_data_matrices_ABC(0);
 
@@ -4676,7 +4672,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     gpu::chunkedMemcpyHostToDevice<double>(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements());
 
-    mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, d_prim_count, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds, cart_naos, cart_dens_ptr);
+    mat_full = screening.get_mat_D_abs_full(cart_naos, cart_dens_ptr);
 
     gpu::chunkedMemcpyHostToDevice<double>(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements());
 
@@ -7718,6 +7714,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     omptimers[thread_id].start("K compute");
 
     // compute K
+
+    for (int64_t exch_idx = 0; exch_idx < static_cast<int64_t>(frac_exact_exchange_values.size()); exch_idx++)
+    {
+    const auto frac_exact_exchange = frac_exact_exchange_values[exch_idx];
+    const auto omega = omega_values[exch_idx];
 
     if (std::fabs(frac_exact_exchange) > 1.0e-13)
     {
@@ -10930,6 +10931,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         //omptimers[thread_id].stop("  K block DD");
     }
 
+    }
     }  // end of compute K
 
     gpuSafe(gpuDeviceSynchronize());

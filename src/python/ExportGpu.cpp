@@ -77,7 +77,7 @@ export_gpu(py::module& m)
         .def(
             "get_q_matrix",
             [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
-                const auto q_mat = self.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);
+                const auto q_mat = self.get_mat_Q_full();
                 return vlx_general::pointer_to_numpy(q_mat.values(), {q_mat.getNumberOfRows(), q_mat.getNumberOfColumns()});
             },
             "Gets Q matrix.");

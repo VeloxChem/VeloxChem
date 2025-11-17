@@ -2171,8 +2171,12 @@ auto CScreeningData::get_local_pair_inds_k_for_K_pd(const int64_t gpu_id) const 
 auto CScreeningData::get_local_pair_inds_i_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_i_for_K_dd[gpu_id]; }
 auto CScreeningData::get_local_pair_inds_k_for_K_dd(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _local_pair_inds_k_for_K_dd[gpu_id]; }
 
-auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) const -> CDenseMatrix
+auto CScreeningData::get_mat_Q_full() const -> CDenseMatrix
 {
+    const auto s_prim_count = _s_prim_count;
+    const auto p_prim_count = _p_prim_count;
+    const auto d_prim_count = _d_prim_count;
+
     const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
 
     CDenseMatrix mat_Q_full(cart_naos, cart_naos);
@@ -2256,15 +2260,16 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
     return mat_Q_full;
 }
 
-auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count,
-                                        const int64_t p_prim_count,
-                                        const int64_t d_prim_count,
-                                        const std::vector<uint32_t>& s_prim_aoinds,
-                                        const std::vector<uint32_t>& p_prim_aoinds,
-                                        const std::vector<uint32_t>& d_prim_aoinds,
-                                        const int64_t naos,
-                                        const double* dens_ptr) const -> CDenseMatrix
+auto CScreeningData::get_mat_D_abs_full(const int64_t naos, const double* dens_ptr) const -> CDenseMatrix
 {
+    const auto s_prim_count = _s_prim_count;
+    const auto p_prim_count = _p_prim_count;
+    const auto d_prim_count = _d_prim_count;
+
+    const auto& s_prim_aoinds = _s_prim_aoinds;
+    const auto& p_prim_aoinds = _p_prim_aoinds;
+    const auto& d_prim_aoinds = _d_prim_aoinds;
+
     const auto cart_naos = s_prim_count + p_prim_count * 3 + d_prim_count * 6;
 
     CDenseMatrix mat_D_abs_full(cart_naos, cart_naos);
@@ -2383,10 +2388,6 @@ auto CScreeningData::form_Q_and_D_inds_for_K() -> void
     const auto s_prim_count = _s_prim_count;
     const auto p_prim_count = _p_prim_count;
     const auto d_prim_count = _d_prim_count;
-
-    const auto& s_prim_aoinds = _s_prim_aoinds;
-    const auto& p_prim_aoinds = _p_prim_aoinds;
-    const auto& d_prim_aoinds = _d_prim_aoinds;
 
     const auto& s_prim_info = _s_prim_info;
     const auto& p_prim_info = _p_prim_info;
