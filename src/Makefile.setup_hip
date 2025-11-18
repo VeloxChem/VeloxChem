@@ -32,7 +32,7 @@
 
 USE_HIP := true
 
-MAGMA_HOME    := /path/to/magma
+#MAGMA_HOME    := /path/to/magma
 LIBXC_HOME    := /path/to/libxc
 
 CXX    := /opt/rocm/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
@@ -42,8 +42,8 @@ DEVCC  := hipcc --offload-arch=gfx90a
 CXX_REL_FLG := -fopenmp -std=c++17
 CXX_DEB_FLG := -fopenmp -std=c++17
 
-MATH_INC := -I$(MAGMA_HOME)/include
-MATH_LIB := -L$(MAGMA_HOME)/lib -lmagma
+#MATH_INC := -I$(MAGMA_HOME)/include
+#MATH_LIB := -L$(MAGMA_HOME)/lib -lmagma
 
 PYTHON_INC += $(shell $(PYTHON) -m pybind11 --includes)
 
@@ -55,8 +55,8 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 
 DEVCC_REL_FLG := -fPIC -fopenmp -std=c++17 $(XC_INC)
 DEVCC_DEB_FLG := -fPIC -fopenmp -std=c++17 $(XC_INC)
-DEVICE_LIB := -lhipblas
-#DEVICE_LIB := -lhipblas -lhipsolver
+#DEVICE_LIB := -lhipblas
+DEVICE_LIB := -lhipblas -lhipsolver
 
 MACLIBS :=
 

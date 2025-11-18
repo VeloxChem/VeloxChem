@@ -85,6 +85,8 @@
         }                                                                                         \
     }
 
+
+/*
 #define magmaSafe(e)                                                                                                   \
     {                                                                                                                  \
         magma_int_t err = (e);                                                                                         \
@@ -93,8 +95,8 @@
             std::exit(EXIT_FAILURE);                                                                                   \
         }                                                                                                              \
     }
+*/
 
-/*
 #define hipsolverSafe(e)                                                                            \
     {                                                                                               \
         hipsolverStatus_t err = (e);                                                                \
@@ -104,6 +106,6 @@
             std::exit(EXIT_FAILURE);                                                                \
         }                                                                                           \
     }
-*/
+
 
 #endif /* GpuSafeChecks_hpp */
